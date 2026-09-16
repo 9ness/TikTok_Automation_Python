@@ -13,7 +13,7 @@ import {
 
 /** Los huecos que se rellenan antes de copiar.
  *
- *  La cuenta y el WeChat son fijos; el producto NO hace falta porque al
+ *  La cuenta, el WeChat y el Lark son fijos; el producto NO hace falta porque al
  *  vendedor se le escribe desde la ficha y el chat ya dice de cuál se habla. Se
  *  deja disponible por si alguna plantilla propia lo necesita, pero la de
  *  fábrica no lo usa: un hueco de menos es un error de menos al enviar.
@@ -23,6 +23,10 @@ const HUECOS = [
   // Va el ID personalizado, NO el `wxid_...` de fábrica: ese es interno y no
   // se puede buscar, así que pegarlo deja al vendedor sin poder encontrarte.
   { clave: "WECHAT", label: "Tu ID de WeChat", ejemplo: "mi-id-wechat" },
+  // Lark es la herramienta interna de las marcas grandes (HONOR y demás):
+  // ahí contesta el equipo de campañas, no un comercial suelto. Va el ALIAS,
+  // que es lo que se puede buscar.
+  { clave: "LARK", label: "Tu alias de Lark", ejemplo: "mi-alias" },
   { clave: "PRODUCTO", label: "Producto (opcional)", ejemplo: "este producto" },
 ] as const;
 

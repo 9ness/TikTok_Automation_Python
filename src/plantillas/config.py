@@ -13,7 +13,7 @@ def redis_prefix() -> str:
 # que entra, y a partir de ahí son SUYAS: editarlas no toca esto, y borrarlas
 # no las resucita. Así el operador puede reescribirlas enteras sin miedo.
 #
-# `{{CUENTA}}` y `{{WECHAT}}` los rellena la pantalla antes de copiar.
+# `{{CUENTA}}`, `{{WECHAT}}` y `{{LARK}}` los rellena la pantalla antes de copiar.
 # `{{PRODUCTO}}` existe como hueco pero la plantilla de fábrica NO lo usa: al
 # vendedor se le escribe DESDE la ficha del producto, así que el chat ya dice de
 # cuál se habla y repetir el nombre solo alarga el mensaje. Queda disponible por
@@ -41,23 +41,24 @@ PLANTILLAS_INICIALES: list[dict] = [
             "• Crecimiento sostenido en un mes que suele ser bajo en ventas\n\n"
             "Propuesta: si me enviáis una muestra gratuita, subo un mínimo de 3 "
             "vídeos en las 2 semanas siguientes a recibirla, con enlace de "
-            "afiliado activo. Cada uno con un ángulo distinto —punto de dolor, "
-            "urgencia de precio y uso real— para ver cuál convierte mejor. Si el "
+            "afiliado activo. Cada uno con un ángulo distinto (punto de dolor, "
+            "urgencia de precio y uso real) para ver cuál convierte mejor. Si el "
             "producto funciona, sigo publicando sin límite por mi parte.\n\n"
             "Mi cuenta es {{CUENTA}}, ahí podéis ver el contenido y el estilo.\n\n"
             "¿Me la podéis enviar? Os paso la dirección por aquí mismo.\n\n"
-            "Si os va mejor, hablamos por WeChat: {{WECHAT}}. Ahí puedo "
-            "responderos rápido y coordinar el envío y los vídeos.\n\n"
+            "Si os va mejor, hablamos por WeChat: {{WECHAT}} o por Lark: "
+            "{{LARK}}. Ahí puedo responderos rápido y coordinar el envío y "
+            "los vídeos.\n\n"
             "Gracias."
         ),
     },
     {
         "id": "campana-halloween",
-        "titulo": "🎃 Campaña Halloween — qué tenéis",
+        "titulo": "🎃 Campaña Halloween: qué tenéis",
         "nota": (
             "Este NO se escribe desde un producto: es para abrir tienda y que "
             "te digan qué catálogo de temporada tienen. Mándalo con semanas de "
-            "margen — en octubre ya no da tiempo a enviar la muestra y grabar."
+            "margen: en octubre ya no da tiempo a enviar la muestra y grabar."
         ),
         # A diferencia del de muestra gratuita, aquí NO se pide un producto
         # concreto: se pregunta qué tienen. El gancho es el calendario — un
@@ -83,8 +84,9 @@ PLANTILLAS_INICIALES: list[dict] = [
             "preparo ahora y no en octubre, cuando ya no da tiempo a enviar, "
             "recibir y grabar.\n\n"
             "Mi cuenta es {{CUENTA}}, ahí podéis ver el contenido y el estilo.\n\n"
-            "Si os va mejor, hablamos por WeChat: {{WECHAT}}. Ahí puedo "
-            "responderos rápido y cerrar la selección y el envío.\n\n"
+            "Si os va mejor, hablamos por WeChat: {{WECHAT}} o por Lark: "
+            "{{LARK}}. Ahí puedo responderos rápido y cerrar la selección y "
+            "el envío.\n\n"
             "Gracias."
         ),
     },
