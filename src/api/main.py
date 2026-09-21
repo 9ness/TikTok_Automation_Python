@@ -377,6 +377,10 @@ _PREFIJOS_PRO = (
     # 403 y parecían rotas.
     "/api/v1/nicho-carruseles",
     "/api/v1/cuotas",
+    # Su propio menú ("Mi menú"). Faltaba, así que a un `pro` la sidebar le
+    # respondía 403 al leer sus preferencias y se caía al menú del rol: lo que
+    # se le escondiera por persona no se aplicaba nunca.
+    "/api/v1/ui",
     "/api/v1/queue",
     "/api/v1/auth",
     "/api/v1/health",
