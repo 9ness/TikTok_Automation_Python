@@ -425,6 +425,30 @@ if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
     dc ps || true
 fi
 
+# ============================================================
+# 3.c. Recorte de la caché de build, DESPUÉS de reconstruir
+# ============================================================
+# La caché de BuildKit crece con cada despliegue y no se limpia sola: el
+# 21/9/2026 llegó a 9 GB y dejó el disco al 100%, con la API caída y sin
+# poder ni ejecutar comandos. El guardia de arriba solo salta por debajo de
+# 5 GB libres, o sea cuando ya casi no queda.
+#
+# Aquí NO se borra todo (`-af` deja el siguiente build sin caché y lo
+# multiplica por tres): se recorta lo que pase de `BUILD_CACHE_KEEP_GB`, así
+# que las capas recientes —las que de verdad aceleran— se quedan. Va al final
+# y solo si se ha construido algo, para no añadir tiempo al despliegue: el
+# servicio ya está arriba cuando esto corre.
+BUILD_CACHE_KEEP_GB="${BUILD_CACHE_KEEP_GB:-10}"
+if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
+    echo "[deploy_safe] 🧹 recortando caché de build a ${BUILD_CACHE_KEEP_GB} GB…"
+    docker builder prune -f \
+        --reserved-space "${BUILD_CACHE_KEEP_GB}GB" >/dev/null 2>&1 || true
+    # Solo las huérfanas (sin `-a`): las imágenes con etiqueta son las que
+    # están corriendo o la anterior, que es a la que se vuelve si algo falla.
+    docker image prune -f >/dev/null 2>&1 || true
+    echo "[deploy_safe]   disco: $(df -BG --output=avail / | tail -1 | tr -d ' ') libres"
+fi
+
 # Reiniciar tiktok-webhook si su código cambió. Requiere sudoers granular
 # (ver register_services.sh). Si la entrada sudoers no incluye el comando
 # todavía, sale con warning — el operador hace `sudo systemctl restart
