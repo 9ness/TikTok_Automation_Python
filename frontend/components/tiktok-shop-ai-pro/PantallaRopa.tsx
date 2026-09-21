@@ -1057,20 +1057,30 @@ export function PantallaRopa({
                   <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Vídeo
                   (movimiento)
                 </button>
+              ) : e.escrito_fuera && !e.plazos ? (
+                /* Nada: este "guion" es el encargo para ChatGPT, y de eso ya
+                   se ocupa el botón de arriba — el texto de cada prenda sale
+                   en SU tarjeta, partido por clip. Un botón que copia un
+                   prompt que nadie va a pegar solo estorba. */
+                null
               ) : !e.plazos ? (
-                /* Sin versión de plazos: un solo botón. El curso solo publicó
-                   la frase de la financiación en el del espejo, y en los demás
-                   el botón "con plazos" copiaba el MISMO texto. */
+                /* Diálogo cerrado del curso: esto SÍ se pega tal cual en
+                   Flow, no lo escribe nadie por ti. */
                 <button
                   type="button"
                   onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
                   className={`${BTN_PROMPT} w-full`}
                 >
                   <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
-                  {e.escrito_fuera ? " (ChatGPT)" : " (Flow)"}
+                  (Flow)
                 </button>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className={e.escrito_fuera ? "" : "grid grid-cols-2 gap-2"}>
+                  {/* El normal solo cuando NO lo escribe la app: si lo hace,
+                      el texto de cada prenda está en su tarjeta. El de plazos
+                      se queda siempre — la app los escribe sin la frase de la
+                      financiación, así que es la única forma de tenerla. */}
+                  {!e.escrito_fuera && (
                   <button
                     type="button"
                     onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
@@ -1078,6 +1088,7 @@ export function PantallaRopa({
                   >
                     <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
                   </button>
+                  )}
                   <button
                     type="button"
                     onClick={() =>
@@ -1092,7 +1103,8 @@ export function PantallaRopa({
                     }
                     className={BTN_PROMPT}
                   >
-                    <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion 💳
+                    <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 ·
+                    Guion con plazos 💳
                   </button>
                 </div>
               )}
