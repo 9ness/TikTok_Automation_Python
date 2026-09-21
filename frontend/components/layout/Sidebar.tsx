@@ -184,8 +184,11 @@ const ORDEN_AI_PRO = [
   `${BASE_AI_PRO}/carruseles`,
 ];
 
-/** Lo único que necesitan hoy Ana y Mauro: los cuatro nichos que comparten
- *  catálogo del Drive del curso, en el orden en que se trabajan.
+/** Los nichos que pueden trabajar Ana y Mauro, en el orden en que se trabajan.
+ *
+ *  Esto es lo que da el ROL, no lo que ve cada uno: quién enseña qué se
+ *  decide por persona desde "Mi menú" (`ui:menu:<usuario>`), que se aplica
+ *  encima. Hoy Ana lleva las dos de Moda Mujer y Mauro el POV BOF Largo.
  *
  *  Fuera quedan Cuenta Piloto (es una prueba de `ness`) y Configuración: lo de
  *  allí —hashtags, textos y guiones de un catálogo entero, copia de seguridad—
@@ -197,6 +200,8 @@ const ORDEN_AI_PRO = [
 const ITEMS_PRO = [
   `${BASE_AI_PRO}/nicho-pov-bof`,
   `${BASE_AI_PRO}/pov-bof-largo`,
+  `${BASE_AI_PRO}/nicho-ropa-mujer`,
+  `${BASE_AI_PRO}/moda-mujer-marca`,
   `${BASE_AI_PRO}/creativos-profesionales`,
   `${BASE_AI_PRO}/carruseles`,
 ];
