@@ -861,6 +861,59 @@ def _nota_plazos(guion: str, avisar: bool) -> str:
     return guion.rstrip() + NOTA_PLAZOS if avisar else guion
 
 
+# La época del año, en el idioma del prompt. Los del curso son JSON en inglés
+# para Flow, así que la nota va en inglés: mezclar idiomas dentro del mismo
+# prompt es pedirle al generador que elija.
+#
+# Es el mismo apaño que en el POV BOF (`pov_config.epoca_actual`), y por lo
+# mismo: sin fecha, la calle sale con luz de agosto y manga corta en
+# noviembre. Lo que NO puede tocar es la prenda: viene de la foto de
+# referencia y es lo único fijo de la escena.
+_MESES_EN = (
+    "January", "February", "March", "April", "May", "June", "July",
+    "August", "September", "October", "November", "December",
+)
+_ESTACIONES_EN = {
+    12: "winter", 1: "winter", 2: "winter",
+    3: "spring", 4: "spring", 5: "spring",
+    6: "summer", 7: "summer", 8: "summer",
+    9: "autumn", 10: "autumn", 11: "autumn",
+}
+
+
+def nota_temporada_guion() -> str:
+    """El mismo apunte, para el prompt del GUION (que va en español).
+
+    Copiado del POV BOF (`pov_config.epoca_actual`), guarda incluida: la época
+    cambia CÓMO se habla de la prenda, nunca lo que la prenda es. Sin ese
+    freno, un vestido de tirantes se vuelve "ideal para el frío".
+    """
+    from src.nicho_pov_bof import config as pov_config
+
+    return (
+        f"\n\nÚLTIMO APUNTE: el vídeo se publica en {pov_config.epoca_actual()}. "
+        "Si la prenda es de temporada, habla de llevarla en esta época y no en "
+        "otra. Si le da igual la época, no cambies nada por esto. Esto cambia "
+        "solo el CONTEXTO, nunca lo que la prenda es: no le atribuyas tejidos, "
+        "abrigo ni usos que no estén en la ficha."
+    )
+
+
+def nota_temporada() -> str:
+    """El apunte de la época que se le pega al prompt de imagen."""
+    from datetime import datetime
+
+    hoy = datetime.now()
+    return (
+        "\n\nSEASON: this is shot in "
+        f"{_MESES_EN[hoy.month - 1]} in Spain ({_ESTACIONES_EN[hoy.month]}). "
+        "The setting, the weather, the light and any clothing that is NOT in "
+        "the reference image must look like that time of year. The referenced "
+        "garment stays exactly as it is: do not cover it, do not layer "
+        "anything over it and do not change it for the season."
+    )
+
+
 def prompts_mof10(
     sexo: str = SEXO_DEFECTO, plazos: bool = False, modo: str = "",
     duracion: str = DURACION_DEFECTO,
@@ -898,7 +951,10 @@ def prompts_mof10(
         salida.append({
             "clave": clave,
             "label": meta["label"],
-            "imagen": _con_duracion(_con_plazos(imagen, plazos), dur, tope),
+            # Con la época del año puesta: es lo que hace que la calle y la
+            # luz sean de este mes y no de cuando se escribió el prompt.
+            "imagen": _con_duracion(_con_plazos(imagen, plazos), dur, tope)
+            + nota_temporada(),
             # La SEGUNDA imagen, en los formatos que se graban en dos partes.
             # Vacío en el resto: la pantalla solo pinta el botón si viene.
             "imagen2": _limpio(meta["imagen2"]) if meta.get("imagen2") else "",
@@ -914,7 +970,7 @@ def prompts_mof10(
                 plazos
                 and "{{FRASE_PLAZOS}}" in guion
                 and "{{CARACTERES}}" in guion,
-            ),
+            ) + (nota_temporada_guion() if "{{CARACTERES}}" in guion else ""),
             "derivado": sexo in meta["derivado"],
             # Lo que hay que saber AL PEGARLO, y que no se ve en el prompt:
             # si se adjunta el personaje de referencia, si la imagen entra
