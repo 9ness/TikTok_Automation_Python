@@ -143,10 +143,18 @@ _RE_VIEJO = re.compile(r"^(\d+)(\.1)?\.[A-Za-z0-9]+$")
 # cuál es la limpia y cuál la captura por FORMA y PESO, no por el nombre, así
 # que con dos fotos cuadradas del mismo producto se colaría la trasera como
 # "la limpia" en todos los productos donde pese menos (que son la mayoría).
+# Y desde el 21 sep 2026 la de delante se llama `Producto_3_Principal.jpeg` y
+# aparecen `Producto_3_Color_1.jpeg` (el mismo producto en otro color), que se
+# ignoran por lo mismo que la trasera. Con la lista de antes, los 29 ZIP
+# entraron con la ficha suelta y ni un producto completo: "sin las dos fotos"
+# en los diez de cada carpeta.
 _RE_NUEVO = re.compile(
-    r"^Producto[\s_-]*(\d+)[\s_-]*(Delantera|Ficha|Trasera)\.[A-Za-z0-9]+$",
+    r"^Producto[\s_-]*(\d+)[\s_-]*"
+    r"(Delantera|Principal|Ficha|Trasera|Color[\s_-]*\d+)\.[A-Za-z0-9]+$",
     re.IGNORECASE,
 )
+# Cómo se llama la foto que se anima (la del producto solo) en cada versión.
+_LIMPIAS = ("delantera", "principal")
 
 
 def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
@@ -166,10 +174,10 @@ def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
         nuevo = _RE_NUEVO.match(base)
         if nuevo:
             cual = nuevo.group(2).lower()
-            if cual == "trasera":
+            if cual == "trasera" or cual.startswith("color"):
                 continue
             salida.setdefault(nuevo.group(1), {})[
-                "limpia" if cual == "delantera" else "ficha"
+                "limpia" if cual in _LIMPIAS else "ficha"
             ] = nombre
             continue
 

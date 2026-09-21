@@ -250,7 +250,10 @@ nueva antes de tocar nada:
 - Los ZIP traen las fotos con nombre propio desde el 7 sep 2026:
   `Producto_3_Delantera.jpeg` (la limpia) y `Producto_3_Ficha.png` (la
   captura). Antes era `3.png` para la ficha y `3.1.jpeg` para la limpia, o sea
-  AL REVÉS de lo nuestro. El importador acepta las dos
+  AL REVÉS de lo nuestro. Y desde el **21 sep 2026** la de delante se llama
+  `Producto_3_Principal.jpeg`, y hay `Producto_3_Color_1.jpeg` —el mismo
+  producto en otro color—, que NO se importa (igual que la trasera). El
+  importador acepta las tres convenciones
   (`nicho_pov_bof/services/productos_web.py`).
 - En Moda Hombre hay una TERCERA foto, `Producto_3_Trasera.jpeg`. **No se
   importa**: ningún prompt la usa y el emparejado limpia↔ficha decide por
