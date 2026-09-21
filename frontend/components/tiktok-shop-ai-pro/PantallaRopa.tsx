@@ -60,6 +60,15 @@ import type { ProductoItem } from "@/lib/types/nichoPovBof";
  *  Solo los dos de siempre y sin inventarse cuáles son de cada sexo: la lista
  *  buena viene con los prompts (`modos`), porque el curso no publica los
  *  mismos formatos para hombre y para mujer. */
+/** Los botones que sacan texto de la app hacia la herramienta de IA. El
+ *  degradado los separa de los de al lado —descargar fotos, abrir Flow—, que
+ *  con el borde gris de todos se confundían (ver UI_NICHOS.md). */
+const BTN_PROMPT =
+  "flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50" +
+  " bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 px-3 py-2 text-xs" +
+  " font-semibold text-violet-400 transition hover:border-violet-400" +
+  " hover:from-violet-500/30 hover:to-fuchsia-500/30";
+
 const MODOS_FALLBACK: ModoRopa[] = [
   { clave: "espejo", label: "🪞 BOF Frente a Espejo", voz: true },
 ];
@@ -1011,27 +1020,31 @@ export function PantallaRopa({
               {/* En orden: primero la imagen (paso 1) a lo ancho, y debajo
                   los DOS guiones del paso 2 uno al lado del otro — son la
                   misma cosa en sus dos versiones, así que van juntos. */}
-              <button
-                type="button"
-                onClick={() => copiar(`Imagen · ${e.label}`, e.imagen)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
-              >
-                <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1 · Imagen
-                (Flow)
-              </button>
-              {/* La segunda imagen, solo en los formatos que se graban en dos
-                  partes: se pide en el MISMO chat que acaba de crear la
-                  primera, así que la chica y la ropa ya están delante. */}
-              {!!e.imagen2 && (
+              {/* Las dos imágenes van en la MISMA fila: son el mismo paso
+                  hecho dos veces, y una debajo de otra alargaban el bloque
+                  hasta dejar el botón de guiones fuera de pantalla. La
+                  segunda solo la llevan los formatos partidos en dos clips —
+                  se pide en el mismo chat que acaba de crear la primera. */}
+              <div className={e.imagen2 ? "grid grid-cols-2 gap-2" : ""}>
                 <button
                   type="button"
-                  onClick={() => copiar(`Imagen 2 · ${e.label}`, e.imagen2 ?? "")}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                  onClick={() => copiar(`Imagen · ${e.label}`, e.imagen)}
+                  className={`${BTN_PROMPT} w-full`}
                 >
-                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1b · Imagen
-                  2 (otra calle)
+                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1 · Imagen
+                  {!e.imagen2 && " (Flow)"}
                 </button>
-              )}
+                {!!e.imagen2 && (
+                  <button
+                    type="button"
+                    onClick={() => copiar(`Imagen 2 · ${e.label}`, e.imagen2 ?? "")}
+                    className={`${BTN_PROMPT} w-full`}
+                  >
+                    <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1b ·
+                    Imagen 2
+                  </button>
+                )}
+              </div>
               {/* En los formatos MUDOS el paso 2 no es un guion: es el prompt
                   de MOVIMIENTO, y no existe versión con plazos — los plazos se
                   meten en lo que DICE la persona, y aquí no dice nada. */}
@@ -1039,7 +1052,7 @@ export function PantallaRopa({
                 <button
                   type="button"
                   onClick={() => copiar(`Vídeo · ${e.label}`, e.guion)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                  className={`${BTN_PROMPT} w-full`}
                 >
                   <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Vídeo
                   (movimiento)
@@ -1051,7 +1064,7 @@ export function PantallaRopa({
                 <button
                   type="button"
                   onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                  className={`${BTN_PROMPT} w-full`}
                 >
                   <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
                   {e.escrito_fuera ? " (ChatGPT)" : " (Flow)"}
@@ -1061,7 +1074,7 @@ export function PantallaRopa({
                   <button
                     type="button"
                     onClick={() => copiar(`Guion · ${e.label}`, e.guion)}
-                    className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                    className={BTN_PROMPT}
                   >
                     <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion
                   </button>
@@ -1077,7 +1090,7 @@ export function PantallaRopa({
                         )?.guion ?? e.guion,
                       )
                     }
-                    className="flex items-center justify-center gap-1.5 rounded-lg border border-violet-500/50 px-3 py-2 text-xs text-violet-400 transition hover:border-violet-400"
+                    className={BTN_PROMPT}
                   >
                     <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 2 · Guion 💳
                   </button>
