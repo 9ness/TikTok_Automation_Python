@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 import type {
+  HashtagItem,
+  HashtagsConfigResponse,
   HashtagsResponse,
   BackupCheckResponse,
   BackupSyncResponse,
@@ -808,11 +810,42 @@ export function useBorrarCuentaEchoTik() {
   );
 }
 
-/** Hashtags de cuenta (los mismos para todos los captions). */
-export function useHashtags() {
+/** Los hashtags que le tocan a un nicho: los generales más los suyos.
+ *
+ *  Sin `nicho` salen solo los generales — un `#moda` marcado para los de ropa
+ *  no pinta nada en el caption de otro sitio. */
+export function useHashtags(nicho = "") {
   return useQuery<string[]>({
-    queryKey: [...nichoPovBofKeys.all, "hashtags"] as const,
-    queryFn: async () => (await api.get<HashtagsResponse>(`${ROOT}/hashtags`)).tags ?? [],
+    queryKey: [...nichoPovBofKeys.all, "hashtags", nicho] as const,
+    queryFn: async () =>
+      (
+        await api.get<HashtagsResponse>(
+          `${ROOT}/hashtags` + (nicho ? `?nicho=${encodeURIComponent(nicho)}` : ""),
+        )
+      ).tags ?? [],
+  });
+}
+
+/** Todos los hashtags con su alcance (pantalla de Configuración). */
+export function useHashtagsConfig() {
+  return useQuery<HashtagItem[]>({
+    queryKey: [...nichoPovBofKeys.all, "hashtags", "config"] as const,
+    queryFn: async () =>
+      (await api.get<HashtagsConfigResponse>(`${ROOT}/hashtags/config`)).items ?? [],
+  });
+}
+
+export function useGuardarHashtagsConfig() {
+  const qc = useQueryClient();
+  return useMutation<HashtagsConfigResponse, Error, HashtagItem[]>({
+    mutationFn: (items) =>
+      api.post<HashtagsConfigResponse>(`${ROOT}/hashtags/config`, { items }),
+    onSuccess: (res) => {
+      qc.setQueryData([...nichoPovBofKeys.all, "hashtags", "config"], res.items ?? []);
+      // Los captions de todas las pantallas piden su propia lista: se
+      // invalidan todas de golpe, que son cuatro claves y una consulta barata.
+      void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "hashtags"] });
+    },
   });
 }
 

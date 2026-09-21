@@ -567,3 +567,23 @@ class HashtagsResponse(BaseModel):
 
 class HashtagsRequest(BaseModel):
     tags: list[str] = Field(default_factory=list)
+
+
+class HashtagItem(BaseModel):
+    """Un hashtag y dónde se pone.
+
+    `nichos` vacío = en todos los captions (lo de siempre). Con nichos, solo
+    en esos: `#moda` pinta en los de ropa y en ningún otro.
+    """
+
+    tag: str = ""
+    nichos: list[str] = Field(default_factory=list)
+
+
+class HashtagsConfigResponse(BaseModel):
+    ok: bool = True
+    items: list[HashtagItem] = Field(default_factory=list)
+
+
+class HashtagsConfigRequest(BaseModel):
+    items: list[HashtagItem] = Field(default_factory=list)

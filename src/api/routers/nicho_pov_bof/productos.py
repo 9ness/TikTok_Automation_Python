@@ -46,6 +46,9 @@ from src.api.schemas.nicho_pov_bof import (
     EchoTikCuenta,
     EchoTikCuentaRequest,
     EchoTikCuentasResponse,
+    HashtagItem,
+    HashtagsConfigRequest,
+    HashtagsConfigResponse,
     HashtagsRequest,
     HashtagsResponse,
     ProductoBuscado,
@@ -2676,11 +2679,42 @@ def borrar_cuenta_echotik(
 
 
 @router.get("/hashtags", response_model=HashtagsResponse)
-def get_hashtags() -> HashtagsResponse:
-    """Hashtags que se pegan al final de todos los captions."""
+def get_hashtags(nicho: Annotated[str, Query()] = "") -> HashtagsResponse:
+    """Hashtags que se pegan al final de los captions de ESE nicho.
+
+    Sin `nicho` van solo los generales: los que llevan nicho propio (`#moda`
+    en los de ropa) no pintan nada en un caption de otro sitio.
+    """
     from src.nicho_pov_bof.repos import product_repo
 
-    return HashtagsResponse(ok=True, tags=product_repo.get_hashtags())
+    return HashtagsResponse(ok=True, tags=product_repo.get_hashtags(nicho))
+
+
+@router.get("/hashtags/config", response_model=HashtagsConfigResponse)
+def get_hashtags_config() -> HashtagsConfigResponse:
+    """Todos los hashtags con su alcance, para la pantalla de Configuración."""
+    from src.nicho_pov_bof.repos import product_repo
+
+    return HashtagsConfigResponse(
+        ok=True,
+        items=[HashtagItem(**x) for x in product_repo.get_hashtags_config()],
+    )
+
+
+@router.post("/hashtags/config", response_model=HashtagsConfigResponse)
+def set_hashtags_config(body: HashtagsConfigRequest) -> HashtagsConfigResponse:
+    """Guarda la lista entera (la UI manda siempre el conjunto)."""
+    from src.nicho_pov_bof.repos import product_repo
+
+    try:
+        items = product_repo.save_hashtags_config(
+            [x.model_dump() for x in body.items]
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return HashtagsConfigResponse(
+        ok=True, items=[HashtagItem(**x) for x in items],
+    )
 
 
 @router.post("/hashtags", response_model=HashtagsResponse)

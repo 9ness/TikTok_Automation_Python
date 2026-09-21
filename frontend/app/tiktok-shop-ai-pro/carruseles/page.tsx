@@ -1175,7 +1175,7 @@ function FraseDeReferencia() {
 function PorNicho() {
   const [categoria, setCategoria] = useState("");
   const listos = useListos(categoria);
-  const hashtags = useHashtags().data ?? [];
+  const hashtags = useHashtags("carruseles").data ?? [];
   const marcar = useMarcarSubidoSuelto();
   const escaparate = useEscaparateCarrusel();
   const [bajando, setBajando] = useState("");
@@ -1894,7 +1894,7 @@ function CarruselCard({
   onDescargar: () => void;
   onSubido: (v: boolean) => void;
 }) {
-  const hashtags = useHashtags();
+  const hashtags = useHashtags("carruseles");
   const prompts = usePromptsCarruseles();
   const marcarApto = useMarcarApto(source, folder);
   const cambiarEscenario = useCambiarEscenario(source, folder);

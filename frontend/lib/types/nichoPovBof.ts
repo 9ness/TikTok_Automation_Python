@@ -324,6 +324,17 @@ export interface VideoUploadResponse {
   message: string;
 }
 
+/** Un hashtag y dónde se pone: `nichos` vacío = en todos los captions. */
+export interface HashtagItem {
+  tag: string;
+  nichos: string[];
+}
+
+export interface HashtagsConfigResponse {
+  ok: boolean;
+  items: HashtagItem[];
+}
+
 export interface HashtagsResponse {
   ok: boolean;
   /** Hashtags que se pegan al final de todos los captions. */

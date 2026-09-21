@@ -616,34 +616,96 @@ _HASHTAGS_KEY = "hashtags"
 HASHTAGS_DEFECTO = ["#rebajasdeverano", "#tiktokshop", "#ofertas"]
 
 
-def get_hashtags() -> list[str]:
-    """Hashtags configurados. Si nunca se han tocado, los de partida."""
+# Desde sep 2026 un hashtag puede ser de TODOS los nichos o solo de algunos:
+# `#moda` pinta en los de ropa y en ningún otro, y hasta ahora la única forma
+# de tenerlo era ponerlo en todos los captions o en ninguno. `nichos` vacío =
+# general; con nichos = solo en esos.
+def _normaliza(tag: str) -> str:
+    tag = str(tag).strip().lstrip("#").strip()
+    return f"#{tag}" if tag else ""
+
+
+def _items_guardados() -> list[dict]:
+    """Los hashtags tal y como están guardados, con su alcance.
+
+    Migra al vuelo lo de antes (`{"tags": [...]}`), que eran todos generales.
+    """
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
-        return list(HASHTAGS_DEFECTO)
+        return [{"tag": t, "nichos": []} for t in HASHTAGS_DEFECTO]
     doc = r.get_json(_HASHTAGS_KEY)
-    if not isinstance(doc, dict) or "tags" not in doc:
-        return list(HASHTAGS_DEFECTO)
-    return [str(t) for t in (doc.get("tags") or []) if str(t).strip()]
+    if not isinstance(doc, dict):
+        return [{"tag": t, "nichos": []} for t in HASHTAGS_DEFECTO]
+    if isinstance(doc.get("items"), list):
+        return [
+            {
+                "tag": _normaliza(x.get("tag")),
+                "nichos": [str(n) for n in (x.get("nichos") or []) if str(n).strip()],
+            }
+            for x in doc["items"]
+            if isinstance(x, dict) and _normaliza(x.get("tag"))
+        ]
+    if "tags" not in doc:
+        return [{"tag": t, "nichos": []} for t in HASHTAGS_DEFECTO]
+    return [
+        {"tag": _normaliza(t), "nichos": []}
+        for t in (doc.get("tags") or [])
+        if _normaliza(t)
+    ]
+
+
+def get_hashtags_config() -> list[dict]:
+    """Todos los hashtags con su alcance, para la pantalla de configuración."""
+    return _items_guardados()
+
+
+def get_hashtags(nicho: str = "") -> list[str]:
+    """Los que le tocan a ese nicho: los generales más los suyos.
+
+    Sin `nicho` van SOLO los generales: es lo que pide quien no sabe desde
+    dónde se le pregunta, y meter los específicos ahí sería ponerle #moda a un
+    vídeo de otra cosa.
+    """
+    nicho = str(nicho or "").strip()
+    return [
+        x["tag"] for x in _items_guardados()
+        if not x["nichos"] or (nicho and nicho in x["nichos"])
+    ]
+
+
+def save_hashtags_config(items: list[dict]) -> list[dict]:
+    """Guarda la lista entera con su alcance y la devuelve.
+
+    Una lista VACÍA es un estado válido: significa "no quiero hashtags", y hay
+    que poder distinguirlo de "nunca los he configurado".
+    """
+    limpios: list[dict] = []
+    vistos: set[str] = set()
+    for x in items or []:
+        tag = _normaliza((x or {}).get("tag"))
+        if not tag or tag.lower() in vistos:
+            continue
+        vistos.add(tag.lower())
+        limpios.append({
+            "tag": tag,
+            "nichos": [
+                str(n).strip() for n in ((x or {}).get("nichos") or []) if str(n).strip()
+            ],
+        })
+    r = _require_redis()
+    r.set_json(_HASHTAGS_KEY, {"items": limpios, "updated_at": _now()})
+    return limpios
 
 
 def save_hashtags(tags: list[str]) -> list[str]:
-    """Guarda la lista (ya normalizada) y la devuelve.
+    """Guarda los GENERALES, respetando los que tienen nicho propio.
 
-    Una lista VACÍA es un estado válido: significa "no quiero hashtags", y
-    hay que poder distinguirlo de "nunca los he configurado".
+    Se mantiene para los clientes que solo saben de una lista plana.
     """
-    limpios: list[str] = []
-    for t in tags:
-        t = str(t).strip().lstrip("#").strip()
-        if not t:
-            continue
-        tag = f"#{t}"
-        if tag.lower() not in {x.lower() for x in limpios}:
-            limpios.append(tag)
-    r = _require_redis()
-    r.set_json(_HASHTAGS_KEY, {"tags": limpios, "updated_at": _now()})
-    return limpios
+    especificos = [x for x in _items_guardados() if x["nichos"]]
+    generales = [{"tag": _normaliza(t), "nichos": []} for t in tags if _normaliza(t)]
+    guardados = save_hashtags_config(generales + especificos)
+    return [x["tag"] for x in guardados if not x["nichos"]]
 
 
 # ---------------------------------------------------------------------------

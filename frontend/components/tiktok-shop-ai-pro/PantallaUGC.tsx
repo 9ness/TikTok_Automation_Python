@@ -506,7 +506,7 @@ function TarjetaUGC({
   cfg?: ConfigUGCResponse;
 }) {
   const qc = useQueryClient();
-  const hashtags = useHashtags().data ?? [];
+  const hashtags = useHashtags("nicho-general").data ?? [];
   const montar = useMontarUGC();
   const rehacer = useEscenasLote();
   const limpiar = useLimpiarClipsUGC();

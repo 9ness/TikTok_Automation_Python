@@ -1914,7 +1914,7 @@ function ProductoCard({
   };
   const borrar = useBorrarMiProducto();
   const qc = useQueryClient();
-  const hashtags = useHashtags().data ?? [];
+  const hashtags = useHashtags("nicho-pov-bof").data ?? [];
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // El producto puede llegar actualizado desde otra mutación (p. ej. tras

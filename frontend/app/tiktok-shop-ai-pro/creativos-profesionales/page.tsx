@@ -623,7 +623,7 @@ function CreativoCard({
 }) {
   const [verFoto, setVerFoto] = useState(false);
   const setEstado = useSetEstado();
-  const hashtags = useHashtags();
+  const hashtags = useHashtags("creativos-profesionales");
   const [enEscaparate, setEnEscaparate] = useState(p.en_escaparate);
   const [sold, setSold] = useState(p.sold);
 

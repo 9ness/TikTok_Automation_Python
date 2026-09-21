@@ -1628,7 +1628,7 @@ function ProductoCard({
   const borrarMio = useBorrarMiProducto();
   const quitarClip = useQuitarClipLargo();
   const buscarUrl = useBuscarProductoUrl();
-  const hashtags = useHashtags().data ?? [];
+  const hashtags = useHashtags("pov-bof-largo").data ?? [];
   const refs = {
     1: useRef<HTMLInputElement>(null),
     2: useRef<HTMLInputElement>(null),

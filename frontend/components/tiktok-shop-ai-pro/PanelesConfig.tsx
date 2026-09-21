@@ -12,51 +12,145 @@ import {
   useEchoTikEstado,
   useGuardarCuentaEchoTik,
   useGuardarEchoTik,
-  useGuardarHashtags,
-  useHashtags,
+  useGuardarHashtagsConfig,
+  useHashtagsConfig,
 } from "@/lib/queries/nichoPovBof";
+import type { HashtagItem } from "@/lib/types/nichoPovBof";
 
 /** Ajustes que se tocan de uvas a peras: los hashtags del caption y las cuentas
  *  de EchoTik. Viven en su propia pantalla y no dentro de cada nicho, que es
  *  donde estorbaban: el trabajo de todos los días es la carpeta de productos.
  */
-export function HashtagsPanel() {
-  const tagsQuery = useHashtags();
-  const guardar = useGuardarHashtags();
-  const [nuevo, setNuevo] = useState("");
-  const tags = tagsQuery.data ?? [];
+/** Las pantallas que pegan hashtags al caption. Un hashtag puede ir en todas
+ *  (general) o solo en algunas: `#moda` tiene sentido en los de ropa y en
+ *  ninguna otra, y hasta ahora era todo o nada. */
+const NICHOS_CAPTION: { slug: string; label: string }[] = [
+  { slug: "nicho-pov-bof", label: "POV BOF" },
+  { slug: "pov-bof-largo", label: "POV BOF Largo" },
+  { slug: "nicho-ropa-mujer", label: "Moda Mujer" },
+  { slug: "moda-mujer-marca", label: "Marca Personal" },
+  { slug: "nicho-ropa-hombre", label: "Moda Hombre" },
+  { slug: "nicho-ropa-sin-humanos", label: "Ropa sin humanos" },
+  { slug: "nicho-general", label: "UGC" },
+  { slug: "creativos-profesionales", label: "Creativos Pro" },
+  { slug: "carruseles", label: "Carruseles" },
+];
 
-  function aplicar(siguientes: string[]) {
+export function HashtagsPanel() {
+  const itemsQuery = useHashtagsConfig();
+  const guardar = useGuardarHashtagsConfig();
+  const [nuevo, setNuevo] = useState("");
+  const [abierto, setAbierto] = useState("");
+  const items = itemsQuery.data ?? [];
+
+  function aplicar(siguientes: HashtagItem[]) {
     guardar.mutate(siguientes, {
       onError: (e) => toast.error(e instanceof ApiError ? e.message : String(e)),
     });
+  }
+
+  /** Enciende o apaga un nicho en un hashtag. Sin ninguno vuelve a ser
+   *  general, que es como se quita el filtro sin borrar el hashtag. */
+  function alternarNicho(tag: string, slug: string) {
+    aplicar(
+      items.map((x) =>
+        x.tag !== tag
+          ? x
+          : {
+              ...x,
+              nichos: x.nichos.includes(slug)
+                ? x.nichos.filter((n) => n !== slug)
+                : [...x.nichos, slug],
+            },
+      ),
+    );
   }
 
   return (
     <section className="space-y-2 rounded-xl border border-border/60 bg-card p-3">
       <p className="text-xs font-semibold">🏷️ Hashtags del caption</p>
       <p className="text-[11px] text-muted-foreground">
-        Se pegan al final de TODOS los captions al copiarlos. Cámbialos según
-        la campaña.
+        Se pegan al final del caption al copiarlo. Los de{" "}
+        <strong className="text-foreground">Todos</strong> van en cualquier
+        nicho; toca un hashtag para ponerlo solo en los que elijas (p. ej.
+        #moda solo en los de ropa).
       </p>
-      <div className="flex flex-wrap gap-1.5">
-        {tags.map((t) => (
-          <span
-            key={t}
-            className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px]"
-          >
-            {t}
-            <button
-              type="button"
-              aria-label={`Quitar ${t}`}
-              onClick={() => aplicar(tags.filter((x) => x !== t))}
-              className="text-muted-foreground transition hover:text-destructive"
+      <div className="space-y-1.5">
+        {items.map((t) => {
+          const general = t.nichos.length === 0;
+          return (
+            <div
+              key={t.tag}
+              className="rounded-lg border border-border/60 px-2 py-1.5"
             >
-              ×
-            </button>
-          </span>
-        ))}
-        {tags.length === 0 && !tagsQuery.isLoading && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setAbierto(abierto === t.tag ? "" : t.tag)}
+                  className="min-w-0 flex-1 truncate text-left text-[11px] font-medium"
+                >
+                  {t.tag}
+                </button>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                    general
+                      ? "bg-emerald-500/15 text-emerald-500"
+                      : "bg-violet-500/15 text-violet-400"
+                  }`}
+                >
+                  {general ? "Todos" : `${t.nichos.length} nicho(s)`}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Quitar ${t.tag}`}
+                  onClick={() => aplicar(items.filter((x) => x.tag !== t.tag))}
+                  className="px-1 text-muted-foreground transition hover:text-destructive"
+                >
+                  ×
+                </button>
+              </div>
+              {/* Los nichos, solo al abrir: nueve chips por hashtag dejaban el
+                  panel imposible de leer con seis o siete hashtags. */}
+              {abierto === t.tag && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {NICHOS_CAPTION.map((n) => {
+                    const puesto = t.nichos.includes(n.slug);
+                    return (
+                      <button
+                        key={n.slug}
+                        type="button"
+                        onClick={() => alternarNicho(t.tag, n.slug)}
+                        className={`rounded border px-1.5 py-0.5 text-[10px] transition ${
+                          puesto
+                            ? "border-violet-500/60 bg-violet-500/10 text-violet-300"
+                            : "border-border/60 text-muted-foreground hover:border-foreground/30"
+                        }`}
+                      >
+                        {n.label}
+                      </button>
+                    );
+                  })}
+                  {!general && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        aplicar(
+                          items.map((x) =>
+                            x.tag === t.tag ? { ...x, nichos: [] } : x,
+                          ),
+                        )
+                      }
+                      className="rounded border border-emerald-500/50 px-1.5 py-0.5 text-[10px] text-emerald-500 transition hover:bg-emerald-500/10"
+                    >
+                      ✓ En todos
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {items.length === 0 && !itemsQuery.isLoading && (
           <span className="text-[11px] text-muted-foreground">Ninguno.</span>
         )}
       </div>
@@ -65,7 +159,8 @@ export function HashtagsPanel() {
           e.preventDefault();
           const t = nuevo.trim();
           if (!t) return;
-          aplicar([...tags, t]);
+          // Nace general: es lo normal, y marcarle nichos es un toque más.
+          aplicar([...items, { tag: t, nichos: [] }]);
           setNuevo("");
         }}
         className="flex gap-1.5"
@@ -73,7 +168,7 @@ export function HashtagsPanel() {
         <input
           value={nuevo}
           onChange={(e) => setNuevo(e.target.value)}
-          placeholder="#rebajasdeverano"
+          placeholder="#moda"
           className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-2 py-1.5 text-xs"
         />
         <button

@@ -280,6 +280,18 @@ function catalogoDe(slug: string): string {
 export type Variante = "curso" | "web";
 export type SexoRopa = "mujer" | "hombre";
 
+/** Con qué nombre se conoce esta pantalla fuera: es la clave con la que los
+ *  hashtags deciden si les toca entrar en el caption (#moda solo en ropa). */
+function nichoDeLaPantalla(
+  variante: Variante,
+  sexo: SexoRopa,
+  modalidad: string,
+): string {
+  if (variante !== "web") return "nicho-ropa-sin-humanos";
+  if (modalidad === "marca") return "moda-mujer-marca";
+  return sexo === "hombre" ? "nicho-ropa-hombre" : "nicho-ropa-mujer";
+}
+
 /** `sexo` solo llega en la variante web y lo fija la RUTA, no un selector.
  *
  *  Mujer y hombre son dos pantallas y no una con un botón porque cada
@@ -1231,6 +1243,7 @@ export function PantallaRopa({
               // El guion de este formato lo escribe la IA por prenda: la
               // tarjeta enseña el botón de copiarlo (y el de rehacerlo).
               conGuion={!!estiloActivo?.escrito_fuera}
+              nichoCaption={nichoDeLaPantalla(variante, sexoFijo, modalidad)}
               // En cuántos clips se graba el formato: con dos, la tarjeta
               // pide los dos y el montaje los pega.
               partes={estiloActivo?.partes ?? 1}
@@ -1252,6 +1265,7 @@ function PrendaCard({
   modo,
   conPlazos = false,
   conGuion = false,
+  nichoCaption = "",
   partes = 1,
   modalidadDuracion = "10",
   onCopiar,
@@ -1267,6 +1281,8 @@ function PrendaCard({
   conGuion?: boolean;
   /** Cuántos clips se suben para este formato. 1 = como siempre. */
   partes?: number;
+  /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
+  nichoCaption?: string;
   /** Con qué duración se pide (decide el tope de caracteres). */
   modalidadDuracion?: string;
   /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
@@ -1351,7 +1367,7 @@ function PrendaCard({
 
   // Con los hashtags pegados, como en el POV BOF: es lo que se pega tal cual
   // en TikTok, y copiarlos aparte se olvida justo el día que hay prisa.
-  const hashtags = useHashtags().data ?? [];
+  const hashtags = useHashtags(nichoCaption).data ?? [];
   const caption = prenda.caption
     ? [
         `${prenda.emojis ? `${prenda.emojis} ` : ""}${prenda.caption}`,
