@@ -44,6 +44,52 @@ _EJEMPLO = re.compile(r"«[^«»]*[«»]")
 # frase en cada mitad y el generador la dice a trozos.
 _CORTES = (". ", "! ", "? ", "; ", ", ")
 
+# Lo que el prompt del curso pide AÑADIR al final de la respuesta: el nombre
+# del producto con el aviso de no pegarlo en el generador. Es una nota para el
+# operador, no algo que diga la chica — pero viene dentro de `dice` y, tal
+# cual, el vídeo lo LEE en alto ("...Nombre de producto (No añadir a orden de
+# video en grok ni onmi) Lumiira pantalón...").
+_COLETILLAS = ("nombre de producto", "(no añadir", "no añadir a orden")
+
+
+def _limpiar_dice(dice: str) -> str:
+    """Deja solo lo que se dice: sin comillas y sin la nota del final."""
+    texto = " ".join((dice or "").split())
+    plano = _sin_acentos(texto)
+    corte = min(
+        (plano.find(c) for c in _COLETILLAS if plano.find(c) != -1),
+        default=-1,
+    )
+    if corte > 0:
+        texto = texto[:corte]
+    return texto.strip().strip("«»\"'' ").strip()
+
+
+def _sin_acentos(txt: str) -> str:
+    import unicodedata
+
+    plano = unicodedata.normalize("NFKD", txt or "")
+    return "".join(c for c in plano if not unicodedata.combining(c)).lower()
+
+
+def recortar(dice: str, tope: int) -> str:
+    """Corta por la última frase que quepa. Nunca a mitad de palabra.
+
+    Se usa cuando la reescritura sigue saliéndose: aquí la voz la pone el
+    generador, así que lo que no cabe en el clip no se oye a medias — se corta
+    en seco donde toque, y mejor que sea en un punto.
+    """
+    dice = dice.strip()
+    if len(dice) <= tope:
+        return dice
+    recorte = dice[:tope]
+    for sep in (". ", "! ", "? ", "; "):
+        pos = recorte.rfind(sep)
+        if pos > tope * 0.5:
+            return recorte[: pos + 1].strip()
+    pos = recorte.rfind(" ")
+    return (recorte[:pos] if pos > 0 else recorte).strip() + "."
+
 
 def partir(dice: str, partes: int = 2) -> list[str]:
     """Reparte lo que se dice entre los clips, lo más a la mitad posible."""
@@ -156,7 +202,7 @@ def escribir(
             f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}"
         )
 
-    dice = " ".join(str(datos.get("dice") or "").split())
+    dice = _limpiar_dice(str(datos.get("dice") or ""))
     if not dice:
         raise ValueError("Gemini no devolvió la frase que se dice")
 
@@ -176,8 +222,12 @@ def escribir(
         if corta.get("dice"):
             on_log(f"[nicho_ropa] recortada a {len(corta['dice'])} caracteres")
             dice = corta["dice"]
-        else:
-            on_log("[nicho_ropa] se queda la larga: el clip la cortará al final")
+        if len(dice) > max_caracteres:
+            # Ni con la reescritura cabe. Se corta por la última frase entera:
+            # dejarla larga es que el generador la corte por donde le toque, y
+            # eso es media palabra al final del clip.
+            dice = recortar(dice, max_caracteres)
+            on_log(f"[nicho_ropa] cortada por la última frase: {len(dice)} caracteres")
 
     # El bloque se monta aquí con el texto del curso: la IA solo pone la frase.
     trozos = partir(dice, partes) if partes > 1 else [dice]
@@ -204,7 +254,7 @@ def _acortar(
     datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes)
     if not isinstance(datos, dict):
         return {}
-    nueva = " ".join(str(datos.get("dice") or "").split())
+    nueva = _limpiar_dice(str(datos.get("dice") or ""))
     if not nueva or len(nueva) >= len(dice):
         return {}
     return {"dice": nueva}

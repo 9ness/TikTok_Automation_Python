@@ -524,8 +524,25 @@ def list_prendas(
         carpeta=carpeta,
         items=items,
         textos_extraidos=bool(doc.get("textos_extraidos")),
-        montando=bool(activos),
+        # Con los guiones en la cola, la lista también se sondea mientras se
+        # escriben: si no, había que recargar para ver aparecer los botones.
+        montando=bool(activos) or _escribiendo_guiones(queue, carpeta),
     )
+
+
+def _escribiendo_guiones(queue: JobQueue | None, carpeta: str) -> bool:
+    """Si hay una tanda de guiones de esta carpeta en cola o en curso."""
+    if queue is None:
+        return False
+    try:
+        return any(
+            job.mode == JobMode.NICHO_ROPA_GUIONES
+            and str(job.params.get("carpeta") or "") == carpeta
+            and job.status in (JobStatus.PENDING, JobStatus.RUNNING)
+            for job in queue.list_jobs()
+        )
+    except Exception:  # noqa: BLE001 — el sondeo es un adorno
+        return False
 
 
 @router.post("/producto/estado", response_model=PrendaInfo)
@@ -648,23 +665,25 @@ def extraer_textos(
     return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
 
 
-@router.post("/guiones", response_model=PrendasListResponse)
+@router.post("/guiones", status_code=201)
 def escribir_guiones(
     body: GuionesRopaRequest,
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
-) -> PrendasListResponse:
-    """Escribe con Gemini el guion de cada prenda, con el prompt del curso.
+) -> dict:
+    """Encola los guiones de unas prendas, con el prompt del curso.
 
     Es lo que el curso manda hacer a mano en ChatGPT: su "pront base" + la
-    foto de la ficha, y lo que devuelve se pega en el generador. Aquí va por
-    prenda y se guarda, así que en la tarjeta queda un botón de copiar.
+    foto de la ficha, y lo que devuelve se pega en el generador. Son diez
+    llamadas a Gemini por carpeta y cada una tarda lo suyo, así que va por la
+    COLA —como los guiones del POV BOF Largo— y no dentro de la petición: así
+    se lanza y se sigue trabajando, y se ve por dónde va.
 
     Solo tiene sentido en los formatos cuyo guion se escribe FUERA (los de
     diálogo cerrado ya vienen con el texto puesto): si se pide en uno de esos,
-    se contesta con un aviso en vez de gastar llamadas.
+    se contesta con un aviso en vez de encolar un trabajo que no hará nada.
     """
-    from src.nicho_ropa.services import guionista
+    from src.queue.models import JobMode
 
     carpeta = body.carpeta or config.CARPETA_DEFECTO
     sexo = config.sexo_de_carpeta(carpeta)
@@ -672,74 +691,35 @@ def escribir_guiones(
     estilos = config.prompts_mof10(sexo, False, modo, body.duracion)
     if not estilos:
         raise APIError(f"El modo {modo} no tiene prompt.", status_code=400)
-    estilo = estilos[0]
-    if not estilo.get("escrito_fuera"):
+    if not estilos[0].get("escrito_fuera"):
         raise APIError(
             "Este formato trae el guion cerrado del curso: se pega tal cual, "
             "no hay nada que escribir.",
             status_code=400,
         )
-    # El tope sale del estilo: los formatos de duración fija (el de calle
-    # dividido son 15s) traen el suyo y no el de la duración elegida.
-    tope = int(
-        estilo.get("caracteres")
-        or config.DURACIONES[config.duracion_valida(body.duracion)]["caracteres"]
+
+    cuantas = len(body.productos) if body.productos else 0
+    alcance = f"{cuantas} prenda(s)" if cuantas else "la carpeta"
+    job = queue.enqueue(
+        JobMode.NICHO_ROPA_GUIONES,
+        title=(
+            f"✍️ Guiones · {config.carpeta_label(carpeta)} · "
+            f"{estilos[0]['label']}" + (" (rehacer)" if body.rehacer else "")
+        ),
+        params={
+            "carpeta": carpeta,
+            # El modo con el que se pidió: el guion se guarda en SU hueco y la
+            # cola tarda, así que resolverlo al guardar metería los guiones en
+            # el modo que estuviera abierto entonces.
+            "modo": modo,
+            "duracion": body.duracion,
+            "productos": [str(x) for x in (body.productos or [])],
+            "rehacer": bool(body.rehacer),
+            "usuario": usuario,
+        },
+        enqueued_by=usuario or None,
     )
-
-    doc = product_repo.load(carpeta)
-    guardados = doc.get("productos") or {}
-    pedidos = body.productos or list(guardados)
-    logs: list[str] = []
-    hechos, fallos = 0, []
-    for pid in pedidos:
-        prod = guardados.get(pid) or {}
-        if not prod.get("titulo"):
-            fallos.append(f"{pid}: sin textos")
-            continue
-        if not body.rehacer and product_repo.guion_de(prod, modo)["video"]:
-            continue
-        # La ficha ES la fuente del precio y las características, que es lo
-        # que el curso adjunta en ChatGPT. La limpia va también: sin ella el
-        # guion habla de la prenda de oídas.
-        fotos = []
-        for clave in ("titled_photo_id", "clean_photo_id"):
-            if prod.get(clave):
-                try:
-                    fotos.append(drive_client.fetch_photo(str(prod[clave])))
-                except (RuntimeError, ValueError) as e:  # noqa: PERF203
-                    logs.append(f"{pid}: sin {clave} ({e})")
-        try:
-            escrito = guionista.escribir(
-                prompt=estilo["guion"],
-                titulo=str(prod.get("titulo") or ""),
-                tienda=str(prod.get("tienda") or ""),
-                caption=str(prod.get("caption") or ""),
-                precio=str(prod.get("precio") or ""),
-                fotos=fotos,
-                max_caracteres=int(tope),
-                partes=int(estilo.get("partes") or 1),
-                on_log=logs.append,
-            )
-        except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
-            fallos.append(f"{pid}: {str(e)[:120]}")
-            continue
-        try:
-            product_repo.guardar_guion(
-                carpeta, pid, modo, escrito["dice"], escrito["video"],
-                escrito.get("videos"),
-            )
-        except RuntimeError as e:
-            raise APIError(str(e), status_code=503) from e
-        hechos += 1
-
-    if not hechos and fallos:
-        raise APIError(
-            "No se pudo escribir ningún guion. " + " · ".join(fallos[:3]),
-            status_code=502,
-        )
-    for linea in logs + fallos:
-        logger.info("[nicho_ropa/guiones] %s", linea)
-    return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario, modo=modo)
+    return {"job_id": job.id, "message": f"Guiones de {alcance}, en la cola."}
 
 
 def _servir_foto(

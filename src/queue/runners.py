@@ -1713,6 +1713,98 @@ def run_viralizacion_clips(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
 # ============================================================
 # RUNNER: NICHO ROPA SIN PERSONAS — ENCUADRE + MUDO
 # ============================================================
+def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Escribe los guiones de una carpeta del Nicho Ropa con el prompt del curso.
+
+    Lo que el curso hace a mano en ChatGPT: su "pront base" + la foto de la
+    ficha, prenda por prenda. Son diez llamadas a Gemini por carpeta y cada
+    una tarda, así que va por la cola como las del POV BOF Largo.
+
+    Params: carpeta, modo, duracion, productos (vacío = las que no lo tengan),
+    rehacer, usuario.
+    """
+    from src.nicho_pov_bof.services import drive_client
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.repos import product_repo
+    from src.nicho_ropa.services import guionista
+
+    p = job.params or {}
+    carpeta = str(p.get("carpeta") or ropa_config.CARPETA_DEFECTO)
+    modo = ropa_config.modo_valido(str(p.get("modo") or ""))
+    duracion = str(p.get("duracion") or ropa_config.DURACION_DEFECTO)
+    pedidos_fijos = [str(x) for x in (p.get("productos") or [])]
+    rehacer = bool(p.get("rehacer"))
+
+    sexo = ropa_config.sexo_de_carpeta(carpeta)
+    estilos = ropa_config.prompts_mof10(sexo, False, modo, duracion)
+    if not estilos:
+        raise RuntimeError(f"El modo {modo} no tiene prompt.")
+    estilo = estilos[0]
+    # El tope sale del estilo: los formatos de duración fija (calle dividido
+    # son 15s) traen el suyo y no el de la duración elegida.
+    tope = int(
+        estilo.get("caracteres")
+        or ropa_config.DURACIONES[ropa_config.duracion_valida(duracion)]["caracteres"]
+    )
+
+    doc = product_repo.load(carpeta)
+    guardados = doc.get("productos") or {}
+    pedidos = pedidos_fijos or list(guardados)
+    hechos, saltados, fallos = 0, 0, []
+
+    for i, pid in enumerate(pedidos):
+        on_progress(i / max(1, len(pedidos)), f"✍️ Prenda {pid} ({i + 1}/{len(pedidos)})")
+        prod = guardados.get(pid) or {}
+        if not prod.get("titulo"):
+            fallos.append(f"{pid}: sin textos")
+            continue
+        if not rehacer and product_repo.guion_de(prod, modo)["video"]:
+            saltados += 1
+            continue
+        # La ficha ES la fuente del precio y las características, que es lo
+        # que el curso adjunta en ChatGPT. La limpia va también: sin ella el
+        # guion habla de la prenda de oídas.
+        fotos = []
+        for clave in ("titled_photo_id", "clean_photo_id"):
+            if prod.get(clave):
+                try:
+                    fotos.append(drive_client.fetch_photo(str(prod[clave])))
+                except (RuntimeError, ValueError) as e:  # noqa: PERF203
+                    on_log(f"[nicho_ropa] {pid}: sin {clave} ({e})")
+        try:
+            escrito = guionista.escribir(
+                prompt=estilo["guion"],
+                titulo=str(prod.get("titulo") or ""),
+                tienda=str(prod.get("tienda") or ""),
+                caption=str(prod.get("caption") or ""),
+                precio=str(prod.get("precio") or ""),
+                fotos=fotos,
+                max_caracteres=tope,
+                partes=int(estilo.get("partes") or 1),
+                on_log=on_log,
+            )
+        except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
+            fallos.append(f"{pid}: {str(e)[:120]}")
+            continue
+        product_repo.guardar_guion(
+            carpeta, pid, modo, escrito["dice"], escrito["video"],
+            escrito.get("videos"),
+        )
+        hechos += 1
+        on_log(f"[nicho_ropa] {pid}: guion de {len(escrito['dice'])} caracteres")
+
+    if not hechos and fallos:
+        raise RuntimeError("No se pudo escribir ningún guion. " + " · ".join(fallos[:3]))
+    for linea in fallos:
+        on_log(f"[nicho_ropa] ⚠️ {linea}")
+    on_progress(1.0, "✅ Listo")
+    return (
+        f"{hechos} escrito(s)"
+        + (f", {saltados} que ya lo tenían" if saltados else "")
+        + (f", {len(fallos)} sin poder" if fallos else "")
+    )
+
+
 def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Monta el vídeo de UNA prenda: encuadre 9:16 y sin audio.
 
@@ -4745,6 +4837,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
     JobMode.NICHO_POV_BOF_TEXTOS: run_nicho_pov_bof_textos,
     JobMode.NICHO_POV_BOF_WEB_IMPORT: run_nicho_pov_bof_web_import,
+    JobMode.NICHO_ROPA_GUIONES: run_nicho_ropa_guiones,
     JobMode.NICHO_POV_BOF_REVISAR: run_nicho_pov_bof_revisar,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
@@ -4782,6 +4875,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",
     JobMode.NICHO_POV_BOF_TEXTOS: "viralizacion",
     JobMode.NICHO_POV_BOF_WEB_IMPORT: "viralizacion",
+    JobMode.NICHO_ROPA_GUIONES: "viralizacion",
     JobMode.NICHO_POV_BOF_REVISAR: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",

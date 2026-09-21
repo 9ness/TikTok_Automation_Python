@@ -201,10 +201,12 @@ export function useExtraerTextosRopa() {
  *
  *  Es lo que el curso hace a mano en ChatGPT (su prompt + la foto de la
  *  ficha). Va síncrono y puede tardar: es una llamada a Gemini por prenda. */
+/** Los guiones van por la COLA (como los del POV BOF Largo): son una llamada
+ *  a Gemini por prenda y dentro de la petición eran diez esperas seguidas. */
 export function useEscribirGuionesRopa() {
   const qc = useQueryClient();
   return useMutation<
-    PrendasListResponse,
+    { job_id: string; message?: string },
     Error,
     {
       carpeta: string;
@@ -215,7 +217,8 @@ export function useEscribirGuionesRopa() {
       rehacer?: boolean;
     }
   >({
-    mutationFn: (body) => api.post<PrendasListResponse>(`${ROOT}/guiones`, body),
+    mutationFn: (body) =>
+      api.post<{ job_id: string; message?: string }>(`${ROOT}/guiones`, body),
     // Se INVALIDA en vez de escribir la respuesta encima: la lista va por
     // (carpeta, modo) y escribirla en la clave sin modo la dejaba sin usar.
     onSuccess: (_res, { carpeta }) =>

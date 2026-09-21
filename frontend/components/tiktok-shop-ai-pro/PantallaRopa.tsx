@@ -985,7 +985,8 @@ export function PantallaRopa({
                     guiones.mutate(
                       { carpeta, modo, duracion },
                       {
-                        onSuccess: () => toast.success("Guiones escritos"),
+                        onSuccess: (r) =>
+                          toast.success(r.message || "Guiones, en la cola"),
                         onError: (err) =>
                           toast.error(
                             err instanceof ApiError ? err.message : String(err),
@@ -1586,7 +1587,8 @@ function PrendaCard({
                   rehacer: true,
                 },
                 {
-                  onSuccess: () => toast.success("Guion escrito"),
+                  onSuccess: (r) =>
+                    toast.success(r.message || "Guion, en la cola"),
                   onError: (e) =>
                     toast.error(e instanceof ApiError ? e.message : String(e)),
                   onSettled: () => setEscribiendo(false),
