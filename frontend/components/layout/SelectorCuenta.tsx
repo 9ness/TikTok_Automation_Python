@@ -45,7 +45,19 @@ export function SelectorCuenta({ size = "md" }: { size?: "sm" | "md" }) {
 
   const adminReal = me.data.admin_real ?? null;
   const suplantando = Boolean(adminReal);
-  const usuarios = me.data.usuarios ?? [];
+  // `usuarios` trae nombre y rol; `available_users` es solo la lista de
+  // nombres y la devuelve cualquier versión de la API. Se usa de respaldo
+  // porque un diálogo VACÍO no dice qué ha fallado: pasó en la APK, donde
+  // salía el título y nada debajo.
+  const usuarios =
+    me.data.usuarios && me.data.usuarios.length > 0
+      ? me.data.usuarios
+      : (me.data.available_users ?? []).map((u) => ({
+          username: u,
+          nombre: u,
+          rol: u === adminReal ? "admin" : "pro",
+          tiene_pin: true,
+        }));
   const dim = size === "sm" ? "h-8 w-8 text-xs" : "h-9 w-9 text-sm";
 
   return (
@@ -144,6 +156,13 @@ export function SelectorCuenta({ size = "md" }: { size?: "sm" | "md" }) {
               );
             })}
           </ul>
+
+          {usuarios.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No llegó la lista de cuentas. Cierra y vuelve a abrir la app; si
+              sigue igual, borra la caché de la aplicación.
+            </p>
+          )}
 
           {cambiar.isError && (
             <p className="text-xs text-destructive">{cambiar.error.message}</p>
