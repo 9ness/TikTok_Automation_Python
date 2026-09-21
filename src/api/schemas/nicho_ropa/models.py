@@ -45,6 +45,13 @@ class EstiloMof10(BaseModel):
     escrito_fuera: bool = False
     personaje: bool = False
     ingrediente: bool = False
+    # El tope de caracteres que se le pide al guion.
+    caracteres: int = 180
+    # La SEGUNDA imagen, en los formatos que se graban en dos partes (el de
+    # calle dividido). Vacía en el resto.
+    imagen2: str = ""
+    # Cuántos clips hay que generar y subir para ese formato. 1 = como siempre.
+    partes: int = 1
 
 
 class ModoRopa(BaseModel):
@@ -151,6 +158,9 @@ class PrendaInfo(BaseModel):
     # que se oye (`guion_dice`) y el bloque entero listo para pegar en el
     # generador (`guion`). Vacíos mientras no se haya pedido.
     guion: str = ""
+    # Un bloque por clip: uno en los formatos de siempre y dos en el de calle
+    # dividido, donde cada clip dice su mitad. `guion` es el primero.
+    guiones: list[str] = Field(default_factory=list)
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

@@ -633,6 +633,16 @@ ARROW_DURATION_S = 3.5
 # si en el futuro se graban frases nuevas.
 ARROW_KEYWORDS = ("carrito", "naranja", "cupones", "cupón", "enlace", "tienda")
 
+# Subtítulos de la voz (tip de Johnny, sep 2026): que se LEA de qué producto
+# se habla refuerza la coherencia vídeo↔ficha ante la moderación. Pequeños,
+# blancos con borde fino y por debajo del producto: el título va arriba
+# (TEXT_BLOCK_Y) y la flecha abajo (ARROW_CY), y aquí no pisan a ninguno.
+SUBS_Y = 0.68                # centro del subtítulo, dentro de la zona segura
+SUBS_FONT_SIZE = 46
+SUBS_MAX_PALABRAS = 4        # por trozo: se lee de un vistazo
+SUBS_MAX_CARACTERES = 24
+SUBS_MAX_ANCHO = 0.64        # fracción del ancho; centrado deja 18% a cada lado
+
 # Duración objetivo del vídeo. Los audios rondan 12-14s, así que lo normal es
 # que el audio sea MÁS LARGO y haya que alargar el vídeo.
 VIDEO_TARGET_S = 10.0

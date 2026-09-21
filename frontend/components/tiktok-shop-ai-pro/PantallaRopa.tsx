@@ -934,9 +934,18 @@ export function PantallaRopa({
                     ? "🔇 Sale mudo: la música se pone en TikTok al publicar"
                     : "🗣️ El clip sale ya hablado: se publica con su voz, sin texto quemado"}
                 </li>
+                {(e.partes ?? 1) > 1 && (
+                  <li className="text-fuchsia-300">
+                    ✂️ Este formato va PARTIDO en {e.partes} clips: copia
+                    también la <strong className="text-foreground">imagen 2</strong>{" "}
+                    (la misma chica en otra calle) y usa un guion por clip —
+                    cada uno dice su mitad.
+                  </li>
+                )}
                 <li>
-                  {e.escrito_fuera ? "4️⃣" : "3️⃣"} Sube el clip aquí abajo, en
-                  su tarjeta.
+                  {e.escrito_fuera ? "4️⃣" : "3️⃣"} Sube{" "}
+                  {(e.partes ?? 1) > 1 ? `los ${e.partes} clips` : "el clip"}{" "}
+                  aquí abajo, en su tarjeta.
                 </li>
                 {e.plazos_fijo && (
                   <li className="text-amber-500">
@@ -1009,6 +1018,19 @@ export function PantallaRopa({
                 <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1 · Imagen
                 (Flow)
               </button>
+              {/* La segunda imagen, solo en los formatos que se graban en dos
+                  partes: se pide en el MISMO chat que acaba de crear la
+                  primera, así que la chica y la ropa ya están delante. */}
+              {!!e.imagen2 && (
+                <button
+                  type="button"
+                  onClick={() => copiar(`Imagen 2 · ${e.label}`, e.imagen2 ?? "")}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs transition hover:border-foreground/30"
+                >
+                  <ClipboardCopy className="h-3.5 w-3.5 shrink-0" /> 1b · Imagen
+                  2 (otra calle)
+                </button>
+              )}
               {/* En los formatos MUDOS el paso 2 no es un guion: es el prompt
                   de MOVIMIENTO, y no existe versión con plazos — los plazos se
                   meten en lo que DICE la persona, y aquí no dice nada. */}
@@ -1183,6 +1205,9 @@ export function PantallaRopa({
               // El guion de este formato lo escribe la IA por prenda: la
               // tarjeta enseña el botón de copiarlo (y el de rehacerlo).
               conGuion={!!estiloActivo?.escrito_fuera}
+              // En cuántos clips se graba el formato: con dos, la tarjeta
+              // pide los dos y el montaje los pega.
+              partes={estiloActivo?.partes ?? 1}
               modalidadDuracion={duracion}
               onCopiar={copiar}
             />
@@ -1201,6 +1226,7 @@ function PrendaCard({
   modo,
   conPlazos = false,
   conGuion = false,
+  partes = 1,
   modalidadDuracion = "10",
   onCopiar,
 }: {
@@ -1213,6 +1239,8 @@ function PrendaCard({
   conPlazos?: boolean;
   /** El guion de este formato lo escribe la IA por prenda. */
   conGuion?: boolean;
+  /** Cuántos clips se suben para este formato. 1 = como siempre. */
+  partes?: number;
   /** Con qué duración se pide (decide el tope de caracteres). */
   modalidadDuracion?: string;
   /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
@@ -1228,6 +1256,8 @@ function PrendaCard({
   // decenas de MB desde el móvil y sin porcentaje no se sabe si va o se colgó
   // (mismo patrón que el POV BOF).
   const [pct, setPct] = useState<number | null>(null);
+  // Cuál de los clips se está subiendo, para pintar el % en SU hueco.
+  const [subiendo, setSubiendo] = useState(0);
   // Qué audio lleva el vídeo. Vacío es el defecto de cada pantalla: mudo en
   // las del curso, y la voz que ya trae el clip en las de la web.
   const [audio, setAudio] = useState("");
@@ -1246,11 +1276,12 @@ function PrendaCard({
     setVendio(!!prenda.sold);
   }, [prenda.en_escaparate, prenda.uploaded, prenda.sold]);
 
-  function elegirArchivo(file: File | null) {
+  function elegirArchivo(file: File | null, parte = 0) {
     if (!file) return;
     // "mudo" solo existe en la web: es pedir que se tire la voz del clip.
     const sexo = audio === "hombre" || audio === "mujer" ? audio : "";
     setPct(0);
+    setSubiendo(parte);
     const fd = new FormData();
     fd.append("producto", prenda.producto);
     fd.append("carpeta", carpeta);
@@ -1261,6 +1292,7 @@ function PrendaCard({
     // esto salía la voz inventada del generador por encima.
     if (esWeb && (mudo || audio === "mudo")) fd.append("conservar_audio", "0");
     fd.append("modo", modo);
+    if (parte) fd.append("parte", String(parte));
     fd.append("file", file);
 
     const base = api.baseUrl;
@@ -1509,20 +1541,37 @@ function PrendaCard({
           primera no convence (cuesta una llamada a la IA). */}
       {conGuion && (
         <div className="flex gap-1">
-          <button
-            type="button"
-            disabled={!prenda.guion}
-            onClick={() => onCopiar("Guion del vídeo", prenda.guion)}
-            className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition disabled:opacity-40 ${
-              prenda.guion
-                ? "border-amber-500/60 text-amber-500 hover:bg-amber-500/10"
-                : "border-border/60 text-muted-foreground"
-            }`}
-            title={prenda.guion_dice || "Aún no tiene guion escrito"}
-          >
-            ✍️ {prenda.guion ? "Copiar guion" : "Sin guion"}
-            {prenda.guion_dice ? ` · ${prenda.guion_dice.length} car` : ""}
-          </button>
+          {/* Un botón por clip: en el formato de calle dividido cada mitad
+              del guion va a SU vídeo, y pegar el entero en los dos hace que
+              los dos digan lo mismo. */}
+          {(prenda.guiones ?? []).length > 1 ? (
+            (prenda.guiones ?? []).map((texto, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onCopiar(`Guion · clip ${i + 1}`, texto)}
+                className="flex-1 rounded-md border border-amber-500/60 px-2 py-1.5 text-[11px] text-amber-500 transition hover:bg-amber-500/10"
+                title={texto.slice(0, 120)}
+              >
+                ✍️ Guion {i + 1}
+              </button>
+            ))
+          ) : (
+            <button
+              type="button"
+              disabled={!prenda.guion}
+              onClick={() => onCopiar("Guion del vídeo", prenda.guion)}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition disabled:opacity-40 ${
+                prenda.guion
+                  ? "border-amber-500/60 text-amber-500 hover:bg-amber-500/10"
+                  : "border-border/60 text-muted-foreground"
+              }`}
+              title={prenda.guion_dice || "Aún no tiene guion escrito"}
+            >
+              ✍️ {prenda.guion ? "Copiar guion" : "Sin guion"}
+              {prenda.guion_dice ? ` · ${prenda.guion_dice.length} car` : ""}
+            </button>
+          )}
           <button
             type="button"
             disabled={escribiendo || !prenda.titulo}
@@ -1571,7 +1620,41 @@ function PrendaCard({
         </p>
       )}
 
+      {/* Los formatos de dos clips piden los dos: el primero se queda
+          esperando y el montaje arranca al subir el segundo. */}
+      {partes > 1 && (
+        <div className="grid grid-cols-2 gap-2">
+          {Array.from({ length: partes }, (_, i) => i + 1).map((n) => (
+            <label
+              key={n}
+              className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30"
+            >
+              {pct !== null && subiendo === n ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> {pct}%
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5" /> Clip {n}
+                </>
+              )}
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => elegirArchivo(e.target.files?.[0] ?? null, n)}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
+        {partes > 1 ? (
+          <span className="flex items-center justify-center rounded-lg border border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground">
+            {partes} clips arriba
+          </span>
+        ) : (
         <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
           {pct !== null ? (
             <>
@@ -1589,6 +1672,7 @@ function PrendaCard({
             onChange={(e) => elegirArchivo(e.target.files?.[0] ?? null)}
           />
         </label>
+        )}
         <button
           type="button"
           disabled={!prenda.video_path}

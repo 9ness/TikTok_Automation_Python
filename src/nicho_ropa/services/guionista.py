@@ -32,7 +32,57 @@ _noop: OnLog = lambda _m: None
 _LINEA_DICE = re.compile(
     r"^(?P<quien>[^\n]*?dice en español)[^\n]*:\s*$", re.MULTILINE,
 )
-_EJEMPLO = re.compile(r"«[^»]*»")
+# El ejemplo del curso va entre comillas angulares, pero la MITAD de sus
+# prompts lo cierran con la de abrir (`«…«`, ver el del espejo de mujer y el
+# de calle dividido). Exigiendo `»` no casaba y el bloque de vídeo salía con
+# el ejemplo de los jeans dentro — con el nombre de OTRO producto.
+_EJEMPLO = re.compile(r"«[^«»]*[«»]")
+
+
+# Dónde partir el guion cuando el formato se graba en dos clips: en un punto,
+# y si no lo hay, en una coma. Cortar por la palabra de en medio deja media
+# frase en cada mitad y el generador la dice a trozos.
+_CORTES = (". ", "! ", "? ", "; ", ", ")
+
+
+def partir(dice: str, partes: int = 2) -> list[str]:
+    """Reparte lo que se dice entre los clips, lo más a la mitad posible."""
+    dice = " ".join((dice or "").split())
+    if partes < 2 or not dice:
+        return [dice]
+    trozos, resto = [], dice
+    for restantes in range(partes - 1, 0, -1):
+        objetivo = len(resto) / (restantes + 1)
+        corte = min(
+            (
+                (abs(pos + len(sep) - objetivo), pos + len(sep))
+                for sep in _CORTES
+                for pos in _buscar_todas(resto, sep)
+            ),
+            default=(0, 0),
+        )[1]
+        # Sin puntuación a mano se parte por el espacio más cercano al medio.
+        if not corte:
+            corte = _espacio_cercano(resto, objetivo)
+        trozos.append(resto[:corte].strip())
+        resto = resto[corte:].strip()
+    trozos.append(resto)
+    return [t for t in trozos if t] or [dice]
+
+
+def _buscar_todas(texto: str, sep: str) -> list[int]:
+    salida, i = [], texto.find(sep)
+    while i != -1:
+        salida.append(i)
+        i = texto.find(sep, i + 1)
+    return salida
+
+
+def _espacio_cercano(texto: str, objetivo: float) -> int:
+    espacios = _buscar_todas(texto, " ")
+    if not espacios:
+        return len(texto)
+    return min(espacios, key=lambda p: abs(p - objetivo)) + 1
 
 
 def _montar_video(prompt: str, dice: str) -> str:
@@ -76,9 +126,14 @@ def escribir(
     precio: str = "",
     fotos: list[Path] | None = None,
     max_caracteres: int = 180,
+    # En cuántos clips se graba el formato. Con dos, lo que se dice se reparte
+    # a la mitad y sale un bloque de vídeo por clip: cada uno lleva SU trozo,
+    # porque el generador dice todo lo que le pongas y en 8 segundos no cabe
+    # el guion entero.
+    partes: int = 1,
     on_log: OnLog = _noop,
 ) -> dict:
-    """`{dice, video}` para una prenda. Lanza si Gemini no devuelve guion."""
+    """`{dice, video, videos}` para una prenda. Lanza si Gemini no lo escribe."""
     from src.tiktok_shop.api.gemini import generate_json
 
     descripcion = f"Producto: {titulo.strip()}."
@@ -125,7 +180,9 @@ def escribir(
             on_log("[nicho_ropa] se queda la larga: el clip la cortará al final")
 
     # El bloque se monta aquí con el texto del curso: la IA solo pone la frase.
-    return {"dice": dice, "video": _montar_video(prompt, dice) or dice}
+    trozos = partir(dice, partes) if partes > 1 else [dice]
+    videos = [_montar_video(prompt, t) or t for t in trozos]
+    return {"dice": dice, "video": videos[0], "videos": videos}
 
 
 def _acortar(

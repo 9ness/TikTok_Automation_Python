@@ -1746,7 +1746,7 @@ export default function NichoPovBofPage() {
 /** Botón compacto: copia el texto al portapapeles sin mostrarlo. Mismo
  *  patrón que `CopyChip` de `calendar/page.tsx:1044`. */
 
-type ToolKey = "gancho" | "titulo" | "cta" | "flecha";
+type ToolKey = "gancho" | "titulo" | "cta" | "flecha" | "subtitulos";
 
 /** Herramientas de edición que se pueden pedir por separado. */
 const TOOLS: { key: ToolKey; label: string }[] = [
@@ -1754,6 +1754,7 @@ const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "titulo", label: "📝 Texto producto" },
   { key: "cta", label: "👉 CTA" },
   { key: "flecha", label: "⬇️ Flecha" },
+  { key: "subtitulos", label: "🔤 Subtítulos" },
 ];
 
 /** Tarjeta de producto: textos, sexo, subida de vídeo y toggles
@@ -1867,7 +1868,7 @@ function ProductoCard({
   // (solo la voz). Así se puede pedir, p. ej., solo el nombre del producto
   // o solo la flecha.
   const [tools, setTools] = useState<Record<ToolKey, boolean>>({
-    gancho: true, titulo: true, cta: true, flecha: true,
+    gancho: true, titulo: true, cta: true, flecha: true, subtitulos: true,
   });
   const [uploading, setUploading] = useState(false);
   const [pct, setPct] = useState(0);
@@ -1990,6 +1991,7 @@ function ProductoCard({
     fd.append("con_titulo", String(tools.titulo));
     fd.append("con_cta", String(tools.cta));
     fd.append("con_flecha", String(tools.flecha));
+    fd.append("con_subtitulos", String(tools.subtitulos));
     if (slot) fd.append("slot", String(slot));
     // XHR (no fetch) para tener progreso real de subida — mismo patrón que
     // `uploadVideo()` en calendar/page.tsx:634.

@@ -1559,7 +1559,7 @@ function EscaparateModalLargo({
   );
 }
 
-type ToolKey = "gancho" | "titulo" | "cta" | "flecha" | "subliminal";
+type ToolKey = "gancho" | "titulo" | "cta" | "flecha" | "subliminal" | "subtitulos";
 
 /* El subliminal va APAGADO por defecto y los otros cuatro encendidos: solo lo
    llevan los formatos de 20s (Vista POV / Vista Sentado), donde además es el
@@ -1589,6 +1589,7 @@ const TOOLS: { key: ToolKey; label: string }[] = [
   { key: "cta", label: "👉 CTA" },
   { key: "flecha", label: "⬇️ Flecha" },
   { key: "subliminal", label: "💬 Subliminal" },
+  { key: "subtitulos", label: "🔤 Subtítulos" },
 ];
 
 /** Tarjeta de producto del Largo: como la del POV BOF (textos, enlace, foto,
@@ -1744,6 +1745,7 @@ function ProductoCard({
   const [sexo, setSexo] = useState<"hombre" | "mujer" | "auto">("auto");
   const [tools, setTools] = useState<Record<ToolKey, boolean>>({
     gancho: true, titulo: true, cta: true, flecha: true, subliminal: false,
+    subtitulos: true,
   });
   // Acabado del bloque de texto. Se guarda POR USUARIO y no por producto: es
   // cómo se edita, y mientras se prueba el estilo nuevo se quiere el mismo en
@@ -1801,6 +1803,7 @@ function ProductoCard({
       con_cta: String(tools.cta),
       con_flecha: String(tools.flecha),
       con_subliminal: String(tools.subliminal),
+      con_subtitulos: String(tools.subtitulos),
       estilo_texto: estiloTexto,
     };
     // Si la app sabe subir por su cuenta, se le deja: con ocho productos a
@@ -1853,6 +1856,7 @@ function ProductoCard({
     fd.append("con_cta", String(tools.cta));
     fd.append("con_flecha", String(tools.flecha));
     fd.append("con_subliminal", String(tools.subliminal));
+    fd.append("con_subtitulos", String(tools.subtitulos));
     fd.append("estilo_texto", estiloTexto);
 
     const xhr = new XMLHttpRequest();

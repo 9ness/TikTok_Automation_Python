@@ -139,9 +139,13 @@ def guion_de(prod: dict, modo: str) -> dict:
 
     guardado = ((prod or {}).get("modos") or {}).get(config.modo_valido(modo)) or {}
     guion = guardado.get("guion") or {}
+    # `videos` son los bloques por clip: uno en los formatos de siempre y dos
+    # en el de calle dividido. `video` se mantiene por lo ya guardado.
+    videos = [str(v) for v in (guion.get("videos") or []) if str(v).strip()]
     return {
         "dice": str(guion.get("dice") or ""),
         "video": str(guion.get("video") or ""),
+        "videos": videos or ([str(guion.get("video"))] if guion.get("video") else []),
         # Los primeros se guardaron con fecha en ISO: si no es un número, se
         # sirve 0 en vez de reventar la lista entera de la carpeta.
         "guion_at": int(guion.get("at") or 0) if str(guion.get("at") or "").isdigit() else 0,
@@ -150,6 +154,7 @@ def guion_de(prod: dict, modo: str) -> dict:
 
 def guardar_guion(
     carpeta: str, producto: str, modo: str, dice: str, video: str,
+    videos: "list[str] | None" = None,
 ) -> dict:
     """Apunta el guion de un modo sin tocar el de los demás ni su vídeo."""
     from src.nicho_ropa import config
@@ -162,11 +167,57 @@ def guardar_guion(
         prod.setdefault("modos", {}).setdefault(modo, {})["guion"] = {
             # Epoch y no `_now()`: eso devuelve un ISO y la pantalla pinta las
             # fechas con el mismo helper que las demás (`horaCorta`).
-            "dice": dice, "video": video, "at": int(time.time()),
+            "dice": dice, "video": video,
+            # Un bloque por clip. En los formatos de un solo clip es `video`
+            # repetido, y así la pantalla pinta lo mismo sin preguntar.
+            "videos": list(videos or [video]),
+            "at": int(time.time()),
         }
         prod["updated_at"] = _now()
         r.set_json(_key(carpeta), doc)
         return prod
+
+
+def clips_de(prod: dict, modo: str) -> dict[str, str]:
+    """Los clips ya subidos de un formato que se graba por partes."""
+    from src.nicho_ropa import config
+
+    guardado = ((prod or {}).get("modos") or {}).get(config.modo_valido(modo)) or {}
+    return {str(k): str(v) for k, v in (guardado.get("clips") or {}).items() if v}
+
+
+def guardar_clip(carpeta: str, producto: str, modo: str, parte: int, ruta: str) -> dict:
+    """Apunta el clip de UNA parte y devuelve todos los que ya hay.
+
+    Los formatos de dos clips (calle dividido) se suben de uno en uno: el
+    primero se queda aquí esperando al segundo, y solo entonces se monta.
+    """
+    from src.nicho_ropa import config
+
+    modo = config.modo_valido(modo)
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        prod = doc.setdefault("productos", {}).setdefault(str(producto), {})
+        clips = prod.setdefault("modos", {}).setdefault(modo, {}).setdefault("clips", {})
+        clips[str(int(parte))] = ruta
+        prod["updated_at"] = _now()
+        r.set_json(_key(carpeta), doc)
+        return {str(k): str(v) for k, v in clips.items() if v}
+
+
+def olvidar_clips(carpeta: str, producto: str, modo: str) -> None:
+    """Vacía los clips guardados de un modo (ya se han montado)."""
+    from src.nicho_ropa import config
+
+    modo = config.modo_valido(modo)
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        prod = (doc.get("productos") or {}).get(str(producto)) or {}
+        if ((prod.get("modos") or {}).get(modo) or {}).pop("clips", None) is not None:
+            prod["updated_at"] = _now()
+            r.set_json(_key(carpeta), doc)
 
 
 def guardar_video(carpeta: str, producto: str, modo: str, ruta: str, listo_at: int) -> dict:

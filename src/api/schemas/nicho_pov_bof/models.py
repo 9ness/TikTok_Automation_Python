@@ -274,6 +274,7 @@ class ProductoInfo(BaseModel):
     con_titulo: bool = True
     con_cta: bool = True
     con_flecha: bool = True
+    con_subtitulos: bool = True
     # Ficha del producto en TikTok Shop, si se llegó a averiguar (EchoTik).
     # Vacío = todavía no se ha buscado o la búsqueda no encontró nada fiable.
     product_id: str = ""
@@ -346,6 +347,7 @@ class VideoLoteConfirmarRequest(BaseModel):
     con_titulo: bool = True
     con_cta: bool = True
     con_flecha: bool = True
+    con_subtitulos: bool = True
 
 
 class VideoLoteConfirmarResponse(BaseModel):

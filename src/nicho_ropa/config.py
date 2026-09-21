@@ -173,6 +173,15 @@ MODOS: dict[str, dict] = {
     # que no lleva a nada. Al pegarlos, se añade aquí con `estilo_mof10:
     # "bolso"` y su entrada en `ESTILOS_MOF10`. Ojo: solo vale para prendas
     # que SEAN bolsos — necesita el filtro por categoría (ver tasks.md).
+    # El primero que se graba en DOS partes: el generador no da los 15
+    # segundos de una pieza, así que son dos clips de la misma chica en dos
+    # calles distintas que se pegan al montar (ver `PARTES`).
+    "calle_dividido": {
+        "desc": "En la calle, hablando sola a cámara de cuerpo entero. Son DOS clips (dos calles) que se pegan: 15s en total.",
+        "label": "🚶\u200d♀️ Calle Dividido 15s",
+        "estilo_mof10": "calle_dividido",
+        "sexos": ("mujer",),
+    },
     # ---- MARCA PERSONAL (sep 2026) -------------------------------------
     # La otra modalidad de Moda Mujer. Lo que la separa de los de arriba no es
     # el estilo, es la CUENTA: aquellos van con personajes distintos cada vez y
@@ -223,6 +232,16 @@ TEXTO_MARCA: dict[str, dict] = {
     "marca_zapatos": {"titulo": "AUTUMN BOOTS", "bajada": "step into style", "segundos": 3.0},
     "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0},
 }
+
+
+def partes_de_modo(modo: str) -> int:
+    """En cuántos clips se graba ese formato. 1 = como siempre."""
+    return int((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("partes") or 1)
+
+
+def lleva_subtitulos(modo: str) -> bool:
+    """Si a ese formato se le queman los subtítulos de lo que dice."""
+    return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("subtitulos"))
 
 
 def texto_de_modo(modo: str) -> dict:
@@ -579,11 +598,15 @@ NOTA_DURACION = (
 )
 
 
-def _con_duracion(texto: str, duracion: str) -> str:
-    """Rellena el tope de caracteres que le toca a esa duración."""
+def _con_duracion(texto: str, duracion: str, caracteres: int = 0) -> str:
+    """Rellena el tope de caracteres que le toca a esa duración.
+
+    `caracteres` lo pisa: hay formatos cuyo tope es del FORMATO y no de la
+    duración elegida (el de calle dividido son 15 segundos, siempre).
+    """
     meta = DURACIONES[duracion_valida(duracion)]
     return (
-        texto.replace("{{CARACTERES}}", str(meta["caracteres"]))
+        texto.replace("{{CARACTERES}}", str(caracteres or meta["caracteres"]))
         .replace("{{SEGUNDOS}}", str(meta["segundos"]))
     )
 
@@ -766,6 +789,31 @@ ESTILOS_MOF10: dict[str, dict] = {
         },
         "derivado": (),
     },
+    # El de 15 segundos en la calle, partido en dos clips. Tres cosas que no
+    # tiene ningún otro estilo:
+    #   `imagen2`    un tercer prompt: la misma chica en otra calle, que es la
+    #                segunda mitad del vídeo.
+    #   `partes`     cuántos clips se suben y se pegan al montar.
+    #   `caracteres` el tope lo manda el FORMATO (15s), no el selector de
+    #                duración, así que va fijo aquí y no en `DURACIONES`.
+    "calle_dividido": {
+        "duraciones": False,
+        "label": "Calle dividido · 15s en dos clips",
+        "voz": True,
+        "caracteres": 300,
+        "partes": 2,
+        # Refuerzo anti-sanción: el clip habla, así que lo que dice se lee
+        # también (ver AGENTS.md). El curso lo publica sin texto encima.
+        "subtitulos": True,
+        "imagen2": "prompt_mof10_calle_dividido_imagen2.md",
+        "por_sexo": {
+            "mujer": (
+                "prompt_mof10_calle_dividido_imagen.md",
+                "prompt_mof10_calle_dividido_guion.md",
+            ),
+        },
+        "derivado": (),
+    },
 }
 
 
@@ -846,13 +894,19 @@ def prompts_mof10(
         # El tope de caracteres solo se toca en los estilos cuyo guion se
         # escribe fuera; en los de calle no hay marcador que rellenar.
         dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO
+        tope = int(meta.get("caracteres") or 0)
         salida.append({
             "clave": clave,
             "label": meta["label"],
-            "imagen": _con_duracion(_con_plazos(imagen, plazos), dur),
+            "imagen": _con_duracion(_con_plazos(imagen, plazos), dur, tope),
+            # La SEGUNDA imagen, en los formatos que se graban en dos partes.
+            # Vacío en el resto: la pantalla solo pinta el botón si viene.
+            "imagen2": _limpio(meta["imagen2"]) if meta.get("imagen2") else "",
+            # Cuántos clips hay que generar y subir. 1 = como siempre.
+            "partes": int(meta.get("partes") or 1),
             "guion": _nota_plazos(
                 _nota_duracion(
-                    _con_duracion(_con_plazos(guion, plazos), dur), dur,
+                    _con_duracion(_con_plazos(guion, plazos), dur, tope), dur,
                 ),
                 # Solo si ESTE guion lleva de verdad la frase y además su tope
                 # lo escribe ChatGPT: en los demás, el aviso hablaría de una
@@ -885,6 +939,9 @@ def prompts_mof10(
             # tal cual en Flow. Son DOS pasos distintos y confundirlos es
             # pegarle a Flow un "no me devuelvas nada".
             "escrito_fuera": "{{CARACTERES}}" in guion,
+            # El tope de caracteres que se le pide al guion: el del formato si
+            # lo tiene fijo, y si no el de la duración elegida.
+            "caracteres": tope or DURACIONES[dur]["caracteres"],
             "duracion": dur,
             "duraciones": [
                 {"clave": k, "label": v["label"], "segundos": v["segundos"]}

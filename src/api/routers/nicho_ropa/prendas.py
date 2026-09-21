@@ -509,6 +509,7 @@ def list_prendas(
             # El guion escrito para ESTE modo: cada formato lleva dentro su
             # movimiento, así que el del espejo no vale para el del coche.
             guion=guiones.get(pid, {}).get("video", ""),
+            guiones=guiones.get(pid, {}).get("videos", []),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -678,7 +679,12 @@ def escribir_guiones(
             "no hay nada que escribir.",
             status_code=400,
         )
-    tope = config.DURACIONES[config.duracion_valida(body.duracion)]["caracteres"]
+    # El tope sale del estilo: los formatos de duración fija (el de calle
+    # dividido son 15s) traen el suyo y no el de la duración elegida.
+    tope = int(
+        estilo.get("caracteres")
+        or config.DURACIONES[config.duracion_valida(body.duracion)]["caracteres"]
+    )
 
     doc = product_repo.load(carpeta)
     guardados = doc.get("productos") or {}
@@ -711,6 +717,7 @@ def escribir_guiones(
                 precio=str(prod.get("precio") or ""),
                 fotos=fotos,
                 max_caracteres=int(tope),
+                partes=int(estilo.get("partes") or 1),
                 on_log=logs.append,
             )
         except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
@@ -719,6 +726,7 @@ def escribir_guiones(
         try:
             product_repo.guardar_guion(
                 carpeta, pid, modo, escrito["dice"], escrito["video"],
+                escrito.get("videos"),
             )
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
@@ -822,6 +830,9 @@ async def upload_video(
     conservar_audio: Annotated[str, Form()] = "",
     # Dónde está la cámara en este vídeo. Cada modo guarda el suyo.
     modo: Annotated[str, Form()] = "",
+    # Qué mitad del vídeo es, en los formatos que se graban en dos clips
+    # (calle dividido). 0 o 1 en los de siempre, que son de un clip.
+    parte: Annotated[int, Form()] = 0,
 ) -> VideoRopaUploadResponse:
     """Sube el vídeo generado fuera y encola el encuadre.
 
@@ -859,6 +870,25 @@ async def upload_video(
     with destino.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
+    # Los formatos que se graban por partes esperan a tenerlas todas: con un
+    # solo clip no hay nada que pegar, y montar la primera mitad sola sería
+    # publicar medio vídeo.
+    modo_norm = config.modo_valido(modo)
+    partes = config.partes_de_modo(modo_norm)
+    rutas = [str(destino)]
+    if partes > 1:
+        n = parte if 1 <= parte <= partes else 1
+        clips = product_repo.guardar_clip(slug, producto, modo_norm, n, str(destino))
+        faltan = [str(i) for i in range(1, partes + 1) if not clips.get(str(i))]
+        if faltan:
+            return VideoRopaUploadResponse(
+                ok=True, job_id=None,
+                message=(
+                    f"Clip {n} guardado. Falta el {', '.join(faltan)} para montar."
+                ),
+            )
+        rutas = [clips[str(i)] for i in range(1, partes + 1)]
+
     job = queue.enqueue(
         JobMode.NICHO_ROPA_VIDEO,
         title=(
@@ -868,10 +898,13 @@ async def upload_video(
         params={
             "producto": producto,
             "carpeta": slug,
-            "raw_path": str(destino),
+            # `raw_path` se mantiene por los trabajos ya encolados; `raw_paths`
+            # es el que manda cuando el formato son varios clips.
+            "raw_path": rutas[0],
+            "raw_paths": rutas,
             "sexo": sexo_norm,
             "conservar_audio": con_audio,
-            "modo": config.modo_valido(modo),
+            "modo": modo_norm,
             "operator": operator,
         },
     )

@@ -28,6 +28,13 @@ export interface EstiloMof10 {
   /** Su guion promete plazos SIEMPRE: el curso lo dejó escrito en el ejemplo
    *  y no hay interruptor que lo quite. */
   plazos_fijo?: boolean;
+  /** La SEGUNDA imagen, en los formatos que se graban en dos partes (calle
+   *  dividido): la misma chica en otra calle. Vacía en el resto. */
+  imagen2?: string;
+  /** Cuántos clips hay que generar y subir. 1 = como siempre. */
+  partes?: number;
+  /** Tope de caracteres que se le pide al guion. */
+  caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
    *  lo que va a Flow es lo que ese devuelva. */
   escrito_fuera?: boolean;
@@ -118,6 +125,9 @@ export interface PrendaItem {
    *  `guion` es el bloque entero que se pega en el generador y `guion_dice`,
    *  solo lo que se oye (lo que tiene tope de caracteres). */
   guion?: string;
+  /** Un bloque por clip: dos en el formato de calle dividido, donde cada clip
+   *  dice su mitad. `guion` es el primero. */
+  guiones?: string[];
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

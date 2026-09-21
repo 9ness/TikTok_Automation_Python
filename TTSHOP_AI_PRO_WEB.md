@@ -311,12 +311,19 @@ saca.
 | 👔 Moda Hombre | Situación Real 2 10s | ⬜ no lo tenemos |
 | 👗 Moda Mujer | MOF MUJER 10s FRENTE A ESPEJO (imagen→vídeo, ONMI) | `nicho_ropa` espejo (`mujer_web`) |
 | 👗 Moda Mujer | BOLSO MOF MUJER POV ONMI 10S | ⬜ no lo tenemos |
+| 👗 Moda Mujer | Grok o Onmi (Dividido) 15 Segundos en Calle | `nicho_ropa` calle_dividido (`mujer_web`) |
 | 🎥 Nichos POV | POV MOF ESP/USA 20 SEGUNDOS GANCHO PUNTO DE DOLOR | `nicho_pov_bof_largo/prompts/guion_dolor.md` |
 | 🎥 Nichos POV | POV MOF ESP/USA 20 SEGUNDOS GANCHO URGENCIA DE PRECIO | `nicho_pov_bof_largo/prompts/guion.md` |
 | 🎥 Nichos POV | POV/BOF 10 SEGUNDOS ONMI | `nicho_pov_bof/prompts/guion_producto.md` |
 | 🎥 Nichos POV | POV/BOF ESPAÑA PLANTILLA | ⬜ por contrastar |
 | 🎨 Creativos y Carruseles | CREATIVOS PUBLICITARIOS | Creativos Pro |
 | 🧿 Nicho General | _(vacío, 0 formatos)_ | — |
+
+**Sep 2026 — los formatos cortos, bloqueados.** En Moda Mujer, Jonny dejó
+"Bloqueado temporalmente" los de 10s (camisetas, espejo agachada, solo música)
+porque son vídeos demasiado cortos, y publicó en su lugar el de 15 segundos en
+la calle, que va DIVIDIDO en dos clips. Los bloqueados no se borran de aquí ni
+de la app: lo que hay grabado con ellos sigue valiendo.
 
 Los dos ganchos del POV MOF de 20s son exactamente los dos estilos del POV
 BOF Largo (`ESTILOS_GUION`), y confirman que ese formato es de 20 segundos —

@@ -980,6 +980,7 @@ def confirmar_lote(
         flags = {
             "con_gancho": bool(body.con_gancho), "con_titulo": bool(body.con_titulo),
             "con_cta": bool(body.con_cta), "con_flecha": bool(body.con_flecha),
+            "con_subtitulos": bool(body.con_subtitulos),
         }
         # Todos los productos llevan DOS clips (ver `_guardar_clip`), así que
         # la tanda ya no reparte por precio, sino por hueco libre.
@@ -1064,6 +1065,7 @@ async def upload_video(
     con_titulo: Annotated[bool, Form()] = True,
     con_cta: Annotated[bool, Form()] = True,
     con_flecha: Annotated[bool, Form()] = True,
+    con_subtitulos: Annotated[bool, Form()] = True,
     con_textos: Annotated[bool, Form()] = True,
     # Solo en productos de plazos (precio >= PRECIO_MIN_PLAZOS): el vídeo son
     # DOS clips, así que cada subida dice cuál es. 0 = producto normal, un
@@ -1120,6 +1122,7 @@ async def upload_video(
             con_titulo=bool(con_titulo) and bool(con_textos),
             con_cta=bool(con_cta) and bool(con_textos),
             con_flecha=bool(con_flecha) and bool(con_textos),
+            con_subtitulos=bool(con_subtitulos) and bool(con_textos),
         )
 
     job = queue.enqueue(
@@ -1137,6 +1140,7 @@ async def upload_video(
             "con_titulo": bool(con_titulo) and bool(con_textos),
             "con_cta": bool(con_cta) and bool(con_textos),
             "con_flecha": bool(con_flecha) and bool(con_textos),
+            "con_subtitulos": bool(con_subtitulos) and bool(con_textos),
         },
         enqueued_by=operator or None,
     )

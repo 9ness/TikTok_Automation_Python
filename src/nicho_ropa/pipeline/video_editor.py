@@ -40,12 +40,87 @@ def _run(cmd: list[str], on_log: OnLog) -> None:
         raise RuntimeError(f"ffmpeg falló: {proc.stderr[-500:]}")
 
 
+def pegar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
+    """Pega los clips de un vídeo que se graba por partes, CON su audio.
+
+    Los `concatenar` del POV BOF y del BOF Cine no valen: tiran el audio
+    (`a=0`) y aquí los clips vienen hablados. Se hace como en el Nicho
+    General: cada clip a la misma caja y códec, y luego concat por lista sin
+    recodificar.
+    """
+    if len(clips) == 1:
+        return Path(clips[0])
+    work = destino.parent / f"pegar_{destino.stem}"
+    work.mkdir(parents=True, exist_ok=True)
+    iguales = []
+    for i, clip in enumerate(clips, start=1):
+        trozo = work / f"parte{i}.mp4"
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(clip),
+            "-vf", (
+                f"scale={pov_config.TARGET_W}:{pov_config.TARGET_H}"
+                ":force_original_aspect_ratio=decrease,"
+                f"pad={pov_config.TARGET_W}:{pov_config.TARGET_H}"
+                ":(ow-iw)/2:(oh-ih)/2:color=black,"
+                f"fps={pov_config.TARGET_FPS},setsar=1"
+            ),
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+            str(trozo),
+        ], on_log)
+        iguales.append(trozo)
+    lista = work / "clips.txt"
+    lista.write_text(
+        "\n".join(f"file '{p.as_posix()}'" for p in iguales) + "\n",
+        encoding="utf-8",
+    )
+    _run([
+        "ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
+        "-i", str(lista), "-c", "copy", "-movflags", "+faststart",
+        str(destino),
+    ], on_log)
+    on_log(f"[nicho_ropa] {len(clips)} clips pegados con su voz")
+    return destino
+
+
+def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
+    """Quema los subtítulos de lo que dice el clip, sobre el propio fichero.
+
+    El texto es el guion escrito para la prenda (lo tenemos exacto) y Whisper
+    solo pone los tiempos, igual que en el POV BOF — de ahí se reutilizan los
+    helpers en vez de tener dos renderizadores de subtítulos.
+    """
+    from src.nicho_pov_bof.pipeline.duration_match import probe_duration
+    from src.nicho_pov_bof.pipeline.video_editor import (
+        _burn_subtitulos,
+        _palabras_con_tiempo,
+        _transcribir_voz,
+        _trozos_subtitulos,
+    )
+
+    work = video.parent / f"subs_{video.stem}"
+    work.mkdir(parents=True, exist_ok=True)
+    palabras = _transcribir_voz(video, work, on_log)
+    if not palabras:
+        on_log("[nicho_ropa] sin transcripción — el vídeo se queda sin subtítulos")
+        return
+    trozos = _trozos_subtitulos(
+        _palabras_con_tiempo(texto, palabras), probe_duration(video),
+    )
+    salida = work / "subtitulado.mp4"
+    if _burn_subtitulos(video, trozos, salida, on_log) == salida and salida.is_file():
+        salida.replace(video)
+
+
 def montar(
     video_in: Path,
     out_path: Path,
     *,
     voz: Path | None = None,
     conservar_audio: bool = False,
+    # Lo que dice el clip, para quemarlo como subtítulos. Vacío = sin ellos,
+    # que es lo de siempre en este nicho.
+    texto_subs: str = "",
     # El modo de grabación. Los de marca personal llevan grado de color y el
     # texto de temporada quemado; el resto salen tal cual.
     modo: str = "",
@@ -84,7 +159,7 @@ def montar(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo con SU audio (la voz que trae el clip)")
-        _rematar(out_path, modo, semilla, on_log)
+        _rematar(out_path, modo, semilla, on_log, texto_subs)
         return out_path
 
     if voz is None:
@@ -95,7 +170,7 @@ def montar(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo mudo (sin voz ni música, a propósito)")
-        _rematar(out_path, modo, semilla, on_log)
+        _rematar(out_path, modo, semilla, on_log, texto_subs)
         return out_path
 
     # Con voz: el vídeo dura lo que dure la voz. `-shortest` corta por el más
@@ -110,12 +185,16 @@ def montar(
         "-movflags", "+faststart", str(out_path),
     ], on_log)
     on_log(f"[nicho_ropa] vídeo con voz: {voz.name}")
-    _rematar(out_path, modo, semilla, on_log)
+    _rematar(out_path, modo, semilla, on_log, texto_subs)
     return out_path
 
 
-def _rematar(salida: Path, modo: str, semilla: str, on_log: OnLog) -> None:
-    """Texto de temporada (si el formato lo lleva) y metadatos fuera."""
+def _rematar(
+    salida: Path, modo: str, semilla: str, on_log: OnLog, texto_subs: str = "",
+) -> None:
+    """Subtítulos, texto de temporada (si lo lleva) y metadatos fuera."""
+    if texto_subs.strip():
+        _subtitular(salida, texto_subs, on_log)
     texto = config.texto_de_modo(modo) if modo else {}
     if texto.get("titulo"):
         _quemar_texto(salida, texto, semilla, on_log)

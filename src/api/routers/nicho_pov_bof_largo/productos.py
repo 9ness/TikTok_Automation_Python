@@ -1367,6 +1367,7 @@ def confirmar_lote(
             con_gancho=body.con_gancho, con_titulo=body.con_titulo,
             con_cta=body.con_cta, con_flecha=body.con_flecha,
             con_subliminal=body.con_subliminal,
+            con_subtitulos=body.con_subtitulos,
             estilo_texto=body.estilo_texto,
         )
         if r.encolado:
@@ -1437,6 +1438,7 @@ async def upload_clip(
     con_cta: Annotated[bool, Form()] = True,
     con_flecha: Annotated[bool, Form()] = True,
     con_subliminal: Annotated[bool, Form()] = False,
+    con_subtitulos: Annotated[bool, Form()] = True,
     estilo_texto: Annotated[str, Form()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ClipLargoUploadResponse:
@@ -1499,6 +1501,7 @@ async def upload_clip(
         con_gancho=con_gancho, con_titulo=con_titulo,
         con_cta=con_cta, con_flecha=con_flecha,
         con_subliminal=con_subliminal,
+        con_subtitulos=con_subtitulos,
         estilo_texto=estilo_texto,
     )
 
@@ -1518,6 +1521,7 @@ def _encolar_clip(
     con_cta: bool = True,
     con_flecha: bool = True,
     con_subliminal: bool = False,
+    con_subtitulos: bool = True,
     estilo_texto: str = "",
 ) -> ClipLargoUploadResponse:
     """Guarda el clip en su hueco y encola el montaje si ya están los dos.
@@ -1586,6 +1590,7 @@ def _encolar_clip(
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
             "con_cta": bool(con_cta), "con_flecha": bool(con_flecha),
             "con_subliminal": bool(con_subliminal),
+            "con_subtitulos": bool(con_subtitulos),
             # Se resuelve AQUÍ, no en el montador: un cliente viejo no manda
             # el campo y hay que darle el de serie igualmente. El orden es lo
             # que pidió la tarjeta → lo que se puso para toda la carpeta → lo

@@ -1732,14 +1732,18 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     p = job.params
     producto = str(p["producto"])
     carpeta = str(p.get("carpeta") or ropa_config_carpeta_defecto())
-    raw_path = Path(p["raw_path"])
+    # Los formatos que se graban por partes mandan varios clips; el resto, uno
+    # (y los trabajos viejos solo `raw_path`).
+    rutas = [Path(x) for x in (p.get("raw_paths") or []) if x] or [Path(p["raw_path"])]
+    raw_path = rutas[0]
     sexo = (p.get("sexo") or "").strip().lower()
     # El catálogo de la web sale de VEO ya hablado: ahí el audio del clip es el
     # vídeo, no un ambiente que sobre.
     conservar_audio = bool(p.get("conservar_audio"))
 
-    if not raw_path.is_file():
-        raise FileNotFoundError(f"No está el vídeo subido: {raw_path}")
+    for ruta in rutas:
+        if not ruta.is_file():
+            raise FileNotFoundError(f"No está el vídeo subido: {ruta}")
 
     voz = None
     if sexo in ("hombre", "mujer"):
@@ -1753,9 +1757,26 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             # defecto), así que no se tira el montaje por esto.
             on_log(f"[nicho_ropa] no se pudo preparar la voz: {e} — sale mudo")
 
-    on_progress(0.4, "🎬 Encuadrando a 9:16…")
-    titulo = str((product_repo.get_product(carpeta, producto) or {}).get("titulo") or "")
+    prod = product_repo.get_product(carpeta, producto) or {}
+    titulo = str(prod.get("titulo") or "")
     modo = ropa_config.modo_valido(str(p.get("modo") or ""))
+
+    if len(rutas) > 1:
+        on_progress(0.3, f"🔗 Pegando {len(rutas)} clips…")
+        raw_path = video_editor.pegar(
+            rutas, raw_path.with_name(f"{raw_path.stem}_pegado.mp4"), on_log,
+        )
+
+    # Los subtítulos solo los pide el formato que los lleva, y solo tienen
+    # sentido si el clip habla: son el refuerzo de que el vídeo va DE ESTE
+    # producto (ver AGENTS.md).
+    texto_subs = ""
+    if ropa_config.lleva_subtitulos(modo) and conservar_audio:
+        texto_subs = str(product_repo.guion_de(prod, modo).get("dice") or "")
+        if not texto_subs:
+            on_log("[nicho_ropa] sin guion guardado: el vídeo sale sin subtítulos")
+
+    on_progress(0.4, "🎬 Encuadrando a 9:16…")
     nombre = pov_config.nombre_video(producto, titulo, folder=carpeta)
     # El modo va en el nombre: sin él, el vídeo de "dejando la cámara" se
     # escribía encima del del espejo (misma prenda, misma carpeta).
@@ -1764,6 +1785,7 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     salida = Path(ropa_config.video_dir()) / carpeta / nombre
     video_editor.montar(
         raw_path, salida, voz=voz, conservar_audio=conservar_audio,
+        texto_subs=texto_subs,
         # De él dependen el grado de color y el texto de temporada.
         modo=str(p.get("modo") or ""),
         semilla=f"{p.get('carpeta')}/{p.get('producto')}", on_log=on_log,
@@ -1775,6 +1797,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     product_repo.guardar_video(
         carpeta, producto, str(p.get("modo") or ""), str(salida), int(time.time()),
     )
+    # Los clips guardados a la espera de su pareja ya se han usado: si se
+    # quedan, la siguiente subida creería que ya están los dos.
+    if len(rutas) > 1:
+        product_repo.olvidar_clips(carpeta, producto, modo)
     on_progress(1.0, "✅ Listo")
     return str(salida)
 
@@ -2130,6 +2156,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             con_cta=bool(p.get("con_cta", True)),
             con_flecha=bool(p.get("con_flecha", True)),
             con_subliminal=bool(p.get("con_subliminal", False)),
+            # Por defecto SÍ: los trabajos encolados antes de existir el
+            # interruptor también los llevan.
+            con_subtitulos=bool(p.get("con_subtitulos", True)),
+            texto_voz=escrito["guion"],
             # Viaja en el trabajo, no en el documento del producto: es cómo se
             # EDITA este vídeo, y el operador está probando los dos acabados
             # sobre los mismos productos.
@@ -4201,6 +4231,9 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
     from src.nicho_pov_bof_largo import config as _largo_cfg
 
     guion = _largo_cfg.sin_minimo_plazos(guion)
+    # Lo que dice la voz, para los subtítulos. Vacío con el audio del banco:
+    # ahí los subtítulos salen de lo que oiga Whisper.
+    texto_voz = ""
     if guion:
         from src.nicho_pov_bof_largo.services import voz as voz_svc
 
@@ -4212,6 +4245,7 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
             segundos_max=_segundos_de_video(clips),
             segundos_min=config.DURACION_MINIMA_S,
         )
+        texto_voz = str(info.get("texto") or guion)
         on_log(
             f"[nicho_pov_bof] voz: {info.get('voz_label') or '?'} "
             f"· {info.get('duracion', 0):.1f}s · x{info.get('tempo', 1):.2f}"
@@ -4251,6 +4285,8 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         con_titulo=bool(p.get("con_titulo", p.get("con_textos", True))),
         con_cta=bool(p.get("con_cta", p.get("con_textos", True))),
         con_flecha=bool(p.get("con_flecha", p.get("con_textos", True))),
+        con_subtitulos=bool(p.get("con_subtitulos", True)),
+        texto_voz=texto_voz,
         semilla=f"{producto} {folder}",
         on_log=on_log,
         on_progress=_pipeline_progress,

@@ -362,6 +362,9 @@ def montar(
     con_flecha: bool = True,
     # El mensaje subliminal en pantalla, que solo llevan los formatos de 20s.
     con_subliminal: bool = False,
+    # Subtítulos de la voz; `texto_voz` es lo locutado (ver `build_video`).
+    con_subtitulos: bool = False,
+    texto_voz: str = "",
     # Acabado del bloque de texto: "" el de siempre (color y destello, con su
     # rotación) o "blanco" el de los POV de 20s nuevos.
     estilo_texto: str = "",
@@ -395,6 +398,8 @@ def montar(
         con_cta=con_cta,
         con_flecha=con_flecha,
         con_subliminal=con_subliminal,
+        con_subtitulos=con_subtitulos,
+        texto_voz=texto_voz,
         estilo_texto=estilo_texto,
         foto_producto=foto_producto,
         semilla=semilla or Path(output_path).stem,

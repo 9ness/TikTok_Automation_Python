@@ -33,6 +33,7 @@ overlay es seguro.
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import random
 import re
@@ -1490,8 +1491,26 @@ def _to_wav_16k_mono(audio_path: Path, out_wav: Path, on_log: OnLog) -> None:
     ], on_log)
 
 
+def _transcribir_voz(audio_path: Path, work_dir: Path, on_log: OnLog) -> list[dict] | None:
+    """Palabras de la voz con sus tiempos (Whisper), o None si falla.
+
+    La usan la flecha y los subtítulos: se transcribe UNA vez por montaje y
+    se pasa a los dos, en vez de cargar Whisper dos veces sobre el mismo audio.
+    """
+    try:
+        from src.subtitles import transcribe
+
+        wav_path = work_dir / "arrow_audio_16k.wav"
+        _to_wav_16k_mono(audio_path, wav_path, on_log)
+        return transcribe(str(wav_path), model_size="base", language="es")
+    except Exception as exc:  # noqa: BLE001 — nunca abortar por esto
+        on_log(f"[whisper] falló ({str(exc)[:120]})")
+        return None
+
+
 def _find_arrow_window(
     audio_path: Path, work_dir: Path, on_log: OnLog, video_dur: float | None = None,
+    words: list[dict] | None = None,
 ) -> tuple[float, float]:
     """Devuelve `(t0, t1)`: ventana en la que debe verse la flecha.
 
@@ -1503,15 +1522,14 @@ def _find_arrow_window(
     contenga alguna de `config.ARROW_KEYWORDS`. La flecha entra
     `ARROW_LEAD_S` segundos ANTES de esa palabra. Si Whisper no detecta
     ninguna palabra gatillo (o falla), la flecha sale desde el principio del
-    vídeo — nunca abortamos el pipeline por esto (asset/paso opcional)."""
-    try:
-        from src.subtitles import transcribe
+    vídeo — nunca abortamos el pipeline por esto (asset/paso opcional).
 
-        wav_path = work_dir / "arrow_audio_16k.wav"
-        _to_wav_16k_mono(audio_path, wav_path, on_log)
-        words = transcribe(str(wav_path), model_size="base", language="es")
-    except Exception as exc:  # noqa: BLE001 — nunca abortar por esto
-        on_log(f"[flecha] Whisper falló ({str(exc)[:120]}) — flecha desde el inicio")
+    `words` = la transcripción ya hecha (ver `_transcribir_voz`); sin ella se
+    transcribe aquí."""
+    if words is None:
+        words = _transcribir_voz(audio_path, work_dir, on_log)
+    if words is None:
+        on_log("[flecha] sin transcripción — flecha desde el inicio")
         return 0.0, _arrow_end(0.0, video_dur)
 
     hit = None
@@ -1541,7 +1559,7 @@ def _arrow_end(t0: float, video_dur: float | None) -> float:
 
 def _overlay_arrow(
     video_in: Path, audio_path: Path, work_dir: Path, out_path: Path,
-    on_log: OnLog, con_audio: bool = False,
+    on_log: OnLog, con_audio: bool = False, words: list[dict] | None = None,
 ) -> Path:
     """Pone la flecha del carrito sobre el vídeo.
 
@@ -1553,7 +1571,9 @@ def _overlay_arrow(
     llega mudo; el UGC es al revés —los clips vienen ya hablados— y sin esto
     el vídeo salía sin voz.
     """
-    t0, t1 = _find_arrow_window(audio_path, work_dir, on_log, probe_duration(video_in))
+    t0, t1 = _find_arrow_window(
+        audio_path, work_dir, on_log, probe_duration(video_in), words=words,
+    )
     # Rotamos el punto de partida de la lista de flechas al azar por vídeo:
     # aquí no hay concepto de "versión" (a diferencia de ready_video), así
     # que un índice aleatorio basta para dar variedad entre productos.
@@ -1593,6 +1613,151 @@ def _overlay_arrow(
     except RuntimeError as e:
         on_log(f"[4/5] overlay de flecha falló ({e}) — se continúa sin ella")
         return video_in
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Subtítulos de la voz
+# ---------------------------------------------------------------------------
+# El TEXTO sale del guion locutado (lo tenemos exacto) y Whisper solo pone los
+# TIEMPOS: transcrito a pelo, el nombre del producto salía mal escrito ("chitos
+# mac and cheese"), que es justo lo que no puede fallar aquí. Sin guion (audio
+# del banco) se usa lo que oye Whisper.
+_PUNTUACION_FINAL = ".,;:"
+_CORTE_TRAS = ".,;:?!…"
+
+
+def _norm_palabra(p: str) -> str:
+    return re.sub(r"[^a-z0-9ñ]", "", _sin_acentos(p))
+
+
+def _repartir_tramo(palabras: list[str], t0: float, t1: float) -> list[tuple[float, float]]:
+    """Reparte [t0, t1] entre `palabras` en proporción a su longitud."""
+    t1 = max(t1, t0)
+    pesos = [max(1, len(p)) for p in palabras]
+    total = sum(pesos)
+    out, t = [], t0
+    for peso in pesos:
+        d = (t1 - t0) * peso / total
+        out.append((t, t + d))
+        t += d
+    return out
+
+
+def _palabras_con_tiempo(texto: str, words: list[dict]) -> list[dict]:
+    """Palabras del guion con los tiempos de Whisper.
+
+    Se casan las dos secuencias por texto normalizado. Lo que Whisper oyó
+    distinto ("chitos" por "Cheetos") ocupa el tiempo de lo que oyó; lo que
+    no oyó, el hueco entre sus vecinas.
+    """
+    guion = (texto or "").split()
+    if not words:
+        return []
+    if not guion:
+        return [dict(w) for w in words]
+    a = [_norm_palabra(p) for p in guion]
+    b = [_norm_palabra(w["word"]) for w in words]
+    out: list[dict] = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op == "equal":
+            for k in range(i2 - i1):
+                w = words[j1 + k]
+                out.append({"word": guion[i1 + k], "start": w["start"], "end": w["end"]})
+        elif op == "replace":
+            tramos = _repartir_tramo(guion[i1:i2], words[j1]["start"], words[j2 - 1]["end"])
+            out += [{"word": p, "start": t0, "end": t1}
+                    for p, (t0, t1) in zip(guion[i1:i2], tramos)]
+        elif op == "delete":
+            t0 = words[j1 - 1]["end"] if j1 > 0 else words[0]["start"]
+            t1 = words[j1]["start"] if j1 < len(words) else words[-1]["end"]
+            tramos = _repartir_tramo(guion[i1:i2], t0, t1)
+            out += [{"word": p, "start": a0, "end": a1}
+                    for p, (a0, a1) in zip(guion[i1:i2], tramos)]
+        # "insert": algo que Whisper oyó y no está en el guion — se ignora.
+    return out
+
+
+def _trozos_subtitulos(palabras: list[dict], video_dur: float) -> list[dict]:
+    """Agrupa las palabras en trozos cortos con su ventana de pantalla.
+
+    Cada trozo se queda hasta que entra el siguiente (sin parpadeo entre
+    palabras); solo se quita antes si la voz hace una pausa larga.
+    """
+    trozos: list[dict] = []
+    cur: list[dict] = []
+    for w in palabras:
+        cur.append(w)
+        texto = " ".join(x["word"] for x in cur)
+        if (len(cur) >= config.SUBS_MAX_PALABRAS
+                or len(texto) >= config.SUBS_MAX_CARACTERES
+                or w["word"][-1:] in _CORTE_TRAS):
+            trozos.append({"palabras": cur})
+            cur = []
+    if cur:
+        trozos.append({"palabras": cur})
+
+    out: list[dict] = []
+    for i, t in enumerate(trozos):
+        ps = t["palabras"]
+        ini, fin_voz = float(ps[0]["start"]), float(ps[-1]["end"])
+        sig = float(trozos[i + 1]["palabras"][0]["start"]) if i + 1 < len(trozos) else None
+        fin = sig if sig is not None and sig - fin_voz < 0.6 else fin_voz + 0.3
+        fin = min(fin, video_dur)
+        if fin - ini < 0.05:
+            continue
+        texto = " ".join(p["word"].rstrip(_PUNTUACION_FINAL) for p in ps).strip()
+        if texto:
+            out.append({"texto": texto, "t0": ini, "t1": fin})
+    return out
+
+
+def _burn_subtitulos(
+    video_in: Path, trozos: list[dict], out_path: Path, on_log: OnLog,
+) -> Path:
+    """Quema los subtítulos: un PNG por trozo, cada uno en su ventana."""
+    # Centrados en el encuadre, así que el ancho se limita por los DOS lados:
+    # a esta altura la columna de botones de TikTok ocupa el 15% derecho.
+    max_w = int(config.TARGET_W * config.SUBS_MAX_ANCHO)
+    pngs: list[tuple[Path, int, dict]] = []
+    for i, t in enumerate(trozos):
+        img = _render_text_line(
+            t["texto"], font_size=config.SUBS_FONT_SIZE, max_w=max_w,
+            fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=2, stroke_frac=0.09,
+        )
+        if img is None:
+            continue
+        png = out_path.parent / f"sub_{i:03d}.png"
+        img.save(png)
+        pngs.append((png, img.height, t))
+    if not pngs:
+        on_log("[3/5] sin subtítulos que quemar")
+        return video_in
+
+    entradas: list[str] = []
+    cadena: list[str] = []
+    previo = "0:v"
+    for k, (png, alto, t) in enumerate(pngs, start=1):
+        entradas += ["-i", str(png)]
+        y = int(config.SUBS_Y * config.TARGET_H - alto / 2)
+        salida = f"s{k}"
+        cadena.append(
+            f"[{previo}][{k}:v]overlay=(main_w-overlay_w)/2:{y}:"
+            f"enable='between(t,{t['t0']:.3f},{t['t1']:.3f})'[{salida}]"
+        )
+        previo = salida
+    try:
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(video_in), *entradas,
+            "-filter_complex", ";".join(cadena),
+            "-map", f"[{previo}]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-c:a", "copy", str(out_path),
+        ], on_log)
+    except RuntimeError as e:
+        on_log(f"[3/5] subtítulos fallaron ({e}) — se continúa sin ellos")
+        return video_in
+    on_log(f"[3/5] subtítulos quemados ({len(pngs)} trozos)")
     return out_path
 
 
@@ -1738,6 +1903,12 @@ def build_video(
     # Apagado por defecto: solo lo llevan esos, y encenderlo en el resto
     # taparía el bloque de gancho/CTA, que va a la misma altura.
     con_subliminal: bool = False,
+    # Subtítulos de la voz, pequeños y por debajo del producto. Apagados por
+    # defecto: cada nicho decide si los lleva.
+    con_subtitulos: bool = False,
+    # Lo que dice la voz, tal cual se locutó. De aquí sale el TEXTO de los
+    # subtítulos (Whisper solo da los tiempos). Vacío = lo que oiga Whisper.
+    texto_voz: str = "",
     # Identifica al producto y es lo que hace rotar emoji, color y tipografía.
     # Tiene que venir de fuera: `output_path` es siempre `output.mp4`, así que
     # usarlo daba la MISMA semilla a todos los vídeos y ni el rótulo ni el
@@ -1821,11 +1992,31 @@ def build_video(
             work_dir / "04b_subliminal.mp4", on_log,
         )
 
+    # Whisper una sola vez para la flecha y los subtítulos.
+    palabras = (
+        _transcribir_voz(audio_path, work_dir, on_log)
+        if con_flecha or con_subtitulos else None
+    )
+
+    # 4.6) Subtítulos de la voz
+    if con_subtitulos:
+        if palabras:
+            on_log("[3/5] Quemando subtítulos…")
+            trozos = _trozos_subtitulos(
+                _palabras_con_tiempo(texto_voz, palabras), probe_duration(texted),
+            )
+            texted = _burn_subtitulos(
+                texted, trozos, work_dir / "04c_subtitulos.mp4", on_log,
+            )
+        else:
+            on_log("[3/5] sin transcripción de la voz — se continúa sin subtítulos")
+
     # 5) Flecha .mov
     if con_flecha:
         on_log("[4/5] Superponiendo flecha…")
         arrowed = _overlay_arrow(
             texted, audio_path, work_dir, work_dir / "05_arrow.mp4", on_log,
+            words=palabras if palabras is not None else [],
         )
         on_progress(0.84, "Flecha superpuesta")
     else:

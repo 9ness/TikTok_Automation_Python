@@ -207,6 +207,15 @@ programa: `betai:` (Pronósticos, escrito por `bet-ai-master`), `tiktok_shop:`,
   Escaparate/Subido/Vendió siempre la última. Lo que no encaje se añade a
   `components/tiktok-shop-ai-pro/` y se usa desde todos — no se inventa un
   diseño por pantalla.
+- **Refuerzo anti-sanción en TODO vídeo que se monte (OBLIGATORIO).** TikTok
+  Shop sanciona por "promoción de productos incoherente" cuando no le queda
+  claro que el vídeo enseña el producto enlazado, y lo decide una máquina. Así
+  que cualquier formato nuevo, de cualquier nicho, sale con: **subtítulos** de
+  lo que dice la voz (el TEXTO del guion locutado, los TIEMPOS de Whisper —
+  ver `build_video(con_subtitulos, texto_voz)`), el **nombre del producto**
+  quemado en pantalla, y los **metadatos limpios** (`limpiar_metadatos`). Lo
+  que NO sirve: meter la foto del producto "con opacidad 0" o fuera del
+  encuadre — en un MP4 renderizado no hay capas y el archivo sale idéntico.
 - **Frontend mobile-first:** grids `grid-cols-2 sm:grid-cols-N`, diálogos
   `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`, texto `text-xs sm:text-sm`,
   `truncate`/`break-words`. La app se usa desde el móvil.
