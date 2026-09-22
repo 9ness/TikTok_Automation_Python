@@ -217,8 +217,11 @@ def _formato_clips(
     extra = (
         '\n"colores" son los colores que nombra al empezar el clip 1, en '
         "español, en el MISMO orden en que los dice y con el de la prenda de "
-        "la foto el ÚLTIMO. Solo los que se ven en la ficha o en las fotos; "
-        "si solo hay uno, la lista lleva solo ese y el clip 1 no los nombra."
+        "la foto el ÚLTIMO. Cada uno con el NOMBRE EXACTO de la variante en "
+        "el selector de color de la captura de TikTok Shop (en minúsculas), "
+        "sin los tachados o agotados; si la captura no enseña el selector, "
+        "solo el color de la prenda de la foto. Nunca inventes un color: si "
+        "solo hay uno, la lista lleva solo ese y el clip 1 no los nombra."
         if colores else ""
     )
     return (
