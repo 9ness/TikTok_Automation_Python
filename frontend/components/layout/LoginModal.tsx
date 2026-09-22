@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import { useCrearPin, useLogin, useMe } from "@/lib/queries/auth";
+import { MENU_PREFS_VACIAS, useMenuPrefs } from "@/lib/queries/uiMenu";
+import { primeraPantalla } from "@/components/layout/Sidebar";
 
 /** Modal de login que tapa toda la pantalla cuando no hay sesión.
  *  Solo se renderiza si `/api/v1/auth/me` devuelve `username === null`
@@ -27,15 +29,26 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   // Un `pro` que abra la raíz (o cualquier sección que no es suya) acabaría
-  // en una página vacía llena de 403. Se le lleva a lo suyo.
+  // en una página vacía llena de 403. Se le lleva a lo suyo: la PRIMERA
+  // pantalla de su menú, no una fija — a Ana, que solo trabaja Moda Mujer, la
+  // dejaba en el POV BOF, que ni siquiera tiene en el menú.
   const rol = me.data?.rol;
+  const prefs = useMenuPrefs();
+  const prefsListas = Boolean(prefs.data) || prefs.isError;
   useEffect(() => {
-    if (!me.data?.username || rol !== "pro") return;
-    if (!pathname.startsWith("/tiktok-shop-ai-pro")) {
-      // typedRoutes exige la aserción: la ruta es literal y existe.
-      router.replace("/tiktok-shop-ai-pro/nicho-pov-bof" as never);
+    if (!me.data?.username || rol !== "pro" || !prefsListas) return;
+    const mias = prefs.data ?? MENU_PREFS_VACIAS;
+    // También si cae en una pantalla que se ha escondido (la última que
+    // abrió, un enlace viejo): lo escondido es "no quiero verlo", y abrir la
+    // app ahí es justo lo contrario.
+    const escondida = mias.ocultos.some(
+      (k) => k.startsWith("/tiktok-shop-ai-pro/") && (pathname === k || pathname.startsWith(`${k}/`)),
+    );
+    if (!pathname.startsWith("/tiktok-shop-ai-pro/") || escondida) {
+      // typedRoutes exige la aserción: la ruta sale del propio menú.
+      router.replace(primeraPantalla(rol, mias) as never);
     }
-  }, [me.data?.username, rol, pathname, router]);
+  }, [me.data?.username, rol, pathname, router, prefsListas, prefs.data]);
 
   // Mientras carga el `/me`, mostramos el layout normal — los hijos pueden
   // que también requieran auth pero los queries fallarán con 401 y los

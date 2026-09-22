@@ -266,6 +266,21 @@ export function aplicarPrefs(nav: NavGroup[], prefs: MenuPrefs): NavGroup[] {
   );
 }
 
+/** La primera pantalla del menú de quien entra: es a donde se le lleva al
+ *  abrir la app. Sale del mismo cálculo que pinta la sidebar, así que lo
+ *  primero que ve y lo primero del menú son siempre lo mismo. */
+export function primeraPantalla(
+  rol: string | null | undefined,
+  prefs: MenuPrefs,
+): string {
+  for (const n of aplicarPrefs(navPara(rol), prefs)) {
+    const primero = n.kind === "group" ? n.items[0] : undefined;
+    if (primero) return primero.href;
+    if (n.kind === "single" && n.item.href !== "/") return n.item.href;
+  }
+  return `${BASE_AI_PRO}/nicho-pov-bof`;
+}
+
 export function navPara(rol: string | null | undefined): NavGroup[] {
   if (rol !== "pro") {
     return NAV.map((n) =>
