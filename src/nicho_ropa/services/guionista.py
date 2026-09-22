@@ -163,6 +163,89 @@ _FORMATO = (
 )
 
 
+# Con el formato partido se piden los textos YA separados, uno por clip, como
+# las escenas del Nicho General. Escribir uno largo y partirlo después dejaba
+# mitades desiguales y frases cortadas por el medio: el clip 2 empezaba con
+# "y además…" y uno de los dos se pasaba de lo que cabe en 8 segundos.
+def _formato_clips(partes: int, tope: int, segundos: int) -> str:
+    ejemplo = ", ".join(f'"lo que dice en el clip {i}"' for i in range(1, partes + 1))
+    return (
+        "\n\nEste vídeo se graba en "
+        f"{partes} clips SEPARADOS de {segundos} segundos cada uno, en dos "
+        "sitios distintos, y luego se pegan. Así que no escribas un texto y lo "
+        f"partas: escribe {partes} textos, uno por clip, y cada uno:\n"
+        f"- con {tope} caracteres COMO MÁXIMO, contando espacios y signos "
+        f"(es lo que se puede decir con calma en {segundos} segundos);\n"
+        "- hecho de frases COMPLETAS: ninguna frase empieza en un clip y acaba "
+        "en el otro;\n"
+        "- el clip 1 abre con el gancho y las primeras características; el "
+        "último cierra con la mejor referencia de la prenda.\n"
+        "Entre todos siguen las reglas de arriba (variar gancho, tono y "
+        "cierre, no inventar nada).\n\n"
+        "Devuelve SOLO un JSON, sin nada más y sin ```:\n"
+        f'{{"clips": [{ejemplo}]}}\n'
+        "Solo lo que dice la persona, sin comillas, sin el nombre del producto "
+        "al final y sin copiar el resto del prompt."
+    )
+
+
+# Lo que se le añade a CADA bloque de vídeo de un formato partido. En 8
+# segundos el generador empieza a mover los labios en el primer fotograma y
+# se comía la primera palabra, y apuraba hasta el último y se comía la última
+# frase: un respiro a cada lado lo evita.
+def nota_tiempos(segundos: int) -> str:
+    return (
+        f"\n\nTiempos: el clip dura {segundos} segundos. Empieza a hablar "
+        "pasado medio segundo, a ritmo natural y sin prisa, y termina la "
+        "última frase antes del último segundo, dejando un instante de "
+        "silencio al final. Di el texto completo, sin cortar ninguna palabra."
+    )
+
+
+def _clips_que_caben(
+    prompt: str, descripcion: str, imagenes, clips: list[str], tope: int,
+    segundos: int, on_log: OnLog,
+) -> list[str]:
+    """Una reescritura para los clips que se pasan; si aun así no, se cortan."""
+    from src.tiktok_shop.api.gemini import generate_json
+
+    largos = [i for i, c in enumerate(clips) if len(c) > tope]
+    if not largos:
+        return clips
+    on_log(
+        "[nicho_ropa] clips que no caben en "
+        f"{segundos}s: {', '.join(f'{i + 1} ({len(clips[i])} car)' for i in largos)}"
+        " — se pide una reescritura"
+    )
+    aviso = (
+        "\n\nATENCIÓN: estos textos se pasan de "
+        f"{tope} caracteres y no caben en {segundos} segundos:\n"
+        + "\n".join(f"clip {i + 1} ({len(clips[i])}): «{clips[i]}»" for i in largos)
+        + f"\n\nDevuelve el MISMO JSON con todos los clips, dejando cada uno en "
+        f"{int(tope * 0.9)} caracteres o menos. Quita una característica entera "
+        "antes que recortar una frase por la mitad: lo lee una voz en alto."
+    )
+    try:
+        datos = generate_json(
+            prompt + _formato_clips(len(clips), tope, segundos) + aviso,
+            descripcion, images=imagenes,
+        )
+        nuevos = [_limpiar_dice(str(c)) for c in (datos or {}).get("clips") or []]
+        if len(nuevos) == len(clips) and all(nuevos):
+            clips = nuevos
+    except Exception as e:  # noqa: BLE001 — valen los primeros antes que nada
+        on_log(f"[nicho_ropa] no se pudo reescribir: {e}")
+    # Último recurso, por clip: cortar por la última frase entera.
+    salida = []
+    for i, c in enumerate(clips, start=1):
+        if len(c) > tope:
+            corto = recortar(c, tope)
+            on_log(f"[nicho_ropa] clip {i}: {len(c)} car. → {len(corto)} (cortado por la última frase)")
+            c = corto
+        salida.append(c)
+    return salida
+
+
 def escribir(
     *,
     prompt: str,
@@ -181,6 +264,7 @@ def escribir(
     # clip). El total puede caber y una mitad no: el corte cae en un punto,
     # no en el centro exacto.
     caracteres_clip: int = 0,
+    segundos_clip: int = 8,
     on_log: OnLog = _noop,
 ) -> dict:
     """`{dice, video, videos}` para una prenda. Lanza si Gemini no lo escribe."""
@@ -200,6 +284,13 @@ def escribir(
         descripcion += f" Descripción: {caption.strip()}"
 
     imagenes = [str(f) for f in (fotos or [])] or None
+
+    if partes > 1 and caracteres_clip:
+        return _escribir_por_clips(
+            prompt, descripcion, imagenes, partes, caracteres_clip,
+            segundos_clip, on_log,
+        )
+
     datos = generate_json(prompt + _FORMATO, descripcion, images=imagenes)
     if not isinstance(datos, dict):
         raise ValueError(
@@ -274,3 +365,31 @@ def _acortar(
     if not nueva or len(nueva) >= len(dice):
         return {}
     return {"dice": nueva}
+
+
+
+def _escribir_por_clips(
+    prompt: str, descripcion: str, imagenes, partes: int, tope: int,
+    segundos: int, on_log: OnLog,
+) -> dict:
+    """Un texto por clip, cada uno con su tope y sus tiempos."""
+    from src.tiktok_shop.api.gemini import generate_json
+
+    datos = generate_json(
+        prompt + _formato_clips(partes, tope, segundos), descripcion, images=imagenes,
+    )
+    clips = [_limpiar_dice(str(c)) for c in (datos or {}).get("clips") or []]
+    clips = [c for c in clips if c]
+    if len(clips) != partes:
+        # Si devuelve uno solo (o tres), se reparte lo que haya: mejor eso que
+        # tirar la llamada.
+        junto = " ".join(clips) or _limpiar_dice(str((datos or {}).get("dice") or ""))
+        if not junto:
+            raise ValueError("Gemini no devolvió lo que se dice en los clips")
+        on_log(f"[nicho_ropa] llegaron {len(clips)} clips en vez de {partes}: se reparten")
+        clips = partir(junto, partes)
+    clips = _clips_que_caben(prompt, descripcion, imagenes, clips, tope, segundos, on_log)
+    videos = [
+        (_montar_video(prompt, c) or c) + nota_tiempos(segundos) for c in clips
+    ]
+    return {"dice": " ".join(clips), "video": videos[0], "videos": videos}

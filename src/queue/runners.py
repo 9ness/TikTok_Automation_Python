@@ -1782,6 +1782,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                 max_caracteres=tope,
                 partes=int(estilo.get("partes") or 1),
                 caracteres_clip=int(estilo.get("caracteres_clip") or 0),
+                segundos_clip=int(estilo.get("segundos_clip") or 8),
                 on_log=on_log,
             )
         except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda

@@ -234,16 +234,23 @@ TEXTO_MARCA: dict[str, dict] = {
 }
 
 
+# El ritmo del Nicho General, que es el que ya funciona en clips de 8s: 136
+# caracteres para 8 segundos (17 car/s).
+CARACTERES_POR_SEGUNDO_CLIP = 17
+
+
 def caracteres_por_clip(meta: dict) -> int:
     """Lo que cabe en un clip de ese formato. 0 = no se parte.
 
-    18 car/s por el 90%: la voz entra y sale con un respiro, y medido al
-    límite el generador se comía la última palabra.
+    Se descuenta UN segundo: el bloque de vídeo pide empezar a hablar pasado
+    medio segundo y acabar antes del último (`nota_tiempos`), porque sin ese
+    respiro el generador se comía la primera palabra y la última frase. 8s →
+    7s hablados → 119 caracteres.
     """
     segundos = int(meta.get("segundos_clip") or 0)
     if not segundos or int(meta.get("partes") or 1) < 2:
         return 0
-    return int(segundos * CARACTERES_POR_SEGUNDO * 0.9)
+    return (segundos - 1) * CARACTERES_POR_SEGUNDO_CLIP
 
 
 def partes_de_modo(modo: str) -> int:
@@ -1028,6 +1035,7 @@ def prompts_mof10(
             "partes": int(meta.get("partes") or 1),
             # Lo que cabe en CADA clip, para repartir el guion sin pasarse.
             "caracteres_clip": caracteres_por_clip(meta),
+            "segundos_clip": int(meta.get("segundos_clip") or 0),
             "guion": _nota_plazos(
                 _nota_duracion(
                     _con_duracion(_con_plazos(guion, plazos), dur, tope), dur,
