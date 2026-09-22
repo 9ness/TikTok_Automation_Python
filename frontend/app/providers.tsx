@@ -17,6 +17,7 @@ import { useMe } from "@/lib/queries/auth";
 import { ThemeProvider } from "@/lib/theme";
 import { useTheme } from "next-themes";
 import { useMenuPrefs } from "@/lib/queries/uiMenu";
+import { medirDialogo } from "@/lib/chivato";
 import { avisarModalAbierto, esAppNativa } from "@/lib/subidaNativa";
 
 /** Rellena la caché con lo último que vio ESTA persona.
@@ -99,11 +100,22 @@ function ModalesEnLaApp() {
   useEffect(() => {
     if (typeof document === "undefined") return;
     let ultimo = false;
+    const relojes: ReturnType<typeof setTimeout>[] = [];
     const mirar = () => {
       const abierto = Boolean(document.querySelector('[role="dialog"][data-state="open"]'));
       if (abierto !== ultimo) {
         ultimo = abierto;
         avisarModalAbierto(abierto);
+        // Chivato temporal del diálogo "a medias" de la app: se mide nada más
+        // abrir y otra vez cuando ya han llegado los datos, que es justo lo
+        // que en el móvil parece no repintarse. Se mide en TODOS los sitios a
+        // propósito: comparar la medida del móvil con la del PC es media
+        // respuesta, y si la marca `app-nativa` no se estuviera aplicando —que
+        // también lo explicaría— medir solo dentro de la app no lo enseñaría.
+        if (abierto) {
+          relojes.push(setTimeout(() => medirDialogo("recien"), 250));
+          relojes.push(setTimeout(() => medirDialogo("con_datos"), 1500));
+        }
       }
     };
     const obs = new MutationObserver(mirar);
@@ -116,6 +128,7 @@ function ModalesEnLaApp() {
     mirar();
     return () => {
       obs.disconnect();
+      relojes.forEach(clearTimeout);
       if (ultimo) avisarModalAbierto(false);
     };
   }, []);

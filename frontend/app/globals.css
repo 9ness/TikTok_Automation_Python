@@ -281,4 +281,25 @@
     -webkit-backdrop-filter: none !important;
     background-color: rgb(0 0 0 / 0.85) !important;
   }
+
+  /* Y el centrado SIN `transform`.
+   *
+   * Quitar la animación y el desenfoque no bastó (3.2 seguía a medias). Lo que
+   * queda es cómo se centra: `translate(-50%,-50%)` promociona el diálogo a su
+   * propia capa, y en el WebView esa capa se quedaba con el PRIMER fotograma
+   * —el diálogo recién montado, todavía sin la lista de cuentas ni el detalle—
+   * y no se repintaba cuando llegaban los datos. De ahí que siempre se viera
+   * justo lo que hay en el primer render: la cabecera, o la fila de pestañas.
+   *
+   * `inset:0` + `margin:auto` centra igual y no crea capa. Se aplica solo a
+   * los diálogos que se centran así (`translate-x-`), no a los paneles que se
+   * pegan a un lado. */
+  html.app-nativa [role="dialog"][class*="translate-x-"] {
+    inset: 0;
+    transform: none;
+    margin: auto;
+    height: fit-content;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+  }
 }
