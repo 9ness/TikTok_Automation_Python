@@ -62,7 +62,9 @@ def _norm(texto: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9ñ ]+", " ", t).split())
 
 
-def _transcribir(clip: Path, work_dir: Path, on_log: OnLog) -> str:
+def _transcribir(
+    clip: Path, work_dir: Path, on_log: OnLog, modelo: str = "small",
+) -> str:
     """Lo que se oye en el clip. Cadena vacía si no se puede transcribir."""
     from src.subtitles import transcribe
 
@@ -73,7 +75,7 @@ def _transcribir(clip: Path, work_dir: Path, on_log: OnLog) -> str:
              "-vn", "-ac", "1", "-ar", "16000", str(wav)],
             check=True, capture_output=True,
         )
-        palabras = transcribe(str(wav), model_size="small", language="es")
+        palabras = transcribe(str(wav), model_size=modelo, language="es")
     except Exception as e:  # noqa: BLE001
         on_log(f"[nicho_general] no se pudo transcribir {clip.name}: {e}")
         return ""
@@ -82,6 +84,10 @@ def _transcribir(clip: Path, work_dir: Path, on_log: OnLog) -> str:
 
 def ordenar_clips(
     clips: list[Path], escenas: list[dict], work_dir: Path, on_log: OnLog = _noop,
+    # Qué Whisper usar. Aquí va "small" (más fino con escenas parecidas), pero
+    # quien ya tenga otro cargado debe pedir ESE: Whisper guarda un solo modelo
+    # en memoria y cambiar de tamaño lo recarga entero cada vez.
+    modelo: str = "small",
 ) -> list[Path]:
     """Los clips en el orden de las escenas, por lo que se dice en cada uno.
 
@@ -97,7 +103,7 @@ def ordenar_clips(
     if len(clips) < 2:
         return list(clips)
 
-    dichos = [_norm(_transcribir(c, work_dir, on_log)) for c in clips]
+    dichos = [_norm(_transcribir(c, work_dir, on_log, modelo)) for c in clips]
     guiones = [_norm(e.get("guion") or "") for e in escenas]
     if not all(dichos) or not all(guiones):
         on_log(

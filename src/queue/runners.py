@@ -1876,7 +1876,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             # subida sin decir nada.
             orden_dir = raw_path.parent / f"orden_{producto}"
             orden_dir.mkdir(parents=True, exist_ok=True)
-            ordenados = ordenar_clips(rutas, escenas, orden_dir, on_log)
+            # "base", el MISMO que usan los subtítulos después: Whisper guarda
+            # un solo modelo en memoria y con "small" aquí y "base" allí se
+            # recargaba dos veces por vídeo. Para distinguir dos clips basta.
+            ordenados = ordenar_clips(rutas, escenas, orden_dir, on_log, modelo="base")
             shutil.rmtree(orden_dir, ignore_errors=True)
             if [str(x) for x in ordenados] != [str(x) for x in rutas]:
                 on_log("[nicho_ropa] los clips estaban cambiados de hueco: se pegan en el orden del guion")
