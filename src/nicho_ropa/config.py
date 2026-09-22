@@ -899,18 +899,57 @@ def nota_temporada_guion() -> str:
     )
 
 
-def nota_temporada() -> str:
-    """El apunte de la época que se le pega al prompt de imagen."""
+# Lo que se VE en cada estación. "Que parezca otoño" a secas no bastaba: la
+# primera prueba salió con un jardín verde de pleno verano. A un generador de
+# imagen hay que darle cosas que pintar, no una fecha.
+_PISTAS_EN = {
+    "autumn": "warm low-angle sunlight, trees turning yellow and orange, some fallen dry leaves on the ground",
+    "winter": "cold soft light, bare trees, passers-by in coats and scarves in the background",
+    "spring": "fresh bright green leaves, flowers in bloom, soft clear light",
+    "summer": "strong bright sunlight, lush green trees, passers-by in light summer clothes",
+}
+_PISTAS_ES = {
+    "autumn": "luz cálida y baja, árboles amarilleando y alguna hoja seca en el suelo",
+    "winter": "luz fría, árboles sin hojas y gente con abrigo al fondo",
+    "spring": "hojas verdes nuevas, flores y luz suave",
+    "summer": "sol fuerte, árboles muy verdes y gente con ropa de verano",
+}
+
+
+def _estacion_hoy() -> tuple[int, str]:
     from datetime import datetime
 
-    hoy = datetime.now()
+    mes = datetime.now().month
+    return mes, _ESTACIONES_EN[mes]
+
+
+def nota_temporada() -> str:
+    """El apunte de la época que se le pega al prompt de imagen."""
+    mes, estacion = _estacion_hoy()
     return (
-        "\n\nSEASON: this is shot in "
-        f"{_MESES_EN[hoy.month - 1]} in Spain ({_ESTACIONES_EN[hoy.month]}). "
-        "The setting, the weather, the light and any clothing that is NOT in "
-        "the reference image must look like that time of year. The referenced "
-        "garment stays exactly as it is: do not cover it, do not layer "
-        "anything over it and do not change it for the season."
+        "\n\nSEASON (mandatory): this is shot in "
+        f"{_MESES_EN[mes - 1]} in Spain ({estacion}). Show it in the scene: "
+        f"{_PISTAS_EN[estacion]}. The setting, the weather, the light and any "
+        "clothing that is NOT in the reference image must match that time of "
+        "year. The referenced garment stays exactly as it is: do not cover it, "
+        "do not layer anything over it and do not change it for the season."
+    )
+
+
+def nota_temporada_imagen2() -> str:
+    """Lo mismo para la SEGUNDA imagen, que se pide en español y en una frase.
+
+    Se creía que la heredaba del chat —es la misma conversación que hizo la
+    primera— y no: al cambiar de sitio, el generador cambiaba también de
+    estación.
+    """
+    mes, estacion = _estacion_hoy()
+    from src.nicho_pov_bof import config as pov_config
+
+    return (
+        f" Sigue siendo {pov_config._MESES[mes - 1]} en España, en "
+        f"{pov_config.estacion_actual()}: que se note ({_PISTAS_ES[estacion]}). "
+        "La prenda no cambia."
     )
 
 
@@ -957,7 +996,10 @@ def prompts_mof10(
             + nota_temporada(),
             # La SEGUNDA imagen, en los formatos que se graban en dos partes.
             # Vacío en el resto: la pantalla solo pinta el botón si viene.
-            "imagen2": _limpio(meta["imagen2"]) if meta.get("imagen2") else "",
+            "imagen2": (
+                _limpio(meta["imagen2"]) + nota_temporada_imagen2()
+                if meta.get("imagen2") else ""
+            ),
             # Cuántos clips hay que generar y subir. 1 = como siempre.
             "partes": int(meta.get("partes") or 1),
             "guion": _nota_plazos(
