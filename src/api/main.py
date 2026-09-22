@@ -381,6 +381,10 @@ _PREFIJOS_PRO = (
     # respondía 403 al leer sus preferencias y se caía al menú del rol: lo que
     # se le escondiera por persona no se aplicaba nunca.
     "/api/v1/ui",
+    # Solo LEER el estado del despliegue (el aviso "Al día · último
+    # despliegue…" de la Cola). Nada de `/run`, `/rebuild` ni `/restart`:
+    # por eso va la ruta exacta y no el prefijo `/api/v1/deploy`.
+    "/api/v1/deploy/status",
     "/api/v1/queue",
     "/api/v1/auth",
     "/api/v1/health",
