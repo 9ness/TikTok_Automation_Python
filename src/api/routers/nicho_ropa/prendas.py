@@ -427,7 +427,7 @@ def _montando(queue: JobQueue | None, carpeta: str) -> set[str]:
         return set()
     activos = set()
     try:
-        for job in queue.list_jobs():
+        for job in queue.get_all():
             if job.mode != JobMode.NICHO_ROPA_VIDEO:
                 continue
             if str(job.params.get("carpeta") or config.CARPETA_DEFECTO) != carpeta:
@@ -539,7 +539,7 @@ def _escribiendo_guiones(queue: JobQueue | None, carpeta: str) -> bool:
             job.mode == JobMode.NICHO_ROPA_GUIONES
             and str(job.params.get("carpeta") or "") == carpeta
             and job.status in (JobStatus.PENDING, JobStatus.RUNNING)
-            for job in queue.list_jobs()
+            for job in queue.get_all()
         )
     except Exception:  # noqa: BLE001 — el sondeo es un adorno
         return False
