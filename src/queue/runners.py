@@ -1784,6 +1784,8 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                 partes=int(estilo.get("partes") or 1),
                 caracteres_clip=int(estilo.get("caracteres_clip") or 0),
                 segundos_clip=int(estilo.get("segundos_clip") or 8),
+                # Formato de la tienda: pide también los colores que nombra.
+                colores=bool(estilo.get("colores")),
                 on_log=on_log,
             )
         except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
@@ -1792,9 +1794,13 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         product_repo.guardar_guion(
             carpeta, pid, modo, escrito["dice"], escrito["video"],
             escrito.get("videos"), usuario=usuario,
+            colores=escrito.get("colores"),
         )
         hechos += 1
-        on_log(f"[nicho_ropa] {pid}: guion de {len(escrito['dice'])} caracteres")
+        on_log(
+            f"[nicho_ropa] {pid}: guion de {len(escrito['dice'])} caracteres"
+            + (f" · colores: {', '.join(escrito['colores'])}" if escrito.get("colores") else "")
+        )
 
     if not hechos and fallos:
         raise RuntimeError("No se pudo escribir ningún guion. " + " · ".join(fallos[:3]))
@@ -1890,6 +1896,27 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             raw_path = rutas[0]
         else:
             on_log("[nicho_ropa] sin guion por clip guardado: se pegan en el orden en que se subieron")
+        # Formato de la tienda: los cortes de color al principio del clip 1
+        # (ya en el orden del guion). Se recolorea su primer fotograma con
+        # Gemini, un color por corte, y se intercalan al ritmo en que la chica
+        # los nombra. Si algo falla, el vídeo sale sin cortes: nunca se tira
+        # un montaje por un adorno.
+        if ropa_config.lleva_colores(modo):
+            colores = product_repo.guion_de(prod, modo).get("colores") or []
+            if len(colores) >= 2:
+                on_progress(0.28, f"🎨 Cortes de color ({', '.join(colores)})…")
+                from src.nicho_ropa.pipeline import colores as colores_pipe
+
+                try:
+                    rutas[0] = colores_pipe.aplicar(
+                        rutas[0], colores, raw_path.parent / f"colores_{producto}",
+                        on_log,
+                    )
+                    raw_path = rutas[0]
+                except Exception as e:  # noqa: BLE001 — sin cortes antes que sin vídeo
+                    on_log(f"[nicho_ropa] ⚠️ sin cortes de color: {str(e)[:160]}")
+            else:
+                on_log("[nicho_ropa] el guion no trae dos colores o más: sin cortes de color")
         on_progress(0.3, f"🔗 Pegando {len(rutas)} clips…")
         raw_path = video_editor.pegar(
             rutas, raw_path.with_name(f"{raw_path.stem}_pegado.mp4"), on_log,

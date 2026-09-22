@@ -201,6 +201,9 @@ def guion_de(prod: dict, modo: str) -> dict:
         "dice": str(guion.get("dice") or ""),
         "video": str(guion.get("video") or ""),
         "videos": videos or ([str(guion.get("video"))] if guion.get("video") else []),
+        # Los colores que nombra al empezar (formato de la tienda), con el
+        # puesto el último. Vacío en el resto de formatos.
+        "colores": [str(c) for c in (guion.get("colores") or []) if str(c).strip()],
         # Los primeros se guardaron con fecha en ISO: si no es un número, se
         # sirve 0 en vez de reventar la lista entera de la carpeta.
         "guion_at": int(guion.get("at") or 0) if str(guion.get("at") or "").isdigit() else 0,
@@ -210,6 +213,7 @@ def guion_de(prod: dict, modo: str) -> dict:
 def guardar_guion(
     carpeta: str, producto: str, modo: str, dice: str, video: str,
     videos: "list[str] | None" = None, usuario: str = "",
+    colores: "list[str] | None" = None,
 ) -> dict:
     """Apunta el guion de un modo sin tocar el de los demás ni su vídeo."""
     from src.nicho_ropa import config
@@ -226,6 +230,9 @@ def guardar_guion(
             # Un bloque por clip. En los formatos de un solo clip es `video`
             # repetido, y así la pantalla pinta lo mismo sin preguntar.
             "videos": list(videos or [video]),
+            # Los colores que nombra (formato de la tienda): los lee el
+            # montaje para los cortes de color. Vacío en los demás.
+            "colores": [str(c) for c in (colores or []) if str(c).strip()],
             "at": int(time.time()),
         }
         prod["updated_at"] = _now()

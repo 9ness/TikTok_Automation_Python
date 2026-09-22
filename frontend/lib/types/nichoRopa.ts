@@ -35,6 +35,9 @@ export interface EstiloMof10 {
   partes?: number;
   /** Lo que cabe en cada clip cuando el formato se parte. */
   caracteres_clip?: number;
+  /** El montaje mete los cortes de color del principio (formato de la
+   *  tienda): los genera la app, el operador solo sube los clips. */
+  colores?: boolean;
   /** Tope de caracteres que se le pide al guion. */
   caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
@@ -136,6 +139,9 @@ export interface PrendaItem {
   guiones?: string[];
   /** Qué huecos tienen ya su clip subido, esperando al resto (1, 2…). */
   clips_subidos?: number[];
+  /** Los colores que nombra el guion (formato de la tienda), el puesto el
+   *  último: son los que se recolorean al montar. */
+  guion_colores?: string[];
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

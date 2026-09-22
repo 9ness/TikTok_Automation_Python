@@ -54,6 +54,10 @@ class EstiloMof10(BaseModel):
     partes: int = 1
     # Lo que cabe en cada clip cuando el formato se parte (0 = no se parte).
     caracteres_clip: int = 0
+    # El montaje mete los cortes de color al principio (formato de la
+    # tienda): los genera la app recoloreando el primer fotograma, así que el
+    # operador no sube nada más que los clips.
+    colores: bool = False
 
 
 class ModoRopa(BaseModel):
@@ -179,6 +183,10 @@ class PrendaInfo(BaseModel):
     # En los formatos de varios clips, qué huecos tienen ya el suyo subido y
     # esperando al resto (1, 2…). Es lo que pinta el ✓ en cada botón.
     clips_subidos: list[int] = Field(default_factory=list)
+    # Los colores que nombra el guion (formato de la tienda), el puesto el
+    # último. Es lo que recolorea el montaje; se enseña para poder comprobar
+    # que son los de la ficha antes de generar.
+    guion_colores: list[str] = Field(default_factory=list)
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

@@ -315,6 +315,7 @@ saca.
 | 👗 Moda Mujer | MOF MUJER 10s FRENTE A ESPEJO (imagen→vídeo, ONMI) | `nicho_ropa` espejo (`mujer_web`) |
 | 👗 Moda Mujer | BOLSO MOF MUJER POV ONMI 10S | ⬜ no lo tenemos |
 | 👗 Moda Mujer | Grok o Onmi (Dividido) 15 Segundos en Calle | `nicho_ropa` calle_dividido (`mujer_web`) |
+| 👗 Moda Mujer | _(no es suyo)_ Tienda Colores 15s — receta de 5 virales de pantalones (sep 2026) | `nicho_ropa` tienda_colores (`mujer_web`): dos clips de 8s en una tienda, la app mete los cortes de color |
 | 🎥 Nichos POV | POV MOF ESP/USA 20 SEGUNDOS GANCHO PUNTO DE DOLOR | `nicho_pov_bof_largo/prompts/guion_dolor.md` |
 | 🎥 Nichos POV | POV MOF ESP/USA 20 SEGUNDOS GANCHO URGENCIA DE PRECIO | `nicho_pov_bof_largo/prompts/guion.md` |
 | 🎥 Nichos POV | POV/BOF 10 SEGUNDOS ONMI | `nicho_pov_bof/prompts/guion_producto.md` |

@@ -1038,8 +1038,21 @@ export function PantallaRopa({
                   <li className="text-fuchsia-300">
                     ✂️ Este formato va PARTIDO en {e.partes} clips: copia
                     también la <strong className="text-foreground">imagen 2</strong>{" "}
-                    (la misma chica en otra calle) y usa un guion por clip —
-                    cada uno dice su mitad.
+                    ({e.colores
+                      ? "la misma chica de espaldas, en la misma tienda"
+                      : "la misma chica en otra calle"}
+                    ) y usa un guion por clip — cada uno lleva su texto y su
+                    movimiento.
+                  </li>
+                )}
+                {e.colores && (
+                  <li className="text-sky-300">
+                    🎨 Los cortes de color del principio los monta la app
+                    sola: recolorea el primer fotograma del clip 1 con Gemini
+                    (uno por color del guion, ~4 cts cada uno) y los mete al
+                    ritmo de las palabras. NO generes nada más: la chica del
+                    clip 1 se queda quieta mientras nombra los colores, y el
+                    que lleva puesto se dice el último.
                   </li>
                 )}
                 <li>
@@ -1663,6 +1676,32 @@ function PrendaCard({
           y se pega en el generador junto con la imagen del paso 1; el botón de
           rehacerlo está porque cada pasada da un tono distinto y a veces la
           primera no convence (cuesta una llamada a la IA). */}
+      {/* Los colores que nombra el guion (formato de la tienda), el puesto
+          el último: son los que se recolorean al montar. Se enseñan para
+          poder cotejarlos con la ficha ANTES de generar el clip. */}
+      {conGuion && (prenda.guion_colores ?? []).length > 0 && (
+        <p
+          className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground"
+          title="Colores que nombra al empezar; el último es el que lleva puesto y el vídeo sigue con él"
+        >
+          🎨
+          {(prenda.guion_colores ?? []).map((c, i, arr) => (
+            <span
+              key={`${c}-${i}`}
+              className={`rounded-full border px-1.5 py-px ${
+                i === arr.length - 1
+                  ? "border-sky-500/60 text-sky-300"
+                  : "border-border/60"
+              }`}
+            >
+              {c}
+            </span>
+          ))}
+          {(prenda.guion_colores ?? []).length < 2 && (
+            <span className="text-amber-500">· un solo color: sin cortes</span>
+          )}
+        </p>
+      )}
       {conGuion && (
         <div className="flex gap-1">
           {/* Un botón por clip: en el formato de calle dividido cada mitad

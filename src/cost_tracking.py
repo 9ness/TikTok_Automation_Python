@@ -60,6 +60,10 @@ _GEMINI_RATES_PER_1M: dict[str, tuple[float, float]] = {
     # (input_per_1M, output_per_1M) — input incluye texto/imagen/vídeo.
     "gemini-2.5-pro":                (1.25, 10.00),
     "gemini-2.5-flash":              (0.30, 2.50),
+    # Modelo de IMAGEN (Nano Banana): la salida se cobra por tokens de imagen
+    # (~1290 por imagen → ~$0,039). Va antes que "gemini-2.5-flash" en el
+    # prefijo por ser más largo. Lo usa el recolor del Nicho Ropa.
+    "gemini-2.5-flash-image":        (0.30, 30.00),
     "gemini-3.5-flash":              (1.50, 9.00),
     "gemini-3.1-flash-lite-preview": (0.25, 1.50),
     # alias legacy del proyecto (Flash CR)

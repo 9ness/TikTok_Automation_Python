@@ -353,6 +353,13 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
   mismo Redis: las separa el flag `web` de `/carpetas`, y la pantalla es el
   mismo componente con `variante`.
 
+- **Tienda Colores 15s** (`tienda_colores`, Moda Mujer aleatorios) NO es del
+  curso: es la receta de cinco virales de pantalones. Dos clips de 8s (frente
+  / espaldas) como calle dividido, y el gancho —la chica nombra 3-4 colores y
+  el pantalón cambia en cada uno— lo monta la app: recolorea el primer
+  fotograma del clip 1 con Gemini imagen (`services/recolor.py`, ~4 cts por
+  color, `record_gemini`) y lo intercala al ritmo de la voz
+  (`pipeline/colores.py`). El guion guarda `colores` (el puesto, el último).
 - Los formatos cuyo guion se escribe FUERA (espejo, selfie, gafas) ya no piden
   pasar por ChatGPT a mano: `services/guionista.py` manda a Gemini el MISMO
   prompt del curso + los textos y fotos de la prenda, y el bloque para el

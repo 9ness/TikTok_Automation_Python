@@ -182,6 +182,18 @@ MODOS: dict[str, dict] = {
         "estilo_mof10": "calle_dividido",
         "sexos": ("mujer",),
     },
+    # NUESTRO, no del curso: la receta de cinco virales de pantalones (sep
+    # 2026). Como el de calle dividido son dos clips de 8s, pero en una
+    # TIENDA y con el arranque de colores: la chica nombra tres o cuatro y
+    # en cada uno el pantalón cambia de golpe. Ese corte no lo hace Flow —
+    # lo monta la app recoloreando el primer fotograma (ver `colores` en el
+    # estilo y `pipeline/colores.py`).
+    "tienda_colores": {
+        "desc": "En una tienda, top blanco y cuerpo entero. Arranca nombrando los colores (el pantalón cambia en cada uno, lo monta la app), enseña cintura y bolsillos, se da la vuelta y se agacha. DOS clips de 8s.",
+        "label": "🏬 Tienda Colores 15s",
+        "estilo_mof10": "tienda_colores",
+        "sexos": ("mujer",),
+    },
     # ---- MARCA PERSONAL (sep 2026) -------------------------------------
     # La otra modalidad de Moda Mujer. Lo que la separa de los de arriba no es
     # el estilo, es la CUENTA: aquellos van con personajes distintos cada vez y
@@ -261,6 +273,11 @@ def partes_de_modo(modo: str) -> int:
 def lleva_flecha(modo: str) -> bool:
     """Si a ese formato se le pone la flecha al carrito al final."""
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("flecha"))
+
+
+def lleva_colores(modo: str) -> bool:
+    """Si ese formato arranca con los cortes de color (los monta la app)."""
+    return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("colores"))
 
 
 def lleva_subtitulos(modo: str) -> bool:
@@ -471,6 +488,11 @@ def _limpio(fichero: str) -> str:
     from src.nicho_pov_bof.config import limpiar_prompt
 
     return limpiar_prompt((prompts_dir() / fichero).read_text(encoding="utf-8"))
+
+
+def prompt_recolor(color: str) -> str:
+    """El encargo a Gemini para recolorear el primer fotograma a ESE color."""
+    return _limpio("recolor_prenda.md").replace("{{COLOR}}", color.strip())
 
 
 def prompts_dir() -> Path:
@@ -853,6 +875,36 @@ ESTILOS_MOF10: dict[str, dict] = {
         },
         "derivado": (),
     },
+    # El de la tienda con los colores. Mismo esqueleto que el de calle
+    # dividido (dos clips de 8s, segunda imagen, subtítulos y flecha) y una
+    # cosa que no tiene ningún otro:
+    #   `colores`    el guion devuelve además la lista de colores que nombra
+    #                (el puesto, el último), y al montar se recolorea el
+    #                primer fotograma del clip 1 con Gemini y se intercalan
+    #                los cortes al ritmo de las palabras. El operador NO
+    #                genera nada más: sube los dos clips y ya.
+    # El tope es más bajo que el de calle dividido: medido sobre cinco
+    # virales, los que cabían sin comerse palabras iban de 236 a 276
+    # caracteres de UNA pieza; partido en dos clips con respiro, 230.
+    "tienda_colores": {
+        "duraciones": False,
+        "label": "Tienda colores · 15s en dos clips",
+        "voz": True,
+        "segundos_clip": 8,
+        "caracteres": 230,
+        "partes": 2,
+        "subtitulos": True,
+        "flecha": True,
+        "colores": True,
+        "imagen2": "prompt_mof10_tienda_colores_imagen2.md",
+        "por_sexo": {
+            "mujer": (
+                "prompt_mof10_tienda_colores_imagen.md",
+                "prompt_mof10_tienda_colores_guion.md",
+            ),
+        },
+        "derivado": (),
+    },
 }
 
 
@@ -1060,6 +1112,9 @@ def prompts_mof10(
             "partes": int(meta.get("partes") or 1),
             # Lo que cabe en CADA clip, para repartir el guion sin pasarse.
             "caracteres_clip": caracteres_por_clip(meta),
+            # Si el montaje intercala los cortes de color al principio (los
+            # genera la app, no el operador): la pantalla lo avisa.
+            "colores": bool(meta.get("colores")),
             "segundos_clip": int(meta.get("segundos_clip") or 0),
             "guion": _nota_plazos(
                 _nota_duracion(

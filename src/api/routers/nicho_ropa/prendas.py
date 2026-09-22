@@ -556,6 +556,7 @@ def list_prendas(
             clips_subidos=sorted(
                 int(k) for k in product_repo.clips_de(prod, modo) if str(k).isdigit()
             ),
+            guion_colores=guiones.get(pid, {}).get("colores", []),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),

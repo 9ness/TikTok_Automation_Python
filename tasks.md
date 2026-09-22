@@ -113,6 +113,19 @@ subir con el ⬆ de esa fila → quemar textos.
   papeles cambiados, marcado "derivado" en la pantalla. Al primer vídeo se
   confirma, y si algún día publica el bueno se pega encima.
 
+## 🏬 Tienda Colores 15s (Moda Mujer) — listo para estrenar (22 sep 2026)
+
+- Flujo: 1 · Imagen (Flow, foto limpia como referencia) → 1b · Imagen 2 (mismo
+  chat, de espaldas) → ✍️ Escribir guiones → Guion 1 con imagen 1 y Guion 2 con
+  imagen 2 en Omni (8s cada uno) → subir Clip 1 y Clip 2. La app mete los
+  cortes de color, pega, subtitula, flecha y limpia metadatos.
+- Probar con UNA prenda real antes de una tanda: mirar que los colores del
+  guion (chips 🎨 en la tarjeta) sean los de la ficha — si Gemini se inventa
+  uno, corregir a mano rehaciendo el guion.
+- Mejora opcional: el ZIP de la web trae `Producto_N_Color_K.jpeg` (se ignoran
+  al importar); guardarlas en `colores/` y pasárselas al guion daría los
+  nombres de color exactos y una referencia para recolorear.
+
 ## 👤 Tareas Humanas
 
 - [ ] **APK nueva (WebView) — lo que queda por probar**: los CARRUSELES, que es lo único que baja por `blob:` (base64) y no se ha visto con tandas grandes. Lo demás ya está en uso: descargas a `Download/TTShopAIPro/`, subida de clips con el móvil bloqueado y el aviso de versión nueva (probado con el salto 2.0 → 2.1). Falta avisar a Ana y a Mauro de que actualicen — les sale el banner al entrar — y de que tendrán que meter el PIN otra vez.

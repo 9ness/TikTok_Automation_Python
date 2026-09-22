@@ -364,7 +364,9 @@ class TestModosPorSexo:
     def test_mujer_solo_los_que_tienen_prompt(self):
         """El del bolso existe en su web pero aún no publica sus prompts."""
         assert [m["clave"] for m in config.modos_de("mujer")] == [
-            "espejo", "camara", "calle_1", "calle_2",
+            "espejo", "camara", "calle_1", "calle_2", "calle_dividido",
+            # Nuestro, no del curso: la receta de los virales de pantalones.
+            "tienda_colores",
         ]
 
     def test_marca_personal_va_aparte(self):

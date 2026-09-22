@@ -137,12 +137,17 @@ def _espacio_cercano(texto: str, objetivo: float) -> int:
     return min(espacios, key=lambda p: abs(p - objetivo)) + 1
 
 
-def _montar_video(prompt: str, dice: str) -> str:
+def _montar_video(prompt: str, dice: str, parte: int = 0) -> str:
     """El bloque para el generador: el prompt del curso con OTRO diálogo.
 
     Se compone aquí y no se le pide a la IA porque lo único que puede cambiar
     es la frase: el movimiento y la voz son del curso, palabra por palabra, y
     cada vez que un modelo los "reescribe" salen matices que nadie pidió.
+
+    `parte` (1, 2…) es para los formatos partidos cuyo prompt trae UN
+    movimiento por clip (`Movimiento clip 1:` / `Movimiento clip 2:`, como el
+    de la tienda: de frente y luego de espaldas). Se deja solo el suyo; en los
+    prompts con un único "Movimiento:" no cambia nada.
     """
     m = _LINEA_DICE.search(prompt)
     if not m:
@@ -154,7 +159,31 @@ def _montar_video(prompt: str, dice: str) -> str:
     for corte in ("\n\nOJO:", "\n\nATENCIÓN:"):
         if corte in cuerpo:
             cuerpo = cuerpo.split(corte)[0]
+    if parte:
+        cuerpo = solo_parte(cuerpo, parte)
     return _EJEMPLO.sub(lambda _m: f"«{dice}»", cuerpo, count=1).strip()
+
+
+# Cabecera de cada bloque de movimiento por clip.
+_MOVIMIENTO_CLIP = re.compile(r"^Movimiento clip (\d+):[ \t]*$", re.MULTILINE)
+
+
+def solo_parte(cuerpo: str, parte: int) -> str:
+    """Deja el bloque `Movimiento clip <parte>:` como "Movimiento:" y quita
+    los de las demás partes. Si el texto no va por clips, sale tal cual."""
+    marcas = list(_MOVIMIENTO_CLIP.finditer(cuerpo))
+    if not marcas:
+        return cuerpo
+    comun = cuerpo[: marcas[0].start()].rstrip()
+    for i, m in enumerate(marcas):
+        fin = marcas[i + 1].start() if i + 1 < len(marcas) else len(cuerpo)
+        if int(m.group(1)) == int(parte):
+            bloque = cuerpo[m.end():fin].strip()
+            return f"{comun}\n\nMovimiento:\n\n{bloque}"
+    # Sin bloque para esa parte: se queda el primero, mejor que ninguno.
+    m = marcas[0]
+    fin = marcas[1].start() if len(marcas) > 1 else len(cuerpo)
+    return f"{comun}\n\nMovimiento:\n\n{cuerpo[m.end():fin].strip()}"
 
 
 # Se le pide SOLO la frase. Pedirle además el bloque entero "tal y como está
@@ -173,12 +202,29 @@ _FORMATO = (
 # las escenas del Nicho General. Escribir uno largo y partirlo después dejaba
 # mitades desiguales y frases cortadas por el medio: el clip 2 empezaba con
 # "y además…" y uno de los dos se pasaba de lo que cabe en 8 segundos.
-def _formato_clips(partes: int, tope: int, segundos: int) -> str:
+def _formato_clips(
+    partes: int, tope: int, segundos: int, colores: bool = False,
+) -> str:
     ejemplo = ", ".join(f'"lo que dice en el clip {i}"' for i in range(1, partes + 1))
+    # Con `colores` (formato de la tienda) se pide ADEMÁS la lista de colores
+    # que nombra, en el orden en que los dice y con el puesto el último: es lo
+    # que usa el montaje para recolorear el primer fotograma en cada corte.
+    donde = "en la misma tienda" if colores else "en dos sitios distintos"
+    json_ejemplo = (
+        f'{{"colores": ["rosa", "beige", "negro", "verde"], "clips": [{ejemplo}]}}'
+        if colores else f'{{"clips": [{ejemplo}]}}'
+    )
+    extra = (
+        '\n"colores" son los colores que nombra al empezar el clip 1, en '
+        "español, en el MISMO orden en que los dice y con el de la prenda de "
+        "la foto el ÚLTIMO. Solo los que se ven en la ficha o en las fotos; "
+        "si solo hay uno, la lista lleva solo ese y el clip 1 no los nombra."
+        if colores else ""
+    )
     return (
         "\n\nEste vídeo se graba en "
-        f"{partes} clips SEPARADOS de {segundos} segundos cada uno, en dos "
-        "sitios distintos, y luego se pegan. Así que no escribas un texto y lo "
+        f"{partes} clips SEPARADOS de {segundos} segundos cada uno, {donde}, "
+        "y luego se pegan. Así que no escribas un texto y lo "
         f"partas: escribe {partes} textos, uno por clip, y cada uno:\n"
         f"- con {int(tope * 0.9)} caracteres COMO MÁXIMO, contando espacios y "
         f"signos (es lo que se puede decir con calma en {segundos} segundos);\n"
@@ -189,10 +235,24 @@ def _formato_clips(partes: int, tope: int, segundos: int) -> str:
         "Entre todos siguen las reglas de arriba (variar gancho, tono y "
         "cierre, no inventar nada).\n\n"
         "Devuelve SOLO un JSON, sin nada más y sin ```:\n"
-        f'{{"clips": [{ejemplo}]}}\n'
+        f"{json_ejemplo}\n"
         "Solo lo que dice la persona, sin comillas, sin el nombre del producto "
-        "al final y sin copiar el resto del prompt."
+        "al final y sin copiar el resto del prompt." + extra
     )
+
+
+def limpiar_colores(valor) -> list[str]:
+    """La lista de colores tal como la devolvió la IA, saneada: strings sin
+    vacíos ni repetidos, en minúsculas, como mucho seis."""
+    if not isinstance(valor, (list, tuple)):
+        return []
+    salida: list[str] = []
+    for c in valor:
+        nombre = " ".join(str(c or "").split()).strip(" .,;«»\"'").lower()
+        # Un número o un "color" de 30 letras no es un color: fuera.
+        if nombre and not nombre.isdigit() and len(nombre) <= 24 and nombre not in salida:
+            salida.append(nombre)
+    return salida[:6]
 
 
 # Lo que se le añade a CADA bloque de vídeo de un formato partido. En 8
@@ -284,9 +344,12 @@ def escribir(
     # no en el centro exacto.
     caracteres_clip: int = 0,
     segundos_clip: int = 8,
+    # Formato de la tienda: se pide además la lista de colores que nombra
+    # (ver `_formato_clips`) y sale en `colores`.
+    colores: bool = False,
     on_log: OnLog = _noop,
 ) -> dict:
-    """`{dice, video, videos}` para una prenda. Lanza si Gemini no lo escribe."""
+    """`{dice, video, videos[, colores]}` para una prenda. Lanza si Gemini no lo escribe."""
     from src.tiktok_shop.api.gemini import generate_json
 
     descripcion = f"Producto: {titulo.strip()}."
@@ -307,7 +370,7 @@ def escribir(
     if partes > 1 and caracteres_clip:
         return _escribir_por_clips(
             prompt, descripcion, imagenes, partes, caracteres_clip,
-            segundos_clip, on_log,
+            segundos_clip, on_log, colores=colores,
         )
 
     datos = generate_json(prompt + _FORMATO, descripcion, images=imagenes)
@@ -389,14 +452,21 @@ def _acortar(
 
 def _escribir_por_clips(
     prompt: str, descripcion: str, imagenes, partes: int, tope: int,
-    segundos: int, on_log: OnLog,
+    segundos: int, on_log: OnLog, colores: bool = False,
 ) -> dict:
     """Un texto por clip, cada uno con su tope y sus tiempos."""
     from src.tiktok_shop.api.gemini import generate_json
 
     datos = generate_json(
-        prompt + _formato_clips(partes, tope, segundos), descripcion, images=imagenes,
+        prompt + _formato_clips(partes, tope, segundos, colores), descripcion,
+        images=imagenes,
     )
+    lista_colores = limpiar_colores((datos or {}).get("colores")) if colores else []
+    if colores and len(lista_colores) < 2:
+        on_log(
+            "[nicho_ropa] el guion trae "
+            f"{len(lista_colores)} color(es): el vídeo saldrá sin cortes de color"
+        )
     clips = [_limpiar_dice(str(c)) for c in (datos or {}).get("clips") or []]
     clips = [c for c in clips if c]
     if len(clips) != partes:
@@ -409,6 +479,10 @@ def _escribir_por_clips(
         clips = partir(junto, partes)
     clips = _clips_que_caben(prompt, descripcion, imagenes, clips, tope, segundos, on_log)
     videos = [
-        (_montar_video(prompt, c) or c) + nota_tiempos(segundos) for c in clips
+        (_montar_video(prompt, c, parte=i) or c) + nota_tiempos(segundos)
+        for i, c in enumerate(clips, start=1)
     ]
-    return {"dice": " ".join(clips), "video": videos[0], "videos": videos}
+    salida = {"dice": " ".join(clips), "video": videos[0], "videos": videos}
+    if colores:
+        salida["colores"] = lista_colores
+    return salida
