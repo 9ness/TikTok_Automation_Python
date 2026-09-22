@@ -1856,6 +1856,34 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     modo = ropa_config.modo_valido(str(p.get("modo") or ""))
 
     if len(rutas) > 1:
+        # En el orden de lo que DICEN, no en el que se subieron: si se sube el
+        # clip 2 en el hueco del 1, el guion se oye al revés y no se nota hasta
+        # verlo. Se transcriben y se casan con el texto de cada clip, igual que
+        # las escenas del Nicho General (misma función: probada allí).
+        import re
+
+        bloques = product_repo.guion_de(prod, modo).get("videos") or []
+        escenas = []
+        for b in bloques:
+            m = re.search(r"«([^«»]*)[«»]", b or "")
+            escenas.append({"guion": m.group(1) if m else ""})
+        if len(escenas) == len(rutas) and all(e["guion"] for e in escenas):
+            on_progress(0.25, "🎧 Comprobando el orden de los clips…")
+            from src.nicho_general.pipeline.video_editor import ordenar_clips
+
+            # La carpeta tiene que EXISTIR: la función escribe ahí el audio de
+            # cada clip, y si no está, no transcribe y se queda el orden de
+            # subida sin decir nada.
+            orden_dir = raw_path.parent / f"orden_{producto}"
+            orden_dir.mkdir(parents=True, exist_ok=True)
+            ordenados = ordenar_clips(rutas, escenas, orden_dir, on_log)
+            shutil.rmtree(orden_dir, ignore_errors=True)
+            if [str(x) for x in ordenados] != [str(x) for x in rutas]:
+                on_log("[nicho_ropa] los clips estaban cambiados de hueco: se pegan en el orden del guion")
+            rutas = ordenados
+            raw_path = rutas[0]
+        else:
+            on_log("[nicho_ropa] sin guion por clip guardado: se pegan en el orden en que se subieron")
         on_progress(0.3, f"🔗 Pegando {len(rutas)} clips…")
         raw_path = video_editor.pegar(
             rutas, raw_path.with_name(f"{raw_path.stem}_pegado.mp4"), on_log,
