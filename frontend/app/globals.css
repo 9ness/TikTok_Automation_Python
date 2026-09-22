@@ -252,16 +252,11 @@
  * salía con el título y nada debajo, y el de "Ver detalle" como una franja.
  * En Chrome, con el mismo motor y el mismo tamaño, se pintan enteros.
  *
- * Son dos cosas del envoltorio, no de la web:
- *   · el "deslizar para recargar" se queda con el gesto (lo apaga la app
- *     desde la 3.2, ver `ModalesEnLaApp`), y mientras dura, el WebView deja
- *     de componer capas a mitad de la animación de entrada;
- *   · el `backdrop-filter` del fondo obliga a una capa aparte, que es justo
- *     la que se queda sin pintar.
- *
- * Así que en la app no hay animación de entrada —el diálogo aparece ya en su
- * sitio— ni desenfoque: el fondo se oscurece y punto. En el navegador no
- * cambia nada.
+ * La causa está abajo del todo (`vh` vale cero) y se tardó en encontrar
+ * porque hubo dos intentos a ciegas antes, que se quedan por lo que valen:
+ * en la app no hay animación de entrada —el diálogo aparece ya en su sitio—
+ * ni desenfoque detrás, que en el WebView cuesta y no aporta. Arreglar no
+ * arreglaban nada. En el navegador no cambia nada.
  * ------------------------------------------------------------------ */
 @layer utilities {
   html.app-nativa [data-state="open"],
@@ -282,24 +277,38 @@
     background-color: rgb(0 0 0 / 0.85) !important;
   }
 
-  /* Y el centrado SIN `transform`.
+  /* ---- Y LA CAUSA DE VERDAD: `vh` vale CERO en el WebView ----
    *
-   * Quitar la animación y el desenfoque no bastó (3.2 seguía a medias). Lo que
-   * queda es cómo se centra: `translate(-50%,-50%)` promociona el diálogo a su
-   * propia capa, y en el WebView esa capa se quedaba con el PRIMER fotograma
-   * —el diálogo recién montado, todavía sin la lista de cuentas ni el detalle—
-   * y no se repintaba cuando llegaban los datos. De ahí que siempre se viera
-   * justo lo que hay en el primer render: la cabecera, o la fila de pestañas.
+   * Lo midió la propia app (`lib/chivato.ts`) con el diálogo de cuentas
+   * abierto en el móvil:
    *
-   * `inset:0` + `margin:auto` centra igual y no crea capa. Se aplica solo a
-   * los diálogos que se centran así (`translate-x-`), no a los paneles que se
-   * pegan a un lado. */
-  html.app-nativa [role="dialog"][class*="translate-x-"] {
-    inset: 0;
-    transform: none;
-    margin: auto;
-    height: fit-content;
-    max-height: calc(100dvh - 2rem);
-    overflow-y: auto;
-  }
+   *     caja: 379x50   contenido: 306px   max=0px   ventana: 411x843
+   *
+   * El contenido está entero (306 px) y la ventana mide 843, pero
+   * `max-h-[90vh]` se resuelve a **0 px**: solo asoma la cabecera. Eso es todo
+   * lo que pasaba — ni animación, ni desenfoque, ni capas. Y cuadra con lo
+   * único que se veía bien: `video-modal.tsx` tiene `minHeight: 16rem`, que lo
+   * mantiene abierto aunque su `max-height` sea 0.
+   *
+   * El ancho (`vw`) sí funciona; es la ALTURA la que se queda a cero, como si
+   * el WebView midiera la página antes de tener alto. Así que dentro de la app
+   * no se usa `vh`: se usa `--alto`, que la web pone en píxeles desde
+   * `window.innerHeight` (`AltoDePantalla` en `providers.tsx`) y mantiene al
+   * día. Si algún día llegara sin poner, se cae a `dvh` y estamos como antes,
+   * no peor. */
+  html.app-nativa [class~="max-h-[95vh]"] { max-height: calc(var(--alto, 100dvh) * 0.95); }
+  html.app-nativa [class~="max-h-[92vh]"] { max-height: calc(var(--alto, 100dvh) * 0.92); }
+  html.app-nativa [class~="max-h-[90vh]"] { max-height: calc(var(--alto, 100dvh) * 0.9); }
+  html.app-nativa [class~="max-h-[85vh]"] { max-height: calc(var(--alto, 100dvh) * 0.85); }
+  html.app-nativa [class~="max-h-[80vh]"] { max-height: calc(var(--alto, 100dvh) * 0.8); }
+  html.app-nativa [class~="max-h-[60vh]"] { max-height: calc(var(--alto, 100dvh) * 0.6); }
+  html.app-nativa [class~="max-h-[50vh]"] { max-height: calc(var(--alto, 100dvh) * 0.5); }
+  html.app-nativa [class~="max-h-[42vh]"] { max-height: calc(var(--alto, 100dvh) * 0.42); }
+  html.app-nativa [class~="max-h-[40vh]"] { max-height: calc(var(--alto, 100dvh) * 0.4); }
+  html.app-nativa [class~="h-[70vh]"] { height: calc(var(--alto, 100dvh) * 0.7); }
+  html.app-nativa [class~="h-[55vh]"] { height: calc(var(--alto, 100dvh) * 0.55); }
+  html.app-nativa [class~="h-[50vh]"] { height: calc(var(--alto, 100dvh) * 0.5); }
+  html.app-nativa [class~="h-screen"] { height: var(--alto, 100dvh); }
+  html.app-nativa [class~="min-h-screen"] { min-height: var(--alto, 100dvh); }
+  html.app-nativa [class~="max-h-screen"] { max-height: var(--alto, 100dvh); }
 }

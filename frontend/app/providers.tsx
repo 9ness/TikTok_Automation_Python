@@ -90,6 +90,33 @@ function MarcaAppNativa() {
   return null;
 }
 
+/** El alto de la pantalla EN PÍXELES, para no depender de `vh`.
+ *
+ *  En el WebView de la app, `90vh` se resuelve a 0 px aunque la ventana mida
+ *  843 (medido con el chivato, ver `globals.css`): por eso las ventanas
+ *  emergentes salían capadas a la cabecera. `window.innerHeight` sí da el
+ *  valor bueno, así que se escribe en `--alto` y de ahí tiran las reglas de
+ *  `html.app-nativa`.
+ *
+ *  Se pone en todas partes, no solo en la app: es un número correcto en
+ *  cualquier navegador y así no hay dos caminos que mantener. */
+function AltoDePantalla() {
+  useEffect(() => {
+    const poner = () =>
+      document.documentElement.style.setProperty("--alto", `${window.innerHeight}px`);
+    poner();
+    window.addEventListener("resize", poner);
+    window.addEventListener("orientationchange", poner);
+    window.visualViewport?.addEventListener("resize", poner);
+    return () => {
+      window.removeEventListener("resize", poner);
+      window.removeEventListener("orientationchange", poner);
+      window.visualViewport?.removeEventListener("resize", poner);
+    };
+  }, []);
+  return null;
+}
+
 /** Vigila si hay alguna ventana emergente abierta y se lo cuenta a la app.
  *
  *  Radix pinta los diálogos y la Cola como `[role="dialog"]` con
@@ -170,6 +197,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <QueueDrawer />
         <TemaDelUsuario />
         <MarcaAppNativa />
+        <AltoDePantalla />
         <ModalesEnLaApp />
         <ToasterConTema />
       </ThemeProvider>

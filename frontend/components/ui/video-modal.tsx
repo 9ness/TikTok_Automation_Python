@@ -146,7 +146,7 @@ export function VideoModal({
         style={{
           width: "320px",
           maxWidth: "calc(100vw - 2rem)",
-          maxHeight: "calc(100vh - 2rem)",
+          maxHeight: "calc(var(--alto, 100vh) - 2rem)",
           minHeight: "16rem",
           overflowY: "auto",
           borderRadius: "0.5rem",
