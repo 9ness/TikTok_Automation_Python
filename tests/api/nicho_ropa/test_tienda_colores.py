@@ -178,7 +178,7 @@ class TestRecolor:
         assert recolor.describir_color("azul marino") == "navy blue"
         assert recolor.describir_color("Marrón oscuro") == "dark chocolate brown"
         assert recolor.describir_color("verde agua").startswith("green (verde agua")
-        assert "terracota" in recolor.describir_color("terracota")
+        assert "Spanish colour name" in recolor.describir_color("ocre quemado")
 
     def test_el_prompt_lleva_el_color_y_nada_de_notas(self):
         p = config.prompt_recolor("navy blue")
