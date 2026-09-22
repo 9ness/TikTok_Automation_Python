@@ -244,7 +244,7 @@ export function useMarcarCarpetaRopa() {
 export function useSubirVariantesRopa() {
   const qc = useQueryClient();
   return useMutation<
-    { ok: boolean; producto: string; variantes_foto: boolean },
+    { ok: boolean; producto: string; variantes_foto: boolean; colores?: string[]; aviso?: string },
     Error,
     { carpeta: string; producto: string; file: File }
   >({

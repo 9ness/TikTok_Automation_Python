@@ -312,3 +312,33 @@ class TestVariantes:
             variantes.guardar("c", "1", b"x", "captura.pdf")
         with pytest.raises(ValueError):
             variantes.guardar("c", "1", b"", "captura.jpg")
+
+
+class TestBloqueoDeGemini:
+    def test_si_bloquea_con_fotos_se_reintenta_sin_ellas(self, monkeypatch):
+        import src.tiktok_shop.api.gemini as gemini
+
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        llamadas = []
+
+        def falso(system_prompt, user_prompt, images=None, **kw):
+            llamadas.append(images)
+            if images:
+                raise gemini.GeminiBlockedError("Gemini bloqueó la petición (PROHIBITED_CONTENT)")
+            return {"colores": ["rosa", "verde"], "clips": ["Rosa y verde. Mira.", "Por detrás. Elige."]}
+
+        monkeypatch.setattr(gemini, "generate_json", falso)
+        salida = guionista.escribir(
+            prompt=e["guion"], titulo="x", fotos=[Path("/tmp/a.jpg")], partes=2,
+            caracteres_clip=119, segundos_clip=8, colores=True,
+        )
+        assert salida["colores"] == ["rosa", "verde"]
+        assert llamadas == [["/tmp/a.jpg"], None]
+
+    def test_los_leidos_de_la_ficha(self):
+        from src.nicho_ropa.services import variantes
+
+        assert variantes.leidos({}) == {"colores": [], "hex": {}}
+        assert variantes.leidos({"variantes": {"colores": ["beige", ""], "hex": {"beige": "#d9cdb8", "x": ""}}}) == {
+            "colores": ["beige"], "hex": {"beige": "#d9cdb8"},
+        }

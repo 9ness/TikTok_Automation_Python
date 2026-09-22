@@ -212,7 +212,7 @@ def _formato_clips(
     donde = "en la misma tienda" if colores else "en dos sitios distintos"
     json_ejemplo = (
         '{"colores": ["rosa", "beige", "negro", "verde"], '
-        '"colores_hex": {"rosa": "#e7b8c4", "beige": "#d9c9b0", "negro": "#1b1b1b", "verde": "#5a6b4f"}, '
+        '"colores_hex": {"rosa": "#rrggbb", "beige": "#rrggbb", "negro": "#rrggbb", "verde": "#rrggbb"}, '
         f'"clips": [{ejemplo}]}}'
         if colores else f'{{"clips": [{ejemplo}]}}'
     )
@@ -226,9 +226,10 @@ def _formato_clips(
         "solo hay uno, la lista lleva solo ese y el clip 1 no los nombra.\n"
         '"colores_hex": para cada color de la lista, el color MEDIO de la '
         "prenda tal como se ve en la miniatura de ESA variante (o en la foto, "
-        "para el puesto), en hexadecimal. Es el tono real de esa tienda: un "
-        '"beige" no es igual en dos prendas. Si no ves la miniatura, omite '
-        "ese color del diccionario."
+        "para el puesto), en hexadecimal MEDIDO en la imagen (no el valor "
+        "típico del nombre). Es el tono real de esa tienda: un \"beige\" no "
+        "es igual en dos prendas. Si no ves la miniatura, omite ese color "
+        "del diccionario."
         if colores else ""
     )
     return (
@@ -405,7 +406,7 @@ def escribir(
             segundos_clip, on_log, colores=colores,
         )
 
-    datos = generate_json(prompt + _FORMATO, descripcion, images=imagenes)
+    datos = _json_o_sin_fotos(generate_json, prompt + _FORMATO, descripcion, imagenes, on_log)
     if not isinstance(datos, dict):
         raise ValueError(
             f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}"
@@ -482,6 +483,24 @@ def _acortar(
 
 
 
+def _json_o_sin_fotos(generate_json, prompt: str, descripcion: str, imagenes, on_log: OnLog):
+    """Con las fotos; y si Gemini BLOQUEA la petición, sin ellas.
+
+    El bloqueo (cero candidatos) lo disparan las imágenes —pasó con una
+    captura de tienda— y el guion sale igual de los textos: mejor un guion
+    de oídas que ninguno.
+    """
+    from src.tiktok_shop.api.gemini import GeminiBlockedError
+
+    try:
+        return generate_json(prompt, descripcion, images=imagenes)
+    except GeminiBlockedError as e:
+        if not imagenes:
+            raise
+        on_log(f"[nicho_ropa] {e}: se reintenta sin las fotos")
+        return generate_json(prompt, descripcion, images=None)
+
+
 def _escribir_por_clips(
     prompt: str, descripcion: str, imagenes, partes: int, tope: int,
     segundos: int, on_log: OnLog, colores: bool = False,
@@ -489,9 +508,9 @@ def _escribir_por_clips(
     """Un texto por clip, cada uno con su tope y sus tiempos."""
     from src.tiktok_shop.api.gemini import generate_json
 
-    datos = generate_json(
-        prompt + _formato_clips(partes, tope, segundos, colores), descripcion,
-        images=imagenes,
+    datos = _json_o_sin_fotos(
+        generate_json, prompt + _formato_clips(partes, tope, segundos, colores),
+        descripcion, imagenes, on_log,
     )
     lista_colores = limpiar_colores((datos or {}).get("colores")) if colores else []
     hex_colores = limpiar_hex((datos or {}).get("colores_hex"), lista_colores) if colores else {}

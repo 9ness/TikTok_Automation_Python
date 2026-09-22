@@ -190,6 +190,9 @@ class PrendaInfo(BaseModel):
     # Hay captura del selector de colores subida para esta prenda (formato
     # de la tienda): es de donde el guion saca los nombres exactos.
     variantes_foto: bool = False
+    # Lo que se leyó de esa captura (nombres exactos de TikTok). Sale antes
+    # que el guion, para cotejarlo con la ficha.
+    variantes_colores: list[str] = Field(default_factory=list)
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

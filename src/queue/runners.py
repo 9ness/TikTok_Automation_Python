@@ -1776,17 +1776,28 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         # operador la subió. La ficha del Drive casi nunca llega hasta ahí y
         # los nombres tienen que ser los de TikTok, letra por letra.
         notas = ""
+        hex_leidos: dict = {}
         if estilo.get("colores"):
             from src.nicho_ropa.services import variantes
 
+            # La captura NO se adjunta: con tres imágenes Gemini bloqueó la
+            # petición entera. Lo leído de ella (al subirla) va como texto.
+            leido = variantes.leidos(prod)
             captura = variantes.ruta(carpeta, pid)
-            if captura:
-                fotos.append(captura)
+            if not leido["colores"] and captura:
+                try:
+                    leido = variantes.extraer(captura)
+                    variantes.guardar_leidos(carpeta, pid, leido)
+                except Exception as e:  # noqa: BLE001 — sin colores antes que sin guion
+                    on_log(f"[nicho_ropa] {pid}: no se pudieron leer las variantes ({str(e)[:100]})")
+            if leido["colores"]:
+                hex_leidos = leido["hex"]
                 notas = (
-                    "La ÚLTIMA imagen adjunta es la captura del selector "
-                    '"Color" de la ficha de TikTok Shop: los colores son '
-                    "EXACTAMENTE los que pone debajo de cada miniatura, sin "
-                    "los tachados o agotados, y ninguno más."
+                    "COLORES en que se vende, leídos del selector de la ficha de "
+                    "TikTok Shop (nombres EXACTOS, no los cambies ni añadas otros): "
+                    + ", ".join(leido["colores"])
+                    + ". El de la foto de la prenda es uno de ellos: identifícalo "
+                    "y ponlo el ÚLTIMO de la lista."
                 )
             else:
                 on_log(
@@ -1813,11 +1824,16 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
             fallos.append(f"{pid}: {str(e)[:120]}")
             continue
+        # El tono leído de la miniatura manda sobre el que adivine el guion.
+        colores_hex = dict(escrito.get("colores_hex") or {})
+        for nombre in escrito.get("colores") or []:
+            if hex_leidos.get(nombre):
+                colores_hex[nombre] = hex_leidos[nombre]
         product_repo.guardar_guion(
             carpeta, pid, modo, escrito["dice"], escrito["video"],
             escrito.get("videos"), usuario=usuario,
             colores=escrito.get("colores"),
-            colores_hex=escrito.get("colores_hex"),
+            colores_hex=colores_hex,
         )
         hechos += 1
         on_log(

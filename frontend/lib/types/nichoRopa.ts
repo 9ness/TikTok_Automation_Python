@@ -144,6 +144,8 @@ export interface PrendaItem {
   guion_colores?: string[];
   /** Hay captura del selector de colores subida (formato de la tienda). */
   variantes_foto?: boolean;
+  /** Nombres leídos de esa captura (exactos de TikTok), antes del guion. */
+  variantes_colores?: string[];
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

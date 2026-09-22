@@ -1725,7 +1725,14 @@ function PrendaCard({
                 subirVariantes.mutate(
                   { carpeta, producto: prenda.producto, file },
                   {
-                    onSuccess: () => toast.success("Captura de variantes guardada"),
+                    onSuccess: (r) =>
+                      r.aviso
+                        ? toast.warning(r.aviso)
+                        : toast.success(
+                            r.colores?.length
+                              ? `Colores leídos: ${r.colores.join(", ")}`
+                              : "Captura de variantes guardada",
+                          ),
                     onError: (e2) =>
                       toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
                   },
@@ -1769,17 +1776,21 @@ function PrendaCard({
       {/* Los colores que nombra el guion (formato de la tienda), el puesto
           el último: son los que se recolorean al montar. Se enseñan para
           poder cotejarlos con la ficha ANTES de generar el clip. */}
-      {conGuion && (prenda.guion_colores ?? []).length > 0 && (
+      {conGuion && ((prenda.guion_colores ?? []).length > 0 || (prenda.variantes_colores ?? []).length > 0) && (
         <p
           className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground"
-          title="Colores que nombra al empezar; el último es el que lleva puesto y el vídeo sigue con él"
+          title={
+            (prenda.guion_colores ?? []).length
+              ? "Colores que nombra al empezar; el último es el que lleva puesto y el vídeo sigue con él"
+              : "Colores leídos de la captura de variantes (el guion los usará tal cual)"
+          }
         >
           🎨
-          {(prenda.guion_colores ?? []).map((c, i, arr) => (
+          {((prenda.guion_colores ?? []).length ? prenda.guion_colores ?? [] : prenda.variantes_colores ?? []).map((c, i, arr) => (
             <span
               key={`${c}-${i}`}
               className={`rounded-full border px-1.5 py-px ${
-                i === arr.length - 1
+                i === arr.length - 1 && (prenda.guion_colores ?? []).length
                   ? "border-sky-500/60 text-sky-300"
                   : "border-border/60"
               }`}
@@ -1787,7 +1798,7 @@ function PrendaCard({
               {c}
             </span>
           ))}
-          {(prenda.guion_colores ?? []).length < 2 && (
+          {(prenda.guion_colores ?? []).length === 1 && (
             <span className="text-amber-500">· un solo color: sin cortes</span>
           )}
         </p>

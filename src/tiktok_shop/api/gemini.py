@@ -45,6 +45,12 @@ _LOGGER_NAME = "tiktok_shop.gemini"
 # ---------------------------------------------------------------------------
 # Resolución de keys
 # ---------------------------------------------------------------------------
+class GeminiBlockedError(ValueError):
+    """Gemini devolvió CERO candidatos: bloqueó la petición (no es cuota ni
+    JSON mal formado, así que no vale reintentar igual — hay que quitar lo
+    que la bloquea, normalmente una imagen)."""
+
+
 def _get_gemini_keys() -> list[tuple[str, str]]:
     """Devuelve `[(label, key), ...]` en orden de prioridad de uso.
 
@@ -241,6 +247,14 @@ def _call_with_key(
             "max_output_tokens": max_output_tokens,
         },
     )
+    # Sin candidatos = Gemini bloqueó la petición entera (filtro de seguridad
+    # o de contenido; pasó al mandar tres imágenes con una captura de tienda).
+    # `response.text` reventaba con un mensaje críptico ("quick accessor
+    # requires a single candidate"): mejor decir QUÉ lo bloqueó.
+    if not getattr(response, "candidates", None):
+        feedback = getattr(response, "prompt_feedback", None)
+        motivo = str(getattr(feedback, "block_reason", "") or "").split(".")[-1] or "sin motivo"
+        raise GeminiBlockedError(f"Gemini bloqueó la petición ({motivo})")
     text = (response.text or "").strip()
     if expect_json:
         text = _strip_json_fences(text)

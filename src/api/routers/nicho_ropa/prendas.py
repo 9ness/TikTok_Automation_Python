@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
 from src.api.dependencies import get_current_user, get_queue, get_web_user
@@ -559,6 +560,7 @@ def list_prendas(
             ),
             guion_colores=guiones.get(pid, {}).get("colores", []),
             variantes_foto=pid in con_variantes,
+            variantes_colores=variantes.leidos(prod)["colores"],
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -879,12 +881,27 @@ async def subir_variantes(
         raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
     datos = await file.read()
     try:
-        variantes.guardar(carpeta, producto, datos, file.filename or "")
+        ruta = variantes.guardar(carpeta, producto, datos, file.filename or "")
     except ValueError as e:
         raise APIError(str(e), status_code=400) from e
     except OSError as e:
         raise APIError(f"No se pudo guardar la captura: {e}", status_code=500) from e
-    return {"ok": True, "producto": producto, "variantes_foto": True}
+    # Los colores se leen AQUÍ (una llamada con solo esta imagen) y se
+    # guardan en la ficha: al guion le llegan como texto. Si Gemini falla, la
+    # captura queda guardada y el guion los volverá a intentar leer.
+    leido: dict = {"colores": [], "hex": {}}
+    aviso = ""
+    try:
+        leido = await run_in_threadpool(variantes.extraer, ruta)
+        variantes.guardar_leidos(carpeta, producto, leido)
+        if not leido["colores"]:
+            aviso = "En la captura no se ve ningún selector de color."
+    except Exception as e:  # noqa: BLE001 — la captura ya está guardada
+        aviso = f"Captura guardada, pero no se pudieron leer los colores: {str(e)[:120]}"
+    return {
+        "ok": True, "producto": producto, "variantes_foto": True,
+        "colores": leido["colores"], "aviso": aviso,
+    }
 
 
 @router.post("/variantes/quitar")
@@ -894,7 +911,9 @@ def quitar_variantes(
 ) -> dict:
     if not config.es_carpeta_conocida(carpeta):
         raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
-    return {"ok": True, "producto": producto, "quitada": variantes.quitar(carpeta, producto)}
+    quitada = variantes.quitar(carpeta, producto)
+    product_repo.quitar_campos(carpeta, producto, "variantes")
+    return {"ok": True, "producto": producto, "quitada": quitada}
 
 
 @router.get("/variantes/foto")

@@ -74,3 +74,45 @@ def tienen(carpeta: str) -> set[str]:
     if not d.is_dir():
         return set()
     return {f.stem for f in d.iterdir() if f.is_file() and f.suffix.lower() in _EXTS}
+
+
+def extraer(captura: Path) -> dict:
+    """`{"colores": [...], "hex": {...}}` leídos de la captura con Gemini.
+
+    Una llamada de texto con UNA imagen. No se hace dentro del guion: con la
+    ficha, la limpia y esta captura (precios, botones) Gemini bloqueó la
+    petición entera y no salió ningún guion. Lanza si Gemini no contesta.
+    """
+    from src.nicho_ropa.services.guionista import limpiar_colores, limpiar_hex
+    from src.tiktok_shop.api.gemini import generate_json
+
+    prompt = config._limpio("variantes_colores.md")
+    datos = generate_json(prompt, "Lee el selector de color de esta captura.", images=[str(captura)])
+    colores = limpiar_colores((datos or {}).get("colores"))
+    return {"colores": colores, "hex": limpiar_hex((datos or {}).get("hex"), colores)}
+
+
+def guardar_leidos(carpeta: str, producto: str, leido: dict) -> None:
+    """Apunta en la ficha del producto (doc compartido: los colores son del
+    producto, no de quien lo graba) lo que se leyó de la captura."""
+    import time
+
+    from src.nicho_ropa.repos import product_repo
+
+    product_repo.update_product(
+        carpeta, producto,
+        variantes={
+            "colores": list(leido.get("colores") or []),
+            "hex": dict(leido.get("hex") or {}),
+            "at": int(time.time()),
+        },
+    )
+
+
+def leidos(prod: dict) -> dict:
+    """`{"colores": [...], "hex": {...}}` guardados en la ficha, o vacíos."""
+    v = (prod or {}).get("variantes") or {}
+    return {
+        "colores": [str(c) for c in (v.get("colores") or []) if str(c).strip()],
+        "hex": {str(k): str(x) for k, x in (v.get("hex") or {}).items() if str(x).strip()},
+    }
