@@ -130,6 +130,8 @@ export interface PrendaItem {
   /** Un bloque por clip: dos en el formato de calle dividido, donde cada clip
    *  dice su mitad. `guion` es el primero. */
   guiones?: string[];
+  /** Qué huecos tienen ya su clip subido, esperando al resto (1, 2…). */
+  clips_subidos?: number[];
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

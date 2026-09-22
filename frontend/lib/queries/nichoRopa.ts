@@ -226,6 +226,26 @@ export function useEscribirGuionesRopa() {
   });
 }
 
+/** Quita un clip subido por error de su hueco, antes de que se monte. */
+export function useQuitarClipRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; clips_subidos: number[] },
+    Error,
+    { carpeta: string; producto: string; modo: string; parte: number }
+  >({
+    mutationFn: ({ carpeta, producto, modo, parte }) =>
+      api.post(
+        `${ROOT}/video/quitar-clip?carpeta=${encodeURIComponent(carpeta)}` +
+          `&producto=${encodeURIComponent(producto)}&modo=${encodeURIComponent(modo)}` +
+          `&parte=${parte}`,
+        {},
+      ),
+    onSuccess: (_r, { carpeta }) =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
 export function useSubirVideoRopa() {
   const qc = useQueryClient();
   return useMutation<

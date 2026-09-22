@@ -510,6 +510,9 @@ def list_prendas(
             # movimiento, así que el del espejo no vale para el del coche.
             guion=guiones.get(pid, {}).get("video", ""),
             guiones=guiones.get(pid, {}).get("videos", []),
+            clips_subidos=sorted(
+                int(k) for k in product_repo.clips_de(prod, modo) if str(k).isdigit()
+            ),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -795,6 +798,23 @@ def get_foto_limpia(
                 clean["id"], descargar=True, nombre=f"ropa_{producto}.jpg",
             )
     raise APIError(f"No existe la prenda {producto}.", status_code=404)
+
+
+@router.post("/video/quitar-clip")
+def quitar_clip(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    modo: Annotated[str, Query()],
+    parte: Annotated[int, Query()],
+) -> dict:
+    """Quita un clip subido por error de su hueco, antes de que se monte."""
+    try:
+        quedan = product_repo.quitar_clip(
+            carpeta or config.CARPETA_DEFECTO, producto, config.modo_valido(modo), parte,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, "clips_subidos": sorted(int(k) for k in quedan if k.isdigit())}
 
 
 @router.post("/video/upload", response_model=VideoRopaUploadResponse)

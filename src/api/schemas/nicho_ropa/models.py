@@ -163,6 +163,9 @@ class PrendaInfo(BaseModel):
     # Un bloque por clip: uno en los formatos de siempre y dos en el de calle
     # dividido, donde cada clip dice su mitad. `guion` es el primero.
     guiones: list[str] = Field(default_factory=list)
+    # En los formatos de varios clips, qué huecos tienen ya el suyo subido y
+    # esperando al resto (1, 2…). Es lo que pinta el ✓ en cada botón.
+    clips_subidos: list[int] = Field(default_factory=list)
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

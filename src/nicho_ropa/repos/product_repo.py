@@ -206,6 +206,22 @@ def guardar_clip(carpeta: str, producto: str, modo: str, parte: int, ruta: str) 
         return {str(k): str(v) for k, v in clips.items() if v}
 
 
+def quitar_clip(carpeta: str, producto: str, modo: str, parte: int) -> dict[str, str]:
+    """Quita el clip de UNA parte (subido por error) y devuelve los que quedan."""
+    from src.nicho_ropa import config
+
+    modo = config.modo_valido(modo)
+    with _cerrojo(carpeta):
+        r = _require_redis()
+        doc = r.get_json(_key(carpeta)) or {}
+        prod = (doc.get("productos") or {}).get(str(producto)) or {}
+        clips = ((prod.get("modos") or {}).get(modo) or {}).get("clips") or {}
+        if clips.pop(str(int(parte)), None) is not None:
+            prod["updated_at"] = _now()
+            r.set_json(_key(carpeta), doc)
+        return {str(k): str(v) for k, v in clips.items() if v}
+
+
 def olvidar_clips(carpeta: str, producto: str, modo: str) -> None:
     """Vacía los clips guardados de un modo (ya se han montado)."""
     from src.nicho_ropa import config

@@ -32,6 +32,7 @@ import {
   usePromptsRopa,
   useSetEstadoRopa,
   type PrendaItem,
+  useQuitarClipRopa,
 } from "@/lib/queries/nichoRopa";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
 import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
@@ -1297,6 +1298,7 @@ function PrendaCard({
 }) {
   const setEstado = useSetEstadoRopa(carpeta);
   const escribirGuion = useEscribirGuionesRopa();
+  const quitarClip = useQuitarClipRopa();
   const [escribiendo, setEscribiendo] = useState(false);
   const qc = useQueryClient();
   // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
@@ -1693,10 +1695,19 @@ function PrendaCard({
           esperando y el montaje arranca al subir el segundo. */}
       {partes > 1 && (
         <div className="grid grid-cols-2 gap-2">
-          {Array.from({ length: partes }, (_, i) => i + 1).map((n) => (
+          {Array.from({ length: partes }, (_, i) => i + 1).map((n) => {
+            // Subido y esperando al otro: en verde con su ✓, como en el POV BOF.
+            // Sin esto, tras subir el primero no había forma de saber si había
+            // entrado o si faltaba volver a subirlo.
+            const puesto = (prenda.clips_subidos ?? []).includes(n);
+            return (
             <label
               key={n}
-              className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30"
+              className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] transition ${
+                puesto
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                  : "border-border/60 hover:border-foreground/30"
+              }`}
             >
               {pct !== null && subiendo === n ? (
                 <>
@@ -1704,7 +1715,32 @@ function PrendaCard({
                 </>
               ) : (
                 <>
-                  <Upload className="h-3.5 w-3.5" /> Clip {n}
+                  <Upload className="h-3.5 w-3.5" /> {puesto ? `Clip ${n} ✓` : `Clip ${n}`}
+                  {/* Quitar el subido por error. Va DENTRO del <label>, así
+                      que hay que cortar el evento o se abre el selector. */}
+                  {puesto && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Quitar el clip ${n}`}
+                      title="Quitar este clip"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        quitarClip.mutate(
+                          { carpeta, producto: prenda.producto, modo, parte: n },
+                          {
+                            onSuccess: () => toast.success(`Clip ${n} quitado`),
+                            onError: (e2) =>
+                              toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
+                          },
+                        );
+                      }}
+                      className="ml-0.5 rounded px-1 text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+                    >
+                      ✕
+                    </span>
+                  )}
                 </>
               )}
               <input
@@ -1714,7 +1750,8 @@ function PrendaCard({
                 onChange={(e) => elegirArchivo(e.target.files?.[0] ?? null, n)}
               />
             </label>
-          ))}
+            );
+          })}
         </div>
       )}
 
