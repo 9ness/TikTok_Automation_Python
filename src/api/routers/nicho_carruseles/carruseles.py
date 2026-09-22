@@ -1135,6 +1135,7 @@ def preparar_catalogo(
             "solo_mensajes": bool(body.solo_mensajes),
             "carpetas": solo,
         },
+        enqueued_by=usuario or None,
     )
     pendientes = [
         j for j in queue.get_all()
@@ -1212,6 +1213,7 @@ def repartir_fotos2(
             + (f" · {categoria}" if categoria else " de carrusel")
         ),
         params={"usuario": usuario, "categoria": categoria, "archivos": solo},
+        enqueued_by=usuario or None,
     )
     return {"pendientes": cuantas, "job_id": job.id}
 
@@ -1628,6 +1630,7 @@ def quemar_todo(
         JobMode.NICHO_CARRUSELES_QUEMAR,
         title="🔥 Textos del carrusel" + (" (rehacer)" if body.rehacer else ""),
         params={"usuario": usuario, "tipo": body.tipo, "rehacer": bool(body.rehacer)},
+        enqueued_by=usuario or None,
     )
     return {"job_id": job.id}
 

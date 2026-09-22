@@ -403,6 +403,7 @@ async def upload_video(
             "clip1_path": clip1, "clip2_path": clip2,
             "sexo": sexo_norm, "operator": operator,
         },
+        enqueued_by=operator or None,
     )
     return CineVideoUploadResponse(
         job_id=job.id, encolado=True,

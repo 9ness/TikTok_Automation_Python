@@ -341,6 +341,7 @@ async def upload_video(
             "raw_path": str(destino),
             "operator": operator,
         },
+        enqueued_by=operator or None,
     )
     return VideoRopaPersonasUploadResponse(
         job_id=job.id, message="Encolado con voz de mujer (una de las cinco)",

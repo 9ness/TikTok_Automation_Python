@@ -1176,6 +1176,7 @@ def guiones_lote(
             # dolor", y el de precio vacío.
             "estilo": estilo,
         },
+        enqueued_by=usuario or None,
     )
     pendientes = [
         j for j in queue.get_all()

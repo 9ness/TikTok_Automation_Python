@@ -377,6 +377,7 @@ async def importar_prendas_web_lote(
     queue: Annotated[JobQueue, Depends(get_queue)],
     archivos: Annotated[list[UploadFile], File()],
     genero: Annotated[str, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola la importación de VARIOS ZIP del inventario de ropa.
 
@@ -423,6 +424,7 @@ async def importar_prendas_web_lote(
         JobMode.NICHO_POV_BOF_WEB_IMPORT,
         title=title,
         params={"temp_folder": str(destino), "total": guardados, "genero": genero},
+        enqueued_by=usuario or None,
     )
     return {"job_id": job.id, "title": title, "zips": guardados}
 
@@ -944,6 +946,7 @@ async def upload_video(
             "modo": modo_norm,
             "operator": operator,
         },
+        enqueued_by=operator or None,
     )
     return VideoRopaUploadResponse(
         job_id=job.id,

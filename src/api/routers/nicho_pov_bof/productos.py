@@ -1315,6 +1315,7 @@ async def importar_productos_web_lote(
     queue: Annotated[JobQueue, Depends(get_queue)],
     archivos: Annotated[list[UploadFile], File()],
     source: Annotated[str, Query()] = "productos_web",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola la importación de VARIOS ZIP de la web del curso.
 
@@ -1356,6 +1357,7 @@ async def importar_productos_web_lote(
         JobMode.NICHO_POV_BOF_WEB_IMPORT,
         title=title,
         params={"temp_folder": str(destino), "total": guardados, "source": source},
+        enqueued_by=usuario or None,
     )
     return {"job_id": job.id, "title": title, "zips": guardados}
 
@@ -1603,6 +1605,7 @@ def renumerar_mis_productos(
     carpeta: Annotated[str, Query()] = "",
     source: Annotated[str, Query()] = "mis_productos",
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Cierra los huecos de numeración de una carpeta propia (5, 7, 8 → 5, 6, 7).
 
@@ -1619,6 +1622,7 @@ def renumerar_mis_productos(
         JobMode.NICHO_POV_BOF_RENUMERAR,
         title=f"🔢 Renumerar · {carpeta}" if carpeta else "🔢 Recolocar productos propios",
         params={"carpeta": carpeta, "source": source},
+        enqueued_by=usuario or None,
     )
     return {"job_id": job.id, "title": job.title}
 

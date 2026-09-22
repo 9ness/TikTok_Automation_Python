@@ -12,7 +12,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
-from src.api.dependencies import get_current_user, get_queue
+from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, InvalidEnqueueRequestError
 from src.api.schemas.viralizacion import (
     CarpetasListResponse,
@@ -206,6 +206,7 @@ def round_plan(
 def generate(
     queue: Annotated[JobQueue, Depends(get_queue)],
     body: ViralizacionGenerateRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ViralizacionGenerateResponse:
     from src.viralizacion.pipeline.batch import preflight_check
 
@@ -243,7 +244,10 @@ def generate(
         "musica": (body.musica or "").strip().lower(),
         "cta_final": (body.cta_final or "no").strip().lower(),
     }
-    job = queue.enqueue(JobMode.VIRALIZACION_BATCH, title=title, params=params)
+    job = queue.enqueue(
+        JobMode.VIRALIZACION_BATCH, title=title, params=params,
+        enqueued_by=usuario or None,
+    )
 
     return ViralizacionGenerateResponse(
         job_id=job.id,
@@ -267,6 +271,7 @@ async def subir_audio_largo(
     queue: Annotated[JobQueue, Depends(get_queue)],
     file: Annotated[UploadFile, File()],
     ponente: Annotated[str, Form()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> SubirAudioLargoResponse:
     """Guarda la charla larga y encola su análisis. No corta nada todavía."""
     import re
@@ -307,6 +312,7 @@ async def subir_audio_largo(
         JobMode.VIRALIZACION_CLIPS,
         title=f"✂️ Cortar audio largo · {ponente} · {destino.name}",
         params={"ponente": ponente, "fichero": destino.name},
+        enqueued_by=usuario or None,
     )
     return SubirAudioLargoResponse(
         job_id=job.id, ponente=ponente, fichero=destino.name,

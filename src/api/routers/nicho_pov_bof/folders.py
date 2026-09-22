@@ -276,11 +276,13 @@ def backup_paquete_estado() -> dict:
 )
 def backup_paquete_enqueue(
     queue: Annotated[JobQueue, Depends(get_queue)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> BackupSyncResponse:
     """Encola el montaje del paquete (vuelca todas las copias en una)."""
     title = "📦 Paquete completo Productos España"
     job = queue.enqueue(
         JobMode.NICHO_POV_BOF_BACKUP, title=title, params={"paquete": True},
+        enqueued_by=usuario or None,
     )
     pending = [
         j for j in queue.get_all()
@@ -339,6 +341,7 @@ def backup_ultima() -> dict:
 def backup_sync_enqueue(
     queue: Annotated[JobQueue, Depends(get_queue)],
     body: BackupSyncRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> BackupSyncResponse:
     """Encola la copia. Va por la cola porque puede tardar mucho."""
     title = "💾 Backup Productos España" + (" (completa)" if body.force_full else "")
@@ -346,6 +349,7 @@ def backup_sync_enqueue(
         JobMode.NICHO_POV_BOF_BACKUP,
         title=title,
         params={"force_full": bool(body.force_full)},
+        enqueued_by=usuario or None,
     )
     pending = [
         j for j in queue.get_all()
@@ -362,6 +366,7 @@ def textos_lote_enqueue(
     rehacer: Annotated[bool, Query()] = False,
     uno_a_uno: Annotated[bool, Query()] = False,
     carpetas: Annotated[list[str] | None, Query()] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola la extracción de textos de TODAS las carpetas de un catálogo.
 
@@ -394,6 +399,7 @@ def textos_lote_enqueue(
             "uno_a_uno": bool(uno_a_uno),
             "carpetas": solo,
         },
+        enqueued_by=usuario or None,
     )
     pending = [
         j for j in queue.get_all()
@@ -409,6 +415,7 @@ def revisar_textos_enqueue(
     source: Annotated[str, Query()],
     arreglar: Annotated[bool, Query()] = False,
     carpetas: Annotated[list[str] | None, Query()] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Encola la revisión de que cada texto es el de SU producto.
 
@@ -434,6 +441,7 @@ def revisar_textos_enqueue(
         JobMode.NICHO_POV_BOF_REVISAR,
         title=title,
         params={"source": source, "arreglar": bool(arreglar), "carpetas": solo},
+        enqueued_by=usuario or None,
     )
     return {"job_id": job.id, "title": title}
 
