@@ -33,6 +33,7 @@ import {
   useSetEstadoRopa,
   type PrendaItem,
   useQuitarClipRopa,
+  useMarcarCarpetaRopa,
 } from "@/lib/queries/nichoRopa";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
 import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
@@ -399,12 +400,13 @@ export function PantallaRopa({
   );
   const extraer = useExtraerTextosRopa();
   const guiones = useEscribirGuionesRopa();
+  const marcarCarpeta = useMarcarCarpetaRopa();
 
   const items = prendas.data?.items ?? [];
   // Una carpeta está "hecha" cuando todas sus prendas tienen el vídeo DE ESTE
   // modo: el progreso es por modo, igual que el vídeo.
   const carpetasHechas = misCarpetas.filter(
-    (c) => !!c.total && (c.con_video ?? 0) >= c.total,
+    (c) => c.completada || (!!c.total && (c.con_video ?? 0) >= c.total),
   ).length;
   const pctCarpetas = misCarpetas.length
     ? Math.round((carpetasHechas / misCarpetas.length) * 100)
@@ -660,14 +662,18 @@ export function PantallaRopa({
             vista, que es lo que deja saltar a cualquiera sin desplegar nada. */}
         <div className="mt-1 flex flex-wrap gap-1">
           {misCarpetas.map((c) => {
-            const hecha = !!c.total && (c.con_video ?? 0) >= c.total;
+            const hecha = c.completada || (!!c.total && (c.con_video ?? 0) >= c.total);
             return (
               <button
                 key={c.slug}
                 type="button"
                 onClick={() => setCarpeta(c.slug)}
                 className={`break-words leading-tight rounded border px-2 py-1 text-[10px] transition ${
-                  carpeta === c.slug
+                  c.pendiente && !hecha
+                    ? carpeta === c.slug
+                      ? "border-orange-500 bg-orange-500/20 font-semibold text-orange-400"
+                      : "border-orange-500/50 text-orange-400"
+                    : carpeta === c.slug
                     ? hecha
                       ? "border-emerald-500 bg-emerald-500/15 font-semibold text-emerald-500"
                       : "border-sky-500 bg-sky-500/15 font-semibold text-sky-400"
@@ -697,6 +703,78 @@ export function PantallaRopa({
             );
           })}
         </div>
+        {/* Los dos estados de la carpeta, como en el POV BOF: darla por hecha
+            (y saltar a la siguiente) o dejarla con los vídeos hechos pero
+            pendientes de subir. Van por MODO: terminarla frente al espejo no
+            la termina en la calle. */}
+        {esWeb && carpeta && misCarpetas.some((c) => c.slug === carpeta) && (() => {
+          const actual = misCarpetas.find((c) => c.slug === carpeta);
+          return (
+            <div className="mt-2 flex items-stretch gap-2">
+              <button
+                type="button"
+                disabled={marcarCarpeta.isPending}
+                onClick={() => {
+                  const completada = !actual?.completada;
+                  marcarCarpeta.mutate(
+                    { carpeta, modo, completada },
+                    {
+                      onSuccess: () => {
+                        if (!completada) {
+                          toast.success(`${nombreCorto(actual?.label ?? carpeta)} reabierta`);
+                          return;
+                        }
+                        toast.success(`${nombreCorto(actual?.label ?? carpeta)} completada`);
+                        // A la siguiente sin hacer, como en el POV BOF.
+                        const i = misCarpetas.findIndex((c) => c.slug === carpeta);
+                        const sig = [...misCarpetas.slice(i + 1), ...misCarpetas.slice(0, i)]
+                          .find((c) => !c.completada);
+                        if (sig) setCarpeta(sig.slug);
+                      },
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  );
+                }}
+                title="Marca la carpeta como hecha y salta a la siguiente"
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2 truncate rounded-lg px-3 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${
+                  actual?.completada
+                    ? "border border-border/60 text-muted-foreground hover:text-foreground"
+                    : "bg-emerald-500 text-white hover:bg-emerald-600"
+                }`}
+              >
+                {marcarCarpeta.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                {actual?.completada ? "Desmarcar" : "Completada"}
+              </button>
+              <button
+                type="button"
+                disabled={marcarCarpeta.isPending}
+                onClick={() =>
+                  marcarCarpeta.mutate(
+                    { carpeta, modo, pendiente: !actual?.pendiente },
+                    {
+                      onError: (e) =>
+                        toast.error(e instanceof ApiError ? e.message : String(e)),
+                    },
+                  )
+                }
+                title="Los vídeos están hechos pero faltan por subir: la carpeta se marca en naranja"
+                className={`flex shrink-0 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 ${
+                  actual?.pendiente
+                    ? "border-orange-500 bg-orange-500/20 text-orange-400"
+                    : "border-border/60 text-muted-foreground hover:border-orange-500 hover:text-orange-400"
+                }`}
+              >
+                <Upload className="h-4 w-4" />
+                {actual?.pendiente ? "Pendiente ✓" : "Pendiente"}
+              </button>
+            </div>
+          );
+        })()}
         {/* Que no cargue NO es lo mismo que no tener carpetas, y con el mismo
             texto para los dos casos un error del servidor se lee como "aquí no
             hay nada" — y a subir otra vez los ZIP que ya estaban. */}

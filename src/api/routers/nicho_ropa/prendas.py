@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError
 from src.api.schemas.nicho_ropa import (
+    CarpetaEstadoRopaRequest,
     CarpetaRopa,
     CarpetasRopaResponse,
     GuionesRopaRequest,
@@ -169,6 +170,7 @@ def list_carpetas(
     # Solo se cuentan las carpetas de ESE: las demás no se ven, y contarlas
     # eran siete segundos por carga — se agotaba hasta el presupuesto.
     catalogo: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> CarpetasRopaResponse:
     """Carpetas de producto disponibles.
 
@@ -251,7 +253,42 @@ def list_carpetas(
                     setattr(i, campo, valor)
             except Exception as e:  # noqa: BLE001
                 logger.warning("[nicho_ropa] no se pudo contar %s: %s", i.slug, e)
+    # Lo marcado a mano. Una sola lectura para todas: no depende del Drive,
+    # así que va FUERA del presupuesto de los contadores y sale siempre.
+    try:
+        from src.nicho_ropa.repos import progress_repo
+
+        hechas, pendientes = progress_repo.estado(usuario, config.modo_valido(modo))
+        for i in items:
+            i.completada = i.slug in hechas
+            i.pendiente = i.slug in pendientes
+    except Exception as e:  # noqa: BLE001 — el progreso es un adorno del chip
+        logger.warning("[nicho_ropa] no se pudo leer el progreso: %s", e)
     return CarpetasRopaResponse(items=items)
+
+
+@router.post("/carpeta/estado")
+def set_carpeta_estado(
+    body: CarpetaEstadoRopaRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Da una carpeta por hecha, o la deja pendiente de subir (por modo)."""
+    from src.nicho_ropa.repos import progress_repo
+
+    modo = config.modo_valido(body.modo)
+    try:
+        hechas, pendientes = progress_repo.marcar(
+            usuario, modo, body.carpeta,
+            completada=body.completada, pendiente=body.pendiente,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {
+        "ok": True,
+        "carpeta": body.carpeta,
+        "completada": body.carpeta in hechas,
+        "pendiente": body.carpeta in pendientes,
+    }
 
 
 @router.post("/prendas/copiar-de-pov-bof")

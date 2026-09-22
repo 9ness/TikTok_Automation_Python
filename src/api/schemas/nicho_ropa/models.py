@@ -122,6 +122,19 @@ class CarpetaRopa(BaseModel):
     total: int = 0
     con_url: int = 0
     con_video: int = 0
+    # Lo que marca a mano quien trabaja, como en el POV BOF: la carpeta dada
+    # por hecha, o con los vídeos hechos pero pendientes de subir. Por usuario
+    # y por MODO (terminarla frente al espejo no la termina en la calle).
+    completada: bool = False
+    pendiente: bool = False
+
+
+class CarpetaEstadoRopaRequest(BaseModel):
+    carpeta: str
+    modo: str = ""
+    # None = no se toca.
+    completada: bool | None = None
+    pendiente: bool | None = None
 
 
 class CarpetasRopaResponse(BaseModel):

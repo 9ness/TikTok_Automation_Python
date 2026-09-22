@@ -226,6 +226,19 @@ export function useEscribirGuionesRopa() {
   });
 }
 
+/** Da una carpeta por hecha o la deja pendiente de subir (por modo). */
+export function useMarcarCarpetaRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; carpeta: string; completada: boolean; pendiente: boolean },
+    Error,
+    { carpeta: string; modo: string; completada?: boolean; pendiente?: boolean }
+  >({
+    mutationFn: (body) => api.post(`${ROOT}/carpeta/estado`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.carpetas() }),
+  });
+}
+
 /** Quita un clip subido por error de su hueco, antes de que se monte. */
 export function useQuitarClipRopa() {
   const qc = useQueryClient();

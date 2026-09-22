@@ -91,6 +91,10 @@ export interface CarpetaRopa {
   total?: number;
   con_url?: number;
   con_video?: number;
+  /** Marcada a mano como hecha, o con los vídeos hechos y pendientes de
+   *  subir. Por usuario y por modo, como en el POV BOF. */
+  completada?: boolean;
+  pendiente?: boolean;
 }
 
 export interface CarpetasRopaResponse {
