@@ -142,6 +142,8 @@ export interface PrendaItem {
   /** Los colores que nombra el guion (formato de la tienda), el puesto el
    *  último: son los que se recolorean al montar. */
   guion_colores?: string[];
+  /** Hay captura del selector de colores subida (formato de la tienda). */
+  variantes_foto?: boolean;
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

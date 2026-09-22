@@ -41,7 +41,7 @@ from src.api.schemas.nicho_ropa import (
 )
 from src.nicho_ropa import config
 from src.nicho_ropa.repos import product_repo
-from src.nicho_ropa.services import drive_client, text_extractor
+from src.nicho_ropa.services import drive_client, text_extractor, variantes
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 
@@ -516,6 +516,7 @@ def list_prendas(
         pid: product_repo.guion_de(prod, modo)
         for pid, prod in guardados.items()
     }
+    con_variantes = variantes.tienen(carpeta)
     for par in pares:
         pid = par["producto"]
         prod = guardados.get(pid) or {}
@@ -557,6 +558,7 @@ def list_prendas(
                 int(k) for k in product_repo.clips_de(prod, modo) if str(k).isdigit()
             ),
             guion_colores=guiones.get(pid, {}).get("colores", []),
+            variantes_foto=pid in con_variantes,
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -860,6 +862,53 @@ def get_foto_limpia(
                 clean["id"], descargar=True, nombre=f"ropa_{producto}.jpg",
             )
     raise APIError(f"No existe la prenda {producto}.", status_code=404)
+
+
+@router.post("/variantes/upload")
+async def subir_variantes(
+    carpeta: Annotated[str, Form()],
+    producto: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
+) -> dict:
+    """La captura del selector de colores de la ficha (formato Tienda Colores).
+
+    Se sube ANTES de escribir los guiones: es de donde salen los nombres
+    exactos de las variantes. Una por prenda; subir otra sustituye la anterior.
+    """
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    datos = await file.read()
+    try:
+        variantes.guardar(carpeta, producto, datos, file.filename or "")
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except OSError as e:
+        raise APIError(f"No se pudo guardar la captura: {e}", status_code=500) from e
+    return {"ok": True, "producto": producto, "variantes_foto": True}
+
+
+@router.post("/variantes/quitar")
+def quitar_variantes(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+) -> dict:
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    return {"ok": True, "producto": producto, "quitada": variantes.quitar(carpeta, producto)}
+
+
+@router.get("/variantes/foto")
+def ver_variantes(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+):
+    """La captura subida, para comprobarla desde la tarjeta."""
+    from fastapi.responses import FileResponse
+
+    f = variantes.ruta(carpeta, producto)
+    if not f:
+        raise APIError("Esa prenda no tiene captura de variantes.", status_code=404)
+    return FileResponse(str(f), headers={"Cache-Control": "no-cache"})
 
 
 @router.post("/video/quitar-clip")

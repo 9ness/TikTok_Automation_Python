@@ -204,6 +204,11 @@ def guion_de(prod: dict, modo: str) -> dict:
         # Los colores que nombra al empezar (formato de la tienda), con el
         # puesto el último. Vacío en el resto de formatos.
         "colores": [str(c) for c in (guion.get("colores") or []) if str(c).strip()],
+        # El tono de cada uno según la miniatura de la tienda, en hex: es lo
+        # que se le da al recolor para que el beige sea EL beige de esa prenda.
+        "colores_hex": {
+            str(k): str(v) for k, v in (guion.get("colores_hex") or {}).items() if str(v).strip()
+        },
         # Los primeros se guardaron con fecha en ISO: si no es un número, se
         # sirve 0 en vez de reventar la lista entera de la carpeta.
         "guion_at": int(guion.get("at") or 0) if str(guion.get("at") or "").isdigit() else 0,
@@ -214,6 +219,7 @@ def guardar_guion(
     carpeta: str, producto: str, modo: str, dice: str, video: str,
     videos: "list[str] | None" = None, usuario: str = "",
     colores: "list[str] | None" = None,
+    colores_hex: "dict[str, str] | None" = None,
 ) -> dict:
     """Apunta el guion de un modo sin tocar el de los demás ni su vídeo."""
     from src.nicho_ropa import config
@@ -233,6 +239,7 @@ def guardar_guion(
             # Los colores que nombra (formato de la tienda): los lee el
             # montaje para los cortes de color. Vacío en los demás.
             "colores": [str(c) for c in (colores or []) if str(c).strip()],
+            "colores_hex": dict(colores_hex or {}),
             "at": int(time.time()),
         }
         prod["updated_at"] = _now()

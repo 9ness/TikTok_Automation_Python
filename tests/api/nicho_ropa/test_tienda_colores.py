@@ -86,6 +86,13 @@ class TestGuionPorClip:
         assert '"colores"' in con and "ÚLTIMO" in con and "misma tienda" in con
         assert '"colores"' not in sin and "sitios distintos" in sin
 
+    def test_limpiar_hex(self):
+        assert guionista.limpiar_hex(
+            {"Rosa": "e7b8c4", "beige": "#zz", "verde": "#5A6B4F", "otro": "#000000"},
+            ["rosa", "beige", "verde"],
+        ) == {"rosa": "#e7b8c4", "verde": "#5a6b4f"}
+        assert guionista.limpiar_hex(["#000"], ["rosa"]) == {}
+
     def test_limpiar_colores(self):
         assert guionista.limpiar_colores(["Rosa,", " Verde ", "rosa", "", 3, "x" * 40]) == ["rosa", "verde"]
         assert guionista.limpiar_colores("rosa") == []
@@ -100,6 +107,7 @@ class TestGuionPorClip:
             assert '"colores"' in system_prompt
             return {
                 "colores": ["Rosa", "beige", "negro", "Verde"],
+                "colores_hex": {"rosa": "#e7b8c4", "verde": "#5a6b4f", "fucsia": "#ff00ff"},
                 "clips": [
                     "Rosa, beige, negro y verde. Mira esta cintura alta con cordón y bolsillos de verdad.",
                     "Por detrás sienta fenomenal y al agacharme no se baja nada. Varios colores en tienda, elige el tuyo.",
@@ -112,6 +120,7 @@ class TestGuionPorClip:
             caracteres_clip=119, segundos_clip=8, colores=True,
         )
         assert salida["colores"] == ["rosa", "beige", "negro", "verde"]
+        assert salida["colores_hex"] == {"rosa": "#e7b8c4", "verde": "#5a6b4f"}
         assert len(salida["videos"]) == 2
         assert "DE ESPALDAS" in salida["videos"][1] and "DE ESPALDAS" not in salida["videos"][0]
         assert salida["videos"][0].rstrip().endswith("sin cortar ninguna palabra.")
@@ -183,6 +192,8 @@ class TestRecolor:
     def test_el_prompt_lleva_el_color_y_nada_de_notas(self):
         p = config.prompt_recolor("navy blue")
         assert "navy blue" in p and "<!--" not in p and "{{" not in p
+        assert "Target shade" not in p
+        assert "approximately #8b7d6b" in config.prompt_recolor("taupe", "#8b7d6b")
 
     def test_reintenta_una_vez_y_luego_lanza(self, monkeypatch):
         llamadas = []
@@ -221,7 +232,7 @@ class TestAplicar:
         monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.0), ("verde", 0.8)))
         monkeypatch.setattr(colores, "_run", lambda cmd, on_log: (work / "fotograma.jpg").write_bytes(b"jpg"))
         pagadas = []
-        monkeypatch.setattr(recolor, "recolorear", lambda *a, **k: pagadas.append(1) or b"png")
+        monkeypatch.setattr(recolor, "recolorear", lambda *a, **k: pagadas.append(k.get("tono")) or b"png")
         superpuesto = {}
         monkeypatch.setattr(
             colores, "_superponer",
@@ -234,3 +245,46 @@ class TestAplicar:
         assert not pagadas
         assert superpuesto["fotos"] == [work / "color_rosa.png"]
         assert superpuesto["tiempos"] == [0.0, 0.8]
+
+    def test_el_tono_de_cada_color_llega_al_recolor(self, tmp_path, monkeypatch):
+        import src.nicho_pov_bof.pipeline.video_editor as pov
+
+        work = tmp_path / "w"
+        monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.0), ("beige", 0.8), ("verde", 1.6)))
+        monkeypatch.setattr(colores, "_run", lambda cmd, on_log: (work / "fotograma.jpg").write_bytes(b"jpg"))
+        tonos = []
+        monkeypatch.setattr(recolor, "recolorear", lambda base, color, **k: tonos.append((color, k.get("tono"))) or b"png")
+        monkeypatch.setattr(colores, "_superponer", lambda *a, **k: None)
+        clip = tmp_path / "clip1.mp4"
+        clip.write_bytes(b"")
+        colores.aplicar(clip, ["rosa", "Beige", "verde"], work, tonos={"Rosa": "#e7b8c4"})
+        assert tonos == [("rosa", "#e7b8c4"), ("Beige", "")]
+
+
+class TestVariantes:
+    def test_guardar_ver_y_quitar(self, tmp_path, monkeypatch):
+        from src.nicho_ropa.services import variantes
+
+        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        assert variantes.ruta("mujer_web__Carpeta 1", "3") is None
+        variantes.guardar("mujer_web__Carpeta 1", "3", b"img", "captura.PNG")
+        f = variantes.ruta("mujer_web__Carpeta 1", "3")
+        assert f and f.suffix == ".png" and f.read_bytes() == b"img"
+        # No cuelga de ningún género: `_variantes` no sale en los selectores.
+        assert f.parent.parent.name == "_variantes"
+        assert variantes.tienen("mujer_web__Carpeta 1") == {"3"}
+        # Sustituir con otra extensión no deja dos.
+        variantes.guardar("mujer_web__Carpeta 1", "3", b"img2", "otra.jpg")
+        assert variantes.ruta("mujer_web__Carpeta 1", "3").suffix == ".jpg"
+        assert len(list(f.parent.iterdir())) == 1
+        assert variantes.quitar("mujer_web__Carpeta 1", "3")
+        assert variantes.ruta("mujer_web__Carpeta 1", "3") is None
+
+    def test_rechaza_lo_que_no_es_imagen(self, tmp_path, monkeypatch):
+        from src.nicho_ropa.services import variantes
+
+        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        with pytest.raises(ValueError):
+            variantes.guardar("c", "1", b"x", "captura.pdf")
+        with pytest.raises(ValueError):
+            variantes.guardar("c", "1", b"", "captura.jpg")

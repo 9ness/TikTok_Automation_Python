@@ -239,6 +239,45 @@ export function useMarcarCarpetaRopa() {
   });
 }
 
+/** La captura del selector de colores de una prenda (formato Tienda
+ *  Colores): se sube ANTES de escribir los guiones, que es donde se leen. */
+export function useSubirVariantesRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; producto: string; variantes_foto: boolean },
+    Error,
+    { carpeta: string; producto: string; file: File }
+  >({
+    mutationFn: ({ carpeta, producto, file }) => {
+      const fd = new FormData();
+      fd.append("carpeta", carpeta);
+      fd.append("producto", producto);
+      fd.append("file", file);
+      return api.post(`${ROOT}/variantes/upload`, fd);
+    },
+    onSuccess: (_r, { carpeta }) =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
+export function useQuitarVariantesRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; producto: string; quitada: boolean },
+    Error,
+    { carpeta: string; producto: string }
+  >({
+    mutationFn: ({ carpeta, producto }) =>
+      api.post(
+        `${ROOT}/variantes/quitar?carpeta=${encodeURIComponent(carpeta)}` +
+          `&producto=${encodeURIComponent(producto)}`,
+        {},
+      ),
+    onSuccess: (_r, { carpeta }) =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
 /** Quita un clip subido por error de su hueco, antes de que se monte. */
 export function useQuitarClipRopa() {
   const qc = useQueryClient();

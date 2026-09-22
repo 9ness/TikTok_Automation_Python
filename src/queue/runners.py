@@ -1772,6 +1772,27 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                     fotos.append(drive_client.fetch_photo(str(prod[clave])))
                 except (RuntimeError, ValueError) as e:  # noqa: PERF203
                     on_log(f"[nicho_ropa] {pid}: sin {clave} ({e})")
+        # Formato de la tienda: la captura del selector de colores, si el
+        # operador la subió. La ficha del Drive casi nunca llega hasta ahí y
+        # los nombres tienen que ser los de TikTok, letra por letra.
+        notas = ""
+        if estilo.get("colores"):
+            from src.nicho_ropa.services import variantes
+
+            captura = variantes.ruta(carpeta, pid)
+            if captura:
+                fotos.append(captura)
+                notas = (
+                    "La ÚLTIMA imagen adjunta es la captura del selector "
+                    '"Color" de la ficha de TikTok Shop: los colores son '
+                    "EXACTAMENTE los que pone debajo de cada miniatura, sin "
+                    "los tachados o agotados, y ninguno más."
+                )
+            else:
+                on_log(
+                    f"[nicho_ropa] {pid}: sin captura de variantes — los colores "
+                    "saldrán solo de lo que se vea en la ficha"
+                )
         try:
             escrito = guionista.escribir(
                 prompt=estilo["guion"],
@@ -1780,6 +1801,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                 caption=str(prod.get("caption") or ""),
                 precio=str(prod.get("precio") or ""),
                 fotos=fotos,
+                notas=notas,
                 max_caracteres=tope,
                 partes=int(estilo.get("partes") or 1),
                 caracteres_clip=int(estilo.get("caracteres_clip") or 0),
@@ -1795,6 +1817,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
             carpeta, pid, modo, escrito["dice"], escrito["video"],
             escrito.get("videos"), usuario=usuario,
             colores=escrito.get("colores"),
+            colores_hex=escrito.get("colores_hex"),
         )
         hechos += 1
         on_log(
@@ -1911,6 +1934,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
                     rutas[0] = colores_pipe.aplicar(
                         rutas[0], colores, raw_path.parent / f"colores_{producto}",
                         on_log,
+                        # El tono de cada color según la miniatura de la
+                        # tienda (lo leyó el guion de la captura de
+                        # variantes): así el beige es EL beige de esa prenda.
+                        tonos=product_repo.guion_de(prod, modo).get("colores_hex") or {},
                     )
                     raw_path = rutas[0]
                 except Exception as e:  # noqa: BLE001 — sin cortes antes que sin vídeo

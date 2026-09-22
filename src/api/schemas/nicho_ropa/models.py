@@ -187,6 +187,9 @@ class PrendaInfo(BaseModel):
     # último. Es lo que recolorea el montaje; se enseña para poder comprobar
     # que son los de la ficha antes de generar.
     guion_colores: list[str] = Field(default_factory=list)
+    # Hay captura del selector de colores subida para esta prenda (formato
+    # de la tienda): es de donde el guion saca los nombres exactos.
+    variantes_foto: bool = False
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

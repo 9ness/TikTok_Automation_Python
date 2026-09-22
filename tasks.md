@@ -115,16 +115,18 @@ subir con el ⬆ de esa fila → quemar textos.
 
 ## 🏬 Tienda Colores 15s (Moda Mujer) — listo para estrenar (22 sep 2026)
 
-- Flujo: 1 · Imagen (Flow, foto limpia como referencia) → 1b · Imagen 2 (mismo
-  chat, de espaldas) → ✍️ Escribir guiones → Guion 1 con imagen 1 y Guion 2 con
-  imagen 2 en Omni (8s cada uno) → subir Clip 1 y Clip 2. La app mete los
-  cortes de color, pega, subtitula, flecha y limpia metadatos.
+- Flujo: en cada tarjeta 🎨 Captura de variantes (el selector "Color" de la
+  ficha de TikTok Shop) → 1 · Imagen (Flow, foto limpia como referencia) → 1b ·
+  Imagen 2 (mismo chat, de espaldas) → ✍️ Escribir guiones (lee nombres y tono
+  de cada color de la captura) → Guion 1 con imagen 1 y Guion 2 con imagen 2
+  en Omni (8s cada uno) → subir Clip 1 y Clip 2. La app mete los cortes de
+  color, pega, subtitula, flecha y limpia metadatos.
 - Probar con UNA prenda real antes de una tanda: mirar que los colores del
   guion (chips 🎨 en la tarjeta) sean los de la ficha — si Gemini se inventa
   uno, corregir a mano rehaciendo el guion.
 - Mejora opcional: el ZIP de la web trae `Producto_N_Color_K.jpeg` (se ignoran
-  al importar); guardarlas en `colores/` y pasárselas al guion daría los
-  nombres de color exactos y una referencia para recolorear.
+  al importar); guardarlas en `colores/` ahorraría subir la captura a mano
+  en los productos que vengan del ZIP.
 
 ## 👤 Tareas Humanas
 

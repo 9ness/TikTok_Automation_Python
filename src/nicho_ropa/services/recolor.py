@@ -134,12 +134,21 @@ def describir_color(color: str) -> str:
     return f'the colour "{color.strip()}" (a Spanish colour name)'
 
 
-def recolorear(imagen: bytes, color: str, mime: str = "image/jpeg", on_log: OnLog = _noop) -> bytes:
-    """La misma foto con la prenda en `color`. Lanza `RuntimeError` si no sale."""
+def recolorear(
+    imagen: bytes, color: str, mime: str = "image/jpeg", on_log: OnLog = _noop,
+    tono: str = "",
+) -> bytes:
+    """La misma foto con la prenda en `color`. Lanza `RuntimeError` si no sale.
+
+    `tono` es el hex de la miniatura de esa variante en la tienda (lo leyó el
+    guion de la captura): con él el modelo clava ESE beige y no uno genérico.
+    Se manda como texto y no la captura como imagen: adjuntándola, el modelo
+    calcaba la barra de "Añadir al carrito" en la foto (probado dos veces).
+    """
     ultimo: Exception | None = None
     for intento in range(1, _INTENTOS + 1):
         try:
-            return _recolorear(imagen, color, mime, on_log)
+            return _recolorear(imagen, color, mime, on_log, tono)
         except RuntimeError as e:
             ultimo = e
             if intento < _INTENTOS:
@@ -147,7 +156,9 @@ def recolorear(imagen: bytes, color: str, mime: str = "image/jpeg", on_log: OnLo
     raise RuntimeError(str(ultimo))
 
 
-def _recolorear(imagen: bytes, color: str, mime: str, on_log: OnLog) -> bytes:
+def _recolorear(
+    imagen: bytes, color: str, mime: str, on_log: OnLog, tono: str = "",
+) -> bytes:
     import requests
 
     from src.nicho_ropa import config
@@ -158,15 +169,13 @@ def _recolorear(imagen: bytes, color: str, mime: str, on_log: OnLog) -> bytes:
         raise RuntimeError("sin key de Gemini configurada")
 
     cuerpo = {
-        "contents": [{
-            "parts": [
-                {"text": config.prompt_recolor(describir_color(color))},
-                {"inline_data": {
-                    "mime_type": mime,
-                    "data": base64.b64encode(imagen).decode("ascii"),
-                }},
-            ],
-        }],
+        "contents": [{"parts": [
+            {"text": config.prompt_recolor(describir_color(color), tono)},
+            {"inline_data": {
+                "mime_type": mime,
+                "data": base64.b64encode(imagen).decode("ascii"),
+            }},
+        ]}],
         "generationConfig": {"responseModalities": ["IMAGE"]},
     }
     ultimo = ""

@@ -39,11 +39,15 @@ PASO_DEFECTO_S = 0.8
 
 def aplicar(
     clip: Path, colores: list[str], work_dir: Path, on_log: OnLog = _noop,
+    tonos: dict[str, str] | None = None,
 ) -> Path:
     """El clip con los cortes de color metidos (mismo audio, misma duración).
 
     `colores` en el orden en que se dicen, el puesto el último. Con menos de
-    dos no hay nada que cortar y se devuelve el clip tal cual.
+    dos no hay nada que cortar y se devuelve el clip tal cual. `tonos` es
+    `{color: "#rrggbb"}` leído de la miniatura de cada variante, para clavar
+    el tono de ESA tienda (no se manda la captura entera al modelo: en la
+    prueba real calcaba la barra de "Añadir al carrito" en la foto).
     """
     colores = [c.strip() for c in colores if c and c.strip()]
     if len(colores) < 2:
@@ -77,6 +81,7 @@ def aplicar(
 
     from src.nicho_ropa.services import recolor
 
+    tonos = {str(k).lower(): str(v) for k, v in (tonos or {}).items()}
     fotos: list[Path] = []
     for i, color in enumerate(colores[:-1], start=1):
         # Se nombra por el color y no por el índice: si se vuelve a montar el
@@ -86,7 +91,9 @@ def aplicar(
             on_log(f"[colores] «{color}»: ya estaba recoloreado, se reutiliza")
         else:
             on_log(f"[colores] recoloreando a «{color}»…")
-            salida.write_bytes(recolor.recolorear(base, color, on_log=on_log))
+            salida.write_bytes(recolor.recolorear(
+                base, color, on_log=on_log, tono=tonos.get(color.lower(), ""),
+            ))
         fotos.append(salida)
 
     destino = Path(clip).with_name(f"{Path(clip).stem}_colores.mp4")

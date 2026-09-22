@@ -27,6 +27,8 @@ import {
   useCarpetasRopa,
   useCrearMiPrenda,
   useEscribirGuionesRopa,
+  useQuitarVariantesRopa,
+  useSubirVariantesRopa,
   useExtraerTextosRopa,
   usePrendas,
   usePromptsRopa,
@@ -1047,9 +1049,13 @@ export function PantallaRopa({
                 )}
                 {e.colores && (
                   <li className="text-sky-300">
-                    🎨 Los cortes de color del principio los monta la app
-                    sola: recolorea el primer fotograma del clip 1 con Gemini
-                    (uno por color del guion, ~4 cts cada uno) y los mete al
+                    🎨 ANTES de escribir los guiones, sube en cada tarjeta la{" "}
+                    <strong className="text-foreground">captura del selector
+                    &quot;Color&quot;</strong> de la ficha de TikTok Shop
+                    (miniaturas con su nombre): de ahí salen los nombres
+                    exactos y el tono de cada color. Los cortes de color del
+                    principio los monta la app sola (recolorea el primer
+                    fotograma del clip 1 con Gemini, ~4 cts por color) al
                     ritmo de las palabras. NO generes nada más: la chica del
                     clip 1 se queda quieta mientras nombra los colores, y el
                     que lleva puesto se dice el último.
@@ -1339,6 +1345,7 @@ export function PantallaRopa({
               // En cuántos clips se graba el formato: con dos, la tarjeta
               // pide los dos y el montaje los pega.
               partes={estiloActivo?.partes ?? 1}
+              conColores={!!estiloActivo?.colores}
               caracteresClip={estiloActivo?.caracteres_clip ?? 0}
               modalidadDuracion={duracion}
               onCopiar={copiar}
@@ -1360,6 +1367,7 @@ function PrendaCard({
   conGuion = false,
   nichoCaption = "",
   partes = 1,
+  conColores = false,
   caracteresClip = 0,
   modalidadDuracion = "10",
   onCopiar,
@@ -1375,6 +1383,9 @@ function PrendaCard({
   conGuion?: boolean;
   /** Cuántos clips se suben para este formato. 1 = como siempre. */
   partes?: number;
+  /** Formato con cortes de color: la tarjeta pide la captura del selector
+   *  de colores de la ficha, que es de donde el guion saca los nombres. */
+  conColores?: boolean;
   /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
   nichoCaption?: string;
   /** Lo que cabe en cada clip: el botón del guion se pinta en ámbar si se
@@ -1390,6 +1401,8 @@ function PrendaCard({
   const setEstado = useSetEstadoRopa(carpeta);
   const escribirGuion = useEscribirGuionesRopa();
   const quitarClip = useQuitarClipRopa();
+  const subirVariantes = useSubirVariantesRopa();
+  const quitarVariantes = useQuitarVariantesRopa();
   const [escribiendo, setEscribiendo] = useState(false);
   const qc = useQueryClient();
   // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
@@ -1676,6 +1689,83 @@ function PrendaCard({
           y se pega en el generador junto con la imagen del paso 1; el botón de
           rehacerlo está porque cada pasada da un tono distinto y a veces la
           primera no convence (cuesta una llamada a la IA). */}
+      {/* La captura del selector de colores de la ficha (formato de la
+          tienda). Va ANTES de escribir el guion: la ficha del Drive casi
+          nunca llega hasta el selector, y los nombres tienen que ser los de
+          TikTok letra por letra. Al montar sirve además de referencia de
+          tono para recolorear. */}
+      {conColores && (
+        <div className="flex items-center gap-1">
+          <label
+            className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] transition ${
+              prenda.variantes_foto
+                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                : "border-sky-500/60 text-sky-300 hover:bg-sky-500/10"
+            }`}
+            title={
+              prenda.variantes_foto
+                ? "Captura del selector de colores subida. Toca para sustituirla."
+                : "Sube la captura del selector \"Color\" de la ficha de TikTok Shop (miniaturas con su nombre) antes de escribir el guion"
+            }
+          >
+            {subirVariantes.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+            {prenda.variantes_foto ? "🎨 Variantes ✓" : "🎨 Captura de variantes"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                subirVariantes.mutate(
+                  { carpeta, producto: prenda.producto, file },
+                  {
+                    onSuccess: () => toast.success("Captura de variantes guardada"),
+                    onError: (e2) =>
+                      toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
+                  },
+                );
+              }}
+            />
+          </label>
+          {prenda.variantes_foto && (
+            <>
+              <a
+                href={`${api.baseUrl}/api/v1/nicho-ropa/variantes/foto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+                title="Ver la captura subida"
+              >
+                👁
+              </a>
+              <button
+                type="button"
+                aria-label="Quitar la captura de variantes"
+                title="Quitar la captura"
+                onClick={() =>
+                  quitarVariantes.mutate(
+                    { carpeta, producto: prenda.producto },
+                    {
+                      onSuccess: () => toast.success("Captura quitada"),
+                      onError: (e2) =>
+                        toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
+                    },
+                  )
+                }
+                className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+              >
+                ✕
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {/* Los colores que nombra el guion (formato de la tienda), el puesto
           el último: son los que se recolorean al montar. Se enseñan para
           poder cotejarlos con la ficha ANTES de generar el clip. */}

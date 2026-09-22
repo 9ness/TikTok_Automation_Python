@@ -490,9 +490,24 @@ def _limpio(fichero: str) -> str:
     return limpiar_prompt((prompts_dir() / fichero).read_text(encoding="utf-8"))
 
 
-def prompt_recolor(color: str) -> str:
-    """El encargo a Gemini para recolorear el primer fotograma a ESE color."""
-    return _limpio("recolor_prenda.md").replace("{{COLOR}}", color.strip())
+def prompt_recolor(color: str, tono: str = "") -> str:
+    """El encargo a Gemini para recolorear el primer fotograma a ESE color.
+
+    `tono` es el hex de la miniatura de esa variante en la tienda: con él se
+    pide clavar ese matiz y no el genérico del nombre. Vacío = por el nombre.
+    """
+    referencia = (
+        f"Target shade: approximately {tono.strip()} (sampled from the shop's "
+        "own swatch for this variant). Match that hue and lightness with "
+        "realistic fabric shading, not a generic version of the colour name."
+        if tono.strip() else ""
+    )
+    return (
+        _limpio("recolor_prenda.md")
+        .replace("{{COLOR}}", color.strip())
+        .replace("{{REFERENCIA}}", referencia)
+        .strip()
+    )
 
 
 def prompts_dir() -> Path:

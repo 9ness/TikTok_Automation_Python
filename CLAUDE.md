@@ -359,7 +359,10 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
   el pantalón cambia en cada uno— lo monta la app: recolorea el primer
   fotograma del clip 1 con Gemini imagen (`services/recolor.py`, ~4 cts por
   color, `record_gemini`) y lo intercala al ritmo de la voz
-  (`pipeline/colores.py`). El guion guarda `colores` (el puesto, el último).
+  (`pipeline/colores.py`). Los nombres y el tono (hex) de cada color los lee
+  el guion de la **captura del selector de colores** que sube el operador por
+  prenda (`services/variantes.py`, `_variantes/` en el Drive montado); el
+  guion guarda `colores` (el puesto, el último) y `colores_hex`.
 - Los formatos cuyo guion se escribe FUERA (espejo, selfie, gafas) ya no piden
   pasar por ChatGPT a mano: `services/guionista.py` manda a Gemini el MISMO
   prompt del curso + los textos y fotos de la prenda, y el bloque para el

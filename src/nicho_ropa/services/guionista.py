@@ -211,7 +211,9 @@ def _formato_clips(
     # que usa el montaje para recolorear el primer fotograma en cada corte.
     donde = "en la misma tienda" if colores else "en dos sitios distintos"
     json_ejemplo = (
-        f'{{"colores": ["rosa", "beige", "negro", "verde"], "clips": [{ejemplo}]}}'
+        '{"colores": ["rosa", "beige", "negro", "verde"], '
+        '"colores_hex": {"rosa": "#e7b8c4", "beige": "#d9c9b0", "negro": "#1b1b1b", "verde": "#5a6b4f"}, '
+        f'"clips": [{ejemplo}]}}'
         if colores else f'{{"clips": [{ejemplo}]}}'
     )
     extra = (
@@ -221,7 +223,12 @@ def _formato_clips(
         "el selector de color de la captura de TikTok Shop (en minúsculas), "
         "sin los tachados o agotados; si la captura no enseña el selector, "
         "solo el color de la prenda de la foto. Nunca inventes un color: si "
-        "solo hay uno, la lista lleva solo ese y el clip 1 no los nombra."
+        "solo hay uno, la lista lleva solo ese y el clip 1 no los nombra.\n"
+        '"colores_hex": para cada color de la lista, el color MEDIO de la '
+        "prenda tal como se ve en la miniatura de ESA variante (o en la foto, "
+        "para el puesto), en hexadecimal. Es el tono real de esa tienda: un "
+        '"beige" no es igual en dos prendas. Si no ves la miniatura, omite '
+        "ese color del diccionario."
         if colores else ""
     )
     return (
@@ -242,6 +249,23 @@ def _formato_clips(
         "Solo lo que dice la persona, sin comillas, sin el nombre del producto "
         "al final y sin copiar el resto del prompt." + extra
     )
+
+
+_HEX = re.compile(r"^#?([0-9a-fA-F]{6})$")
+
+
+def limpiar_hex(valor, colores: list[str]) -> dict[str, str]:
+    """`{color: "#rrggbb"}` solo para colores de la lista y hex válidos."""
+    if not isinstance(valor, dict):
+        return {}
+    salida: dict[str, str] = {}
+    nombres = {c.lower(): c for c in colores}
+    for k, v in valor.items():
+        nombre = " ".join(str(k or "").split()).strip(" .,;«»\"'").lower()
+        m = _HEX.match(str(v or "").strip())
+        if nombre in nombres and m:
+            salida[nombres[nombre]] = "#" + m.group(1).lower()
+    return salida
 
 
 def limpiar_colores(valor) -> list[str]:
@@ -350,6 +374,9 @@ def escribir(
     # Formato de la tienda: se pide además la lista de colores que nombra
     # (ver `_formato_clips`) y sale en `colores`.
     colores: bool = False,
+    # Algo más que decirle sobre las fotos adjuntas (p. ej. que la última es
+    # la captura del selector de colores). Va en la descripción del producto.
+    notas: str = "",
     on_log: OnLog = _noop,
 ) -> dict:
     """`{dice, video, videos[, colores]}` para una prenda. Lanza si Gemini no lo escribe."""
@@ -367,6 +394,8 @@ def escribir(
         descripcion += f" Tienda: {tienda.strip()}."
     if caption:
         descripcion += f" Descripción: {caption.strip()}"
+    if notas:
+        descripcion += f" {notas.strip()}"
 
     imagenes = [str(f) for f in (fotos or [])] or None
 
@@ -465,6 +494,7 @@ def _escribir_por_clips(
         images=imagenes,
     )
     lista_colores = limpiar_colores((datos or {}).get("colores")) if colores else []
+    hex_colores = limpiar_hex((datos or {}).get("colores_hex"), lista_colores) if colores else {}
     if colores and len(lista_colores) < 2:
         on_log(
             "[nicho_ropa] el guion trae "
@@ -488,4 +518,5 @@ def _escribir_por_clips(
     salida = {"dice": " ".join(clips), "video": videos[0], "videos": videos}
     if colores:
         salida["colores"] = lista_colores
+        salida["colores_hex"] = hex_colores
     return salida
