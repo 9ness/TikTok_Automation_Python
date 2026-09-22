@@ -920,21 +920,38 @@ _ESTACIONES_EN = {
 }
 
 
-def nota_temporada_guion() -> str:
-    """El mismo apunte, para el prompt del GUION (que va en español).
+# Qué prendas son "de temporada" en cada estación. Sirve de ejemplo para que
+# Gemini distinga: sin esto, "si la prenda es de temporada" lo leía como "di
+# que es perfecta para otoño" y lo metía en TODOS los guiones, también en unos
+# vaqueros o una camiseta básica.
+_PRENDAS_DE_TEMPORADA = {
+    "otoño": "jerséis, chaquetas, cazadoras, gabardinas, botas o prendas de punto o pana",
+    "invierno": "abrigos, plumíferos, jerséis gruesos, botas o bufandas",
+    "primavera": "vestidos ligeros, chaquetas finas, blusas o gabardinas",
+    "verano": "bikinis, bañadores, shorts, vestidos de tirantes o sandalias",
+}
 
-    Copiado del POV BOF (`pov_config.epoca_actual`), guarda incluida: la época
-    cambia CÓMO se habla de la prenda, nunca lo que la prenda es. Sin ese
-    freno, un vestido de tirantes se vuelve "ideal para el frío".
+
+def nota_temporada_guion() -> str:
+    """El apunte de la época para el prompt del GUION (que va en español).
+
+    Es un permiso, no un encargo: por defecto NO se nombra la estación. Solo
+    si la prenda es claramente de esta época, y una vez. Y con el freno del
+    POV BOF: la época cambia CÓMO se habla de la prenda, nunca lo que es — sin
+    él, un vestido de tirantes se volvía "ideal para el frío".
     """
     from src.nicho_pov_bof import config as pov_config
 
+    estacion = pov_config.estacion_actual()
+    ejemplos = _PRENDAS_DE_TEMPORADA.get(estacion, "")
     return (
         f"\n\nÚLTIMO APUNTE: el vídeo se publica en {pov_config.epoca_actual()}. "
-        "Si la prenda es de temporada, habla de llevarla en esta época y no en "
-        "otra. Si le da igual la época, no cambies nada por esto. Esto cambia "
-        "solo el CONTEXTO, nunca lo que la prenda es: no le atribuyas tejidos, "
-        "abrigo ni usos que no estén en la ficha."
+        "Por defecto NO nombres la estación. Solo si la prenda es claramente "
+        f"de {estacion} ({ejemplos}), puedes mencionarlo UNA vez y de pasada, "
+        "nunca como gancho. Si es una prenda de todo el año (vaqueros, "
+        "camisetas, vestidos de entretiempo…) o de otra estación, no digas "
+        "nada de la época. Nunca le atribuyas tejidos, abrigo ni usos que no "
+        "estén en la ficha."
     )
 
 
