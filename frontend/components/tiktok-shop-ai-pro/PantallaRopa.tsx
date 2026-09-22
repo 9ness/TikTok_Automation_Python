@@ -1597,7 +1597,11 @@ function PrendaCard({
               // bloque entero lleva también la voz y el movimiento, que no
               // cuentan para lo que cabe en 8 segundos.
               const dice = /«([^«»]*)[«»]/.exec(texto)?.[1]?.trim() ?? "";
-              const largo = caracteresClip > 0 && dice.length > caracteresClip;
+              // Rojo solo si NO cabe: `caracteresClip` es el tope con un
+              // segundo de respiro, y hasta un 8% por encima sigue cabiendo
+              // (el mismo tope duro que usa el guionista).
+              const largo =
+                caracteresClip > 0 && dice.length > Math.floor(caracteresClip * 1.08);
               return (
                 <button
                   key={i}
@@ -1610,7 +1614,7 @@ function PrendaCard({
                   }`}
                   title={
                     largo
-                      ? `${dice.length} caracteres: en el clip caben ~${caracteresClip} y se comerá el final. Rehazlo con 🔁.`
+                      ? `${dice.length} caracteres: en el clip caben ~${Math.floor(caracteresClip * 1.08)} y se comerá el final. Rehazlo con 🔁.`
                       : dice || texto.slice(0, 120)
                   }
                 >
