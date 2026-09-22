@@ -206,20 +206,32 @@ FLECHA_SEGUNDOS = 4.0
 # desentona encima de un vídeo de moda.
 _FLECHA_POR_COLOR = {
     "amarilla": "flecha_amarilla.mov",
-    "verde": "flecha_verde.mov",
-    "cyan": "flecha_cyan.mov",
+    "naranja": "flecha_naranja.mov",
+    "marron": "flecha_marron.mov",
+    "beige": "flecha_beige.mov",
     "roja": "flecha_roja.mov",
+    "burdeos": "flecha_burdeos.mov",
+    "rosa": "flecha_rosa.mov",
+    "morada": "flecha_morada.mov",
+    "azul": "flecha_azul.mov",
+    "cyan": "flecha_cyan.mov",
+    "verde": "flecha_verde.mov",
     "blanca": "flecha_blanca.mov",
     "negra": "flecha_negra.mov",
 }
+# Las siete de la mitad (naranja → burdeos) salen de teñir la blanca con
+# `scripts/flechas_colores.sh`: con las seis de siempre, una calle de otoño o
+# un fondo de tonos tierra caían en la amarilla o la roja.
 
 
 def _color_del_fondo(video: Path, t: float) -> str:
     """El color de flecha que va con el vídeo en el segundo `t`.
 
     Matiz dominante PESADO por la saturación: el cielo gris o el asfalto no
-    votan, y lo que da el tono (hojas, fachadas, vegetación) sí. Sin color de
-    verdad, blanca sobre fondo oscuro y negra sobre claro.
+    votan, y lo que da el tono (hojas, fachadas, vegetación) sí. Luego se mira
+    lo oscuro o claro que es ESE matiz, que es lo que separa un naranja de un
+    marrón o un rojo de un burdeos. Sin color de verdad, blanca sobre fondo
+    oscuro, negra sobre claro y beige si lo que hay es un tono crema.
     """
     import cv2
     import numpy as np
@@ -236,18 +248,39 @@ def _color_del_fondo(video: Path, t: float) -> str:
     if img is None:
         return "blanca"
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).reshape(-1, 3).astype(float)
+    grados_px = hsv[:, 0] * 2
     sat = hsv[:, 1] / 255.0
-    if sat.mean() < 0.18:
-        return "negra" if hsv[:, 2].mean() / 255.0 > 0.62 else "blanca"
-    hist, _ = np.histogram(hsv[:, 0] * 2, bins=36, range=(0, 360), weights=sat)
+    luz = hsv[:, 2] / 255.0
+
+    hist, _ = np.histogram(grados_px, bins=36, range=(0, 360), weights=sat)
     grados = (int(hist.argmax()) + 0.5) * 10
-    if 15 <= grados < 70:
+    # Luz y saturación del matiz ganador, no de toda la imagen.
+    cerca = np.abs(((grados_px - grados) + 180) % 360 - 180) <= 15
+    s_tono = float(sat[cerca].mean()) if cerca.any() else float(sat.mean())
+    v_tono = float(luz[cerca].mean()) if cerca.any() else float(luz.mean())
+
+    if sat.mean() < 0.18:
+        # Un crema (E8DCC4) tiene solo un 15% de saturación: poca para contar
+        # como color, pero bastante para no ser gris. Un gris de verdad no
+        # llega al 3%.
+        if 15 <= grados < 60 and s_tono >= 0.08 and v_tono > 0.6:
+            return "beige"
+        return "negra" if luz.mean() > 0.62 else "blanca"
+    if grados < 15 or grados >= 345:
+        return "burdeos" if v_tono < 0.45 else "roja"
+    if grados < 40:
+        return "marron" if v_tono < 0.5 else "naranja"
+    if grados < 70:
         return "amarilla"
-    if 70 <= grados < 170:
+    if grados < 170:
         return "verde"
-    if 170 <= grados < 260:
+    if grados < 200:
         return "cyan"
-    return "roja"
+    if grados < 260:
+        return "azul"
+    if grados < 300:
+        return "morada"
+    return "rosa"
 
 
 def _flecha(salida: Path, on_log: OnLog) -> None:
