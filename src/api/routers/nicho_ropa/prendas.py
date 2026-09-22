@@ -631,6 +631,10 @@ def set_producto_estado(
             )
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
+        # Al contador de publicaciones del día (la barra "Vídeos N/25"),
+        # como hacen el POV BOF, el Largo, Carruseles y Creativos. Faltaba:
+        # Ana marcaba vídeos de moda como subidos y su contador no se movía.
+        _contar_subida(f"ropa:{carpeta}:{body.producto}", bool(body.uploaded), usuario)
 
     # El ranking de vendidos es POR USUARIO y común a todos los nichos: la
     # venta es de la cuenta de quien la hizo, no del catálogo de donde saliera
@@ -762,6 +766,20 @@ def escribir_guiones(
         enqueued_by=usuario or None,
     )
     return {"job_id": job.id, "message": f"Guiones de {alcance}, en la cola."}
+
+
+def _contar_subida(referencia: str, subido: bool, usuario: str) -> None:
+    """Suma (o resta) el vídeo en el tope diario de la cuenta.
+
+    Nunca tumba la petición: el dato bueno es el de la prenda, y quedarse sin
+    contador es molesto pero no impide trabajar.
+    """
+    try:
+        from src.cuotas.repos import cuota_repo
+
+        cuota_repo.marcar("videos", referencia, usuario, subido)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[nicho_ropa] no se pudo apuntar en el contador: %s", e)
 
 
 def _servir_foto(

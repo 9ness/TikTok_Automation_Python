@@ -367,6 +367,19 @@ def set_estado(
             body.source, body.folder, body.producto, usuario, gancho, duracion,
             **campos,
         )
+    # Al contador de publicaciones del día, como el resto de nichos: marcar un
+    # UGC como subido no sumaba en la barra "Vídeos N/25".
+    if body.uploaded is not None:
+        try:
+            from src.cuotas.repos import cuota_repo
+
+            cuota_repo.marcar(
+                "videos",
+                f"ugc:{body.source}:{body.folder}:{body.producto}:{gancho}:{duracion}",
+                usuario, bool(body.uploaded),
+            )
+        except Exception:  # noqa: BLE001 — el contador no tumba la petición
+            pass
     if body.sold is not None:
         try:
             if body.sold:
