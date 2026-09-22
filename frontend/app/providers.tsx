@@ -17,7 +17,7 @@ import { useMe } from "@/lib/queries/auth";
 import { ThemeProvider } from "@/lib/theme";
 import { useTheme } from "next-themes";
 import { useMenuPrefs } from "@/lib/queries/uiMenu";
-import { avisarModalAbierto } from "@/lib/subidaNativa";
+import { avisarModalAbierto, esAppNativa } from "@/lib/subidaNativa";
 
 /** Rellena la caché con lo último que vio ESTA persona.
  *
@@ -74,6 +74,18 @@ function TemaDelUsuario() {
     aplicado.current = tema;
     setTheme(tema);
   }, [tema, setTheme]);
+  return null;
+}
+
+/** Marca el `<html>` cuando se está dentro de la app de Android.
+ *
+ *  De ahí cuelgan los ajustes de `globals.css` que hacen falta SOLO en el
+ *  WebView: sin animación de entrada y sin desenfoque detrás de las ventanas
+ *  emergentes (ver el comentario allí). */
+function MarcaAppNativa() {
+  useEffect(() => {
+    if (esAppNativa()) document.documentElement.classList.add("app-nativa");
+  }, []);
   return null;
 }
 
@@ -144,6 +156,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         {children}
         <QueueDrawer />
         <TemaDelUsuario />
+        <MarcaAppNativa />
         <ModalesEnLaApp />
         <ToasterConTema />
       </ThemeProvider>

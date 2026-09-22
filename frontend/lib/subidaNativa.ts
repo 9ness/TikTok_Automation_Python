@@ -42,6 +42,16 @@ function puente(): PuenteAndroid | null {
   return p ?? null;
 }
 
+/** ¿Se está dentro de nuestra app de Android (no en el navegador)?
+ *
+ *  Por el trozo que le añadimos al identificador del navegador
+ *  (`MainActivity.java`), no por el puente: el puente existe solo cuando la
+ *  app lo inyecta, y esto hace falta ya en el primer pintado. */
+export function esAppNativa(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return navigator.userAgent.includes("TTShopApp");
+}
+
 /** ¿Se está dentro de una app que sabe subir por su cuenta? */
 export function haySubidaNativa(): boolean {
   const p = puente();

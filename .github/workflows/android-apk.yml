@@ -32,6 +32,13 @@ jobs:
           java-version: "17"
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Sin `packages`, la acción intenta instalar `tools`, que Google
+          # retiró del repositorio del SDK: desde el 22/9/2026 la compilación
+          # moría ahí ("Failed to find package 'tools'"). Vacío = no instala
+          # nada suelto; Gradle se baja la plataforma y las build-tools que
+          # pide el proyecto (las licencias las acepta esta misma acción).
+          packages: ""
 
       - uses: gradle/actions/setup-gradle@v4
 
