@@ -9,10 +9,13 @@
        · termina con el NOMBRE del producto y el aviso de no pegarlo en el
          generador: es refuerzo para la caption, no texto del vídeo.
 
-     El `{{CARACTERES}}` sale del propio estilo (`caracteres: 300`), no del
-     selector de duración: aquí el tope lo manda el formato, que son 15s. -->
+     El tope NO es el del curso (250-300 para 15s de una pieza): aquí son dos
+     clips de 8s y el guion se reparte entre los dos, así que `{{CARACTERES}}`
+     y `{{MINIMO}}` salen del estilo (`caracteres: 240`, ~120 por clip). Con
+     los 300 del curso cada mitad salía de 150-240 y el clip se comía el
+     final. -->
 
-Te voy a pasar una pront base para que mantengas toda la estructura y guión. Solo cambia las características del producto según la imagen que yo te vaya enviando. No añadas ninguna referencia de más al pront en referencia al producto ya que se le añadirá una imagen de referencia al importar el pront en VEO.No me devuelvas nada. Solo registra todo y dame la orden para que yo te envíe la imagen: Estructura guión: Debe explicar todas las caractericas que puedas del producto y potenciar sus beneficios. Minimo 250 Caracteres. Máximo {{CARACTERES}} Caracteres. Devuelvemelo desde la parte que dice la mujer en español.  Añade al final de toda la respuesta tambien el nombre completo del producto visible en la ficha junto con un avisto de que el nombre no deben pegarlo en ONMI ni en Grok que es un refuerzo para la sancion de producto irrelevante. Pones Nombre de producto (No añadir a orden de video en grok ni onmi) y nombre del producto.También Cambia el tono de voz por cada pront que me des. Tambien varia los ganchos de los guiones y los cierres de los guiones para que no suenen repetitivos. Intenta cerrar dando muy buena referencia de la prenda.
+Te voy a pasar una pront base para que mantengas toda la estructura y guión. Solo cambia las características del producto según la imagen que yo te vaya enviando. No añadas ninguna referencia de más al pront en referencia al producto ya que se le añadirá una imagen de referencia al importar el pront en VEO.No me devuelvas nada. Solo registra todo y dame la orden para que yo te envíe la imagen: Estructura guión: Debe explicar todas las caractericas que puedas del producto y potenciar sus beneficios. Minimo {{MINIMO}} Caracteres. Máximo {{CARACTERES}} Caracteres. Devuelvemelo desde la parte que dice la mujer en español.  Añade al final de toda la respuesta tambien el nombre completo del producto visible en la ficha junto con un avisto de que el nombre no deben pegarlo en ONMI ni en Grok que es un refuerzo para la sancion de producto irrelevante. Pones Nombre de producto (No añadir a orden de video en grok ni onmi) y nombre del producto.También Cambia el tono de voz por cada pront que me des. Tambien varia los ganchos de los guiones y los cierres de los guiones para que no suenen repetitivos. Intenta cerrar dando muy buena referencia de la prenda.
 
 La mujer dice en español:
 

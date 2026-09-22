@@ -52,6 +52,8 @@ class EstiloMof10(BaseModel):
     imagen2: str = ""
     # Cuántos clips hay que generar y subir para ese formato. 1 = como siempre.
     partes: int = 1
+    # Lo que cabe en cada clip cuando el formato se parte (0 = no se parte).
+    caracteres_clip: int = 0
 
 
 class ModoRopa(BaseModel):

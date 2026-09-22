@@ -234,6 +234,18 @@ TEXTO_MARCA: dict[str, dict] = {
 }
 
 
+def caracteres_por_clip(meta: dict) -> int:
+    """Lo que cabe en un clip de ese formato. 0 = no se parte.
+
+    18 car/s por el 90%: la voz entra y sale con un respiro, y medido al
+    límite el generador se comía la última palabra.
+    """
+    segundos = int(meta.get("segundos_clip") or 0)
+    if not segundos or int(meta.get("partes") or 1) < 2:
+        return 0
+    return int(segundos * CARACTERES_POR_SEGUNDO * 0.9)
+
+
 def partes_de_modo(modo: str) -> int:
     """En cuántos clips se graba ese formato. 1 = como siempre."""
     return int((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("partes") or 1)
@@ -605,8 +617,12 @@ def _con_duracion(texto: str, duracion: str, caracteres: int = 0) -> str:
     duración elegida (el de calle dividido son 15 segundos, siempre).
     """
     meta = DURACIONES[duracion_valida(duracion)]
+    tope = caracteres or meta["caracteres"]
     return (
-        texto.replace("{{CARACTERES}}", str(caracteres or meta["caracteres"]))
+        texto.replace("{{CARACTERES}}", str(tope))
+        # El mínimo va 30 por debajo del tope: con el "mínimo 250" del curso y
+        # un tope de 240 se le pedía algo imposible.
+        .replace("{{MINIMO}}", str(max(0, tope - 30)))
         .replace("{{SEGUNDOS}}", str(meta["segundos"]))
     )
 
@@ -800,7 +816,15 @@ ESTILOS_MOF10: dict[str, dict] = {
         "duraciones": False,
         "label": "Calle dividido · 15s en dos clips",
         "voz": True,
-        "caracteres": 300,
+        # El tope es POR CLIP, no del vídeo: el curso pide 250-300 para 15s de
+        # una pieza, pero aquí son dos clips de 8s y cada uno arranca y acaba
+        # su frase. 8s a 18 car/s son 144, y con el respiro de entrada y
+        # salida caben ~130. Con 300 partidos en dos, cada mitad salía de
+        # 150-240 y el clip se comía el final.
+        "segundos_clip": 8,
+        # Menos que 2 x 129 a propósito: el corte cae en un punto o una coma,
+        # no en el centro, así que una mitad sale siempre algo más larga.
+        "caracteres": 240,
         "partes": 2,
         # Refuerzo anti-sanción: el clip habla, así que lo que dice se lee
         # también (ver AGENTS.md). El curso lo publica sin texto encima.
@@ -1002,6 +1026,8 @@ def prompts_mof10(
             ),
             # Cuántos clips hay que generar y subir. 1 = como siempre.
             "partes": int(meta.get("partes") or 1),
+            # Lo que cabe en CADA clip, para repartir el guion sin pasarse.
+            "caracteres_clip": caracteres_por_clip(meta),
             "guion": _nota_plazos(
                 _nota_duracion(
                     _con_duracion(_con_plazos(guion, plazos), dur, tope), dur,

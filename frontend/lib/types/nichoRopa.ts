@@ -33,6 +33,8 @@ export interface EstiloMof10 {
   imagen2?: string;
   /** Cuántos clips hay que generar y subir. 1 = como siempre. */
   partes?: number;
+  /** Lo que cabe en cada clip cuando el formato se parte. */
+  caracteres_clip?: number;
   /** Tope de caracteres que se le pide al guion. */
   caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y

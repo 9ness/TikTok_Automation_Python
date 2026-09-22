@@ -1247,6 +1247,7 @@ export function PantallaRopa({
               // En cuántos clips se graba el formato: con dos, la tarjeta
               // pide los dos y el montaje los pega.
               partes={estiloActivo?.partes ?? 1}
+              caracteresClip={estiloActivo?.caracteres_clip ?? 0}
               modalidadDuracion={duracion}
               onCopiar={copiar}
             />
@@ -1267,6 +1268,7 @@ function PrendaCard({
   conGuion = false,
   nichoCaption = "",
   partes = 1,
+  caracteresClip = 0,
   modalidadDuracion = "10",
   onCopiar,
 }: {
@@ -1283,6 +1285,9 @@ function PrendaCard({
   partes?: number;
   /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
   nichoCaption?: string;
+  /** Lo que cabe en cada clip: el botón del guion se pinta en ámbar si se
+   *  pasa, que es cuando el clip se come el final. */
+  caracteresClip?: number;
   /** Con qué duración se pide (decide el tope de caracteres). */
   modalidadDuracion?: string;
   /** Modo de grabación en el que se está trabajando: decide QUÉ vídeo se ve
@@ -1587,17 +1592,34 @@ function PrendaCard({
               del guion va a SU vídeo, y pegar el entero en los dos hace que
               los dos digan lo mismo. */}
           {(prenda.guiones ?? []).length > 1 ? (
-            (prenda.guiones ?? []).map((texto, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onCopiar(`Guion · clip ${i + 1}`, texto)}
-                className="flex-1 rounded-md border border-amber-500/60 px-2 py-1.5 text-[11px] text-amber-500 transition hover:bg-amber-500/10"
-                title={texto.slice(0, 120)}
-              >
-                ✍️ Guion {i + 1}
-              </button>
-            ))
+            (prenda.guiones ?? []).map((texto, i) => {
+              // Lo que se DICE en ese clip (lo que va entre comillas): el
+              // bloque entero lleva también la voz y el movimiento, que no
+              // cuentan para lo que cabe en 8 segundos.
+              const dice = /«([^«»]*)[«»]/.exec(texto)?.[1]?.trim() ?? "";
+              const largo = caracteresClip > 0 && dice.length > caracteresClip;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onCopiar(`Guion · clip ${i + 1}`, texto)}
+                  className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition ${
+                    largo
+                      ? "border-red-500/60 text-red-400 hover:bg-red-500/10"
+                      : "border-amber-500/60 text-amber-500 hover:bg-amber-500/10"
+                  }`}
+                  title={
+                    largo
+                      ? `${dice.length} caracteres: en el clip caben ~${caracteresClip} y se comerá el final. Rehazlo con 🔁.`
+                      : dice || texto.slice(0, 120)
+                  }
+                >
+                  ✍️ Guion {i + 1}
+                  {dice ? ` · ${dice.length}` : ""}
+                  {largo ? " ⚠️" : ""}
+                </button>
+              );
+            })
           ) : (
             <button
               type="button"

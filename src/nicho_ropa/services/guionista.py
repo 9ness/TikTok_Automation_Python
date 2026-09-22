@@ -177,6 +177,10 @@ def escribir(
     # porque el generador dice todo lo que le pongas y en 8 segundos no cabe
     # el guion entero.
     partes: int = 1,
+    # Lo que cabe en CADA clip cuando el formato se parte (0 = sin tope por
+    # clip). El total puede caber y una mitad no: el corte cae en un punto,
+    # no en el centro exacto.
+    caracteres_clip: int = 0,
     on_log: OnLog = _noop,
 ) -> dict:
     """`{dice, video, videos}` para una prenda. Lanza si Gemini no lo escribe."""
@@ -231,6 +235,18 @@ def escribir(
 
     # El bloque se monta aquí con el texto del curso: la IA solo pone la frase.
     trozos = partir(dice, partes) if partes > 1 else [dice]
+    if caracteres_clip:
+        # Una mitad que no cabe en su clip se corta por su última frase: el
+        # generador dice TODO lo que le pongas y lo que sobra se lo come.
+        ajustados = [recortar(t, caracteres_clip) for t in trozos]
+        for i, (antes, despues) in enumerate(zip(trozos, ajustados), start=1):
+            if len(despues) < len(antes):
+                on_log(
+                    f"[nicho_ropa] clip {i}: {len(antes)} car. no caben en 8s, "
+                    f"se queda en {len(despues)}"
+                )
+        trozos = ajustados
+        dice = " ".join(trozos)
     videos = [_montar_video(prompt, t) or t for t in trozos]
     return {"dice": dice, "video": videos[0], "videos": videos}
 
