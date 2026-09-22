@@ -1451,15 +1451,12 @@ function PrendaCard({
   }
 
   // Con los hashtags pegados, como en el POV BOF: es lo que se pega tal cual
-  // en TikTok, y copiarlos aparte se olvida justo el día que hay prisa.
+  // en TikTok, y copiarlos aparte se olvida justo el día que hay prisa. Y en
+  // el MISMO orden que allí —texto, emojis y hashtags—: aquí los emojis iban
+  // delante del texto y el caption de moda no se parecía al del resto.
   const hashtags = useHashtags(nichoCaption).data ?? [];
   const caption = prenda.caption
-    ? [
-        `${prenda.emojis ? `${prenda.emojis} ` : ""}${prenda.caption}`,
-        hashtags.join(" "),
-      ]
-        .filter(Boolean)
-        .join(" ")
+    ? [prenda.caption, prenda.emojis, hashtags.join(" ")].filter(Boolean).join(" ")
     : "";
 
   return (
