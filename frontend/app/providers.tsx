@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toaster } from "sonner";
 
 import { QueueDrawer } from "@/components/queue/QueueDrawer";
@@ -15,6 +15,8 @@ import {
 } from "@/lib/cache-persistente";
 import { useMe } from "@/lib/queries/auth";
 import { ThemeProvider } from "@/lib/theme";
+import { useTheme } from "next-themes";
+import { useMenuPrefs } from "@/lib/queries/uiMenu";
 
 /** Rellena la caché con lo último que vio ESTA persona.
  *
@@ -57,6 +59,35 @@ function CachePersistente() {
   return null;
 }
 
+/** Aplica el tema guardado en la CUENTA (Redis), no solo en el dispositivo:
+ *  así Ana lo tiene en claro en el móvil, en el PC y en la APK sin tocar nada
+ *  en cada uno. Se aplica una vez por valor, para no pelear con el
+ *  interruptor mientras alguien lo está cambiando. */
+function TemaDelUsuario() {
+  const prefs = useMenuPrefs();
+  const { setTheme } = useTheme();
+  const aplicado = useRef("");
+  const tema = prefs.data?.tema ?? "";
+  useEffect(() => {
+    if (!tema || tema === aplicado.current) return;
+    aplicado.current = tema;
+    setTheme(tema);
+  }, [tema, setTheme]);
+  return null;
+}
+
+/** Los avisos, en el tema que se esté viendo (antes iban fijos en oscuro). */
+function ToasterConTema() {
+  const { resolvedTheme } = useTheme();
+  return (
+    <Toaster
+      richColors
+      position="top-right"
+      theme={resolvedTheme === "light" ? "light" : "dark"}
+    />
+  );
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
     () =>
@@ -78,7 +109,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <QueueWebSocketBridge />
         {children}
         <QueueDrawer />
-        <Toaster richColors position="top-right" theme="dark" />
+        <TemaDelUsuario />
+        <ToasterConTema />
       </ThemeProvider>
     </QueryClientProvider>
   );

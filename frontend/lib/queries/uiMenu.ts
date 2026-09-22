@@ -14,6 +14,8 @@ export interface MenuPrefs {
   ocultos: string[];
   orden_grupos: string[];
   orden_items: Record<string, string[]>;
+  /** "light" / "dark" / "system"; vacío = el del dispositivo. */
+  tema?: string;
 }
 
 export const MENU_PREFS_VACIAS: MenuPrefs = {

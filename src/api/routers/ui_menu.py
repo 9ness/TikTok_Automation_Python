@@ -54,6 +54,10 @@ class MenuPrefs(BaseModel):
     orden_grupos: list[str] = Field(default_factory=list)
     # Orden dentro de cada grupo: `basePath` → hrefs.
     orden_items: dict[str, list[str]] = Field(default_factory=dict)
+    # Claro u oscuro ("light" / "dark" / "system"; vacío = lo que diga el
+    # dispositivo). Va aquí por lo mismo que el menú: la misma cuenta entra
+    # desde el móvil, el PC y la APK, y el tema tiene que ser el mismo.
+    tema: str = ""
 
 
 def _key(usuario: str) -> str:

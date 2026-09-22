@@ -128,3 +128,119 @@
     );
   }
 }
+
+/* ------------------------------------------------------------------
+ * Modo claro: los textos de color.
+ *
+ * La app se diseñó en oscuro y usa para los textos de color los tonos
+ * CLAROS (text-violet-400, text-amber-300…), que sobre negro se leen
+ * bien y sobre blanco casi desaparecen: los botones de prompt o el
+ * selector de duración salían en un violeta que no se distinguía del
+ * fondo. En vez de tocar cientos de componentes, en modo claro esos tonos
+ * pasan a su versión oscura (700; 800 los amarillos, que son los que peor
+ * se ven sobre blanco). En oscuro no cambia nada.
+ * ------------------------------------------------------------------ */
+@layer utilities {
+  html:not(.dark) .text-violet-200,
+  html:not(.dark) .hover\:text-violet-200:hover { color: theme('colors.violet.700'); }
+  html:not(.dark) .text-violet-300,
+  html:not(.dark) .hover\:text-violet-300:hover { color: theme('colors.violet.700'); }
+  html:not(.dark) .text-violet-400,
+  html:not(.dark) .hover\:text-violet-400:hover { color: theme('colors.violet.700'); }
+  html:not(.dark) .text-fuchsia-200,
+  html:not(.dark) .hover\:text-fuchsia-200:hover { color: theme('colors.fuchsia.700'); }
+  html:not(.dark) .text-fuchsia-300,
+  html:not(.dark) .hover\:text-fuchsia-300:hover { color: theme('colors.fuchsia.700'); }
+  html:not(.dark) .text-fuchsia-400,
+  html:not(.dark) .hover\:text-fuchsia-400:hover { color: theme('colors.fuchsia.700'); }
+  html:not(.dark) .text-sky-200,
+  html:not(.dark) .hover\:text-sky-200:hover { color: theme('colors.sky.700'); }
+  html:not(.dark) .text-sky-300,
+  html:not(.dark) .hover\:text-sky-300:hover { color: theme('colors.sky.700'); }
+  html:not(.dark) .text-sky-400,
+  html:not(.dark) .hover\:text-sky-400:hover { color: theme('colors.sky.700'); }
+  html:not(.dark) .text-cyan-200,
+  html:not(.dark) .hover\:text-cyan-200:hover { color: theme('colors.cyan.700'); }
+  html:not(.dark) .text-cyan-300,
+  html:not(.dark) .hover\:text-cyan-300:hover { color: theme('colors.cyan.700'); }
+  html:not(.dark) .text-cyan-400,
+  html:not(.dark) .hover\:text-cyan-400:hover { color: theme('colors.cyan.700'); }
+  html:not(.dark) .text-emerald-200,
+  html:not(.dark) .hover\:text-emerald-200:hover { color: theme('colors.emerald.700'); }
+  html:not(.dark) .text-emerald-300,
+  html:not(.dark) .hover\:text-emerald-300:hover { color: theme('colors.emerald.700'); }
+  html:not(.dark) .text-emerald-400,
+  html:not(.dark) .hover\:text-emerald-400:hover { color: theme('colors.emerald.700'); }
+  html:not(.dark) .text-green-200,
+  html:not(.dark) .hover\:text-green-200:hover { color: theme('colors.green.700'); }
+  html:not(.dark) .text-green-300,
+  html:not(.dark) .hover\:text-green-300:hover { color: theme('colors.green.700'); }
+  html:not(.dark) .text-green-400,
+  html:not(.dark) .hover\:text-green-400:hover { color: theme('colors.green.700'); }
+  html:not(.dark) .text-amber-200,
+  html:not(.dark) .hover\:text-amber-200:hover { color: theme('colors.amber.800'); }
+  html:not(.dark) .text-amber-300,
+  html:not(.dark) .hover\:text-amber-300:hover { color: theme('colors.amber.800'); }
+  html:not(.dark) .text-amber-400,
+  html:not(.dark) .hover\:text-amber-400:hover { color: theme('colors.amber.800'); }
+  html:not(.dark) .text-orange-200,
+  html:not(.dark) .hover\:text-orange-200:hover { color: theme('colors.orange.700'); }
+  html:not(.dark) .text-orange-300,
+  html:not(.dark) .hover\:text-orange-300:hover { color: theme('colors.orange.700'); }
+  html:not(.dark) .text-orange-400,
+  html:not(.dark) .hover\:text-orange-400:hover { color: theme('colors.orange.700'); }
+  html:not(.dark) .text-red-200,
+  html:not(.dark) .hover\:text-red-200:hover { color: theme('colors.red.700'); }
+  html:not(.dark) .text-red-300,
+  html:not(.dark) .hover\:text-red-300:hover { color: theme('colors.red.700'); }
+  html:not(.dark) .text-red-400,
+  html:not(.dark) .hover\:text-red-400:hover { color: theme('colors.red.700'); }
+  html:not(.dark) .text-rose-200,
+  html:not(.dark) .hover\:text-rose-200:hover { color: theme('colors.rose.700'); }
+  html:not(.dark) .text-rose-300,
+  html:not(.dark) .hover\:text-rose-300:hover { color: theme('colors.rose.700'); }
+  html:not(.dark) .text-rose-400,
+  html:not(.dark) .hover\:text-rose-400:hover { color: theme('colors.rose.700'); }
+  html:not(.dark) .text-pink-200,
+  html:not(.dark) .hover\:text-pink-200:hover { color: theme('colors.pink.700'); }
+  html:not(.dark) .text-pink-300,
+  html:not(.dark) .hover\:text-pink-300:hover { color: theme('colors.pink.700'); }
+  html:not(.dark) .text-pink-400,
+  html:not(.dark) .hover\:text-pink-400:hover { color: theme('colors.pink.700'); }
+  html:not(.dark) .text-blue-200,
+  html:not(.dark) .hover\:text-blue-200:hover { color: theme('colors.blue.700'); }
+  html:not(.dark) .text-blue-300,
+  html:not(.dark) .hover\:text-blue-300:hover { color: theme('colors.blue.700'); }
+  html:not(.dark) .text-blue-400,
+  html:not(.dark) .hover\:text-blue-400:hover { color: theme('colors.blue.700'); }
+  html:not(.dark) .text-indigo-200,
+  html:not(.dark) .hover\:text-indigo-200:hover { color: theme('colors.indigo.700'); }
+  html:not(.dark) .text-indigo-300,
+  html:not(.dark) .hover\:text-indigo-300:hover { color: theme('colors.indigo.700'); }
+  html:not(.dark) .text-indigo-400,
+  html:not(.dark) .hover\:text-indigo-400:hover { color: theme('colors.indigo.700'); }
+  html:not(.dark) .text-teal-200,
+  html:not(.dark) .hover\:text-teal-200:hover { color: theme('colors.teal.700'); }
+  html:not(.dark) .text-teal-300,
+  html:not(.dark) .hover\:text-teal-300:hover { color: theme('colors.teal.700'); }
+  html:not(.dark) .text-teal-400,
+  html:not(.dark) .hover\:text-teal-400:hover { color: theme('colors.teal.700'); }
+  html:not(.dark) .text-yellow-200,
+  html:not(.dark) .hover\:text-yellow-200:hover { color: theme('colors.yellow.800'); }
+  html:not(.dark) .text-yellow-300,
+  html:not(.dark) .hover\:text-yellow-300:hover { color: theme('colors.yellow.800'); }
+  html:not(.dark) .text-yellow-400,
+  html:not(.dark) .hover\:text-yellow-400:hover { color: theme('colors.yellow.800'); }
+  html:not(.dark) .text-lime-200,
+  html:not(.dark) .hover\:text-lime-200:hover { color: theme('colors.lime.800'); }
+  html:not(.dark) .text-lime-300,
+  html:not(.dark) .hover\:text-lime-300:hover { color: theme('colors.lime.800'); }
+  html:not(.dark) .text-lime-400,
+  html:not(.dark) .hover\:text-lime-400:hover { color: theme('colors.lime.800'); }
+  html:not(.dark) .text-purple-200,
+  html:not(.dark) .hover\:text-purple-200:hover { color: theme('colors.purple.700'); }
+  html:not(.dark) .text-purple-300,
+  html:not(.dark) .hover\:text-purple-300:hover { color: theme('colors.purple.700'); }
+  html:not(.dark) .text-purple-400,
+  html:not(.dark) .hover\:text-purple-400:hover { color: theme('colors.purple.700'); }
+}
