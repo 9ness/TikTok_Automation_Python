@@ -204,24 +204,28 @@ FLECHA_SEGUNDOS = 4.0
 # Qué flecha va con qué fondo. Se busca que case con el ESTILO del vídeo —una
 # calle de otoño pide la amarilla, un parque la verde— y no un color fijo que
 # desentona encima de un vídeo de moda.
-_FLECHA_POR_COLOR = {
-    "amarilla": "flecha_amarilla.mov",
-    "naranja": "flecha_naranja.mov",
-    "marron": "flecha_marron.mov",
-    "beige": "flecha_beige.mov",
-    "roja": "flecha_roja.mov",
-    "burdeos": "flecha_burdeos.mov",
-    "rosa": "flecha_rosa.mov",
-    "morada": "flecha_morada.mov",
-    "azul": "flecha_azul.mov",
-    "cyan": "flecha_cyan.mov",
-    "verde": "flecha_verde.mov",
-    "blanca": "flecha_blanca.mov",
-    "negra": "flecha_negra.mov",
-}
-# Las siete de la mitad (naranja → burdeos) salen de teñir la blanca con
-# `scripts/flechas_colores.sh`: con las seis de siempre, una calle de otoño o
-# un fondo de tonos tierra caían en la amarilla o la roja.
+# Estilos de flecha, y en qué fichero está cada uno para un color dado
+# (`flecha_<estilo><color>.mov`). El color lo decide el fondo del vídeo; el
+# estilo va ROTANDO por prenda, para que dos vídeos seguidos no lleven la misma
+# flecha. Los estilos teñidos salen de `scripts/flechas_colores.sh` y el del
+# círculo de `scripts/flechas_circulo.py`; la 3D solo existe en amarilla y roja,
+# y se usa cuando toca ese color.
+_ESTILOS_FLECHA = ("", "avanza_", "triple_", "abajo_triple_", "circulo_", "3d_")
+
+
+def _elegir_flecha(color: str, semilla: str, carpeta: str) -> "Path | None":
+    """Una flecha de ese color, en el estilo que le toque a esta prenda."""
+    import hashlib
+
+    existentes = [
+        Path(carpeta) / f"flecha_{estilo}{color}.mov"
+        for estilo in _ESTILOS_FLECHA
+        if (Path(carpeta) / f"flecha_{estilo}{color}.mov").is_file()
+    ]
+    if not existentes:
+        return None
+    n = int(hashlib.md5((semilla or "").encode()).hexdigest(), 16)
+    return existentes[n % len(existentes)]
 
 
 def _color_del_fondo(video: Path, t: float) -> str:
@@ -283,7 +287,7 @@ def _color_del_fondo(video: Path, t: float) -> str:
     return "rosa"
 
 
-def _flecha(salida: Path, on_log: OnLog) -> None:
+def _flecha(salida: Path, on_log: OnLog, semilla: str = "") -> None:
     """Pone la flecha al carrito los últimos segundos. Si falla, sin flecha."""
     from src.nicho_pov_bof.pipeline.duration_match import probe_duration
     from src.tiktok_shop.pipeline.ready_video import _arrows_dir, _pick_arrow
@@ -293,8 +297,8 @@ def _flecha(salida: Path, on_log: OnLog) -> None:
         t0 = max(0.0, dur - FLECHA_SEGUNDOS)
         color = _color_del_fondo(salida, t0 + FLECHA_SEGUNDOS / 2)
         carpeta = _arrows_dir()
-        ruta = Path(carpeta) / _FLECHA_POR_COLOR[color] if carpeta else None
-        if not ruta or not ruta.is_file():
+        ruta = _elegir_flecha(color, semilla or salida.stem, carpeta) if carpeta else None
+        if not ruta:
             elegida = _pick_arrow(0)
             ruta = Path(elegida) if elegida else None
         if not ruta:
@@ -318,7 +322,7 @@ def _flecha(salida: Path, on_log: OnLog) -> None:
             "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp),
         ], on_log)
         tmp.replace(salida)
-        on_log(f"[nicho_ropa] flecha {color} los últimos {FLECHA_SEGUNDOS:.0f}s")
+        on_log(f"[nicho_ropa] flecha {ruta.stem} los últimos {FLECHA_SEGUNDOS:.0f}s")
     except Exception as e:  # noqa: BLE001 — la flecha es un extra
         on_log(f"[nicho_ropa] no se pudo poner la flecha ({str(e)[:160]}) — sale sin ella")
 
@@ -330,7 +334,7 @@ def _rematar(
     if texto_subs.strip():
         _subtitular(salida, texto_subs, on_log)
     if modo and config.lleva_flecha(modo):
-        _flecha(salida, on_log)
+        _flecha(salida, on_log, semilla)
     texto = config.texto_de_modo(modo) if modo else {}
     if texto.get("titulo"):
         _quemar_texto(salida, texto, semilla, on_log)
