@@ -50,13 +50,31 @@ def pegar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
     """
     if len(clips) == 1:
         return Path(clips[0])
+    from src.nicho_general.pipeline.video_editor import _silencio_inicial
+    from src.nicho_pov_bof.pipeline.duration_match import probe_duration
+
     work = destino.parent / f"pegar_{destino.stem}"
     work.mkdir(parents=True, exist_ok=True)
     iguales = []
     for i, clip in enumerate(clips, start=1):
         trozo = work / f"parte{i}.mp4"
+        # El hueco antes de hablar se quita en CADA clip (el prompt le pide
+        # al generador un respiro al empezar, y sumado a lo que ya deja él
+        # eran ~1 s por clip). Y el del final, en todos menos el último: ahí
+        # es el hueco entre las dos mitades, que se oía como un corte. El
+        # último conserva su cola, que es donde se ve la flecha.
+        quitar_ini = _silencio_inicial(Path(clip))
+        quitar_fin = _silencio_final(Path(clip)) if i < len(clips) else 0.0
+        dur = probe_duration(Path(clip))
+        largo = max(0.5, dur - quitar_ini - quitar_fin)
+        if quitar_ini or quitar_fin:
+            on_log(
+                f"[nicho_ropa] clip {i}: fuera {quitar_ini:.2f}s de silencio al "
+                f"principio y {quitar_fin:.2f}s al final"
+            )
         _run([
-            "ffmpeg", "-y", "-v", "error", "-i", str(clip),
+            "ffmpeg", "-y", "-v", "error",
+            "-ss", f"{quitar_ini:.3f}", "-t", f"{largo:.3f}", "-i", str(clip),
             "-vf", (
                 f"scale={pov_config.TARGET_W}:{pov_config.TARGET_H}"
                 ":force_original_aspect_ratio=decrease,"
@@ -81,6 +99,52 @@ def pegar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
     ], on_log)
     on_log(f"[nicho_ropa] {len(clips)} clips pegados con su voz")
     return destino
+
+
+# Mismos umbrales que el silencio de entrada del Nicho General, y un margen
+# algo mayor al final: cortar pegado a la última sílaba se la come.
+_RUIDO_DB = -35
+_MIN_SILENCIO_S = 0.15
+_MARGEN_FINAL_S = 0.15
+_MAX_RECORTE_FINAL_S = 1.5
+
+
+def _silencio_final(clip: Path) -> float:
+    """Cuánto dura el hueco del final, 0 si acaba hablando."""
+    from src.nicho_pov_bof.pipeline.duration_match import probe_duration
+
+    proc = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-i", str(clip),
+         "-af", f"silencedetect=noise={_RUIDO_DB}dB:d={_MIN_SILENCIO_S}",
+         "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    ultimo_inicio, ultimo_fin = None, None
+    for linea in proc.stderr.splitlines():
+        if "silence_start:" in linea:
+            try:
+                ultimo_inicio = float(linea.split("silence_start:")[1].split()[0])
+                ultimo_fin = None
+            except (IndexError, ValueError):
+                pass
+        elif "silence_end:" in linea:
+            try:
+                ultimo_fin = float(linea.split("silence_end:")[1].split()[0])
+            except (IndexError, ValueError):
+                pass
+    try:
+        dur = probe_duration(clip)
+    except Exception:  # noqa: BLE001
+        return 0.0
+    # Solo cuenta si el silencio llega hasta el FINAL: o el detector no lo
+    # cierra, o lo cierra pegado al último fotograma. Uno que se cierra antes
+    # es una pausa de la persona y ahí no se toca.
+    if ultimo_inicio is None:
+        return 0.0
+    if ultimo_fin is not None and ultimo_fin < dur - 0.1:
+        return 0.0
+    hueco = dur - ultimo_inicio - _MARGEN_FINAL_S
+    return max(0.0, min(hueco, _MAX_RECORTE_FINAL_S))
 
 
 def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
