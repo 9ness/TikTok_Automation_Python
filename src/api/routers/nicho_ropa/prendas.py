@@ -135,7 +135,7 @@ def importar_urls(body: dict) -> dict:
         raise APIError(str(e), status_code=503) from e
 
 
-def _contar(slug: str, modo: str) -> dict[str, int]:
+def _contar(slug: str, modo: str, usuario: str = "") -> dict[str, int]:
     """Cuántas prendas tiene la carpeta y cómo van, para el chip del selector.
 
     `total` sale del propio Drive (listar la carpeta) y lo demás del documento
@@ -149,7 +149,7 @@ def _contar(slug: str, modo: str) -> dict[str, int]:
         total = prendas_web.cuantas_prendas(genero, carpeta)
     except Exception:  # noqa: BLE001
         total = 0
-    productos = (product_repo.load(slug).get("productos") or {}).values()
+    productos = (product_repo.load(slug, usuario).get("productos") or {}).values()
     return {
         "total": total,
         "con_url": sum(1 for p in productos if (p or {}).get("product_url")),
@@ -249,7 +249,7 @@ def list_carpetas(
             # tiene que salir igual. Sin esta guarda, un error contando dejó la
             # pantalla entera sin carpetas y pareciendo que no había ninguna.
             try:
-                for campo, valor in _contar(i.slug, modo).items():
+                for campo, valor in _contar(i.slug, modo, usuario).items():
                     setattr(i, campo, valor)
             except Exception as e:  # noqa: BLE001
                 logger.warning("[nicho_ropa] no se pudo contar %s: %s", i.slug, e)
@@ -455,12 +455,13 @@ async def importar_prendas_web(
         raise APIError(f"No se pudo escribir en el Drive: {e}", status_code=500) from e
 
 
-def _montando(queue: JobQueue | None, carpeta: str) -> set[str]:
-    """Prendas con un montaje en cola o en curso.
+def _montando(queue: JobQueue | None, carpeta: str, usuario: str = "") -> set[str]:
+    """Prendas con un montaje DE ESE USUARIO en cola o en curso.
 
     Sale de la COLA y no del estado guardado, por lo mismo que en el otro
     nicho: el runner escribe `uploaded` y `video_path` a la vez al terminar,
-    así que lo guardado no distingue "montándose" de "sin empezar".
+    así que lo guardado no distingue "montándose" de "sin empezar". Y solo lo
+    suyo: el vídeo es de cada uno, y ver "montando…" por el de otro engaña.
     """
     if queue is None:
         return set()
@@ -470,6 +471,9 @@ def _montando(queue: JobQueue | None, carpeta: str) -> set[str]:
             if job.mode != JobMode.NICHO_ROPA_VIDEO:
                 continue
             if str(job.params.get("carpeta") or config.CARPETA_DEFECTO) != carpeta:
+                continue
+            duenio = str(job.params.get("operator") or job.enqueued_by or "")
+            if usuario and duenio and duenio != usuario:
                 continue
             if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
                 activos.add(str(job.params.get("producto")))
@@ -501,9 +505,9 @@ def list_prendas(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
-    doc = product_repo.load(carpeta)
+    doc = product_repo.load(carpeta, usuario)
     guardados = doc.get("productos") or {}
-    activos = _montando(queue, carpeta)
+    activos = _montando(queue, carpeta, usuario)
     # Una sola lectura del índice de escaparate para toda la carpeta.
     escaparate = pov_repo.escaparate_index(usuario)
 
@@ -625,8 +629,8 @@ def set_producto_estado(
             # Con la FECHA: sin ella el chip decía "subido" y no había forma de
             # saber si fue hoy o hace una semana — que es justo lo que se
             # mira al preparar la publicación del día.
-            product_repo.update_product(
-                carpeta, body.producto, uploaded=bool(body.uploaded),
+            product_repo.update_personal(
+                carpeta, body.producto, usuario, uploaded=bool(body.uploaded),
                 uploaded_at=int(time.time()) if body.uploaded else 0,
             )
         except RuntimeError as e:
@@ -642,8 +646,8 @@ def set_producto_estado(
     # el índice entero.
     if body.sold is not None:
         try:
-            product_repo.update_product(
-                carpeta, body.producto, sold=bool(body.sold),
+            product_repo.update_personal(
+                carpeta, body.producto, usuario, sold=bool(body.sold),
             )
         except RuntimeError as e:
             raise APIError(str(e), status_code=503) from e
@@ -863,11 +867,13 @@ def quitar_clip(
     producto: Annotated[str, Query()],
     modo: Annotated[str, Query()],
     parte: Annotated[int, Query()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Quita un clip subido por error de su hueco, antes de que se monte."""
     try:
         quedan = product_repo.quitar_clip(
             carpeta or config.CARPETA_DEFECTO, producto, config.modo_valido(modo), parte,
+            usuario,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
@@ -935,7 +941,9 @@ async def upload_video(
     rutas = [str(destino)]
     if partes > 1:
         n = parte if 1 <= parte <= partes else 1
-        clips = product_repo.guardar_clip(slug, producto, modo_norm, n, str(destino))
+        clips = product_repo.guardar_clip(
+            slug, producto, modo_norm, n, str(destino), operator,
+        )
         faltan = [str(i) for i in range(1, partes + 1) if not clips.get(str(i))]
         if faltan:
             return VideoRopaUploadResponse(
@@ -982,9 +990,10 @@ def get_video(
     carpeta: Annotated[str, Query()] = "",
     descargar: Annotated[bool, Query()] = False,
     modo: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FileResponse:
-    """Sirve el vídeo ya montado de ese modo de grabación."""
-    prod = product_repo.get_product(carpeta or config.CARPETA_DEFECTO, producto)
+    """Sirve el vídeo ya montado de ese modo de grabación (el de ese usuario)."""
+    prod = product_repo.get_product(carpeta or config.CARPETA_DEFECTO, producto, usuario)
     ruta = product_repo.video_de(prod, modo)["video_path"]
     if not ruta or not Path(ruta).is_file():
         raise APIError(f"La prenda {producto} no tiene vídeo montado.", status_code=404)

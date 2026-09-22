@@ -57,15 +57,70 @@ def _cerrojo(carpeta: str, espera_s: float = 10.0):
             r.delete(_lock(carpeta))
 
 
-def load(carpeta: str) -> dict:
+# ---------------------------------------------------------------------------
+# Por usuario
+# ---------------------------------------------------------------------------
+# Los TEXTOS de la prenda (título, tienda, caption, precio, enlace) son datos
+# del producto y se comparten: se extraen una vez para todos. Lo que es
+# TRABAJO de cada uno —guiones, clips y vídeo de cada modo, y si lo ha
+# subido— va por usuario, como en el POV BOF: Ana y Mauro llevan cuentas de
+# TikTok distintas, y que una marque una prenda como subida no la sube en la
+# del otro. Antes todo iba en el mismo documento y se pisaban.
+#
+# El histórico (lo de antes de separar) se queda en el documento común y es
+# de `ness`, igual que en el POV BOF: así no hay que migrar lo suyo.
+PERSONALES = ("modos", "uploaded", "uploaded_at", "video_path", "video_listo_at", "sold")
+USUARIO_HISTORICO = "ness"
+
+
+def _es_historico(usuario: str) -> bool:
+    return not usuario or usuario == USUARIO_HISTORICO
+
+
+def _ambito(carpeta: str, usuario: str = "") -> str:
+    """Dónde vive lo personal de ese usuario: el documento común para el
+    histórico, `productos:<carpeta>:u:<usuario>` para el resto. Sirve también
+    de nombre del cerrojo, así cada documento tiene el suyo."""
+    return carpeta if _es_historico(usuario) else f"{carpeta}:u:{usuario}"
+
+
+def load(carpeta: str, usuario: str = "") -> dict:
+    """El documento de la carpeta TAL Y COMO LO VE ese usuario.
+
+    Sin usuario (o el histórico) es el documento común tal cual. Con otro, los
+    textos salen del común y lo personal de SU documento: no ve los vídeos ni
+    los "subido" de los demás.
+    """
     r = get_nicho_ropa_redis()
     if not r.is_available():
         return {}
-    return r.get_json(_key(carpeta)) or {}
+    doc = r.get_json(_key(carpeta)) or {}
+    if _es_historico(usuario):
+        return doc
+    mio = (r.get_json(_key(_ambito(carpeta, usuario))) or {}).get("productos") or {}
+    vista = {}
+    for pid, prod in (doc.get("productos") or {}).items():
+        base = {k: v for k, v in (prod or {}).items() if k not in PERSONALES}
+        base.update(mio.get(pid) or {})
+        vista[pid] = base
+    return {**doc, "productos": vista}
 
 
-def get_product(carpeta: str, producto: str) -> dict:
-    return (load(carpeta).get("productos") or {}).get(str(producto)) or {}
+def get_product(carpeta: str, producto: str, usuario: str = "") -> dict:
+    return (load(carpeta, usuario).get("productos") or {}).get(str(producto)) or {}
+
+
+def update_personal(carpeta: str, producto: str, usuario: str = "", **campos) -> dict:
+    """Parche de lo PERSONAL (subido, vendido…) en el documento del usuario."""
+    ambito = _ambito(carpeta, usuario)
+    with _cerrojo(ambito):
+        r = _require_redis()
+        doc = r.get_json(_key(ambito)) or {}
+        prod = doc.setdefault("productos", {}).setdefault(str(producto), {})
+        prod.update({k: v for k, v in campos.items() if v is not None})
+        prod["updated_at"] = _now()
+        r.set_json(_key(ambito), doc)
+        return prod
 
 
 def save_extracted_texts(carpeta: str, textos: dict[str, dict]) -> dict:
@@ -154,15 +209,15 @@ def guion_de(prod: dict, modo: str) -> dict:
 
 def guardar_guion(
     carpeta: str, producto: str, modo: str, dice: str, video: str,
-    videos: "list[str] | None" = None,
+    videos: "list[str] | None" = None, usuario: str = "",
 ) -> dict:
     """Apunta el guion de un modo sin tocar el de los demás ni su vídeo."""
     from src.nicho_ropa import config
 
     modo = config.modo_valido(modo)
-    with _cerrojo(carpeta):
+    with _cerrojo(_ambito(carpeta, usuario)):
         r = _require_redis()
-        doc = r.get_json(_key(carpeta)) or {}
+        doc = r.get_json(_key(_ambito(carpeta, usuario))) or {}
         prod = doc.setdefault("productos", {}).setdefault(str(producto), {})
         prod.setdefault("modos", {}).setdefault(modo, {})["guion"] = {
             # Epoch y no `_now()`: eso devuelve un ISO y la pantalla pinta las
@@ -174,7 +229,7 @@ def guardar_guion(
             "at": int(time.time()),
         }
         prod["updated_at"] = _now()
-        r.set_json(_key(carpeta), doc)
+        r.set_json(_key(_ambito(carpeta, usuario)), doc)
         return prod
 
 
@@ -186,7 +241,9 @@ def clips_de(prod: dict, modo: str) -> dict[str, str]:
     return {str(k): str(v) for k, v in (guardado.get("clips") or {}).items() if v}
 
 
-def guardar_clip(carpeta: str, producto: str, modo: str, parte: int, ruta: str) -> dict:
+def guardar_clip(
+    carpeta: str, producto: str, modo: str, parte: int, ruta: str, usuario: str = "",
+) -> dict:
     """Apunta el clip de UNA parte y devuelve todos los que ya hay.
 
     Los formatos de dos clips (calle dividido) se suben de uno en uno: el
@@ -195,55 +252,59 @@ def guardar_clip(carpeta: str, producto: str, modo: str, parte: int, ruta: str) 
     from src.nicho_ropa import config
 
     modo = config.modo_valido(modo)
-    with _cerrojo(carpeta):
+    with _cerrojo(_ambito(carpeta, usuario)):
         r = _require_redis()
-        doc = r.get_json(_key(carpeta)) or {}
+        doc = r.get_json(_key(_ambito(carpeta, usuario))) or {}
         prod = doc.setdefault("productos", {}).setdefault(str(producto), {})
         clips = prod.setdefault("modos", {}).setdefault(modo, {}).setdefault("clips", {})
         clips[str(int(parte))] = ruta
         prod["updated_at"] = _now()
-        r.set_json(_key(carpeta), doc)
+        r.set_json(_key(_ambito(carpeta, usuario)), doc)
         return {str(k): str(v) for k, v in clips.items() if v}
 
 
-def quitar_clip(carpeta: str, producto: str, modo: str, parte: int) -> dict[str, str]:
+def quitar_clip(
+    carpeta: str, producto: str, modo: str, parte: int, usuario: str = "",
+) -> dict[str, str]:
     """Quita el clip de UNA parte (subido por error) y devuelve los que quedan."""
     from src.nicho_ropa import config
 
     modo = config.modo_valido(modo)
-    with _cerrojo(carpeta):
+    with _cerrojo(_ambito(carpeta, usuario)):
         r = _require_redis()
-        doc = r.get_json(_key(carpeta)) or {}
+        doc = r.get_json(_key(_ambito(carpeta, usuario))) or {}
         prod = (doc.get("productos") or {}).get(str(producto)) or {}
         clips = ((prod.get("modos") or {}).get(modo) or {}).get("clips") or {}
         if clips.pop(str(int(parte)), None) is not None:
             prod["updated_at"] = _now()
-            r.set_json(_key(carpeta), doc)
+            r.set_json(_key(_ambito(carpeta, usuario)), doc)
         return {str(k): str(v) for k, v in clips.items() if v}
 
 
-def olvidar_clips(carpeta: str, producto: str, modo: str) -> None:
+def olvidar_clips(carpeta: str, producto: str, modo: str, usuario: str = "") -> None:
     """Vacía los clips guardados de un modo (ya se han montado)."""
     from src.nicho_ropa import config
 
     modo = config.modo_valido(modo)
-    with _cerrojo(carpeta):
+    with _cerrojo(_ambito(carpeta, usuario)):
         r = _require_redis()
-        doc = r.get_json(_key(carpeta)) or {}
+        doc = r.get_json(_key(_ambito(carpeta, usuario))) or {}
         prod = (doc.get("productos") or {}).get(str(producto)) or {}
         if ((prod.get("modos") or {}).get(modo) or {}).pop("clips", None) is not None:
             prod["updated_at"] = _now()
-            r.set_json(_key(carpeta), doc)
+            r.set_json(_key(_ambito(carpeta, usuario)), doc)
 
 
-def guardar_video(carpeta: str, producto: str, modo: str, ruta: str, listo_at: int) -> dict:
+def guardar_video(
+    carpeta: str, producto: str, modo: str, ruta: str, listo_at: int, usuario: str = "",
+) -> dict:
     """Apunta el vídeo de un modo sin tocar el de los demás."""
     from src.nicho_ropa import config
 
     modo = config.modo_valido(modo)
-    with _cerrojo(carpeta):
+    with _cerrojo(_ambito(carpeta, usuario)):
         r = _require_redis()
-        doc = r.get_json(_key(carpeta)) or {}
+        doc = r.get_json(_key(_ambito(carpeta, usuario))) or {}
         productos = doc.setdefault("productos", {})
         prod = productos.setdefault(str(producto), {})
         # `update` y no asignación: en ese hueco vive también el guion de
@@ -257,7 +318,7 @@ def guardar_video(carpeta: str, producto: str, modo: str, ruta: str, listo_at: i
             prod["video_path"] = ruta
             prod["video_listo_at"] = listo_at
         prod["updated_at"] = _now()
-        r.set_json(_key(carpeta), doc)
+        r.set_json(_key(_ambito(carpeta, usuario)), doc)
         return prod
 
 

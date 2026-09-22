@@ -1747,7 +1747,8 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         or ropa_config.DURACIONES[ropa_config.duracion_valida(duracion)]["caracteres"]
     )
 
-    doc = product_repo.load(carpeta)
+    usuario = str(p.get("usuario") or job.enqueued_by or "")
+    doc = product_repo.load(carpeta, usuario)
     guardados = doc.get("productos") or {}
     pedidos = pedidos_fijos or list(guardados)
     hechos, saltados, fallos = 0, 0, []
@@ -1790,7 +1791,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
             continue
         product_repo.guardar_guion(
             carpeta, pid, modo, escrito["dice"], escrito["video"],
-            escrito.get("videos"),
+            escrito.get("videos"), usuario=usuario,
         )
         hechos += 1
         on_log(f"[nicho_ropa] {pid}: guion de {len(escrito['dice'])} caracteres")
@@ -1851,7 +1852,9 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             # defecto), así que no se tira el montaje por esto.
             on_log(f"[nicho_ropa] no se pudo preparar la voz: {e} — sale mudo")
 
-    prod = product_repo.get_product(carpeta, producto) or {}
+    # De quien lo monta: el guion, los clips y el vídeo son de cada usuario.
+    quien = str(p.get("operator") or job.enqueued_by or "")
+    prod = product_repo.get_product(carpeta, producto, quien) or {}
     titulo = str(prod.get("titulo") or "")
     modo = ropa_config.modo_valido(str(p.get("modo") or ""))
 
@@ -1907,7 +1910,14 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     # escribía encima del del espejo (misma prenda, misma carpeta).
     if modo != ropa_config.MODO_DEFECTO:
         nombre = f"{Path(nombre).stem}__{modo}{Path(nombre).suffix}"
-    salida = Path(ropa_config.video_dir()) / carpeta / nombre
+    # Cada usuario en su subcarpeta, como en el POV BOF: montan la MISMA
+    # prenda por separado y el nombre del fichero es idéntico, así que sin
+    # esto el vídeo de uno sobrescribía el del otro. `ness` se queda en la
+    # raíz de siempre para no mover su histórico.
+    raiz_videos = Path(ropa_config.video_dir())
+    if quien and quien != product_repo.USUARIO_HISTORICO:
+        raiz_videos = raiz_videos / quien
+    salida = raiz_videos / carpeta / nombre
     video_editor.montar(
         raw_path, salida, voz=voz, conservar_audio=conservar_audio,
         texto_subs=texto_subs,
@@ -1921,11 +1931,12 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     # otro dejando la cámara, y guardar en la raíz pisaba el anterior.
     product_repo.guardar_video(
         carpeta, producto, str(p.get("modo") or ""), str(salida), int(time.time()),
+        usuario=quien,
     )
     # Los clips guardados a la espera de su pareja ya se han usado: si se
     # quedan, la siguiente subida creería que ya están los dos.
     if len(rutas) > 1:
-        product_repo.olvidar_clips(carpeta, producto, modo)
+        product_repo.olvidar_clips(carpeta, producto, modo, quien)
     on_progress(1.0, "✅ Listo")
     return str(salida)
 
