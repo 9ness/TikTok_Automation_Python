@@ -17,6 +17,7 @@ import { useMe } from "@/lib/queries/auth";
 import { ThemeProvider } from "@/lib/theme";
 import { useTheme } from "next-themes";
 import { useMenuPrefs } from "@/lib/queries/uiMenu";
+import { avisarModalAbierto } from "@/lib/subidaNativa";
 
 /** Rellena la caché con lo último que vio ESTA persona.
  *
@@ -76,6 +77,39 @@ function TemaDelUsuario() {
   return null;
 }
 
+/** Vigila si hay alguna ventana emergente abierta y se lo cuenta a la app.
+ *
+ *  Radix pinta los diálogos y la Cola como `[role="dialog"]` con
+ *  `data-state="open"` colgados del `body`, así que basta con observar el
+ *  `body`. Se avisa solo cuando cambia (abierto ↔ cerrado), no en cada
+ *  mutación. */
+function ModalesEnLaApp() {
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    let ultimo = false;
+    const mirar = () => {
+      const abierto = Boolean(document.querySelector('[role="dialog"][data-state="open"]'));
+      if (abierto !== ultimo) {
+        ultimo = abierto;
+        avisarModalAbierto(abierto);
+      }
+    };
+    const obs = new MutationObserver(mirar);
+    obs.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-state"],
+    });
+    mirar();
+    return () => {
+      obs.disconnect();
+      if (ultimo) avisarModalAbierto(false);
+    };
+  }, []);
+  return null;
+}
+
 /** Los avisos, en el tema que se esté viendo (antes iban fijos en oscuro). */
 function ToasterConTema() {
   const { resolvedTheme } = useTheme();
@@ -110,6 +144,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         {children}
         <QueueDrawer />
         <TemaDelUsuario />
+        <ModalesEnLaApp />
         <ToasterConTema />
       </ThemeProvider>
     </QueryClientProvider>

@@ -502,6 +502,41 @@ def limpiar_video_cache(dias: int = VIDEO_CACHE_DIAS) -> int:
     return borrados
 
 
+# Cuántos días se conserva una foto descargada sin que nadie la pida. Las
+# fotos van por file ID y no cambian, así que borrarlas no pierde nada: si
+# hace falta, se vuelve a bajar.
+PHOTO_CACHE_DIAS = 30
+
+
+def limpiar_photo_cache(dias: int = PHOTO_CACHE_DIAS) -> int:
+    """Borra las fotos (y miniaturas) que llevan `dias` sin tocarse.
+
+    Faltaba: la caché solo crecía y el 22/9/2026 iba por 2,2 GB en un disco de
+    75 que se llenó dos días seguidos. Por FECHA DE ACCESO cuando el sistema
+    la lleva, y si no por la de modificación.
+    """
+    import time
+
+    carpeta = photo_cache_dir()
+    if not os.path.isdir(carpeta):
+        return 0
+    limite = time.time() - dias * 86400
+    borrados = 0
+    for raiz, _dirs, ficheros in os.walk(carpeta):
+        for nombre in ficheros:
+            if nombre.endswith(".json"):
+                continue  # `dimensiones.json` es un índice, no una foto
+            ruta = os.path.join(raiz, nombre)
+            try:
+                st = os.stat(ruta)
+                if max(st.st_atime, st.st_mtime) < limite:
+                    os.unlink(ruta)
+                    borrados += 1
+            except OSError:
+                continue
+    return borrados
+
+
 def photo_cache_dir() -> str:
     """Dir local donde se cachean las fotos descargadas por file ID.
 

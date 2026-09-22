@@ -32,6 +32,8 @@ interface PuenteAndroid {
   puedeSubirEnSegundoPlano?: () => boolean;
   subirVarios?: (url: string, apiKey: string, tareasJson: string) => boolean;
   recogerResultados?: () => string;
+  /** Enciende o apaga el "deslizar para recargar" de la app (APK 3.2+). */
+  recargaDeslizando?: (activa: boolean) => void;
 }
 
 function puente(): PuenteAndroid | null {
@@ -161,4 +163,22 @@ export function alElegirEnLaApp(fn: (nombres: string[]) => void): () => void {
   return () => {
     alElegirFicheros.delete(fn);
   };
+}
+
+
+/** Le dice a la app si hay una ventana emergente abierta.
+ *
+ *  Con un diálogo (o la Cola) abierto la página no se desplaza, y el
+ *  "deslizar para recargar" de la app creía que estaba arriba del todo: un
+ *  arrastre dentro del diálogo recargaba la página y el diálogo desaparecía.
+ *  En Chrome no pasa —no hay recargador—; en la app hay que apagarlo mientras
+ *  dure. Sin la app (o con una anterior a la 3.2) no hace nada.
+ */
+export function avisarModalAbierto(abierto: boolean): void {
+  const p = puente();
+  try {
+    p?.recargaDeslizando?.(!abierto);
+  } catch {
+    // Un fallo del puente no puede tumbar la pantalla.
+  }
 }

@@ -72,6 +72,17 @@ querer.
 
 ## Cosas que ya costaron una vez
 
+- **Las ventanas emergentes "no abrían" en la app (22/9/2026).** Ver detalle
+  de un trabajo, cambiar de cuenta, la propia Cola: en Chrome iban y en la app
+  se cortaban. La web estaba bien (se reprodujo con el mismo Chrome del
+  WebView y se pintaban enteras); era el **deslizar para recargar**: con un
+  diálogo abierto la web bloquea el desplazamiento de la página, `getScrollY()`
+  es 0, y `SwipeRefreshLayout` se quedaba con cualquier arrastre dentro del
+  diálogo y recargaba la página. Desde la 3.2 la web avisa por el puente
+  (`AppAndroid.recargaDeslizando(false)`) mientras haya un `[role="dialog"]`
+  abierto y la app apaga el recargador. Regla: cualquier gesto que "en Chrome
+  funciona y en la app no" es sospechoso del recargador antes que de la web.
+
 - **Instalar encima exige la misma clave y el mismo `applicationId`.**
   `com.nebulabsai.tiktokauto` firmado con `android-keys/tiktok.keystore` (alias
   `tiktok`, contraseña `tiktokauto`). Si cambiara la firma habría que

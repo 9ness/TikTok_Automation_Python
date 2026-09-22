@@ -67,6 +67,8 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private SwipeRefreshLayout deslizar;
+    /** Hay una ventana emergente abierta en la web (ver `recargaDeslizando`). */
+    private volatile boolean modalAbierto = false;
     private AvisoDescargas avisosDescarga;
     /** Lo ÚLTIMO que eligió el usuario en el selector: nombre → `content://`.
      *
@@ -100,7 +102,15 @@ public class MainActivity extends Activity {
         deslizar.setOnRefreshListener(() -> web.reload());
         // Solo se dispara ARRIBA DEL TODO: si no, al desplazarse por una lista
         // larga el gesto se lo comía el recargador y la página no bajaba.
-        deslizar.setOnChildScrollUpCallback((padre, hijo) -> web.getScrollY() > 0);
+        //
+        // Y NUNCA con una ventana emergente abierta. Con un diálogo (o la
+        // Cola) abierto la web bloquea el desplazamiento de la página, así que
+        // `getScrollY()` es 0 y cualquier arrastre dentro del diálogo se
+        // convertía en "recargar": la página se recargaba y el diálogo
+        // desaparecía. En Chrome no pasa porque allí no hay recargador. La web
+        // avisa por el puente (`recargaDeslizando`) de cuándo hay uno abierto.
+        deslizar.setOnChildScrollUpCallback(
+            (padre, hijo) -> modalAbierto || web.getScrollY() > 0);
         setContentView(deslizar);
 
         WebSettings s = web.getSettings();
@@ -515,6 +525,25 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean puedeSubirEnSegundoPlano() {
             return true;
+        }
+
+        /**
+         * La web dice si el "deslizar para recargar" puede actuar.
+         *
+         * Lo apaga mientras haya una ventana emergente abierta: con ella la
+         * página no se desplaza, el recargador cree que está arriba del todo
+         * y se queda con el gesto — recargaba la página en vez de desplazar
+         * el diálogo. Llega desde el hilo del JavaScript, y la vista solo se
+         * toca desde el de la interfaz.
+         */
+        @JavascriptInterface
+        public void recargaDeslizando(boolean activa) {
+            modalAbierto = !activa;
+            runOnUiThread(() -> {
+                if (deslizar == null) return;
+                deslizar.setEnabled(activa);
+                if (!activa) deslizar.setRefreshing(false);
+            });
         }
 
         /**

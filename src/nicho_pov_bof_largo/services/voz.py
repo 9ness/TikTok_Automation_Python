@@ -357,7 +357,11 @@ def sintetizar(
     destino.parent.mkdir(parents=True, exist_ok=True)
     crudo = destino.with_name(destino.stem + "_crudo.mp3")
 
+    # Voces ya probadas en este montaje: si Fish no puede con una, se cambia.
+    descartadas: set[str] = set()
+
     def _locutar(frase: str) -> None:
+        nonlocal elegida
         cuerpo = json.dumps({
             "text": frase, "reference_id": elegida["id"], "format": "mp3",
         }).encode("utf-8")
@@ -375,6 +379,20 @@ def sintetizar(
                 detalle = e.read().decode("utf-8", "replace")[:300]
             except Exception:
                 pass
+            # Un 5xx es cosa de Fish, no del guion: el 22/9/2026 devolvió
+            # "Failed to download reference audio" con una voz de su propia
+            # biblioteca y tumbó el montaje. Con otra voz del mismo sexo sale
+            # igual de bien, así que se cambia antes de rendirse.
+            descartadas.add(elegida["id"])
+            otras = [v for v in config.VOCES.get(sexo, []) if v["id"] not in descartadas]
+            if e.code >= 500 and otras:
+                nueva = (rng or random).choice(otras)
+                on_log(
+                    f"[voz] Fish no puede con «{elegida['label']}» ({e.code}: "
+                    f"{detalle[:80]}) — se prueba con «{nueva['label']}»"
+                )
+                elegida = nueva
+                return _locutar(frase)
             raise RuntimeError(f"Fish Audio devolvió {e.code}: {detalle}") from e
         _registrar_coste(frase, elegida)
 

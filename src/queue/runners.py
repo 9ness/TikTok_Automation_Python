@@ -4467,6 +4467,10 @@ def run_nicho_pov_bof_video(job: Job, on_log: OnLog, on_progress: OnProgress) ->
         borradas = config.limpiar_video_cache()
         if borradas:
             on_log(f"[nicho_pov_bof] caché de vídeos: {borradas} antigua(s) borrada(s)")
+        # Y las fotos: la caché de fotos no se limpiaba nunca y llegó a 2 GB.
+        fotos_fuera = config.limpiar_photo_cache()
+        if fotos_fuera:
+            on_log(f"[nicho_pov_bof] caché de fotos: {fotos_fuera} antigua(s) borrada(s)")
     except OSError as e:
         # Sin copia local se sigue sirviendo desde Drive: más lento, pero
         # funciona. No es motivo para tumbar el montaje.

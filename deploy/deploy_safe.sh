@@ -309,8 +309,10 @@ fi
 # Si quedan < 5 GB libres, lanzamos un prune ANTES de los rebuilds —
 # evita builds a medias por ENOSPC. Más conservador que `system prune
 # -af`: solo limpia builder cache + imágenes sin tag.
+# 12 GB y no 5: reconstruir la imagen de la API necesita ~5 GB de sitio y con
+# 5 libres se quedaba a medias (ENOSPC) y la API en bucle de reinicio.
 DISK_FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-if [[ -n "$DISK_FREE_GB" && "$DISK_FREE_GB" -lt 5 ]]; then
+if [[ -n "$DISK_FREE_GB" && "$DISK_FREE_GB" -lt 12 ]]; then
     echo "[deploy_safe] ⚠️ disco bajo (${DISK_FREE_GB} GB libres) — limpiando builder cache + dangling images…"
     docker builder prune -af >/dev/null 2>&1 || true
     docker image prune -af >/dev/null 2>&1 || true
@@ -438,11 +440,15 @@ fi
 # que las capas recientes —las que de verdad aceleran— se quedan. Va al final
 # y solo si se ha construido algo, para no añadir tiempo al despliegue: el
 # servicio ya está arriba cuando esto corre.
-BUILD_CACHE_KEEP_GB="${BUILD_CACHE_KEEP_GB:-10}"
+# `--max-used-space` y NO `--reserved-space`: aquel es lo MÁXIMO que se deja
+# (recorta lo que pase de ahí); este es lo mínimo que se conserva, y con 10 GB
+# de "mínimo" no borraba nunca — el 22/9/2026 la caché volvió a 9 GB y el disco
+# al 100% en un día.
+BUILD_CACHE_KEEP_GB="${BUILD_CACHE_KEEP_GB:-3}"
 if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
     echo "[deploy_safe] 🧹 recortando caché de build a ${BUILD_CACHE_KEEP_GB} GB…"
     docker builder prune -f \
-        --reserved-space "${BUILD_CACHE_KEEP_GB}GB" >/dev/null 2>&1 || true
+        --max-used-space "${BUILD_CACHE_KEEP_GB}GB" >/dev/null 2>&1 || true
     # Solo las huérfanas (sin `-a`): las imágenes con etiqueta son las que
     # están corriendo o la anterior, que es a la que se vuelve si algo falla.
     docker image prune -f >/dev/null 2>&1 || true
