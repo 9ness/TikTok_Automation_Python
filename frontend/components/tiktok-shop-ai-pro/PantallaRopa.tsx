@@ -1755,20 +1755,20 @@ function PrendaCard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
-        {partes > 1 ? (
-          <span className="flex items-center justify-center rounded-lg border border-border/40 px-3 py-1.5 text-[11px] text-muted-foreground">
-            {partes} clips arriba
-          </span>
-        ) : (
-        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-[11px] transition hover:border-foreground/30">
+      {/* Como en el POV BOF: "Ver vídeo" abre el reproductor y "Descargar"
+          baja el fichero directamente. Antes "Descargar" abría el reproductor
+          (un toque de más cada vez) y, en los formatos de dos clips, el hueco
+          de la izquierda era un "2 clips arriba" que no servía para nada. */}
+      <div className={`grid gap-2 ${partes > 1 ? "grid-cols-2" : "grid-cols-3"}`}>
+        {partes === 1 && (
+        <label className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border/60 px-2 py-1.5 text-[11px] transition hover:border-foreground/30">
           {pct !== null ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo {pct}%
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> {pct}%
             </>
           ) : (
             <>
-              <Upload className="h-3.5 w-3.5" /> Subir vídeo
+              <Upload className="h-3.5 w-3.5" /> Subir
             </>
           )}
           <input
@@ -1785,14 +1785,31 @@ function PrendaCard({
           onClick={() => setVerVideo(true)}
           // En verde cuando hay algo que ver, como en los demás nichos: es la
           // señal de "esta prenda ya está hecha" sin leer nada.
-          className={`rounded-lg border px-3 py-1.5 text-[11px] transition disabled:opacity-40 ${
+          className={`rounded-lg border px-2 py-1.5 text-[11px] transition disabled:opacity-40 ${
             prenda.video_path
-              ? "border-emerald-500/60 text-emerald-500 hover:bg-emerald-500/10"
-              : "border-border/60 hover:border-foreground/30"
+              ? "border-emerald-500/60 bg-emerald-500/10 font-semibold text-emerald-500"
+              : "border-border/60"
           }`}
         >
-          Descargar
+          ▶ Ver vídeo
         </button>
+        {prenda.video_path ? (
+          /* `download` es lo que hace que BAJE: sin él el navegador navega a
+             la URL y parece que carga una página. */
+          <a
+            href={buildVideoRopaUrl(
+              prenda.producto, carpeta, prenda.video_listo_at, true, modo,
+            )}
+            download={`ropa_${prenda.producto}${modo && modo !== "espejo" ? `_${modo}` : ""}.mp4`}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/60 px-2 py-1.5 text-[11px] text-emerald-500 transition hover:bg-emerald-500/10"
+          >
+            <Download className="h-3.5 w-3.5" /> Descargar
+          </a>
+        ) : (
+          <span className="flex items-center justify-center gap-1.5 rounded-lg border border-border/60 px-2 py-1.5 text-[11px] opacity-40">
+            <Download className="h-3.5 w-3.5" /> Descargar
+          </span>
+        )}
       </div>
       {/* Cuándo se montó: el botón se ve igual para un vídeo de hace diez
           minutos que para uno de hace cinco días, y una carpeta se trabaja en
