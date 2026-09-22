@@ -9,11 +9,12 @@ puesto, y ahí sigue el vídeo.
 Aquí se hace exactamente eso sobre el clip 1 que sale del generador:
 
 1. Se transcribe la voz (Whisper) y se busca en qué instante dice cada color.
-2. Se saca el fotograma del instante en que nombra el ÚLTIMO (el puesto): es
-   el que se recolorea, así el corte al vídeo real es invisible —misma pose.
-3. Gemini devuelve una copia por cada color que NO lleva puesto.
-4. Se superponen esas fotos sobre el vídeo, cada una desde su palabra hasta
-   la siguiente, y el audio se deja intacto.
+2. Por cada color que NO lleva puesto, se saca el fotograma del instante en
+   que lo nombra (otra pose cada vez: en el viral cada color es otra toma) y
+   Gemini devuelve ese fotograma con el pantalón de ese color.
+3. Se superponen esas fotos sobre el vídeo, cada una desde su palabra hasta
+   la siguiente, con punch-in y vibración de mano para que no parezcan
+   congeladas; al nombrar el puesto sigue el vídeo real. Audio intacto.
 
 Si algo falla (Whisper, Gemini, un color que no encuentra), quien llama
 sigue con el clip original: es un adorno y no tira el montaje.
@@ -69,30 +70,32 @@ def aplicar(
             f"{PASO_DEFECTO_S}s desde {tiempos[0]:.2f}s"
         )
 
-    # El fotograma del instante en que dice el color puesto: desde ahí sigue
-    # el vídeo real, así que recolorear ESE es lo que hace el corte invisible.
-    t_puesto = tiempos[-1]
-    fotograma = work_dir / "fotograma.jpg"
-    _run([
-        "ffmpeg", "-y", "-v", "error", "-ss", f"{t_puesto:.3f}", "-i", str(clip),
-        "-frames:v", "1", "-q:v", "2", str(fotograma),
-    ], on_log)
-    base = fotograma.read_bytes()
-
     from src.nicho_ropa.services import recolor
 
     tonos = {str(k).lower(): str(v) for k, v in (tonos or {}).items()}
     fotos: list[Path] = []
     for i, color in enumerate(colores[:-1], start=1):
+        # Cada color con SU fotograma: el del instante en que lo nombra. En
+        # el viral cada color es otra toma (se lo acaba de subir, se coloca
+        # la cintura), así que entre un corte y otro la pose CAMBIA; con el
+        # mismo fotograma para todos parecía una foto que cambia de color.
+        # El prompt del clip 1 le pide que se vaya colocando mientras los
+        # nombra, para que haya pose distinta que coger.
+        fotograma = work_dir / f"fotograma_{i}.jpg"
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-ss", f"{tiempos[i - 1]:.3f}", "-i", str(clip),
+            "-frames:v", "1", "-q:v", "2", str(fotograma),
+        ], on_log)
         # Se nombra por el color y no por el índice: si se vuelve a montar el
         # mismo producto, las que ya salieron no se vuelven a pagar.
         salida = work_dir / f"color_{_norm(color).replace(' ', '_') or i}.png"
         if salida.is_file() and salida.stat().st_size > 0:
             on_log(f"[colores] «{color}»: ya estaba recoloreado, se reutiliza")
         else:
-            on_log(f"[colores] recoloreando a «{color}»…")
+            on_log(f"[colores] recoloreando a «{color}» el fotograma de {tiempos[i - 1]:.2f}s…")
             salida.write_bytes(recolor.recolorear(
-                base, color, on_log=on_log, tono=tonos.get(color.lower(), ""),
+                fotograma.read_bytes(), color, on_log=on_log,
+                tono=tonos.get(color.lower(), ""),
             ))
         fotos.append(salida)
 
@@ -187,6 +190,20 @@ def _tiempos_por_defecto(palabras: list[dict], n: int) -> list[float]:
     return [inicio + i * PASO_DEFECTO_S for i in range(n)]
 
 
+# Los cortes de color del viral son TOMAS distintas con corte seco: en cada
+# una la chica se acaba de poner el pantalón y se mueve un poco. Aquí son
+# fotos, así que se les da vida como en un edit de influencer: cada corte
+# entra con un punch-in distinto (zoom que va creciendo despacio) y una
+# vibración de mano continua. Congelada, la foto canta; con esto lee como
+# otra toma. Escalas por corte, cíclicas.
+PUNCH_ESCALAS = (1.04, 1.08, 1.05, 1.09)
+# Cuánto crece el zoom a lo largo del corte (por segundo) y la amplitud de
+# la vibración, en fracción del ancho/alto.
+PUNCH_CRECIMIENTO_S = 0.025
+VIBRACION_X = 0.006
+VIBRACION_Y = 0.004
+
+
 def _superponer(
     clip: Path, fotos: list[Path], tiempos: list[float], destino: Path, on_log: OnLog,
 ) -> None:
@@ -197,26 +214,58 @@ def _superponer(
     partes = ["[0:v]null[v0]"]
     entradas: list[str] = []
     for i, foto in enumerate(fotos, start=1):
-        entradas += ["-i", str(foto)]
+        entradas += ["-loop", "1", "-i", str(foto)]
         desde = 0.0 if i == 1 else tiempos[i - 1]
         hasta = tiempos[i]
+        escala = PUNCH_ESCALAS[(i - 1) % len(PUNCH_ESCALAS)]
         # La foto de Gemini puede volver con otra proporción: se rellena y se
-        # recorta al tamaño del clip para que el corte no salte.
+        # recorta al tamaño del clip, y algo más grande para el punch-in.
+        sw, sh = int(w * escala) // 2 * 2, int(h * escala) // 2 * 2
         partes.append(
-            f"[{i}:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
-            f"crop={w}:{h},setsar=1[f{i}]"
+            f"[{i}:v]scale={sw}:{sh}:force_original_aspect_ratio=increase,"
+            f"crop={sw}:{sh},setsar=1,fps={_fps(clip)}[f{i}]"
+        )
+        # El zoom crece desde el instante en que entra el corte y la mano
+        # vibra con dos senos de frecuencias que no son múltiplos.
+        t0 = f"(t-{desde:.3f})"
+        zoom = f"(1+{PUNCH_CRECIMIENTO_S}*{t0})"
+        # Centrada: la esquina se desplaza la mitad de lo que sobra.
+        x = (
+            f"(({w}-{sw}*{zoom})/2 + {VIBRACION_X * w:.1f}*sin(6.3*t) "
+            f"+ {VIBRACION_X * w / 2:.1f}*sin(11.7*t))"
+        )
+        y = (
+            f"(({h}-{sh}*{zoom})/2 + {VIBRACION_Y * h:.1f}*cos(4.9*t) "
+            f"+ {VIBRACION_Y * h / 2:.1f}*cos(9.1*t))"
         )
         partes.append(
-            f"[v{i - 1}][f{i}]overlay=0:0:enable='between(t,{desde:.3f},{hasta:.3f})'[v{i}]"
+            f"[f{i}]scale=w='{sw}*{zoom}':h='{sh}*{zoom}':eval=frame[z{i}]"
+        )
+        partes.append(
+            f"[v{i - 1}][z{i}]overlay=x='{x}':y='{y}':eval=frame"
+            f":enable='between(t,{desde:.3f},{hasta:.3f})'[v{i}]"
         )
     ultimo = f"[v{len(fotos)}]"
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(clip), *entradas,
         "-filter_complex", ";".join(partes),
-        "-map", ultimo, "-map", "0:a?",
+        "-map", ultimo, "-map", "0:a?", "-shortest",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
         "-c:a", "copy", "-movflags", "+faststart", str(destino),
     ], on_log)
+
+
+def _fps(clip: Path) -> int:
+    proc = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", str(clip)],
+        capture_output=True, text=True,
+    )
+    try:
+        num, den = proc.stdout.strip().split("\n")[0].split("/")[:2]
+        return max(1, round(int(num) / int(den)))
+    except (ValueError, IndexError, ZeroDivisionError):
+        return 30
 
 
 def _tamano(clip: Path) -> tuple[int, int]:

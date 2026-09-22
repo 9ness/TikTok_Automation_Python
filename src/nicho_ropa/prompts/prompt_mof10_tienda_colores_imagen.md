@@ -12,7 +12,8 @@
      Esta imagen es el PRIMER fotograma del clip 1 (de frente). Los cortes de
      color NO se generan en Flow: al montar, la app recolorea este mismo
      fotograma con Gemini y los intercala al ritmo de las palabras. Por eso la
-     pose tiene que ser quieta y frontal, y el pantalón verse entero.
+     pose tiene que ser frontal y el pantalón verse entero (cada color usa el
+     fotograma del instante en que lo nombra, con la pose que tenga).
 
      La segunda imagen (`prompt_mof10_tienda_colores_imagen2.md`) es la misma
      chica de espaldas, en la misma tienda: es el arranque del clip 2. -->
