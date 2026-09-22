@@ -82,13 +82,19 @@ def recortar(dice: str, tope: int) -> str:
     dice = dice.strip()
     if len(dice) <= tope:
         return dice
-    recorte = dice[:tope]
-    for sep in (". ", "! ", "? ", "; "):
-        pos = recorte.rfind(sep)
-        if pos > tope * 0.5:
-            return recorte[: pos + 1].strip()
-    pos = recorte.rfind(" ")
-    return (recorte[:pos] if pos > 0 else recorte).strip() + "."
+    # Se mira también el final exacto: una frase que acaba justo en el tope
+    # cabe entera.
+    recorte = dice[: tope + 1]
+    mejor = max(recorte.rfind(sep) for sep in (".", "!", "?", ";"))
+    if mejor > tope * 0.5:
+        return recorte[: mejor + 1].strip()
+    # Sin punto a mano, por una coma, cerrando ahí la frase.
+    coma = recorte.rfind(", ")
+    if coma > tope * 0.6:
+        return recorte[:coma].strip() + "."
+    # Y si tampoco, NO se corta: media frase en el vídeo ("…mangas murciélago
+    # tan.") es peor que un clip justo. Se devuelve tal cual y quien llama avisa.
+    return dice
 
 
 def partir(dice: str, partes: int = 2) -> list[str]:
@@ -174,8 +180,8 @@ def _formato_clips(partes: int, tope: int, segundos: int) -> str:
         f"{partes} clips SEPARADOS de {segundos} segundos cada uno, en dos "
         "sitios distintos, y luego se pegan. Así que no escribas un texto y lo "
         f"partas: escribe {partes} textos, uno por clip, y cada uno:\n"
-        f"- con {tope} caracteres COMO MÁXIMO, contando espacios y signos "
-        f"(es lo que se puede decir con calma en {segundos} segundos);\n"
+        f"- con {int(tope * 0.9)} caracteres COMO MÁXIMO, contando espacios y "
+        f"signos (es lo que se puede decir con calma en {segundos} segundos);\n"
         "- hecho de frases COMPLETAS: ninguna frase empieza en un clip y acaba "
         "en el otro;\n"
         "- el clip 1 abre con el gancho y las primeras características; el "
@@ -209,6 +215,11 @@ def _clips_que_caben(
     """Una reescritura para los clips que se pasan; si aun así no, se cortan."""
     from src.tiktok_shop.api.gemini import generate_json
 
+    # Dos topes: el blando (lo que se pide, con un segundo de respiro) y el
+    # duro (lo que de verdad cabe en el clip, medio segundo de respiro). Entre
+    # uno y otro se intenta reescribir, pero si no sale, se deja: cortar por
+    # 6 caracteres de más destrozaba la frase y cabía igual.
+    duro = int(tope * 1.08)
     largos = [i for i, c in enumerate(clips) if len(c) > tope]
     if not largos:
         return clips
@@ -226,22 +237,30 @@ def _clips_que_caben(
         "antes que recortar una frase por la mitad: lo lee una voz en alto."
     )
     try:
+        # SIN las fotos: para acortar no hacen falta, y con ellas el filtro de
+        # Gemini bloqueó la segunda pasada (PROHIBITED_CONTENT) en la primera
+        # prueba real —la primera, idéntica pero sin el aviso, pasó—.
         datos = generate_json(
             prompt + _formato_clips(len(clips), tope, segundos) + aviso,
-            descripcion, images=imagenes,
+            descripcion, images=None,
         )
         nuevos = [_limpiar_dice(str(c)) for c in (datos or {}).get("clips") or []]
         if len(nuevos) == len(clips) and all(nuevos):
             clips = nuevos
     except Exception as e:  # noqa: BLE001 — valen los primeros antes que nada
         on_log(f"[nicho_ropa] no se pudo reescribir: {e}")
-    # Último recurso, por clip: cortar por la última frase entera.
+    # Último recurso, por clip y SOLO si no cabe de verdad (tope duro).
     salida = []
     for i, c in enumerate(clips, start=1):
-        if len(c) > tope:
-            corto = recortar(c, tope)
-            on_log(f"[nicho_ropa] clip {i}: {len(c)} car. → {len(corto)} (cortado por la última frase)")
+        if len(c) > duro:
+            corto = recortar(c, duro)
+            if corto == c:
+                on_log(f"[nicho_ropa] ⚠️ clip {i}: {len(c)} car. y sin sitio donde cortar sin romper la frase — rehazlo")
+            else:
+                on_log(f"[nicho_ropa] clip {i}: {len(c)} car. → {len(corto)} (cortado por la última frase)")
             c = corto
+        elif len(c) > tope:
+            on_log(f"[nicho_ropa] clip {i}: {len(c)} car., algo justo pero cabe")
         salida.append(c)
     return salida
 
