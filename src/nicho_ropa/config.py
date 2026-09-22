@@ -258,6 +258,11 @@ def partes_de_modo(modo: str) -> int:
     return int((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("partes") or 1)
 
 
+def lleva_flecha(modo: str) -> bool:
+    """Si a ese formato se le pone la flecha al carrito al final."""
+    return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("flecha"))
+
+
 def lleva_subtitulos(modo: str) -> bool:
     """Si a ese formato se le queman los subtítulos de lo que dice."""
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("subtitulos"))
@@ -836,6 +841,9 @@ ESTILOS_MOF10: dict[str, dict] = {
         # Refuerzo anti-sanción: el clip habla, así que lo que dice se lee
         # también (ver AGENTS.md). El curso lo publica sin texto encima.
         "subtitulos": True,
+        # La flecha al carrito los últimos segundos: el guion del curso no
+        # lleva CTA (y no se toca), así que es la única llamada a comprar.
+        "flecha": True,
         "imagen2": "prompt_mof10_calle_dividido_imagen2.md",
         "por_sexo": {
             "mujer": (

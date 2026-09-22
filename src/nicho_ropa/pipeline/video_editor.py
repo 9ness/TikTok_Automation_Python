@@ -108,8 +108,15 @@ def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
         _palabras_con_tiempo(texto, palabras), probe_duration(video),
     )
     salida = work / "subtitulado.mp4"
-    if _burn_subtitulos(video, trozos, salida, on_log) == salida and salida.is_file():
-        salida.replace(video)
+    try:
+        if _burn_subtitulos(video, trozos, salida, on_log) == salida and salida.is_file():
+            salida.replace(video)
+    finally:
+        # Vive al lado del vídeo (en el Drive montado, para poder hacer
+        # `replace` sin cruzar de sistema de ficheros): no se deja ahí.
+        import shutil
+
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def montar(
@@ -189,12 +196,108 @@ def montar(
     return out_path
 
 
+# La flecha al carrito sale los ÚLTIMOS segundos, no desde que se nombra el
+# carrito como en el POV BOF: el guion de moda no lleva CTA hablada (el del
+# curso no la tiene y no se toca), así que no hay palabra que la dispare.
+FLECHA_SEGUNDOS = 4.0
+
+# Qué flecha va con qué fondo. Se busca que case con el ESTILO del vídeo —una
+# calle de otoño pide la amarilla, un parque la verde— y no un color fijo que
+# desentona encima de un vídeo de moda.
+_FLECHA_POR_COLOR = {
+    "amarilla": "flecha_amarilla.mov",
+    "verde": "flecha_verde.mov",
+    "cyan": "flecha_cyan.mov",
+    "roja": "flecha_roja.mov",
+    "blanca": "flecha_blanca.mov",
+    "negra": "flecha_negra.mov",
+}
+
+
+def _color_del_fondo(video: Path, t: float) -> str:
+    """El color de flecha que va con el vídeo en el segundo `t`.
+
+    Matiz dominante PESADO por la saturación: el cielo gris o el asfalto no
+    votan, y lo que da el tono (hojas, fachadas, vegetación) sí. Sin color de
+    verdad, blanca sobre fondo oscuro y negra sobre claro.
+    """
+    import cv2
+    import numpy as np
+
+    foto = video.with_name(f"_fondo_{video.stem}.jpg")
+    try:
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-ss", f"{max(0.0, t):.2f}",
+            "-i", str(video), "-frames:v", "1", "-vf", "scale=240:-1", str(foto),
+        ], _noop)
+        img = cv2.imread(str(foto))
+    finally:
+        foto.unlink(missing_ok=True)
+    if img is None:
+        return "blanca"
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).reshape(-1, 3).astype(float)
+    sat = hsv[:, 1] / 255.0
+    if sat.mean() < 0.18:
+        return "negra" if hsv[:, 2].mean() / 255.0 > 0.62 else "blanca"
+    hist, _ = np.histogram(hsv[:, 0] * 2, bins=36, range=(0, 360), weights=sat)
+    grados = (int(hist.argmax()) + 0.5) * 10
+    if 15 <= grados < 70:
+        return "amarilla"
+    if 70 <= grados < 170:
+        return "verde"
+    if 170 <= grados < 260:
+        return "cyan"
+    return "roja"
+
+
+def _flecha(salida: Path, on_log: OnLog) -> None:
+    """Pone la flecha al carrito los últimos segundos. Si falla, sin flecha."""
+    from src.nicho_pov_bof.pipeline.duration_match import probe_duration
+    from src.tiktok_shop.pipeline.ready_video import _arrows_dir, _pick_arrow
+
+    try:
+        dur = probe_duration(salida)
+        t0 = max(0.0, dur - FLECHA_SEGUNDOS)
+        color = _color_del_fondo(salida, t0 + FLECHA_SEGUNDOS / 2)
+        carpeta = _arrows_dir()
+        ruta = Path(carpeta) / _FLECHA_POR_COLOR[color] if carpeta else None
+        if not ruta or not ruta.is_file():
+            elegida = _pick_arrow(0)
+            ruta = Path(elegida) if elegida else None
+        if not ruta:
+            on_log("[nicho_ropa] sin flechas en disco — el vídeo sale sin ella")
+            return
+        ancho = int(pov_config.TARGET_W * pov_config.ARROW_SCALE_W)
+        tmp = salida.with_name(salida.stem + "__flecha" + salida.suffix)
+        # `setpts` desplaza la animación para que EMPIECE cuando aparece, y
+        # `-t` acota el bucle infinito de la flecha (el vídeo lleva audio,
+        # pero no hay que fiarse de `-shortest` con un `-stream_loop -1`).
+        _run([
+            "ffmpeg", "-y", "-v", "error", "-i", str(salida),
+            "-stream_loop", "-1", "-i", str(ruta),
+            "-filter_complex",
+            f"[1:v]scale={ancho}:-2,format=rgba,setpts=PTS-STARTPTS+{t0:.3f}/TB[f];"
+            f"[0:v][f]overlay=x=(main_w*{pov_config.ARROW_CX})-(overlay_w/2):"
+            f"y=(main_h*{pov_config.ARROW_CY})-(overlay_h/2):"
+            f"enable='between(t,{t0:.3f},{dur:.3f})'[v]",
+            "-map", "[v]", "-map", "0:a?", "-c:a", "copy",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp),
+        ], on_log)
+        tmp.replace(salida)
+        on_log(f"[nicho_ropa] flecha {color} los últimos {FLECHA_SEGUNDOS:.0f}s")
+    except Exception as e:  # noqa: BLE001 — la flecha es un extra
+        on_log(f"[nicho_ropa] no se pudo poner la flecha ({str(e)[:160]}) — sale sin ella")
+
+
 def _rematar(
     salida: Path, modo: str, semilla: str, on_log: OnLog, texto_subs: str = "",
 ) -> None:
-    """Subtítulos, texto de temporada (si lo lleva) y metadatos fuera."""
+    """Subtítulos, flecha y texto de temporada (si los lleva) y metadatos fuera."""
     if texto_subs.strip():
         _subtitular(salida, texto_subs, on_log)
+    if modo and config.lleva_flecha(modo):
+        _flecha(salida, on_log)
     texto = config.texto_de_modo(modo) if modo else {}
     if texto.get("titulo"):
         _quemar_texto(salida, texto, semilla, on_log)
