@@ -136,6 +136,15 @@ def importar_urls(body: dict) -> dict:
         raise APIError(str(e), status_code=503) from e
 
 
+def _contar_en_drive(slug: str) -> int:
+    """Cuántas prendas hay en la carpeta según el Drive (memoizado). Solo para
+    las que aún no tienen documento en Redis."""
+    from src.nicho_ropa.services import prendas_web
+
+    genero, carpeta = config.partes_web(slug)
+    return prendas_web.cuantas_prendas(genero, carpeta)
+
+
 def _contar(slug: str, modo: str, usuario: str = "") -> dict[str, int]:
     """Cuántas prendas tiene la carpeta y cómo van, para el chip del selector.
 
@@ -239,21 +248,43 @@ def list_carpetas(
                 return not propio
             return (c.genero or "").endswith(f"_{catalogo}")
 
-        for i in [x for x in items if _se_ve(x)]:
-            if time.monotonic() > limite:
+        # Como en el POV BOF: los tres contadores salen de Redis con UNA
+        # lectura (`resumen_por_carpeta`), sin listar el Drive. Contar en
+        # serie contra el mount (~0,8 s por carpeta) dejaba a Moda Mujer sin
+        # contadores de la carpeta 11 en adelante teniendo las URLs puestas.
+        visibles = [x for x in items if _se_ve(x)]
+        try:
+            resumen = product_repo.resumen_por_carpeta([x.slug for x in visibles], usuario, modo)
+        except Exception as e:  # noqa: BLE001 — los contadores son un adorno
+            logger.warning("[nicho_ropa] no se pudo resumir las carpetas: %s", e)
+            resumen = {}
+        for i in visibles:
+            for campo, valor in (resumen.get(i.slug) or {}).items():
+                setattr(i, campo, valor)
+        # Solo las carpetas SIN documento (nunca abiertas) se cuentan en el
+        # Drive, en paralelo y con el presupuesto: son las recién importadas.
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as FuturesTimeout
+
+        vacias = [x for x in visibles if not (resumen.get(x.slug) or {}).get("total")]
+        if vacias:
+            pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="contar-ropa")
+            futuros = [(i, pool.submit(_contar_en_drive, i.slug)) for i in vacias]
+            sin_contar = 0
+            for i, fut in futuros:
+                try:
+                    i.total = fut.result(timeout=max(0.0, limite - time.monotonic()))
+                except FuturesTimeout:
+                    sin_contar += 1
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("[nicho_ropa] no se pudo contar %s: %s", i.slug, e)
+            # Sin esperar a los rezagados: dejan memoizado su listado.
+            pool.shutdown(wait=False, cancel_futures=False)
+            if sin_contar:
                 logger.warning(
                     "[nicho_ropa] contando carpetas se agotó el tiempo; "
-                    "el resto va sin contadores",
+                    "%d van sin contadores", sin_contar,
                 )
-                break
-            # Los contadores son un ADORNO del chip: si fallan, la carpeta
-            # tiene que salir igual. Sin esta guarda, un error contando dejó la
-            # pantalla entera sin carpetas y pareciendo que no había ninguna.
-            try:
-                for campo, valor in _contar(i.slug, modo, usuario).items():
-                    setattr(i, campo, valor)
-            except Exception as e:  # noqa: BLE001
-                logger.warning("[nicho_ropa] no se pudo contar %s: %s", i.slug, e)
     # Lo marcado a mano. Una sola lectura para todas: no depende del Drive,
     # así que va FUERA del presupuesto de los contadores y sale siempre.
     try:

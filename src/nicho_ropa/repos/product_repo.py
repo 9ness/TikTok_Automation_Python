@@ -106,6 +106,54 @@ def load(carpeta: str, usuario: str = "") -> dict:
     return {**doc, "productos": vista}
 
 
+def resumen_por_carpeta(carpetas: list[str], usuario: str = "", modo: str = "") -> dict[str, dict]:
+    """`{slug: {total, con_url, con_video}}` de varias carpetas con UNA lectura
+    (dos si el usuario no es el histórico: el documento común y el suyo).
+
+    Es lo que hace el POV BOF para los chips del selector: el total sale del
+    documento, no de listar el Drive, que a ~0,8 s por carpeta dejaba a Moda
+    Mujer sin contadores de la carpeta 11 en adelante. Una carpeta sin
+    documento (nunca extraída) sale con total 0: el que llama decide si la
+    cuenta en el Drive.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_ropa import config
+
+    r = get_nicho_ropa_redis()
+    if not r.is_available() or not carpetas:
+        return {}
+    modo = config.modo_valido(modo)
+    docs = r.mget_json([_key(c) for c in carpetas])
+    mios = (
+        r.mget_json([_key(_ambito(c, usuario)) for c in carpetas])
+        if not _es_historico(usuario) else docs
+    )
+    try:
+        indice = pov_repo.urls_index()
+    except Exception:  # noqa: BLE001 — sin índice, vale lo que lleve la ficha
+        indice = None
+    salida: dict[str, dict] = {}
+    for slug, doc, mio in zip(carpetas, docs, mios):
+        productos = (doc or {}).get("productos") or {}
+        personales = (mio or {}).get("productos") or {}
+        con_video = 0
+        for pid, prod in productos.items():
+            personal = personales.get(pid) or {}
+            vista = {k: v for k, v in (prod or {}).items() if k not in PERSONALES}
+            vista.update(personal)
+            if video_de(vista, modo).get("video_path"):
+                con_video += 1
+        salida[slug] = {
+            "total": len(productos),
+            "con_url": sum(
+                1 for prod in productos.values()
+                if (indice and pov_repo.url_de(prod, indice)) or (prod or {}).get("product_url")
+            ),
+            "con_video": con_video,
+        }
+    return salida
+
+
 def get_product(carpeta: str, producto: str, usuario: str = "") -> dict:
     return (load(carpeta, usuario).get("productos") or {}).get(str(producto)) or {}
 
