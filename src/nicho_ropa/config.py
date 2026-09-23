@@ -912,6 +912,9 @@ ESTILOS_MOF10: dict[str, dict] = {
         "flecha": True,
         "colores": True,
         "imagen2": "prompt_mof10_tienda_colores_imagen2.md",
+        # La misma imagen 1 con el pantalón en cada uno de los otros colores
+        # (una por color, en Flow): son las fotos de los cortes de color.
+        "imagen_color": "prompt_mof10_tienda_colores_imagen_color.md",
         "por_sexo": {
             "mujer": (
                 "prompt_mof10_tienda_colores_imagen.md",
@@ -1130,6 +1133,9 @@ def prompts_mof10(
             # Si el montaje intercala los cortes de color al principio (los
             # genera la app, no el operador): la pantalla lo avisa.
             "colores": bool(meta.get("colores")),
+            # La plantilla para pedir en Flow la imagen 1 en otro color
+            # (`{{COLOR}}` lo rellena la pantalla con cada variante).
+            "imagen_color": _limpio(meta["imagen_color"]) if meta.get("imagen_color") else "",
             "segundos_clip": int(meta.get("segundos_clip") or 0),
             "guion": _nota_plazos(
                 _nota_duracion(

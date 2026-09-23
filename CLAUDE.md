@@ -356,13 +356,16 @@ API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
 - **Tienda Colores 15s** (`tienda_colores`, Moda Mujer aleatorios) NO es del
   curso: es la receta de cinco virales de pantalones. Dos clips de 8s (frente
   / espaldas) como calle dividido, y el gancho —la chica nombra 3-4 colores y
-  el pantalón cambia en cada uno— lo monta la app: recolorea el primer
-  fotograma del clip 1 con Gemini imagen (`services/recolor.py`, ~4 cts por
-  color, `record_gemini`) y lo intercala al ritmo de la voz
-  (`pipeline/colores.py`). Los nombres y el tono (hex) de cada color los lee
-  el guion de la **captura del selector de colores** que sube el operador por
-  prenda (`services/variantes.py`, `_variantes/` en el Drive montado); el
-  guion guarda `colores` (el puesto, el último) y `colores_hex`.
+  el pantalón cambia en cada uno— lo monta la app (`pipeline/colores.py`):
+  corta, al ritmo de la voz (Whisper), las **fotos de cada color** que el
+  operador genera en Flow desde el mismo chat de la imagen 1 y sube en la
+  tarjeta (`services/variantes.py`, `_variantes/<slug>/<producto>__<color>`,
+  gratis). El recolor con Gemini imagen (`services/recolor.py`) queda apagado
+  salvo `TIENDA_COLORES_RECOLOR_IA=1`. Los nombres de las variantes los lee
+  el guion de la **captura del selector de colores** subida por prenda; el
+  guion guarda `colores` (el puesto, el último) y `colores_hex`. La imagen 1
+  es la chica con mallas y el pantalón a medio poner, y el clip 1 se pide
+  como lista de planos con corte (Omni los respeta).
 - Los formatos cuyo guion se escribe FUERA (espejo, selfie, gafas) ya no piden
   pasar por ChatGPT a mano: `services/guionista.py` manda a Gemini el MISMO
   prompt del curso + los textos y fotos de la prenda, y el bloque para el

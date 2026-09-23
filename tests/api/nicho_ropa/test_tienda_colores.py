@@ -253,6 +253,7 @@ class TestAplicar:
         """Volver a montar el mismo producto no vuelve a pagar las imágenes."""
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
+        monkeypatch.setattr(colores, "RECOLOR_IA", True)
         work = tmp_path / "w"
         work.mkdir()
         (work / "color_rosa.png").write_bytes(b"png")
@@ -276,6 +277,7 @@ class TestAplicar:
     def test_el_tono_de_cada_color_llega_al_recolor(self, tmp_path, monkeypatch):
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
+        monkeypatch.setattr(colores, "RECOLOR_IA", True)
         work = tmp_path / "w"
         monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.0), ("beige", 0.8), ("verde", 1.6)))
         monkeypatch.setattr(colores, "_run", lambda cmd, on_log: Path(cmd[-1]).write_bytes(b"jpg"))
@@ -292,6 +294,7 @@ class TestAplicar:
         instante en que lo nombra, no el mismo para todos."""
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
+        monkeypatch.setattr(colores, "RECOLOR_IA", True)
         work = tmp_path / "w"
         monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.1), ("beige", 0.9), ("verde", 1.7)))
         instantes = []
@@ -396,3 +399,72 @@ class TestBloqueoDeGemini:
         assert variantes.leidos({"variantes": {"colores": ["beige", ""], "hex": {"beige": "#d9cdb8", "x": ""}}}) == {
             "colores": ["beige"], "hex": {"beige": "#d9cdb8"},
         }
+
+
+class TestFotosDeColorSubidas:
+    """Las fotos de cada color las hace Flow (gratis) y las sube el operador:
+    son las que se cortan. Gemini solo si se enciende a propósito."""
+
+    def _monta(self, tmp_path, monkeypatch, fotos_colores):
+        import src.nicho_pov_bof.pipeline.video_editor as pov
+
+        work = tmp_path / "w"
+        monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.1), ("beige", 0.9), ("verde", 1.7)))
+        monkeypatch.setattr(colores, "_run", lambda cmd, on_log: Path(cmd[-1]).write_bytes(b"jpg"))
+        pagadas = []
+        monkeypatch.setattr(recolor, "recolorear", lambda *a, **k: pagadas.append(1) or b"png")
+        superpuesto = {}
+        monkeypatch.setattr(colores, "_superponer", lambda clip, fotos, tiempos, destino, on_log: superpuesto.update(fotos=fotos))
+        clip = tmp_path / "clip1.mp4"
+        clip.write_bytes(b"")
+        avisos = []
+        salida = colores.aplicar(clip, ["rosa", "beige", "verde"], work, on_log=avisos.append, fotos_colores=fotos_colores)
+        return salida, pagadas, superpuesto, avisos
+
+    def test_con_todas_las_fotos_no_se_paga_nada(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(colores, "RECOLOR_IA", False)
+        fotos = {"rosa": tmp_path / "rosa.png", "Beige": tmp_path / "beige.png"}
+        salida, pagadas, sup, _ = self._monta(tmp_path, monkeypatch, fotos)
+        assert salida.name == "clip1_colores.mp4"
+        assert not pagadas
+        assert sup["fotos"] == [tmp_path / "rosa.png", tmp_path / "beige.png"]
+
+    def test_sin_ia_el_color_sin_foto_se_salta_y_avisa(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(colores, "RECOLOR_IA", False)
+        salida, pagadas, sup, avisos = self._monta(tmp_path, monkeypatch, {"rosa": tmp_path / "rosa.png"})
+        assert not pagadas
+        assert sup["fotos"] == [tmp_path / "rosa.png", None]
+        assert any("sin foto para: beige" in a for a in avisos)
+
+    def test_sin_ninguna_foto_el_clip_sale_tal_cual(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(colores, "RECOLOR_IA", False)
+        salida, pagadas, sup, _ = self._monta(tmp_path, monkeypatch, {})
+        assert salida.name == "clip1.mp4" and not pagadas and not sup
+
+    def test_con_ia_encendida_recolorea_lo_que_falte(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(colores, "RECOLOR_IA", True)
+        _, pagadas, sup, _ = self._monta(tmp_path, monkeypatch, {"rosa": tmp_path / "rosa.png"})
+        assert len(pagadas) == 1
+        assert sup["fotos"][0] == tmp_path / "rosa.png" and sup["fotos"][1].name.startswith("color_beige")
+
+    def test_guardar_y_listar_fotos_por_color(self, tmp_path, monkeypatch):
+        from src.nicho_ropa.services import variantes
+
+        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        variantes.guardar_color("mujer_web__C 1", "4", "Verde militar", b"img", "a.PNG")
+        variantes.guardar_color("mujer_web__C 1", "4", "beige", b"img", "b.jpg")
+        assert variantes.ruta_color("mujer_web__C 1", "4", "verde militar").name == "4__verde_militar.png"
+        assert set(variantes.fotos_de_colores("mujer_web__C 1", "4", ["beige", "taupe", "verde militar"])) == {"beige", "verde militar"}
+        assert variantes.colores_con_foto("mujer_web__C 1") == {"4": {"verde_militar", "beige"}}
+        # La captura del selector (sin `__`) no cuenta como foto de color.
+        variantes.guardar("mujer_web__C 1", "4", b"cap", "c.jpg")
+        assert variantes.colores_con_foto("mujer_web__C 1") == {"4": {"verde_militar", "beige"}}
+        assert variantes.quitar_color("mujer_web__C 1", "4", "beige")
+        assert variantes.ruta_color("mujer_web__C 1", "4", "beige") is None
+
+    def test_el_estilo_trae_la_plantilla_de_flow(self):
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        assert "{{COLOR}}" in e["imagen_color"] and "<!--" not in e["imagen_color"]
+        from src.api.schemas.nicho_ropa.models import EstiloMof10
+
+        assert "{{COLOR}}" in EstiloMof10(**e).imagen_color

@@ -1945,6 +1945,7 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             if len(colores) >= 2:
                 on_progress(0.28, f"🎨 Cortes de color ({', '.join(colores)})…")
                 from src.nicho_ropa.pipeline import colores as colores_pipe
+                from src.nicho_ropa.services import variantes
 
                 try:
                     rutas[0] = colores_pipe.aplicar(
@@ -1954,6 +1955,9 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
                         # tienda (lo leyó el guion de la captura de
                         # variantes): así el beige es EL beige de esa prenda.
                         tonos=product_repo.guion_de(prod, modo).get("colores_hex") or {},
+                        # Las fotos de cada color hechas en Flow y subidas en
+                        # la tarjeta: son las que se cortan (gratis).
+                        fotos_colores=variantes.fotos_de_colores(carpeta, producto, colores),
                     )
                     raw_path = rutas[0]
                 except Exception as e:  # noqa: BLE001 — sin cortes antes que sin vídeo

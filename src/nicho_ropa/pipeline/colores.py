@@ -22,6 +22,7 @@ sigue con el clip original: es un adorno y no tira el montaje.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -38,17 +39,27 @@ VENTANA_S = 6.0
 PASO_DEFECTO_S = 0.8
 
 
+# Si un color no tiene foto subida, ¿se recolorea con Gemini (~4 cts por
+# color)? Apagado por defecto: el operador pidió que el formato saliera
+# gratis — las fotos de cada color las hace Flow. Con la variable a "1" se
+# recupera el recolor como red de seguridad.
+RECOLOR_IA = os.getenv("TIENDA_COLORES_RECOLOR_IA", "0").strip().lower() in ("1", "true", "si", "sí")
+
+
 def aplicar(
     clip: Path, colores: list[str], work_dir: Path, on_log: OnLog = _noop,
     tonos: dict[str, str] | None = None,
+    fotos_colores: dict[str, Path] | None = None,
 ) -> Path:
     """El clip con los cortes de color metidos (mismo audio, misma duración).
 
     `colores` en el orden en que se dicen, el puesto el último. Con menos de
-    dos no hay nada que cortar y se devuelve el clip tal cual. `tonos` es
-    `{color: "#rrggbb"}` leído de la miniatura de cada variante, para clavar
-    el tono de ESA tienda (no se manda la captura entera al modelo: en la
-    prueba real calcaba la barra de "Añadir al carrito" en la foto).
+    dos no hay nada que cortar y se devuelve el clip tal cual.
+    `fotos_colores` son las fotos subidas por el operador (la imagen 1 en
+    cada color, hechas en Flow): son las que se cortan. Un color sin foto se
+    recolorea con Gemini solo si `RECOLOR_IA`; si no, ese corte se salta
+    (se queda el vídeo real) y se avisa. `tonos` (`{color: "#rrggbb"}`) es
+    para el recolor.
     """
     colores = [c.strip() for c in colores if c and c.strip()]
     if len(colores) < 2:
@@ -70,11 +81,21 @@ def aplicar(
             f"{PASO_DEFECTO_S}s desde {tiempos[0]:.2f}s"
         )
 
-    from src.nicho_ropa.services import recolor
-
     tonos = {str(k).lower(): str(v) for k, v in (tonos or {}).items()}
+    subidas = {str(k).lower(): Path(v) for k, v in (fotos_colores or {}).items()}
     fotos: list[Path] = []
+    sin_foto: list[str] = []
     for i, color in enumerate(colores[:-1], start=1):
+        if color.lower() in subidas:
+            on_log(f"[colores] «{color}»: foto subida por el operador")
+            fotos.append(subidas[color.lower()])
+            continue
+        if not RECOLOR_IA:
+            sin_foto.append(color)
+            fotos.append(None)  # type: ignore[arg-type]
+            continue
+        from src.nicho_ropa.services import recolor
+
         # Cada color con SU fotograma: el del instante en que lo nombra. En
         # el viral cada color es otra toma (se lo acaba de subir, se coloca
         # la cintura), así que entre un corte y otro la pose CAMBIA; con el
@@ -99,9 +120,18 @@ def aplicar(
             ))
         fotos.append(salida)
 
+    if sin_foto:
+        on_log(
+            "[colores] ⚠️ sin foto para: " + ", ".join(sin_foto)
+            + " — en esos colores se queda el vídeo real (sube la imagen 1 en "
+            "ese color, o TIENDA_COLORES_RECOLOR_IA=1 para recolorear con Gemini)"
+        )
+    if not any(fotos):
+        on_log("[colores] ninguna foto de color: el clip sale sin cortes")
+        return Path(clip)
     destino = Path(clip).with_name(f"{Path(clip).stem}_colores.mp4")
     _superponer(Path(clip), fotos, tiempos, destino, on_log)
-    on_log(f"[colores] {len(fotos)} cortes de color metidos en el clip 1")
+    on_log(f"[colores] {sum(1 for f in fotos if f)} cortes de color metidos en el clip 1")
     return destino
 
 
@@ -213,7 +243,11 @@ def _superponer(
     w, h = _tamano(clip)
     partes = ["[0:v]null[v0]"]
     entradas: list[str] = []
+    n = 0
     for i, foto in enumerate(fotos, start=1):
+        if not foto:
+            continue
+        n += 1
         entradas += ["-loop", "1", "-i", str(foto)]
         desde = 0.0 if i == 1 else tiempos[i - 1]
         hasta = tiempos[i]
@@ -222,8 +256,8 @@ def _superponer(
         # recorta al tamaño del clip, y algo más grande para el punch-in.
         sw, sh = int(w * escala) // 2 * 2, int(h * escala) // 2 * 2
         partes.append(
-            f"[{i}:v]scale={sw}:{sh}:force_original_aspect_ratio=increase,"
-            f"crop={sw}:{sh},setsar=1,fps={_fps(clip)}[f{i}]"
+            f"[{n}:v]scale={sw}:{sh}:force_original_aspect_ratio=increase,"
+            f"crop={sw}:{sh},setsar=1,fps={_fps(clip)}[f{n}]"
         )
         # El zoom crece desde el instante en que entra el corte y la mano
         # vibra con dos senos de frecuencias que no son múltiplos.
@@ -239,13 +273,13 @@ def _superponer(
             f"+ {VIBRACION_Y * h / 2:.1f}*cos(9.1*t))"
         )
         partes.append(
-            f"[f{i}]scale=w='{sw}*{zoom}':h='{sh}*{zoom}':eval=frame[z{i}]"
+            f"[f{n}]scale=w='{sw}*{zoom}':h='{sh}*{zoom}':eval=frame[z{n}]"
         )
         partes.append(
-            f"[v{i - 1}][z{i}]overlay=x='{x}':y='{y}':eval=frame"
-            f":enable='between(t,{desde:.3f},{hasta:.3f})'[v{i}]"
+            f"[v{n - 1}][z{n}]overlay=x='{x}':y='{y}':eval=frame"
+            f":enable='between(t,{desde:.3f},{hasta:.3f})'[v{n}]"
         )
-    ultimo = f"[v{len(fotos)}]"
+    ultimo = f"[v{n}]"
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(clip), *entradas,
         "-filter_complex", ";".join(partes),

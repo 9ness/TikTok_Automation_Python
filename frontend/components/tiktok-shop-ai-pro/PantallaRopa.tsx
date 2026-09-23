@@ -27,7 +27,9 @@ import {
   useCarpetasRopa,
   useCrearMiPrenda,
   useEscribirGuionesRopa,
+  useQuitarFotoColorRopa,
   useQuitarVariantesRopa,
+  useSubirFotoColorRopa,
   useSubirVariantesRopa,
   useExtraerTextosRopa,
   usePrendas,
@@ -1053,13 +1055,14 @@ export function PantallaRopa({
                     <strong className="text-foreground">captura del selector
                     &quot;Color&quot;</strong> de la ficha de TikTok Shop
                     (miniaturas con su nombre): de ahí salen los nombres
-                    exactos y el tono de cada color. Los cortes de color del
-                    principio los monta la app sola (recolorea el primer
-                    fotograma del clip 1 con Gemini, ~4 cts por color) al
-                    ritmo de las palabras. NO generes nada más. La imagen 1 es la
-                    chica con mallas negras y el pantalón a medio poner: en el
-                    clip se lo sube mientras nombra los colores, y el que lleva
-                    puesto se dice el último.
+                    exactos. Los cortes de color del principio los monta la
+                    app con las fotos de cada color que subas, al
+                    ritmo de las palabras. La imagen 1 es la chica con mallas
+                    negras y el pantalón a medio poner: en el clip se lo sube
+                    mientras nombra los colores, y el que lleva puesto se dice
+                    el último. Tras el guion, genera en el MISMO chat de Flow la
+                    imagen 1 en cada uno de los otros colores (botón 📋 de cada
+                    color en la tarjeta) y súbelas: son los cortes, gratis.
                   </li>
                 )}
                 <li>
@@ -1347,6 +1350,7 @@ export function PantallaRopa({
               // pide los dos y el montaje los pega.
               partes={estiloActivo?.partes ?? 1}
               conColores={!!estiloActivo?.colores}
+              imagenColor={estiloActivo?.imagen_color ?? ""}
               caracteresClip={estiloActivo?.caracteres_clip ?? 0}
               modalidadDuracion={duracion}
               onCopiar={copiar}
@@ -1369,6 +1373,7 @@ function PrendaCard({
   nichoCaption = "",
   partes = 1,
   conColores = false,
+  imagenColor = "",
   caracteresClip = 0,
   modalidadDuracion = "10",
   onCopiar,
@@ -1387,6 +1392,8 @@ function PrendaCard({
   /** Formato con cortes de color: la tarjeta pide la captura del selector
    *  de colores de la ficha, que es de donde el guion saca los nombres. */
   conColores?: boolean;
+  /** Plantilla de Flow para la imagen 1 en otro color (`{{COLOR}}`). */
+  imagenColor?: string;
   /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
   nichoCaption?: string;
   /** Lo que cabe en cada clip: el botón del guion se pinta en ámbar si se
@@ -1404,6 +1411,8 @@ function PrendaCard({
   const quitarClip = useQuitarClipRopa();
   const subirVariantes = useSubirVariantesRopa();
   const quitarVariantes = useQuitarVariantesRopa();
+  const subirFotoColor = useSubirFotoColorRopa();
+  const quitarFotoColor = useQuitarFotoColorRopa();
   const [escribiendo, setEscribiendo] = useState(false);
   const qc = useQueryClient();
   // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
@@ -1803,6 +1812,87 @@ function PrendaCard({
             <span className="text-amber-500">· un solo color: sin cortes</span>
           )}
         </p>
+      )}
+      {/* Las fotos de los OTROS colores (la imagen 1 con el pantalón en cada
+          uno), hechas en Flow en el mismo chat y subidas aquí: son las que
+          el montaje corta cuando la creadora nombra ese color. El puesto (el
+          último) no la necesita: ahí sigue el vídeo real. Gratis: no pasa
+          por ninguna IA de pago. */}
+      {conColores && (prenda.guion_colores ?? []).length > 1 && (
+        <div className="space-y-1">
+          <p className="text-[10px] text-muted-foreground">
+            📷 Foto de cada color (en Flow, mismo chat que la imagen 1): copia
+            el prompt, genera y sube.
+          </p>
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+            {(prenda.guion_colores ?? []).slice(0, -1).map((c) => {
+              const puesta = (prenda.colores_con_foto ?? []).includes(c);
+              return (
+                <div key={c} className="flex items-center gap-0.5">
+                  <label
+                    className={`flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[11px] transition ${
+                      puesta
+                        ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                        : "border-border/60 hover:border-foreground/30"
+                    }`}
+                    title={puesta ? `Foto de «${c}» subida. Toca para sustituirla.` : `Sube la imagen 1 con el pantalón en ${c}`}
+                  >
+                    <Upload className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{c}{puesta ? " ✓" : ""}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!file) return;
+                        subirFotoColor.mutate(
+                          { carpeta, producto: prenda.producto, color: c, file },
+                          {
+                            onSuccess: () => toast.success(`Foto de ${c} guardada`),
+                            onError: (e2) =>
+                              toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
+                          },
+                        );
+                      }}
+                    />
+                  </label>
+                  {imagenColor && (
+                    <button
+                      type="button"
+                      title={`Copiar el prompt de Flow para la imagen en ${c}`}
+                      onClick={() => onCopiar(`Imagen en ${c}`, imagenColor.replace("{{COLOR}}", c))}
+                      className="rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+                    >
+                      📋
+                    </button>
+                  )}
+                  {puesta && (
+                    <button
+                      type="button"
+                      aria-label={`Quitar la foto de ${c}`}
+                      title="Quitar esta foto"
+                      onClick={() =>
+                        quitarFotoColor.mutate(
+                          { carpeta, producto: prenda.producto, color: c },
+                          {
+                            onSuccess: () => toast.success(`Foto de ${c} quitada`),
+                            onError: (e2) =>
+                              toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
+                          },
+                        )
+                      }
+                      className="rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
       {conGuion && (
         <div className="flex gap-1">

@@ -118,9 +118,10 @@ subir con el ⬆ de esa fila → quemar textos.
 - Flujo: en cada tarjeta 🎨 Captura de variantes (el selector "Color" de la
   ficha de TikTok Shop) → 1 · Imagen (Flow, foto limpia como referencia) → 1b ·
   Imagen 2 (mismo chat, de espaldas) → ✍️ Escribir guiones (lee nombres y tono
-  de cada color de la captura) → Guion 1 con imagen 1 y Guion 2 con imagen 2
-  en Omni (8s cada uno) → subir Clip 1 y Clip 2. La app mete los cortes de
-  color, pega, subtitula, flecha y limpia metadatos.
+  de cada color de la captura) → 📋 de cada color en la tarjeta: la imagen 1
+  en ese color en el MISMO chat de Flow, y subirla → Guion 1 con imagen 1 y
+  Guion 2 con imagen 2 en Omni (8s cada uno) → subir Clip 1 y Clip 2. La app
+  mete los cortes de color, pega, subtitula, flecha y limpia metadatos.
 - Probar con UNA prenda real antes de una tanda: mirar que los colores del
   guion (chips 🎨 en la tarjeta) sean los de la ficha — si Gemini se inventa
   uno, corregir a mano rehaciendo el guion.

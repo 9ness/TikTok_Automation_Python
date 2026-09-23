@@ -260,6 +260,46 @@ export function useSubirVariantesRopa() {
   });
 }
 
+/** La imagen 1 con el pantalón en OTRO color (hecha en Flow): la foto que
+ *  el montaje corta cuando se nombra ese color. Una por color. */
+export function useSubirFotoColorRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; producto: string; color: string },
+    Error,
+    { carpeta: string; producto: string; color: string; file: File }
+  >({
+    mutationFn: ({ carpeta, producto, color, file }) => {
+      const fd = new FormData();
+      fd.append("carpeta", carpeta);
+      fd.append("producto", producto);
+      fd.append("color", color);
+      fd.append("file", file);
+      return api.post(`${ROOT}/variantes/color/upload`, fd);
+    },
+    onSuccess: (_r, { carpeta }) =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
+export function useQuitarFotoColorRopa() {
+  const qc = useQueryClient();
+  return useMutation<
+    { ok: boolean; quitada: boolean },
+    Error,
+    { carpeta: string; producto: string; color: string }
+  >({
+    mutationFn: ({ carpeta, producto, color }) =>
+      api.post(
+        `${ROOT}/variantes/color/quitar?carpeta=${encodeURIComponent(carpeta)}` +
+          `&producto=${encodeURIComponent(producto)}&color=${encodeURIComponent(color)}`,
+        {},
+      ),
+    onSuccess: (_r, { carpeta }) =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) }),
+  });
+}
+
 export function useQuitarVariantesRopa() {
   const qc = useQueryClient();
   return useMutation<

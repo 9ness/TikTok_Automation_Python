@@ -518,6 +518,7 @@ def list_prendas(
         for pid, prod in guardados.items()
     }
     con_variantes = variantes.tienen(carpeta)
+    fotos_color = variantes.colores_con_foto(carpeta)
     for par in pares:
         pid = par["producto"]
         prod = guardados.get(pid) or {}
@@ -561,6 +562,10 @@ def list_prendas(
             guion_colores=guiones.get(pid, {}).get("colores", []),
             variantes_foto=pid in con_variantes,
             variantes_colores=variantes.leidos(prod)["colores"],
+            colores_con_foto=[
+                c for c in guiones.get(pid, {}).get("colores", [])
+                if variantes._slug_color(c) in fotos_color.get(pid, set())
+            ],
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -914,6 +919,52 @@ def quitar_variantes(
     quitada = variantes.quitar(carpeta, producto)
     product_repo.quitar_campos(carpeta, producto, "variantes")
     return {"ok": True, "producto": producto, "quitada": quitada}
+
+
+@router.post("/variantes/color/upload")
+async def subir_foto_color(
+    carpeta: Annotated[str, Form()],
+    producto: Annotated[str, Form()],
+    color: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
+) -> dict:
+    """La imagen 1 con el pantalón en ESE color (hecha en Flow): es la foto
+    que el montaje corta cuando la creadora nombra el color. Una por color."""
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    datos = await file.read()
+    try:
+        variantes.guardar_color(carpeta, producto, color, datos, file.filename or "")
+    except ValueError as e:
+        raise APIError(str(e), status_code=400) from e
+    except OSError as e:
+        raise APIError(f"No se pudo guardar la foto: {e}", status_code=500) from e
+    return {"ok": True, "producto": producto, "color": color}
+
+
+@router.post("/variantes/color/quitar")
+def quitar_foto_color(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    color: Annotated[str, Query()],
+) -> dict:
+    if not config.es_carpeta_conocida(carpeta):
+        raise APIError(f"Carpeta desconocida: {carpeta!r}", status_code=400)
+    return {"ok": True, "quitada": variantes.quitar_color(carpeta, producto, color)}
+
+
+@router.get("/variantes/color/foto")
+def ver_foto_color(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    color: Annotated[str, Query()],
+):
+    from fastapi.responses import FileResponse
+
+    f = variantes.ruta_color(carpeta, producto, color)
+    if not f:
+        raise APIError("Ese color no tiene foto.", status_code=404)
+    return FileResponse(str(f), headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/variantes/foto")

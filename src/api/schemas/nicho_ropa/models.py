@@ -58,6 +58,9 @@ class EstiloMof10(BaseModel):
     # tienda): los genera la app recoloreando el primer fotograma, así que el
     # operador no sube nada más que los clips.
     colores: bool = False
+    # Plantilla para pedir en Flow la imagen 1 con el pantalón en otro color
+    # (`{{COLOR}}`): una por variante, son las fotos de los cortes.
+    imagen_color: str = ""
 
 
 class ModoRopa(BaseModel):
@@ -193,6 +196,8 @@ class PrendaInfo(BaseModel):
     # Lo que se leyó de esa captura (nombres exactos de TikTok). Sale antes
     # que el guion, para cotejarlo con la ficha.
     variantes_colores: list[str] = Field(default_factory=list)
+    # Colores (del guion) que ya tienen su foto subida para los cortes.
+    colores_con_foto: list[str] = Field(default_factory=list)
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

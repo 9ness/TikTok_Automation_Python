@@ -116,3 +116,81 @@ def leidos(prod: dict) -> dict:
         "colores": [str(c) for c in (v.get("colores") or []) if str(c).strip()],
         "hex": {str(k): str(x) for k, x in (v.get("hex") or {}).items() if str(x).strip()},
     }
+
+
+# ---------------------------------------------------------------------------
+# Fotos por color: la imagen 1 con el pantalón en cada uno de los otros
+# colores, generadas en Flow por el operador (gratis) y subidas aquí. Son las
+# que el montaje corta al ritmo de la voz. Van en la misma carpeta que la
+# captura, con el color en el nombre: `<producto>__<color>.jpg`.
+# ---------------------------------------------------------------------------
+def _slug_color(color: str) -> str:
+    import unicodedata
+
+    plano = "".join(
+        c for c in unicodedata.normalize("NFKD", color or "") if not unicodedata.combining(c)
+    ).lower().strip()
+    return re.sub(r"[^a-z0-9]+", "_", plano).strip("_")
+
+
+def ruta_color(carpeta: str, producto: str, color: str) -> Path | None:
+    d = _dir(carpeta)
+    if not d.is_dir():
+        return None
+    for ext in _EXTS:
+        f = d / f"{producto}__{_slug_color(color)}{ext}"
+        if f.is_file() and f.stat().st_size > 0:
+            return f
+    return None
+
+
+def guardar_color(carpeta: str, producto: str, color: str, datos: bytes, nombre: str) -> Path:
+    ext = Path(nombre or "").suffix.lower()
+    if ext not in _EXTS:
+        raise ValueError(f"Formato no soportado ({nombre!r}): acepta jpg, jpeg, png o webp.")
+    if not datos:
+        raise ValueError("La foto llegó vacía.")
+    if len(datos) > MAX_BYTES:
+        raise ValueError(f"La foto pesa {len(datos) / 1e6:.0f} MB; el tope son 12 MB.")
+    if not _slug_color(color):
+        raise ValueError("Falta el color de la foto.")
+    d = _dir(carpeta)
+    d.mkdir(parents=True, exist_ok=True)
+    quitar_color(carpeta, producto, color)
+    destino = d / f"{producto}__{_slug_color(color)}{ext}"
+    destino.write_bytes(datos)
+    return destino
+
+
+def quitar_color(carpeta: str, producto: str, color: str) -> bool:
+    habia = False
+    for ext in _EXTS:
+        f = _dir(carpeta) / f"{producto}__{_slug_color(color)}{ext}"
+        if f.is_file():
+            f.unlink(missing_ok=True)
+            habia = True
+    return habia
+
+
+def fotos_de_colores(carpeta: str, producto: str, colores: list[str]) -> dict[str, Path]:
+    """`{color: ruta}` de los colores de la lista que tienen foto subida."""
+    salida: dict[str, Path] = {}
+    for c in colores:
+        f = ruta_color(carpeta, producto, c)
+        if f:
+            salida[c] = f
+    return salida
+
+
+def colores_con_foto(carpeta: str) -> dict[str, set[str]]:
+    """`{producto: {slug_color…}}` de toda la carpeta, en una lectura."""
+    d = _dir(carpeta)
+    salida: dict[str, set[str]] = {}
+    if not d.is_dir():
+        return salida
+    for f in d.iterdir():
+        if not f.is_file() or f.suffix.lower() not in _EXTS or "__" not in f.stem:
+            continue
+        producto, _, color = f.stem.partition("__")
+        salida.setdefault(producto, set()).add(color)
+    return salida

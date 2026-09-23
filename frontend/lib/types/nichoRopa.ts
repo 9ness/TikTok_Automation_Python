@@ -38,6 +38,8 @@ export interface EstiloMof10 {
   /** El montaje mete los cortes de color del principio (formato de la
    *  tienda): los genera la app, el operador solo sube los clips. */
   colores?: boolean;
+  /** Plantilla para pedir en Flow la imagen 1 en otro color (`{{COLOR}}`). */
+  imagen_color?: string;
   /** Tope de caracteres que se le pide al guion. */
   caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
@@ -146,6 +148,8 @@ export interface PrendaItem {
   variantes_foto?: boolean;
   /** Nombres leídos de esa captura (exactos de TikTok), antes del guion. */
   variantes_colores?: string[];
+  /** Colores del guion que ya tienen su foto subida para los cortes. */
+  colores_con_foto?: string[];
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;
