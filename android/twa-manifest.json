@@ -30,7 +30,7 @@
   "isMetaQuest": false,
   "fullScopeUrl": "https://tiktok-factory.tailbff00e.ts.net/",
   "minSdkVersion": 21,
-  "orientation": "portrait",
+  "orientation": "any",
   "signingKey": {
     "path": "../android-keys/tiktok.keystore",
     "alias": "tiktok"
