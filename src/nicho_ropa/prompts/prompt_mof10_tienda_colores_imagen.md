@@ -9,18 +9,19 @@
      luego enseña la cintura y los bolsillos, se da la vuelta, se agacha y
      cierra con "varios colores en tienda".
 
-     Esta imagen es el PRIMER fotograma del clip 1 (de frente). Los cortes de
-     color NO se generan en Flow: al montar, la app recolorea este mismo
-     fotograma con Gemini y los intercala al ritmo de las palabras. Por eso la
-     pose tiene que ser frontal y el pantalón verse entero (cada color usa el
-     fotograma del instante en que lo nombra, con la pose que tenga).
+     Esta imagen es el PRIMER fotograma del clip 1: la chica con mallas
+     negras y el pantalón A MEDIO PONER (a mitad de muslo), que es el "guau"
+     de los virales —empiezan en mallas y se lo suben—. El plano 1 del clip
+     es subírselo mientras nombra los colores. Los cortes de color NO se
+     generan en Flow: al montar, la app recolorea el fotograma del instante
+     en que nombra cada color (con el pantalón a la altura que esté).
 
      La segunda imagen (`prompt_mof10_tienda_colores_imagen2.md`) es la misma
      chica de espaldas, en la misma tienda: es el arranque del clip 2. -->
 
 {
   "subject": {
-    "description": "A completely random adult woman standing still and facing the camera inside a real clothing store, looking directly at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe, standing straight, weight on both feet, in a relaxed and natural posture.",
+    "description": "A completely random adult woman standing and facing the camera inside a real clothing store, caught in the middle of PUTTING ON the referenced trousers: the trousers are pulled up only to mid-thigh, both hands holding the waistband, about to pull them up. Underneath she wears plain black fitted leggings (visible above the trousers, between the waistband and the top). She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
     "appearance": "entirely random",
     "age": "random adult age between 20 and 32",
     "expression": "natural, confident, slight smile, as if about to start talking",
@@ -34,11 +35,11 @@
     "source": "The female subject MUST wear exactly the garment shown in the provided reference image.",
     "instructions": [
       "Use the provided reference image exclusively as the garment reference.",
-      "The female subject MUST wear the exact garment shown in the reference image, in the exact same color.",
+      "The female subject is putting on the exact garment shown in the reference image, in the exact same color: it is pulled up to mid-thigh, not yet at the waist.",
       "Replicate every detail with maximum accuracy: color, fabric, texture, seams, pleats, waistband, drawstring, buttons, pockets, fit, cut, length and proportion.",
       "Do not reinterpret, redesign, replace, simplify, recolor, add or omit any part of the referenced garment.",
       "The referenced garment must remain exactly the same and must be the main visual focus, fully visible from the waistband to the hem.",
-      "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text: a fitted white t-shirt or a fitted white long-sleeve top, cropped or tucked in so the waistband of the referenced garment is fully visible.",
+      "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text: a fitted white t-shirt or a fitted white long-sleeve top, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted leggings or black bike shorts, visible from the waist down to where the trousers currently are (mid-thigh).",
       "Shoes: simple and neutral (white or light grey sneakers, or plain sandals or flats), chosen to match the garment; never shoes that draw attention.",
       "No jacket, coat, bag, belt or any garment that covers or overlaps the referenced garment, unless a belt is part of the reference image.",
       "The complete outfit must look clean, simple and coordinated: the garment is the star and the white top is a neutral canvas.",
@@ -54,11 +55,11 @@
     "instructions": "Preserve any accessories visible in the reference image. Otherwise at most small, discreet accessories (thin bracelets, small earrings) that do not cover the garment. No sunglasses, no hats, no bags."
   },
   "pose": {
-    "stance": "standing straight and still, facing the camera, feet slightly apart, full body from head to toe",
-    "arms": "both hands resting naturally on the waistband or on the hips, so the waistband of the garment is visible and framed by her hands",
+    "stance": "standing, facing the camera, feet slightly apart, full body from head to toe, slightly bent forward as she pulls the trousers up",
+    "arms": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
     "gaze": "the woman must look directly into the camera",
     "head_position": "her face must remain naturally oriented toward the camera",
-    "full_body_visibility": "The complete garment and the female subject's full body must remain clearly visible from head to toe, with some floor visible below her shoes."
+    "full_body_visibility": "The female subject's full body must remain clearly visible from head to toe, with some floor visible below her shoes; the trousers hang from mid-thigh down and their color and fabric are clearly visible."
   },
   "photography": {
     "camera_style": "Casual smartphone UGC video frame, recorded by another person holding a phone in front of her.",

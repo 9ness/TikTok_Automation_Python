@@ -1056,9 +1056,10 @@ export function PantallaRopa({
                     exactos y el tono de cada color. Los cortes de color del
                     principio los monta la app sola (recolorea el primer
                     fotograma del clip 1 con Gemini, ~4 cts por color) al
-                    ritmo de las palabras. NO generes nada más: la chica del
-                    clip 1 se queda quieta mientras nombra los colores, y el
-                    que lleva puesto se dice el último.
+                    ritmo de las palabras. NO generes nada más. La imagen 1 es la
+                    chica con mallas negras y el pantalón a medio poner: en el
+                    clip se lo sube mientras nombra los colores, y el que lleva
+                    puesto se dice el último.
                   </li>
                 )}
                 <li>
