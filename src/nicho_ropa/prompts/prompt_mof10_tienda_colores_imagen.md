@@ -36,6 +36,7 @@
     "instructions": [
       "Use the provided reference image exclusively as the garment reference.",
       "The female subject is putting on the exact garment shown in the reference image, in the exact same color: it is pulled up to mid-thigh, not yet at the waist.",
+      "The garment KEEPS ITS FULL LENGTH: because it is only at mid-thigh, its hem reaches down to the ankles / the shoes and bunches on them. It must NOT look like shorts or a cropped garment — the total length of the legs of the garment is the same as in the reference image.",
       "Replicate every detail with maximum accuracy: color, fabric, texture, seams, pleats, waistband, drawstring, buttons, pockets, fit, cut, length and proportion.",
       "Do not reinterpret, redesign, replace, simplify, recolor, add or omit any part of the referenced garment.",
       "The referenced garment must remain exactly the same and must be the main visual focus, fully visible from the waistband to the hem.",
@@ -59,7 +60,7 @@
     "arms": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
     "gaze": "the woman must look directly into the camera",
     "head_position": "her face must remain naturally oriented toward the camera",
-    "full_body_visibility": "The female subject's full body must remain clearly visible from head to toe, with some floor visible below her shoes; the trousers hang from mid-thigh down and their color and fabric are clearly visible."
+    "full_body_visibility": "The female subject's full body must remain clearly visible from head to toe, with some floor visible below her shoes; the trousers hang from mid-thigh down to the shoes, full length, and their color and fabric are clearly visible."
   },
   "photography": {
     "camera_style": "Casual smartphone UGC video frame, recorded by another person holding a phone in front of her.",
