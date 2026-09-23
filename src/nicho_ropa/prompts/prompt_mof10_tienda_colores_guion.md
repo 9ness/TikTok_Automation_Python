@@ -44,9 +44,9 @@ Movimiento clip 1:
 
 Crea un vídeo UGC totalmente realista grabado con un móvil en una tienda de ropa, con la creadora de la imagen, que está poniéndose la prenda. El clip tiene TRES planos con corte seco entre ellos, como un vídeo de probador de una creadora de moda:
 
-Plano 1 (0-3 s): plano medio-largo de tres cuartos (el cuerpo algo girado, para que se vea la curva de la cadera de perfil), de la cintura a los pies, con la cara fuera o casi fuera del encuadre. Mientras nombra los colores se sube el pantalón desde el muslo hasta la cintura con las dos manos, por encima de las mallas negras, y lo ajusta; cambia el peso de una pierna a otra.
+Plano 1 (0-3 s): plano medio-largo de tres cuartos (el cuerpo algo girado, para que se vea la curva de la cadera de perfil), de la cintura a los pies, con la cara fuera o casi fuera del encuadre. Mientras nombra los colores SE SUBE EL PANTALÓN DEL TODO: en un movimiento continuo de un segundo y medio tira de la cintura con las dos manos desde el muslo hasta la cintura, por encima de las mallas negras, lo asienta en la cintura y lo ajusta. Al acabar el plano 1 (segundo 3) el pantalón está PUESTO y colocado en la cintura, con las mallas ya tapadas; no se queda a medias ni sujeto con las manos. Cambia el peso de una pierna a otra.
 
-Plano 2 (3-5,5 s): primer plano de la cintura y las caderas, mientras habla de la cintura. Las manos enseñan la cintura (la goma, el cordón o el botón, lo que tenga) y estiran un poco los bolsillos; la tela se ve de cerca, con su textura real.
+Plano 2 (3-5,5 s): primer plano de la cintura y las caderas, con el pantalón ya puesto, mientras habla de la cintura. Las manos enseñan la cintura (la goma, el cordón o el botón, lo que tenga) y estiran un poco los bolsillos; la tela se ve de cerca, con su textura real.
 
 Plano 3 (5,5-8 s): plano de las piernas, de la cadera a los pies, mientras habla de la pierna y la caída: da un paso o balancea una pierna para que la tela se mueva y se vea el ancho y la caída.
 
