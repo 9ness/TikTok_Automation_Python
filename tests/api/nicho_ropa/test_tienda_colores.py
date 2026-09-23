@@ -317,7 +317,7 @@ class TestVariantes:
     def test_guardar_ver_y_quitar(self, tmp_path, monkeypatch):
         from src.nicho_ropa.services import variantes
 
-        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        monkeypatch.setenv("API_TEMP_ROOT", str(tmp_path))
         assert variantes.ruta("mujer_web__Carpeta 1", "3") is None
         variantes.guardar("mujer_web__Carpeta 1", "3", b"img", "captura.PNG")
         f = variantes.ruta("mujer_web__Carpeta 1", "3")
@@ -335,7 +335,7 @@ class TestVariantes:
     def test_rechaza_lo_que_no_es_imagen(self, tmp_path, monkeypatch):
         from src.nicho_ropa.services import variantes
 
-        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        monkeypatch.setenv("API_TEMP_ROOT", str(tmp_path))
         with pytest.raises(ValueError):
             variantes.guardar("c", "1", b"x", "captura.pdf")
         with pytest.raises(ValueError):
@@ -450,7 +450,7 @@ class TestFotosDeColorSubidas:
     def test_guardar_y_listar_fotos_por_color(self, tmp_path, monkeypatch):
         from src.nicho_ropa.services import variantes
 
-        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        monkeypatch.setenv("API_TEMP_ROOT", str(tmp_path))
         variantes.guardar_color("mujer_web__C 1", "4", "Verde militar", b"img", "a.PNG")
         variantes.guardar_color("mujer_web__C 1", "4", "beige", b"img", "b.jpg")
         assert variantes.ruta_color("mujer_web__C 1", "4", "verde militar").name == "4__verde_militar.png"
@@ -541,7 +541,7 @@ class TestMiniaturasDeLaCaptura:
 
         from src.nicho_ropa.services import variantes
 
-        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        monkeypatch.setenv("API_TEMP_ROOT", str(tmp_path))
         cap = self._captura(tmp_path)
         assert variantes.recortar_miniaturas(cap, ["beige", "marron", "taupe", "verde militar"], "c", "4") == ["beige", "marron", "taupe", "verde militar"]
         f = variantes.ruta_miniatura("c", "4", "verde militar")

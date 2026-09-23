@@ -7,26 +7,37 @@ ficha, o TikTok lo sanciona como producto inconsistente). Así que el operador
 sube UNA captura más —la del selector, con las miniaturas y sus nombres— y
 se adjunta al guion junto con la ficha y la limpia.
 
-Vive en el Drive montado, aparte de las fotos de la prenda: en la carpeta de
-la prenda rompería el emparejado limpia/ficha (que mira todas las imágenes
-del directorio). `_variantes` cuelga de la raíz de prendas importadas, que
-no es un género y no sale en ningún selector.
+Vive en DISCO LOCAL persistente (`API_TEMP_ROOT/variantes/<carpeta>/`), no en
+el Drive montado: listar la carpeta en el mount tardaba hasta 120 s cuando
+rclone estaba subiendo lo recién escrito, y ese listado va en CADA carga de
+la lista de prendas — la app del móvil se cortaba y se quedaba con la copia
+vieja. Son ficheros regenerables (capturas y fotos de Flow), así que no
+necesitan Drive. `temp_cleanup` no los purga (`PROTECTED_DIRS`).
 """
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
-from src.nicho_ropa import config
+from src.nicho_ropa import config  # noqa: F401 — `_slug_color` y compañía siguen usándolo
 
 _EXTS = (".jpg", ".jpeg", ".png", ".webp")
 MAX_BYTES = 12 * 1024 * 1024
 
 
+SUBDIR = "variantes"
+
+
+def raiz() -> Path:
+    """Local y persistente (el volumen de `temp_work` en el contenedor)."""
+    return Path(os.getenv("API_TEMP_ROOT", "/tmp")) / SUBDIR
+
+
 def _dir(carpeta: str) -> Path:
     seguro = re.sub(r"[^\w.\- ]+", "_", carpeta or "").strip() or "_"
-    return config.prendas_web_dir() / "_variantes" / seguro
+    return raiz() / seguro
 
 
 def ruta(carpeta: str, producto: str) -> Path | None:

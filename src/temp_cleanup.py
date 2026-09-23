@@ -13,6 +13,9 @@ CLEANUP_MARKER = ".last_cleanup"
 # badge se quedaba mudo (o peor: cayendo al fallback de git, que dice "success"
 # mire lo que mire).
 PROTECTED_NAMES = {CLEANUP_MARKER, ".gitkeep", ".gitignore", "deploy_status.json"}
+# Las capturas de variantes y fotos por color del Nicho Ropa (`variantes/`):
+# regenerables, pero no temporales — el operador las sube a mano.
+PROTECTED_DIRS = ("variantes",)
 
 
 def cleanup_temp_files(temp_dir, max_age_days=3, throttle_hours=12, force=False):
@@ -42,6 +45,13 @@ def cleanup_temp_files(temp_dir, max_age_days=3, throttle_hours=12, force=False)
     for entry in temp_path.rglob("*"):
         if not entry.is_file() or entry.name in PROTECTED_NAMES:
             continue
+        # Subcarpetas que NO son temporales aunque vivan aquí (van en el
+        # volumen persistente porque el Drive montado era demasiado lento).
+        try:
+            if entry.relative_to(temp_path).parts[0] in PROTECTED_DIRS:
+                continue
+        except (ValueError, IndexError):
+            pass
         try:
             stat = entry.stat()
             if stat.st_mtime < cutoff:
