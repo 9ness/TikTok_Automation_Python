@@ -70,7 +70,7 @@ class TestGuionPorClip:
         assert "Movimiento clip" not in v1 and "Movimiento clip" not in v2
         assert "\nMovimiento:\n" in v1 and "\nMovimiento:\n" in v2
         assert "No se gira" in v1 and "No se gira" not in v2
-        assert "DE ESPALDAS" in v2 and "DE ESPALDAS" not in v1
+        assert "de espaldas" in v2 and "de espaldas" not in v1
         # La voz es común y va en los dos.
         assert "Voz femenina" in v1 and "Voz femenina" in v2
 
@@ -124,7 +124,7 @@ class TestGuionPorClip:
         assert salida["colores"] == ["rosa", "beige", "negro", "verde"]
         assert salida["colores_hex"] == {"rosa": "#e7b8c4", "verde": "#5a6b4f"}
         assert len(salida["videos"]) == 2
-        assert "DE ESPALDAS" in salida["videos"][1] and "DE ESPALDAS" not in salida["videos"][0]
+        assert "de espaldas" in salida["videos"][1] and "de espaldas" not in salida["videos"][0]
         assert salida["videos"][0].rstrip().endswith("sin cortar ninguna palabra.")
 
     def test_sin_colores_no_se_pide_nada(self, monkeypatch):
@@ -334,6 +334,35 @@ class TestBloqueoDeGemini:
         )
         assert salida["colores"] == ["rosa", "verde"]
         assert llamadas == [["/tmp/a.jpg"], None]
+
+    def test_si_bloquea_tambien_sin_fotos_manda_solo_las_instrucciones(self, monkeypatch):
+        import src.tiktok_shop.api.gemini as gemini
+
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        llamadas = []
+
+        def falso(system_prompt, user_prompt, images=None, **kw):
+            llamadas.append((len(system_prompt), images))
+            if "Movimiento clip" in system_prompt:
+                raise gemini.GeminiBlockedError("Gemini bloqueó la petición (4)")
+            return {"colores": ["rosa", "verde"], "clips": ["Rosa y verde. Mira.", "Por detrás. Elige."]}
+
+        monkeypatch.setattr(gemini, "generate_json", falso)
+        salida = guionista.escribir(
+            prompt=e["guion"], titulo="x", fotos=[Path("/tmp/a.jpg")], partes=2,
+            caracteres_clip=119, segundos_clip=8, colores=True,
+        )
+        assert len(llamadas) == 3 and llamadas[2][1] is None
+        assert llamadas[2][0] < llamadas[0][0]
+        # El bloque de vídeo se monta con el prompt ENTERO: la voz y el
+        # movimiento vuelven aunque a Gemini no se le mandaran.
+        assert "Movimiento:" in salida["videos"][1] and "de espaldas" in salida["videos"][1]
+
+    def test_solo_instrucciones_corta_en_la_voz(self):
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        corto = guionista.solo_instrucciones(e["guion"])
+        assert "«" in corto and "Voz femenina" not in corto and "Movimiento" not in corto
+        assert guionista.solo_instrucciones("sin voz aquí") == "sin voz aquí"
 
     def test_los_leidos_de_la_ficha(self):
         from src.nicho_ropa.services import variantes

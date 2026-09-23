@@ -483,22 +483,45 @@ def _acortar(
 
 
 
-def _json_o_sin_fotos(generate_json, prompt: str, descripcion: str, imagenes, on_log: OnLog):
-    """Con las fotos; y si Gemini BLOQUEA la petición, sin ellas.
+# Dónde empieza lo que NO hace falta para ESCRIBIR el texto: la voz y el
+# movimiento son para el generador de vídeo, y `_montar_video` los vuelve a
+# pegar del prompt original. Se cortan como último recurso ante un bloqueo.
+_INICIO_VOZ = re.compile(r"\n\s*Voz (femenina|masculina)", re.IGNORECASE)
 
-    El bloqueo (cero candidatos) lo disparan las imágenes —pasó con una
-    captura de tienda— y el guion sale igual de los textos: mejor un guion
-    de oídas que ninguno.
+
+def solo_instrucciones(prompt: str) -> str:
+    """El prompt hasta el ejemplo (incluido), sin la voz ni el movimiento."""
+    m = _INICIO_VOZ.search(prompt)
+    return prompt[: m.start()].rstrip() if m else prompt
+
+
+def _json_o_sin_fotos(generate_json, prompt: str, descripcion: str, imagenes, on_log: OnLog):
+    """Con las fotos; y si Gemini BLOQUEA la petición, cada vez con menos.
+
+    El bloqueo (cero candidatos, PROHIBITED_CONTENT) no es determinista: el
+    mismo texto pasa o no según la suma de "mujer + por detrás + sentadilla"
+    y las fotos. Escalera: (1) tal cual, (2) sin fotos, (3) sin fotos y solo
+    las instrucciones + ejemplo — la voz y el movimiento no hacen falta para
+    escribir el texto y son lo que más pesa en el filtro. Mejor un guion de
+    oídas que ninguno.
     """
     from src.tiktok_shop.api.gemini import GeminiBlockedError
 
-    try:
-        return generate_json(prompt, descripcion, images=imagenes)
-    except GeminiBlockedError as e:
-        if not imagenes:
-            raise
-        on_log(f"[nicho_ropa] {e}: se reintenta sin las fotos")
-        return generate_json(prompt, descripcion, images=None)
+    intentos = [(prompt, imagenes, "con fotos")]
+    if imagenes:
+        intentos.append((prompt, None, "sin fotos"))
+    corto = solo_instrucciones(prompt)
+    if corto != prompt:
+        intentos.append((corto, None, "sin fotos y sin voz/movimiento"))
+    ultimo: Exception | None = None
+    for i, (texto, fotos, como) in enumerate(intentos):
+        try:
+            return generate_json(texto, descripcion, images=fotos)
+        except GeminiBlockedError as e:
+            ultimo = e
+            if i + 1 < len(intentos):
+                on_log(f"[nicho_ropa] {e} ({como}): se reintenta {intentos[i + 1][2]}")
+    raise ultimo  # type: ignore[misc]
 
 
 def _escribir_por_clips(
