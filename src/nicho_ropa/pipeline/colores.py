@@ -44,6 +44,52 @@ PASO_DEFECTO_S = 0.8
 # gratis — las fotos de cada color las hace Flow. Con la variable a "1" se
 # recupera el recolor como red de seguridad.
 RECOLOR_IA = os.getenv("TIENDA_COLORES_RECOLOR_IA", "0").strip().lower() in ("1", "true", "si", "sí")
+# Recolorear el pantalón sobre el propio vídeo (fotograma a fotograma) en
+# vez de tapar con fotos: gratis, con movimiento, y con el tono del hex de
+# cada variante. Solo cuando el color puesto se deja aislar (ver
+# `recolor_video.aislable`); si no, se cae a las fotos como antes.
+RECOLOR_VIDEO = os.getenv("TIENDA_COLORES_RECOLOR_VIDEO", "1").strip().lower() in ("1", "true", "si", "sí")
+
+
+def _recolorear_en_video(
+    clip: Path, colores: list[str], tiempos: list[float], tonos: dict[str, str],
+    work_dir: Path, on_log: OnLog,
+) -> Path | None:
+    """El clip con cada tramo de color recoloreado sobre el vídeo, o None si
+    no se puede (sin tono para algún color, o color puesto no aislable)."""
+    from src.nicho_ropa.pipeline import recolor_video as rv
+
+    faltan = [c for c in colores[:-1] if not tonos.get(c.lower())]
+    if faltan:
+        on_log(f"[colores] sin tono (hex) para {', '.join(faltan)}: no se recolorea el vídeo")
+        return None
+    tramos = []
+    for i, color in enumerate(colores[:-1]):
+        desde = 0.0 if i == 0 else tiempos[i]
+        tramos.append((desde, tiempos[i + 1], tonos[color.lower()]))
+    destino = clip.with_name(f"{clip.stem}_colores.mp4")
+    try:
+        import cv2
+
+        cap = cv2.VideoCapture(str(clip))
+        cap.set(cv2.CAP_PROP_POS_MSEC, tiempos[-1] * 1000)
+        ok, ref = cap.read()
+        cap.release()
+        if not ok:
+            return None
+        origen = rv.color_prenda(ref)
+        if not rv.aislable(origen):
+            on_log(
+                "[colores] el color puesto no se deja aislar (croma "
+                f"{float(((origen[1]-128)**2 + (origen[2]-128)**2) ** 0.5):.0f}): se usan fotos"
+            )
+            return None
+        rv.recolorear_tramos(clip, tramos, destino, on_log=on_log, t_medida=tiempos[-1])
+    except Exception as e:  # noqa: BLE001 — a las fotos, sin tirar el montaje
+        on_log(f"[colores] no se pudo recolorear el vídeo ({str(e)[:120]}): se usan fotos")
+        return None
+    on_log(f"[colores] {len(tramos)} cortes de color recoloreados sobre el vídeo")
+    return destino
 
 
 def aplicar(
@@ -83,6 +129,15 @@ def aplicar(
 
     tonos = {str(k).lower(): str(v) for k, v in (tonos or {}).items()}
     subidas = {str(k).lower(): Path(v) for k, v in (fotos_colores or {}).items()}
+
+    # Primero, recolorear el VÍDEO (con movimiento) si el color puesto se
+    # deja aislar y hay tono para cada color: es lo más parecido al viral, y
+    # sin contenido estático. Si no se puede, fotos.
+    if RECOLOR_VIDEO:
+        hecho = _recolorear_en_video(Path(clip), colores, tiempos, tonos, work_dir, on_log)
+        if hecho:
+            return hecho
+
     fotos: list[Path] = []
     sin_foto: list[str] = []
     for i, color in enumerate(colores[:-1], start=1):

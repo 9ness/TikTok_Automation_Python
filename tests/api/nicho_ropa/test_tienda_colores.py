@@ -557,3 +557,50 @@ class TestMiniaturasDeLaCaptura:
         # Y los recortes no cuentan como fotos de color subidas ni como captura.
         assert variantes.colores_con_foto("c") == {}
         assert variantes.tienen("c") == set()
+
+
+class TestRecolorEnVideo:
+    def _frame(self, color_bgr, top_bgr=(250, 250, 250)):
+        import numpy as np
+
+        f = np.zeros((400, 200, 3), dtype=np.uint8)
+        f[:, :] = (200, 200, 200)          # fondo gris claro
+        f[60:150, 60:140] = top_bgr        # top blanco arriba
+        f[160:380, 50:150] = color_bgr     # pantalón
+        return f
+
+    def test_aisla_un_rosa_y_no_un_gris(self):
+        from src.nicho_ropa.pipeline import recolor_video as rv
+
+        rosa = rv.color_prenda(self._frame((217, 208, 246)))   # BGR de #f6d0d9
+        gris = rv.color_prenda(self._frame((150, 150, 150)))
+        assert rv.aislable(rosa) and not rv.aislable(gris)
+
+    def test_recolorea_el_pantalon_y_respeta_el_top(self):
+        import numpy as np
+
+        from src.nicho_ropa.pipeline import recolor_video as rv
+
+        f = self._frame((217, 208, 246))
+        origen = rv.color_prenda(f)
+        out = rv.recolorear_frame(f, origen, rv.hex_a_lab("#1a1a1a"))
+        assert out[270, 100].mean() < 80          # el pantalón, ahora oscuro
+        assert out[100, 100].mean() > 240         # el top, intacto
+        assert abs(int(out[30, 30].mean()) - 200) < 3  # el fondo, intacto
+
+    def test_sin_hex_para_un_color_se_cae_a_las_fotos(self, tmp_path, monkeypatch):
+        import src.nicho_pov_bof.pipeline.video_editor as pov
+
+        monkeypatch.setattr(colores, "RECOLOR_VIDEO", True)
+        monkeypatch.setattr(colores, "RECOLOR_IA", False)
+        work = tmp_path / "w"
+        monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.0), ("verde", 0.8)))
+        monkeypatch.setattr(colores, "_run", lambda cmd, on_log: Path(cmd[-1]).write_bytes(b"jpg"))
+        sup = {}
+        monkeypatch.setattr(colores, "_superponer", lambda clip, fotos, tiempos, destino, on_log: sup.update(fotos=fotos))
+        clip = tmp_path / "clip1.mp4"
+        clip.write_bytes(b"")
+        avisos = []
+        colores.aplicar(clip, ["rosa", "verde"], work, on_log=avisos.append, tonos={}, fotos_colores={"rosa": tmp_path / "rosa.png"})
+        assert any("sin tono" in a for a in avisos)
+        assert sup["fotos"] == [tmp_path / "rosa.png"]
