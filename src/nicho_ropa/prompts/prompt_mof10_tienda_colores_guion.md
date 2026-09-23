@@ -19,7 +19,9 @@
 
      El bloque de vídeo se monta aquí (`guionista._montar_video`): la línea
      "La mujer dice en español:" y el ejemplo entre «» son lo que busca, y
-     los dos bloques "Movimiento clip N:" se reparten uno por clip. La lista
+     los dos bloques "Movimiento clip N:" se reparten uno por clip — van
+     como LISTA DE PLANOS con corte seco (el "clip continuo, sin cortes" del
+     curso dejaba a la creadora quieta de cuerpo entero 8 s). La lista
      de colores se guarda con el guion y es la que usa el montaje para
      recolorear el primer fotograma. -->
 
@@ -40,8 +42,24 @@ Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamen
 
 Movimiento clip 1:
 
-Crea un vídeo UGC totalmente realista grabado con un móvil en una tienda de ropa. La creadora está de pie, de frente, cuerpo entero, mirando a cámara y hablando con entusiasmo de la prenda que lleva puesta. Mientras dice las primeras palabras se va colocando la prenda como si se la acabara de poner: sube y ajusta la cintura con las dos manos, cambia el peso de una pierna a otra, pone las manos en las caderas — sin salir del encuadre y sin taparse la prenda con los brazos. Después enseña la cintura y estira un poco los bolsillos, y la cámara se acerca despacio hacia la cintura sin perder el encuadre. No se gira. No enseña la prenda por detrás. La prenda debe conservar exactamente su diseño, tejido, color, corte y detalles. Sin filtros, efectos, textos ni elementos artificiales. La cámara presenta pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Desde el inicio hay movimiento de labios perfectamente sincronizado con el texto añadido de la narración, con una voz femenina española, juvenil y natural. Clip continuo realista. Sin cortes ni cambio de escenario.
+Crea un vídeo UGC totalmente realista grabado con un móvil en una tienda de ropa, con la creadora de la imagen y la prenda que lleva puesta. El clip tiene TRES planos con corte seco entre ellos, como un vídeo de probador de una creadora de moda:
+
+Plano 1 (0-3 s): plano medio-largo de frente, de la cintura a los pies, con la cara fuera o casi fuera del encuadre. Mientras nombra los colores tira de la cintura del pantalón hacia arriba con las dos manos y lo ajusta, como si se lo acabara de poner; cambia el peso de una pierna a otra.
+
+Plano 2 (3-6 s): primer plano de la cintura y las caderas. Las manos enseñan la cintura (la goma, el cordón o el botón, lo que tenga) y estiran un poco los bolsillos; la tela se ve de cerca, con su textura real.
+
+Plano 3 (6-8 s): plano general de frente, cuerpo entero, manos en las caderas, mirando a cámara.
+
+Misma creadora, misma tienda, misma luz y misma prenda en los tres planos: la prenda conserva exactamente su diseño, tejido, color, corte y detalles. Sin filtros, efectos, textos ni elementos artificiales. Cámara con pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Movimiento de labios sincronizado con la narración cuando la cara está en plano, con una voz femenina española, juvenil y natural. No se gira. No enseña la prenda por detrás.
 
 Movimiento clip 2:
 
-Crea un vídeo UGC totalmente realista grabado con un móvil en una tienda de ropa. La creadora empieza de espaldas a la cámara, cuerpo entero, para que se vea la parte trasera de la prenda, con las manos en la cintura; hace una sentadilla y se levanta despacio para demostrar que la cintura no se baja ni se mueve, y en los últimos segundos se gira hacia la cámara sonriendo y señala con la mano el perchero de la tienda. La prenda debe conservar exactamente su diseño, tejido, color, corte y detalles. Sin filtros, efectos, textos ni elementos artificiales. La cámara presenta pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Movimiento de labios perfectamente sincronizado con el texto añadido de la narración, con la MISMA voz femenina española, juvenil y natural del clip anterior. Clip continuo realista. Sin cortes ni cambio de escenario.
+Crea un vídeo UGC totalmente realista grabado con un móvil en una tienda de ropa, con la creadora de la imagen (de espaldas) y la prenda que lleva puesta. El clip tiene TRES planos con corte seco entre ellos, como un vídeo de probador de una creadora de moda:
+
+Plano 1 (0-3 s): plano general de espaldas, cuerpo entero, para que se vea la parte trasera de la prenda; manos en la cintura, la cabeza girada por encima del hombro hacia la cámara.
+
+Plano 2 (3-6 s): de espaldas o en tres cuartos, hace una sentadilla completa y se levanta despacio para demostrar que la cintura no se baja ni se mueve.
+
+Plano 3 (6-8 s): se gira hacia la cámara sonriendo, plano general de frente, y señala con la mano el perchero de la tienda.
+
+Misma creadora, misma tienda, misma luz y misma prenda en los tres planos: la prenda conserva exactamente su diseño, tejido, color, corte y detalles. Sin filtros, efectos, textos ni elementos artificiales. Cámara con pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Movimiento de labios sincronizado con la narración cuando la cara está en plano, con la MISMA voz femenina española, juvenil y natural del clip anterior.

@@ -203,16 +203,6 @@ PUNCH_CRECIMIENTO_S = 0.025
 VIBRACION_X = 0.006
 VIBRACION_Y = 0.004
 
-# El primer plano de la cintura del viral (bolsillos, cordón) lo pide el
-# prompt y Omni lo ignora: la creadora se queda de cuerpo entero. Se hace en
-# el montaje: pasado el último color, la imagen se acerca a la cintura y se
-# queda ahí hasta que acaba el clip 1. Digital sobre 720p, pero el clip de
-# Omni ya es blando y en TikTok no canta.
-ZOOM_CINTURA = 1.35
-ZOOM_CINTURA_ESPERA_S = 0.8   # tras nombrar el color puesto
-ZOOM_CINTURA_DURACION_S = 1.7
-ZOOM_CINTURA_CENTRO_Y = 0.42  # dónde queda la cintura (fracción de la altura)
-
 
 def _superponer(
     clip: Path, fotos: list[Path], tiempos: list[float], destino: Path, on_log: OnLog,
@@ -255,15 +245,7 @@ def _superponer(
             f"[v{i - 1}][z{i}]overlay=x='{x}':y='{y}':eval=frame"
             f":enable='between(t,{desde:.3f},{hasta:.3f})'[v{i}]"
         )
-    # Acercamiento a la cintura una vez nombrado el color puesto (el vídeo
-    # real ya está en pantalla): zoom suave y se queda.
-    t0 = tiempos[-1] + ZOOM_CINTURA_ESPERA_S
-    z = f"(1+{ZOOM_CINTURA - 1:.3f}*min(max((t-{t0:.3f})/{ZOOM_CINTURA_DURACION_S},0),1))"
-    partes.append(
-        f"[v{len(fotos)}]scale=w='iw*{z}':h='ih*{z}':eval=frame,"
-        f"crop={w}:{h}:x='(iw-ow)/2':y='(ih-oh)*{ZOOM_CINTURA_CENTRO_Y}'[vz]"
-    )
-    ultimo = "[vz]"
+    ultimo = f"[v{len(fotos)}]"
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(clip), *entradas,
         "-filter_complex", ";".join(partes),
