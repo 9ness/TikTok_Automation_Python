@@ -88,6 +88,31 @@ class TestGuionPorClip:
         assert '"colores"' in con and "ÚLTIMO" in con and "misma tienda" in con
         assert '"colores"' not in sin and "sitios distintos" in sin
 
+    def test_reordenar_enumeracion(self):
+        r = guionista.reordenar_enumeracion
+        assert r("Beige, marron, taupe y verde militar. Mira.", ["beige", "marron", "verde militar", "taupe"]) == "Beige, marron, verde militar y taupe. Mira."
+        assert r("Azul claro, azul, gris y verde. Mira.", ["azul", "gris", "verde", "azul claro"]) == "Azul, gris, verde y azul claro. Mira."
+        # Con acento en la frase también casa.
+        assert r("Beige, marrón y taupe. Mira.", ["beige", "taupe", "marron"]).startswith("Beige, taupe y marron.")
+        # Sin enumeración al principio, no se toca.
+        assert r("Mira este pantalón beige.", ["beige", "taupe"]) == "Mira este pantalón beige."
+
+    def test_el_color_puesto_va_el_ultimo(self, monkeypatch):
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        import src.tiktok_shop.api.gemini as gemini
+
+        monkeypatch.setattr(gemini, "generate_json", lambda s, u, **k: {
+            "colores": ["beige", "marron", "taupe", "verde militar"],
+            "color_puesto": "Taupe",
+            "clips": ["Beige, marron, taupe y verde militar. Mira este culotte.", "Por detrás queda genial. Elige el tuyo."],
+        })
+        salida = guionista.escribir(
+            prompt=e["guion"], titulo="x", partes=2, caracteres_clip=119, segundos_clip=8, colores=True,
+        )
+        assert salida["colores"] == ["beige", "marron", "verde militar", "taupe"]
+        assert salida["dice"].startswith("Beige, marron, verde militar y taupe.")
+        assert "«Beige, marron, verde militar y taupe. Mira este culotte.»" in salida["videos"][0]
+
     def test_limpiar_hex(self):
         assert guionista.limpiar_hex(
             {"Rosa": "e7b8c4", "beige": "#zz", "verde": "#5A6B4F", "otro": "#000000"},

@@ -211,7 +211,7 @@ def _formato_clips(
     # que usa el montaje para recolorear el primer fotograma en cada corte.
     donde = "en la misma tienda" if colores else "en dos sitios distintos"
     json_ejemplo = (
-        '{"colores": ["rosa", "beige", "negro", "verde"], '
+        '{"colores": ["rosa", "beige", "negro", "verde"], "color_puesto": "verde", '
         '"colores_hex": {"rosa": "#rrggbb", "beige": "#rrggbb", "negro": "#rrggbb", "verde": "#rrggbb"}, '
         f'"clips": [{ejemplo}]}}'
         if colores else f'{{"clips": [{ejemplo}]}}'
@@ -224,6 +224,9 @@ def _formato_clips(
         "sin los tachados o agotados; si la captura no enseña el selector, "
         "solo el color de la prenda de la foto. Nunca inventes un color: si "
         "solo hay uno, la lista lleva solo ese y el clip 1 no los nombra.\n"
+        '"color_puesto": cuál de esos colores es el de la prenda en la foto '
+        "limpia (la que se anima): mira la foto y elige el de la lista que "
+        "más se le parezca. Ese va el ÚLTIMO en la lista y en la frase.\n"
         '"colores_hex": para cada color de la lista, el color MEDIO de la '
         "prenda tal como se ve en la miniatura de ESA variante (o en la foto, "
         "para el puesto), en hexadecimal MEDIDO en la imagen (no el valor "
@@ -537,6 +540,15 @@ def _escribir_por_clips(
     )
     lista_colores = limpiar_colores((datos or {}).get("colores")) if colores else []
     hex_colores = limpiar_hex((datos or {}).get("colores_hex"), lista_colores) if colores else {}
+    puesto = ""
+    if colores:
+        # El puesto va el ÚLTIMO: es donde el montaje deja de poner fotos y
+        # sigue el vídeo real. Gemini lo identifica pero no siempre lo
+        # ordena (dejó "beige, marron, taupe y verde militar" llevando taupe).
+        puesto = _color_de_la_lista(str((datos or {}).get("color_puesto") or ""), lista_colores)
+        if puesto and lista_colores[-1] != puesto:
+            lista_colores = [c for c in lista_colores if c != puesto] + [puesto]
+            on_log(f"[nicho_ropa] el color puesto es «{puesto}»: pasa al final de la lista")
     if colores and len(lista_colores) < 2:
         on_log(
             "[nicho_ropa] el guion trae "
@@ -557,8 +569,57 @@ def _escribir_por_clips(
         (_montar_video(prompt, c, parte=i) or c) + nota_tiempos(segundos)
         for i, c in enumerate(clips, start=1)
     ]
+    if colores and len(lista_colores) >= 2 and clips:
+        # La frase del clip 1 tiene que enumerar los colores en ESE orden:
+        # es lo que casa cada palabra con su foto al montar.
+        clips[0] = reordenar_enumeracion(clips[0], lista_colores)
+        videos[0] = (_montar_video(prompt, clips[0], parte=1) or clips[0]) + nota_tiempos(segundos)
     salida = {"dice": " ".join(clips), "video": videos[0], "videos": videos}
     if colores:
         salida["colores"] = lista_colores
         salida["colores_hex"] = hex_colores
     return salida
+
+
+def _color_de_la_lista(nombre: str, lista: list[str]) -> str:
+    """El elemento de `lista` que es ese nombre (sin acentos ni mayúsculas)."""
+    plano = _sin_acentos(nombre).strip(" .,;«»\"'")
+    if not plano:
+        return ""
+    for c in lista:
+        if _sin_acentos(c) == plano:
+            return c
+    for c in lista:
+        if plano in _sin_acentos(c) or _sin_acentos(c) in plano:
+            return c
+    return ""
+
+
+def reordenar_enumeracion(texto: str, colores: list[str]) -> str:
+    """Si el texto EMPIEZA enumerando esos colores, los deja en el orden de
+    `colores` (el puesto el último). Si no encuentra la enumeración, no toca."""
+    import re as _re
+
+    resto = texto.lstrip()
+    # Consumir, desde el principio, colores separados por comas / "y".
+    vistos: list[str] = []
+    pos = 0
+    while True:
+        m = _re.match(r"\s*(?:,\s*)?(?:(?:y|e)\s+)?", resto[pos:])
+        arranque = pos + (m.end() if m else 0)
+        hallado = None
+        # Los nombres largos primero: "azul claro" antes que "azul".
+        for c in sorted(colores, key=len, reverse=True):
+            if _sin_acentos(resto[arranque:arranque + len(c)]) == _sin_acentos(c) and c not in vistos:
+                hallado = c
+                break
+        if not hallado:
+            break
+        vistos.append(hallado)
+        pos = arranque + len(hallado)
+    if len(vistos) < 2 or set(vistos) != set(colores):
+        return texto
+    ordenados = [c for c in colores if c in vistos]
+    nueva = ", ".join(ordenados[:-1]) + " y " + ordenados[-1]
+    nueva = nueva[0].upper() + nueva[1:]
+    return (nueva + resto[pos:]).strip()
