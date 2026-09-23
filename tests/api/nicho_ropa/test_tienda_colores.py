@@ -509,3 +509,49 @@ class TestFotosDeColorDelZip:
         r = pov_web.importar_zip(self._zip(tmp_path), "Carpeta 7.zip", raiz=tmp_path)
         assert r["iguales"] == ["3", "4"]
         assert len(pov_web.fotos_color_de(carpeta, "3")) == 2
+
+
+class TestMiniaturasDeLaCaptura:
+    def _captura(self, tmp_path, n=4):
+        """Una captura falsa: fondo blanco y n tarjetas con borde gris en fila."""
+        from PIL import Image, ImageDraw
+
+        W, H = 1440, 3168
+        im = Image.new("RGB", (W, H), "white")
+        d = ImageDraw.Draw(im)
+        colores = [(200, 180, 150), (90, 60, 45), (140, 130, 115), (110, 140, 100), (30, 30, 30)]
+        for i in range(n):
+            x = 54 + i * 315
+            d.rectangle((x, 2244, x + 277, 2244 + 340), outline=(200, 200, 200), width=3)
+            d.rectangle((x + 40, 2270, x + 237, 2470), fill=colores[i])
+        f = tmp_path / "cap.jpg"
+        im.save(f, "JPEG", quality=92)
+        return f
+
+    def test_detecta_la_fila_de_tarjetas(self, tmp_path):
+        from src.nicho_ropa.services import variantes
+
+        cajas = variantes.detectar_miniaturas(self._captura(tmp_path))
+        assert len(cajas) == 4
+        assert [c[0] for c in cajas] == sorted(c[0] for c in cajas)
+        assert all(abs(c[1] - 2244) < 6 for c in cajas)
+
+    def test_recorta_por_orden_y_solo_si_cuadra(self, tmp_path, monkeypatch):
+        from PIL import Image
+
+        from src.nicho_ropa.services import variantes
+
+        monkeypatch.setattr(config, "prendas_web_dir", lambda: tmp_path)
+        cap = self._captura(tmp_path)
+        assert variantes.recortar_miniaturas(cap, ["beige", "marron", "taupe", "verde militar"], "c", "4") == ["beige", "marron", "taupe", "verde militar"]
+        f = variantes.ruta_miniatura("c", "4", "verde militar")
+        assert f and f.name == "4__ref__verde_militar.jpg"
+        with Image.open(f) as im:
+            r, g, b = im.resize((1, 1)).getpixel((0, 0))
+        assert g > r and g > b  # el cuarto recorte es el verdoso
+        assert variantes.miniaturas_de("c", "4", ["beige", "negro", "taupe"]) == ["beige", "taupe"]
+        # Tres nombres para cuatro tarjetas: no se recorta nada.
+        assert variantes.recortar_miniaturas(cap, ["a", "b", "c"], "c", "5") == []
+        # Y los recortes no cuentan como fotos de color subidas ni como captura.
+        assert variantes.colores_con_foto("c") == {}
+        assert variantes.tienen("c") == set()

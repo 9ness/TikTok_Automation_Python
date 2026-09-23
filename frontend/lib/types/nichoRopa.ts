@@ -154,6 +154,8 @@ export interface PrendaItem {
   colores_con_foto?: string[];
   /** Fotos del producto en otros colores que trajo el ZIP (para Flow). */
   fotos_color_producto?: number;
+  /** Variantes con miniatura recortada de la captura (foto para Flow). */
+  miniaturas_variantes?: string[];
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

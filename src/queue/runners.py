@@ -1788,6 +1788,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                 try:
                     leido = variantes.extraer(captura)
                     variantes.guardar_leidos(carpeta, pid, leido)
+                    variantes.recortar_miniaturas(captura, leido["colores"], carpeta, pid)
                 except Exception as e:  # noqa: BLE001 — sin colores antes que sin guion
                     on_log(f"[nicho_ropa] {pid}: no se pudieron leer las variantes ({str(e)[:100]})")
             if leido["colores"]:

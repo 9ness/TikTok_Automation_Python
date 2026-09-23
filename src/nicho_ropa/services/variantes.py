@@ -30,7 +30,7 @@ def _dir(carpeta: str) -> Path:
 
 
 def ruta(carpeta: str, producto: str) -> Path | None:
-    """La captura guardada de esa prenda, o None."""
+    """La captura guardada de esa prenda, o None (nunca la copia cuadrada)."""
     d = _dir(carpeta)
     if not d.is_dir():
         return None
@@ -73,7 +73,10 @@ def tienen(carpeta: str) -> set[str]:
     d = _dir(carpeta)
     if not d.is_dir():
         return set()
-    return {f.stem for f in d.iterdir() if f.is_file() and f.suffix.lower() in _EXTS}
+    return {
+        f.stem for f in d.iterdir()
+        if f.is_file() and f.suffix.lower() in _EXTS and "__" not in f.stem
+    }
 
 
 def extraer(captura: Path) -> dict:
@@ -90,6 +93,83 @@ def extraer(captura: Path) -> dict:
     datos = generate_json(prompt, "Lee el selector de color de esta captura.", images=[str(captura)])
     colores = limpiar_colores((datos or {}).get("colores"))
     return {"colores": colores, "hex": limpiar_hex((datos or {}).get("hex"), colores)}
+
+
+def detectar_miniaturas(captura: Path) -> list[tuple[int, int, int, int]]:
+    """Las tarjetas del selector de color, de izquierda a derecha: `(x, y, w, h)`.
+
+    Con OpenCV y no con Gemini: pedirle las cajas devolvía la Y normalizada
+    por el ancho (los recortes caían en los pies de la modelo), y rellenando a
+    cuadrado tampoco cuadraba. Las tarjetas son rectángulos con borde fino,
+    del mismo tamaño y en fila; se buscan contornos así y se queda la fila
+    con más. La tachada que asoma cortada por el borde no cierra contorno y
+    se queda fuera sola.
+    """
+    import cv2
+    import numpy as np
+
+    im = cv2.imread(str(captura))
+    if im is None:
+        return []
+    alto, ancho = im.shape[:2]
+    gris = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    bordes = cv2.dilate(cv2.Canny(gris, 40, 120), np.ones((3, 3), np.uint8), 1)
+    contornos, _ = cv2.findContours(bordes, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cajas = []
+    for c in contornos:
+        x, y, w, h = cv2.boundingRect(c)
+        if 0.10 * ancho < w < 0.30 * ancho and 0.08 * ancho < h < 0.35 * ancho and 0.6 < w / h < 1.6:
+            cajas.append((x, y, w, h))
+    cajas.sort(key=lambda b: b[1])
+    filas: list[list[tuple[int, int, int, int]]] = []
+    for b in cajas:
+        for f in filas:
+            if abs(f[0][1] - b[1]) < 0.05 * alto and abs(f[0][3] - b[3]) < 0.3 * b[3]:
+                f.append(b)
+                break
+        else:
+            filas.append([b])
+    if not filas:
+        return []
+    mejor = max(filas, key=len)
+    if len(mejor) < 2:
+        return []
+    return sorted(mejor, key=lambda b: b[0])
+
+
+def recortar_miniaturas(captura: Path, colores: list[str], carpeta: str, producto: str) -> list[str]:
+    """Recorta de la captura la miniatura de cada color (por ORDEN: la lista
+    leída y las tarjetas van las dos de izquierda a derecha, sin las
+    tachadas) y la guarda como `<producto>__ref__<color>.jpg`: la foto del
+    producto en ese color para adjuntar en Flow. Devuelve los que salieron.
+    Si el número de tarjetas no cuadra con el de colores, no recorta nada:
+    mejor ninguna que una con el nombre cambiado."""
+    from PIL import Image
+
+    cajas = detectar_miniaturas(captura)
+    if not cajas or len(cajas) != len(colores):
+        return []
+    d = _dir(carpeta)
+    d.mkdir(parents=True, exist_ok=True)
+    hechos: list[str] = []
+    with Image.open(captura) as im:
+        im = im.convert("RGB")
+        for color, (x, y, w, h) in zip(colores, cajas):
+            # Solo la foto: el nombre va en el cuarto de abajo de la tarjeta.
+            im.crop((x + 2, y + 2, x + w - 2, y + int(h * 0.78))).save(
+                d / f"{producto}__ref__{_slug_color(color)}.jpg", "JPEG", quality=92,
+            )
+            hechos.append(color)
+    return hechos
+
+
+def ruta_miniatura(carpeta: str, producto: str, color: str) -> Path | None:
+    f = _dir(carpeta) / f"{producto}__ref__{_slug_color(color)}.jpg"
+    return f if f.is_file() and f.stat().st_size > 0 else None
+
+
+def miniaturas_de(carpeta: str, producto: str, colores: list[str]) -> list[str]:
+    return [c for c in colores if ruta_miniatura(carpeta, producto, c)]
 
 
 def guardar_leidos(carpeta: str, producto: str, leido: dict) -> None:
@@ -131,6 +211,10 @@ def _slug_color(color: str) -> str:
         c for c in unicodedata.normalize("NFKD", color or "") if not unicodedata.combining(c)
     ).lower().strip()
     return re.sub(r"[^a-z0-9]+", "_", plano).strip("_")
+
+
+def _es_ref(nombre: str) -> bool:
+    return "__ref__" in nombre
 
 
 def ruta_color(carpeta: str, producto: str, color: str) -> Path | None:
@@ -192,5 +276,7 @@ def colores_con_foto(carpeta: str) -> dict[str, set[str]]:
         if not f.is_file() or f.suffix.lower() not in _EXTS or "__" not in f.stem:
             continue
         producto, _, color = f.stem.partition("__")
+        if color.startswith("ref__"):
+            continue  # recorte de la miniatura de la ficha, no una foto de color
         salida.setdefault(producto, set()).add(color)
     return salida

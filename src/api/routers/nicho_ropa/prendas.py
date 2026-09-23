@@ -598,6 +598,7 @@ def list_prendas(
                 if variantes._slug_color(c) in fotos_color.get(pid, set())
             ],
             fotos_color_producto=len(prendas_web.fotos_color(carpeta, pid)),
+            miniaturas_variantes=variantes.miniaturas_de(carpeta, pid, variantes.leidos(prod)["colores"]),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -933,6 +934,14 @@ async def subir_variantes(
         variantes.guardar_leidos(carpeta, producto, leido)
         if not leido["colores"]:
             aviso = "En la captura no se ve ningún selector de color."
+        else:
+            # Las miniaturas recortadas: la foto del producto en cada color
+            # para adjuntar en Flow. Si no cuadran, se avisa y ya.
+            recortes = await run_in_threadpool(
+                variantes.recortar_miniaturas, ruta, leido["colores"], carpeta, producto,
+            )
+            if not recortes:
+                aviso = "Colores leídos, pero no se pudieron recortar las miniaturas de la captura."
     except Exception as e:  # noqa: BLE001 — la captura ya está guardada
         aviso = f"Captura guardada, pero no se pudieron leer los colores: {str(e)[:120]}"
     return {
@@ -1012,6 +1021,21 @@ def ver_foto_color_producto(
     if k < 1 or k > len(fotos):
         raise APIError("Esa prenda no tiene esa foto de color.", status_code=404)
     return FileResponse(str(fotos[k - 1]), headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/variantes/miniatura")
+def ver_miniatura_variante(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    color: Annotated[str, Query()],
+):
+    """La miniatura de esa variante recortada de la captura del selector."""
+    from fastapi.responses import FileResponse
+
+    f = variantes.ruta_miniatura(carpeta, producto, color)
+    if not f:
+        raise APIError("Esa variante no tiene miniatura recortada.", status_code=404)
+    return FileResponse(str(f), headers={"Cache-Control": "no-cache"})
 
 
 @router.get("/variantes/foto")

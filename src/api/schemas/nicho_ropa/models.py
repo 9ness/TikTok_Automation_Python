@@ -204,6 +204,9 @@ class PrendaInfo(BaseModel):
     # Cuántas fotos del producto en OTROS colores trajo el ZIP (`colores/`):
     # se adjuntan en Flow junto a la imagen 1 para clavar cada color.
     fotos_color_producto: int = 0
+    # Variantes cuya miniatura se recortó de la captura del selector: la foto
+    # del producto en ese color, para adjuntar en Flow.
+    miniaturas_variantes: list[str] = Field(default_factory=list)
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

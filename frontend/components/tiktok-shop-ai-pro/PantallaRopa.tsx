@@ -1835,6 +1835,32 @@ function PrendaCard({
               sea el de verdad (con el nombre solo no lo clavaba). Se abren en
               otra pestaña para guardarlas; si no las hay, vale una captura
               de la miniatura del selector de la ficha. */}
+          {/* Las miniaturas recortadas de la captura del selector, con su
+              nombre: la foto del producto en cada color, para adjuntar en
+              Flow junto al prompt 📋. Salen solas al subir la captura. */}
+          {(prenda.miniaturas_variantes ?? []).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+              🧵 De la captura:
+              {(prenda.miniaturas_variantes ?? []).map((c) => (
+                <a
+                  key={c}
+                  href={`${api.baseUrl}/api/v1/nicho-ropa/variantes/miniatura?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&color=${encodeURIComponent(c)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex flex-col items-center overflow-hidden rounded border border-border/60"
+                  title={`Miniatura de «${c}»: ábrela y adjúntala en Flow con el prompt de ese color`}
+                >
+                  <img
+                    src={`${api.baseUrl}/api/v1/nicho-ropa/variantes/miniatura?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&color=${encodeURIComponent(c)}`}
+                    alt={c}
+                    className="h-12 w-10 object-cover"
+                    loading="lazy"
+                  />
+                  <span className="max-w-10 truncate px-0.5">{c}</span>
+                </a>
+              ))}
+            </div>
+          )}
           {(prenda.fotos_color_producto ?? 0) > 0 && (
             <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
               🧵 Producto en otros colores (del ZIP):
