@@ -1826,9 +1826,10 @@ function PrendaCard({
         <div className="space-y-1">
           <p className="text-[10px] text-muted-foreground">
             📷 Foto de cada color (en Flow, mismo chat que la imagen 1): copia
-            el prompt, adjunta la foto del producto en ese color, genera y
-            sube. O, sin subirlas, prueba que Omni haga los colores con las
-            fotos como ingredientes:
+            el prompt (es el mismo para todos), adjunta la foto del producto en
+            ese color —el color lo manda la foto, no el nombre—, genera y sube.
+            O, sin subirlas, prueba que Omni haga los colores con las fotos
+            como ingredientes:
           </p>
           {/* Las fotos del producto en otros colores que trajo el ZIP: se
               adjuntan en Flow con el prompt de cada color para que el tono
