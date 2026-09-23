@@ -1351,6 +1351,7 @@ export function PantallaRopa({
               partes={estiloActivo?.partes ?? 1}
               conColores={!!estiloActivo?.colores}
               imagenColor={estiloActivo?.imagen_color ?? ""}
+              videoOmni={estiloActivo?.video_omni ?? ""}
               caracteresClip={estiloActivo?.caracteres_clip ?? 0}
               modalidadDuracion={duracion}
               onCopiar={copiar}
@@ -1374,6 +1375,7 @@ function PrendaCard({
   partes = 1,
   conColores = false,
   imagenColor = "",
+  videoOmni = "",
   caracteresClip = 0,
   modalidadDuracion = "10",
   onCopiar,
@@ -1394,6 +1396,8 @@ function PrendaCard({
   conColores?: boolean;
   /** Plantilla de Flow para la imagen 1 en otro color (`{{COLOR}}`). */
   imagenColor?: string;
+  /** Clip 1 con los colores hechos por Omni (`{{DICE}}`, `{{COLORES}}`). */
+  videoOmni?: string;
   /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
   nichoCaption?: string;
   /** Lo que cabe en cada clip: el botón del guion se pinta en ámbar si se
@@ -1822,8 +1826,26 @@ function PrendaCard({
         <div className="space-y-1">
           <p className="text-[10px] text-muted-foreground">
             📷 Foto de cada color (en Flow, mismo chat que la imagen 1): copia
-            el prompt, genera y sube.
+            el prompt, genera y sube. O, sin subirlas, prueba que Omni haga los
+            colores con las fotos como ingredientes:
           </p>
+          {videoOmni && (
+            <button
+              type="button"
+              onClick={() => {
+                const dice = /«([^«»]*)[«»]/.exec(prenda.guiones?.[0] ?? "")?.[1]?.trim() ?? "";
+                const cols = (prenda.guion_colores ?? []).join(", ");
+                onCopiar(
+                  "Guion 1 · colores en Omni",
+                  videoOmni.replace("{{DICE}}", dice).replaceAll("{{COLORES}}", cols),
+                );
+              }}
+              className="w-full rounded-md border border-fuchsia-500/60 px-2 py-1.5 text-[11px] text-fuchsia-300 transition hover:bg-fuchsia-500/10"
+              title="Clip 1 con los cambios de color hechos por Omni: adjunta como ingredientes la imagen 1 en cada color (la puesta la última). NO subas fotos de color a la app."
+            >
+              🎬 Guion 1 · colores en Omni (fotos como ingredientes)
+            </button>
+          )}
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
             {(prenda.guion_colores ?? []).slice(0, -1).map((c) => {
               const puesta = (prenda.colores_con_foto ?? []).includes(c);

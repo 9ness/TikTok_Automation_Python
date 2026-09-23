@@ -40,6 +40,8 @@ export interface EstiloMof10 {
   colores?: boolean;
   /** Plantilla para pedir en Flow la imagen 1 en otro color (`{{COLOR}}`). */
   imagen_color?: string;
+  /** Clip 1 con los colores hechos por Omni (fotos como ingredientes). */
+  video_omni?: string;
   /** Tope de caracteres que se le pide al guion. */
   caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y

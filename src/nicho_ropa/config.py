@@ -915,6 +915,10 @@ ESTILOS_MOF10: dict[str, dict] = {
         # La misma imagen 1 con el pantalón en cada uno de los otros colores
         # (una por color, en Flow): son las fotos de los cortes de color.
         "imagen_color": "prompt_mof10_tienda_colores_imagen_color.md",
+        # Variante del clip 1 en la que los cambios de color los hace Omni
+        # con las fotos de cada color como ingredientes (sin subirlas a la
+        # app). `{{DICE}}` y `{{COLORES}}` los rellena la pantalla del guion.
+        "video_omni": "prompt_mof10_tienda_colores_video_omni.md",
         "por_sexo": {
             "mujer": (
                 "prompt_mof10_tienda_colores_imagen.md",
@@ -1136,6 +1140,7 @@ def prompts_mof10(
             # La plantilla para pedir en Flow la imagen 1 en otro color
             # (`{{COLOR}}` lo rellena la pantalla con cada variante).
             "imagen_color": _limpio(meta["imagen_color"]) if meta.get("imagen_color") else "",
+            "video_omni": _limpio(meta["video_omni"]) if meta.get("video_omni") else "",
             "segundos_clip": int(meta.get("segundos_clip") or 0),
             "guion": _nota_plazos(
                 _nota_duracion(

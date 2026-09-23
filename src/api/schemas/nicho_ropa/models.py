@@ -61,6 +61,9 @@ class EstiloMof10(BaseModel):
     # Plantilla para pedir en Flow la imagen 1 con el pantalón en otro color
     # (`{{COLOR}}`): una por variante, son las fotos de los cortes.
     imagen_color: str = ""
+    # Variante del clip 1 con los cambios de color hechos por Omni (fotos de
+    # cada color como ingredientes). `{{DICE}}` y `{{COLORES}}`.
+    video_omni: str = ""
 
 
 class ModoRopa(BaseModel):
