@@ -1058,9 +1058,9 @@ export function PantallaRopa({
                     exactos. Los cortes de color del principio los monta la
                     app con las fotos de cada color que subas, al
                     ritmo de las palabras. La imagen 1 es la chica con mallas
-                    negras y el pantalón a medio poner: en el clip se lo sube
-                    mientras nombra los colores, y el que lleva puesto se dice
-                    el último. Tras el guion, genera en el MISMO chat de Flow la
+                    negras y el pantalón a medio poner: en el clip se queda así
+                    mientras nombra los colores y se lo sube al decir el último,
+                    que es el que lleva puesto. Tras el guion, genera en el MISMO chat de Flow la
                     imagen 1 en cada uno de los otros colores (botón 📋 de cada
                     color en la tarjeta) y súbelas: son los cortes, gratis.
                   </li>

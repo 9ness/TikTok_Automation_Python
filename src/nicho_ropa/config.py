@@ -262,6 +262,11 @@ def caracteres_por_clip(meta: dict) -> int:
     segundos = int(meta.get("segundos_clip") or 0)
     if not segundos or int(meta.get("partes") or 1) < 2:
         return 0
+    # Un estilo puede fijar el suyo más bajo: el de la tienda con 102 car en
+    # el clip 2 se comió "elige el tuyo" (Omni repitió media frase y llegó al
+    # segundo 8 hablando). Con ~100 hay margen para esos tropiezos.
+    if meta.get("caracteres_clip"):
+        return int(meta["caracteres_clip"])
     return (segundos - 1) * CARACTERES_POR_SEGUNDO_CLIP
 
 
@@ -906,7 +911,11 @@ ESTILOS_MOF10: dict[str, dict] = {
         "label": "Tienda colores · 15s en dos clips",
         "voz": True,
         "segundos_clip": 8,
-        "caracteres": 230,
+        # Más corto que calle dividido: medido en el primer vídeo real, el
+        # clip 2 con 102 caracteres llegó hablando al segundo 8 (Omni repitió
+        # "y con la sentadilla") y se comió el cierre. ~95 por clip.
+        "caracteres": 190,
+        "caracteres_clip": 95,
         "partes": 2,
         "subtitulos": True,
         "flecha": True,
