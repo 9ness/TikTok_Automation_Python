@@ -322,8 +322,8 @@ class TestVariantes:
         variantes.guardar("mujer_web__Carpeta 1", "3", b"img", "captura.PNG")
         f = variantes.ruta("mujer_web__Carpeta 1", "3")
         assert f and f.suffix == ".png" and f.read_bytes() == b"img"
-        # No cuelga de ningún género: `_variantes` no sale en los selectores.
-        assert f.parent.parent.name == "_variantes"
+        # En el volumen local, no en el Drive montado (ver el docstring del módulo).
+        assert f.parent.parent.name == "variantes"
         assert variantes.tienen("mujer_web__Carpeta 1") == {"3"}
         # Sustituir con otra extensión no deja dos.
         variantes.guardar("mujer_web__Carpeta 1", "3", b"img2", "otra.jpg")
