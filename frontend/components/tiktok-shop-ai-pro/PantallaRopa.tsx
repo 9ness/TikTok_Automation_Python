@@ -1826,9 +1826,37 @@ function PrendaCard({
         <div className="space-y-1">
           <p className="text-[10px] text-muted-foreground">
             📷 Foto de cada color (en Flow, mismo chat que la imagen 1): copia
-            el prompt, genera y sube. O, sin subirlas, prueba que Omni haga los
-            colores con las fotos como ingredientes:
+            el prompt, adjunta la foto del producto en ese color, genera y
+            sube. O, sin subirlas, prueba que Omni haga los colores con las
+            fotos como ingredientes:
           </p>
+          {/* Las fotos del producto en otros colores que trajo el ZIP: se
+              adjuntan en Flow con el prompt de cada color para que el tono
+              sea el de verdad (con el nombre solo no lo clavaba). Se abren en
+              otra pestaña para guardarlas; si no las hay, vale una captura
+              de la miniatura del selector de la ficha. */}
+          {(prenda.fotos_color_producto ?? 0) > 0 && (
+            <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+              🧵 Producto en otros colores (del ZIP):
+              {Array.from({ length: prenda.fotos_color_producto ?? 0 }, (_, i) => i + 1).map((k) => (
+                <a
+                  key={k}
+                  href={`${api.baseUrl}/api/v1/nicho-ropa/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&k=${k}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="overflow-hidden rounded border border-border/60"
+                  title={`Foto ${k} del producto en otro color: ábrela y adjúntala en Flow`}
+                >
+                  <img
+                    src={`${api.baseUrl}/api/v1/nicho-ropa/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&k=${k}`}
+                    alt={`color ${k}`}
+                    className="h-10 w-10 object-cover"
+                    loading="lazy"
+                  />
+                </a>
+              ))}
+            </div>
+          )}
           {videoOmni && (
             <button
               type="button"

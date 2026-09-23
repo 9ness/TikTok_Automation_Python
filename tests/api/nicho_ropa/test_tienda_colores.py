@@ -468,3 +468,44 @@ class TestFotosDeColorSubidas:
         from src.api.schemas.nicho_ropa.models import EstiloMof10
 
         assert "{{COLOR}}" in EstiloMof10(**e).imagen_color
+
+
+class TestFotosDeColorDelZip:
+    def _zip(self, tmp_path):
+        import io
+        import zipfile
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("Carpeta 7/Producto_3_Principal.jpeg", b"limpia3")
+            zf.writestr("Carpeta 7/Producto_3_Ficha.png", b"ficha3")
+            zf.writestr("Carpeta 7/Producto_3_Color_2.jpeg", b"c32")
+            zf.writestr("Carpeta 7/Producto_3_Color_1.jpeg", b"c31")
+            zf.writestr("Carpeta 7/Producto_3_Trasera.jpeg", b"tras")
+            zf.writestr("Carpeta 7/Producto_4_Principal.jpeg", b"limpia4")
+            zf.writestr("Carpeta 7/Producto_4_Ficha.png", b"ficha4")
+        return buf.getvalue()
+
+    def test_se_guardan_en_colores_y_no_rompen_el_emparejado(self, tmp_path):
+        from src.nicho_pov_bof.services import productos_web as pov_web
+
+        r = pov_web.importar_zip(self._zip(tmp_path), "Carpeta 7.zip", raiz=tmp_path)
+        assert r["nuevos"] == ["3", "4"]
+        carpeta = tmp_path / r["carpeta"]
+        fotos = pov_web.fotos_color_de(carpeta, "3")
+        assert [f.name for f in fotos] == ["3_1.jpeg", "3_2.jpeg"]
+        assert fotos[0].read_bytes() == b"c31"
+        assert pov_web.fotos_color_de(carpeta, "4") == []
+        # En la carpeta de la prenda siguen solo la limpia y la ficha.
+        assert sorted(f.name for f in carpeta.iterdir() if f.is_file()) == ["3(1).png", "3.jpeg", "4(1).png", "4.jpeg"]
+
+    def test_resubir_el_zip_anade_los_colores_a_lo_ya_importado(self, tmp_path):
+        from src.nicho_pov_bof.services import productos_web as pov_web
+
+        pov_web.importar_zip(self._zip(tmp_path), "Carpeta 7.zip", raiz=tmp_path)
+        carpeta = tmp_path / "Carpeta 7"
+        for f in (carpeta / "colores").iterdir():
+            f.unlink()
+        r = pov_web.importar_zip(self._zip(tmp_path), "Carpeta 7.zip", raiz=tmp_path)
+        assert r["iguales"] == ["3", "4"]
+        assert len(pov_web.fotos_color_de(carpeta, "3")) == 2

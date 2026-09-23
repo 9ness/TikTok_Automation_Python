@@ -144,8 +144,10 @@ _RE_VIEJO = re.compile(r"^(\d+)(\.1)?\.[A-Za-z0-9]+$")
 # que con dos fotos cuadradas del mismo producto se colaría la trasera como
 # "la limpia" en todos los productos donde pese menos (que son la mayoría).
 # Y desde el 21 sep 2026 la de delante se llama `Producto_3_Principal.jpeg` y
-# aparecen `Producto_3_Color_1.jpeg` (el mismo producto en otro color), que se
-# ignoran por lo mismo que la trasera. Con la lista de antes, los 29 ZIP
+# aparecen `Producto_3_Color_1.jpeg` (el mismo producto en otro color): no
+# entran en el emparejado (por lo mismo que la trasera) pero SÍ se guardan en
+# `colores/`, que es lo que el Nicho Ropa adjunta en Flow para clavar el color
+# de cada variante (Tienda Colores). Con la lista de antes, los 29 ZIP
 # entraron con la ficha suelta y ni un producto completo: "sin las dos fotos"
 # en los diez de cada carpeta.
 _RE_NUEVO = re.compile(
@@ -186,6 +188,52 @@ def _parejas(zf: zipfile.ZipFile) -> dict[str, dict[str, str]]:
             producto, es_limpia = viejo.group(1), bool(viejo.group(2))
             salida.setdefault(producto, {})["limpia" if es_limpia else "ficha"] = nombre
     return salida
+
+
+_RE_COLOR = re.compile(
+    r"^Producto[\s_-]*(\d+)[\s_-]*Color[\s_-]*(\d+)\.[A-Za-z0-9]+$", re.IGNORECASE,
+)
+# Subcarpeta donde van las fotos del producto en OTROS colores. Aparte de las
+# de la prenda a propósito: el emparejado limpia/ficha mira todas las imágenes
+# del directorio (no recursivo), y dentro se colarían como "la limpia".
+SUBDIR_COLORES = "colores"
+
+
+def _fotos_color(zf: zipfile.ZipFile) -> dict[str, list[tuple[int, str]]]:
+    """`{"3": [(1, "…/Producto_3_Color_1.jpeg"), …]}`: el producto en otros colores."""
+    salida: dict[str, list[tuple[int, str]]] = {}
+    for nombre in zf.namelist():
+        if nombre.endswith("/"):
+            continue
+        m = _RE_COLOR.match(Path(nombre).name)
+        if m and Path(nombre).suffix.lower() in _EXTS:
+            salida.setdefault(m.group(1), []).append((int(m.group(2)), nombre))
+    return {k: sorted(v) for k, v in salida.items()}
+
+
+def fotos_color_de(carpeta_dir: Path, producto: str) -> list[Path]:
+    """Las fotos del producto en otros colores ya importadas, en orden."""
+    d = carpeta_dir / SUBDIR_COLORES
+    if not d.is_dir():
+        return []
+    return sorted(
+        (f for f in d.iterdir() if f.is_file() and f.stem.startswith(f"{producto}_")),
+        key=lambda f: int(f.stem.split("_")[-1]) if f.stem.split("_")[-1].isdigit() else 0,
+    )
+
+
+def _guardar_fotos_color(zf: zipfile.ZipFile, destino: Path, producto: str, fotos: list[tuple[int, str]]) -> None:
+    """Escribe `colores/<producto>_<k>.<ext>` si no está ya (misma huella)."""
+    if not fotos:
+        return
+    d = destino / SUBDIR_COLORES
+    d.mkdir(parents=True, exist_ok=True)
+    for k, nombre in fotos:
+        datos = zf.read(nombre)
+        ruta = d / f"{producto}_{k}{_ext(nombre)}"
+        if ruta.is_file() and _huella_fichero(ruta) == _huella(datos):
+            continue
+        ruta.write_bytes(datos)
 
 
 def _huella(datos: bytes) -> str:
@@ -236,6 +284,7 @@ def importar_zip(
         Path(n).name for n in zf.namelist()[:60] if not n.endswith("/")
     ][:8]
 
+    colores_zip = _fotos_color(zf)
     for producto in sorted(_parejas(zf), key=lambda x: int(x)):
         par = _parejas(zf)[producto]
         # Sin las dos fotos no entra: la ficha es de donde salen los textos y
@@ -256,6 +305,10 @@ def importar_zip(
             _huella_fichero(p) for p in destino.glob(f"{producto}*") if p.is_file()
         }
         ya_estaba = bool(antes)
+        # Las fotos en otros colores van SIEMPRE (también en las carpetas que
+        # ya estaban): se añadieron al importador después, y resubir el ZIP es
+        # la forma de traerlas a lo ya importado.
+        _guardar_fotos_color(zf, destino, producto, colores_zip.get(producto, []))
         if ya_estaba and _huella(limpia) in antes and _huella(ficha) in antes:
             iguales.append(producto)
             continue

@@ -42,7 +42,7 @@ from src.api.schemas.nicho_ropa import (
 )
 from src.nicho_ropa import config
 from src.nicho_ropa.repos import product_repo
-from src.nicho_ropa.services import drive_client, text_extractor, variantes
+from src.nicho_ropa.services import drive_client, prendas_web, text_extractor, variantes
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
 
@@ -597,6 +597,7 @@ def list_prendas(
                 c for c in guiones.get(pid, {}).get("colores", [])
                 if variantes._slug_color(c) in fotos_color.get(pid, set())
             ],
+            fotos_color_producto=len(prendas_web.fotos_color(carpeta, pid)),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
@@ -996,6 +997,21 @@ def ver_foto_color(
     if not f:
         raise APIError("Ese color no tiene foto.", status_code=404)
     return FileResponse(str(f), headers={"Cache-Control": "no-cache"})
+
+
+@router.get("/foto-color-producto")
+def ver_foto_color_producto(
+    carpeta: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+    k: Annotated[int, Query()] = 1,
+):
+    """La foto k-ésima (1…) del producto en otro color, tal como vino en el ZIP."""
+    from fastapi.responses import FileResponse
+
+    fotos = prendas_web.fotos_color(carpeta, producto)
+    if k < 1 or k > len(fotos):
+        raise APIError("Esa prenda no tiene esa foto de color.", status_code=404)
+    return FileResponse(str(fotos[k - 1]), headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/variantes/foto")

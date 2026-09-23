@@ -285,6 +285,16 @@ def listar_fotos_como_drive(slug: str) -> list[dict]:
     return _memo(f"fotos:{slug}", leer)
 
 
+def fotos_color(slug: str, producto: str) -> list[Path]:
+    """Las fotos del producto en OTROS colores que trajo el ZIP (`colores/`)."""
+    from src.nicho_pov_bof.services import productos_web as pov_web
+
+    if not config.es_carpeta_web(slug):
+        return []
+    genero, carpeta = config.partes_web(slug)
+    return pov_web.fotos_color_de(_dir_genero(genero) / carpeta, producto)
+
+
 def importar_zip(datos: bytes, nombre_zip: str, genero: str) -> dict:
     """Mete un ZIP de la web en el género que toque. Repetible.
 

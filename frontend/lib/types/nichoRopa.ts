@@ -152,6 +152,8 @@ export interface PrendaItem {
   variantes_colores?: string[];
   /** Colores del guion que ya tienen su foto subida para los cortes. */
   colores_con_foto?: string[];
+  /** Fotos del producto en otros colores que trajo el ZIP (para Flow). */
+  fotos_color_producto?: number;
   guion_dice?: string;
   guion_at?: number;
   uploaded: boolean;

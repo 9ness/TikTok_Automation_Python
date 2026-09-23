@@ -201,6 +201,9 @@ class PrendaInfo(BaseModel):
     variantes_colores: list[str] = Field(default_factory=list)
     # Colores (del guion) que ya tienen su foto subida para los cortes.
     colores_con_foto: list[str] = Field(default_factory=list)
+    # Cuántas fotos del producto en OTROS colores trajo el ZIP (`colores/`):
+    # se adjuntan en Flow junto a la imagen 1 para clavar cada color.
+    fotos_color_producto: int = 0
     guion_dice: str = ""
     guion_at: int = 0
     uploaded: bool = False

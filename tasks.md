@@ -125,9 +125,9 @@ subir con el ⬆ de esa fila → quemar textos.
 - Probar con UNA prenda real antes de una tanda: mirar que los colores del
   guion (chips 🎨 en la tarjeta) sean los de la ficha — si Gemini se inventa
   uno, corregir a mano rehaciendo el guion.
-- Mejora opcional: el ZIP de la web trae `Producto_N_Color_K.jpeg` (se ignoran
-  al importar); guardarlas en `colores/` ahorraría subir la captura a mano
-  en los productos que vengan del ZIP.
+- Las fotos `Producto_N_Color_K.jpeg` del ZIP ya se guardan en `colores/` y
+  salen en la tarjeta (🧵). Las 29 carpetas importadas antes NO las tienen:
+  hay que resubir sus ZIP (no toca lo demás).
 
 ## 👤 Tareas Humanas
 
