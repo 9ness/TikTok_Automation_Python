@@ -21,7 +21,7 @@
 
 {
   "subject": {
-    "description": "A completely random adult woman standing and facing the camera inside a real clothing store, caught in the middle of PUTTING ON the referenced trousers: the trousers are pulled up only to mid-thigh, both hands holding the waistband, about to pull them up. Underneath she wears plain black fitted leggings (visible above the trousers, between the waistband and the top). She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
+    "description": "A completely random adult woman standing in three-quarter view (body slightly turned, face to the camera) inside a real clothing store, caught in the middle of PUTTING ON the referenced trousers: the trousers are pulled up only to mid-thigh, both hands holding the waistband, about to pull them up. Underneath she wears plain black fitted leggings (visible above the trousers, between the waistband and the top). She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
     "appearance": "entirely random",
     "age": "random adult age between 20 and 32",
     "expression": "natural, confident, slight smile, as if about to start talking",
@@ -56,7 +56,7 @@
     "instructions": "Preserve any accessories visible in the reference image. Otherwise at most small, discreet accessories (thin bracelets, small earrings) that do not cover the garment. No sunglasses, no hats, no bags."
   },
   "pose": {
-    "stance": "standing, facing the camera, feet slightly apart, full body from head to toe, slightly bent forward as she pulls the trousers up",
+    "stance": "standing in a THREE-QUARTER turn (body turned about 30-45 degrees away from the camera, face still towards it), feet slightly apart, full body from head to toe, slightly bent forward as she pulls the trousers up, so the curve of her hip and bottom is visible in profile",
     "arms": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
     "gaze": "the woman must look directly into the camera",
     "head_position": "her face must remain naturally oriented toward the camera",
@@ -64,7 +64,7 @@
   },
   "photography": {
     "camera_style": "Casual smartphone UGC video frame, recorded by another person holding a phone in front of her.",
-    "angle": "Frontal, straight-on, at roughly chest height, slightly below eye level so the legs look long. Not from above.",
+    "angle": "Straight-on at roughly chest height, slightly below eye level so the legs look long, with her body in three-quarter view. Not from above.",
     "shot_type": "Vertical full-body shot, the woman centered, occupying most of the frame height.",
     "aspect_ratio": "9:16 vertical",
     "camera_movement": "Subtle realistic handheld micro-vibrations, otherwise static.",
