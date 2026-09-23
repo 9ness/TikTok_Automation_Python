@@ -1417,6 +1417,9 @@ function PrendaCard({
   const quitarVariantes = useQuitarVariantesRopa();
   const subirFotoColor = useSubirFotoColorRopa();
   const quitarFotoColor = useQuitarFotoColorRopa();
+  // Qué color se está subiendo: sin esto el botón no cambiaba hasta que
+  // volvía el listado y el operador no sabía si había entrado.
+  const [subiendoColor, setSubiendoColor] = useState("");
   const [escribiendo, setEscribiendo] = useState(false);
   const qc = useQueryClient();
   // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
@@ -1914,8 +1917,15 @@ function PrendaCard({
                     }`}
                     title={puesta ? `Foto de «${c}» subida. Toca para sustituirla.` : `Sube la imagen 1 con el pantalón en ${c}`}
                   >
-                    <Upload className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{c}{puesta ? " ✓" : ""}</span>
+                    {subiendoColor === c ? (
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                    ) : (
+                      <Upload className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {c}
+                      {subiendoColor === c ? " · subiendo…" : puesta ? " ✓" : ""}
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1924,12 +1934,14 @@ function PrendaCard({
                         const file = e.target.files?.[0];
                         e.target.value = "";
                         if (!file) return;
+                        setSubiendoColor(c);
                         subirFotoColor.mutate(
                           { carpeta, producto: prenda.producto, color: c, file },
                           {
-                            onSuccess: () => toast.success(`Foto de ${c} guardada`),
+                            onSuccess: () => toast.success(`Foto de ${c} guardada ✓`),
                             onError: (e2) =>
                               toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
+                            onSettled: () => setSubiendoColor(""),
                           },
                         );
                       }}
