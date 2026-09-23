@@ -464,10 +464,12 @@ class TestFotosDeColorSubidas:
 
     def test_el_estilo_trae_la_plantilla_de_flow(self):
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
-        assert "{{COLOR}}" in e["imagen_color"] and "<!--" not in e["imagen_color"]
+        # Ya no nombra el color: lo manda la foto de producto adjunta.
+        assert "foto de producto que adjunto" in e["imagen_color"] and "<!--" not in e["imagen_color"]
+        assert "{{" not in e["imagen_color"]
         from src.api.schemas.nicho_ropa.models import EstiloMof10
 
-        assert "{{COLOR}}" in EstiloMof10(**e).imagen_color
+        assert EstiloMof10(**e).imagen_color == e["imagen_color"]
 
 
 class TestFotosDeColorDelZip:
