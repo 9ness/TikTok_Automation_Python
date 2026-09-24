@@ -411,6 +411,18 @@ export function buildFotoRopaUrl(fileId: string, ancho = 0): string {
   );
 }
 
+/** La foto del producto en otro color (la k-ésima del ZIP). Con la API key:
+ *  sin ella el `<img>` se queda en blanco y no se ve por qué. */
+export function buildFotoColorProductoUrl(
+  carpeta: string, producto: string, k: number, descargar = false,
+): string {
+  return conApiKey(
+    `${ROOT}/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}` +
+      `&producto=${encodeURIComponent(producto)}&k=${k}` +
+      (descargar ? "&descargar=1" : ""),
+  );
+}
+
 export function buildFotoLimpiaRopaUrl(producto: string, carpeta: string): string {
   return conApiKey(
     `${ROOT}/foto-limpia?producto=${encodeURIComponent(producto)}` +

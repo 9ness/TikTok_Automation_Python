@@ -21,6 +21,7 @@ import { api, ApiError } from "@/lib/api";
 import { useEstadoDeUsuario } from "@/lib/hooks/useEstadoRecordado";
 import {
   buildFotoLimpiaRopaUrl,
+  buildFotoColorProductoUrl,
   buildFotoRopaUrl,
   buildVideoRopaUrl,
   nichoRopaKeys,
@@ -1610,19 +1611,22 @@ function PrendaCard({
         {(prenda.fotos_color_producto ?? 0) > 0 && (
           <div className="flex shrink-0 flex-wrap gap-1" style={{ maxWidth: "6rem" }}>
             {Array.from({ length: prenda.fotos_color_producto ?? 0 }, (_, i) => i + 1).map((k) => {
-              const url = `${api.baseUrl}/api/v1/nicho-ropa/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&k=${k}`;
               return (
                 <a
                   key={k}
-                  href={url}
-                  download={`${prenda.producto}_color_${k}.jpg`}
+                  href={buildFotoColorProductoUrl(carpeta, prenda.producto, k, true)}
                   target="_blank"
                   rel="noreferrer"
-                  title={`Color ${k} — tocar para descargar y adjuntarlo en Flow`}
+                  title={`Color ${k} — tocar para descargarlo y adjuntarlo en Flow`}
                   className="overflow-hidden rounded border border-border/60 transition hover:opacity-80"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`color ${k}`} loading="lazy" className="h-[30px] w-[30px] object-cover" />
+                  <img
+                    src={buildFotoColorProductoUrl(carpeta, prenda.producto, k)}
+                    alt={`color ${k}`}
+                    loading="lazy"
+                    className="h-[30px] w-[30px] object-cover"
+                  />
                 </a>
               );
             })}
@@ -1736,6 +1740,29 @@ function PrendaCard({
         )}
         <CopyChip label="✍️ Caption" text={caption} siempre />
         <BotonUrl url={prenda.product_url} />
+        {/* Las fotos del producto en sus otros colores, de una vez: son las
+            que se adjuntan en Flow para que cada color salga con su tono. */}
+        {(prenda.fotos_color_producto ?? 0) > 0 && (
+          <button
+            type="button"
+            title={`Descargar las ${prenda.fotos_color_producto} fotos de los otros colores`}
+            onClick={() => {
+              for (let k = 1; k <= (prenda.fotos_color_producto ?? 0); k++) {
+                const a = document.createElement("a");
+                a.href = buildFotoColorProductoUrl(carpeta, prenda.producto, k, true);
+                a.target = "_blank";
+                a.rel = "noreferrer";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+              }
+              toast.success(`Descargando ${prenda.fotos_color_producto} foto(s) de color`);
+            }}
+            className="rounded-md border border-sky-500/60 px-2 py-1 text-[11px] text-sky-400 transition hover:bg-sky-500/10"
+          >
+            🎨 {prenda.fotos_color_producto}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setVerMasCopias((v) => !v)}

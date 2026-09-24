@@ -1039,6 +1039,7 @@ def ver_foto_color_producto(
     carpeta: Annotated[str, Query()],
     producto: Annotated[str, Query()],
     k: Annotated[int, Query()] = 1,
+    descargar: Annotated[bool, Query()] = False,
 ):
     """La foto k-ésima (1…) del producto en otro color, tal como vino en el ZIP."""
     from fastapi.responses import FileResponse
@@ -1046,7 +1047,15 @@ def ver_foto_color_producto(
     fotos = prendas_web.fotos_color(carpeta, producto)
     if k < 1 or k > len(fotos):
         raise APIError("Esa prenda no tiene esa foto de color.", status_code=404)
-    return FileResponse(str(fotos[k - 1]), headers={"Cache-Control": "public, max-age=86400"})
+    f = fotos[k - 1]
+    cabeceras = {"Cache-Control": "public, max-age=86400"}
+    if descargar:
+        # Con nombre: en el móvil, sin esto la foto se guarda como
+        # "foto-color-producto" y no se sabe de qué prenda es.
+        cabeceras["Content-Disposition"] = (
+            f'attachment; filename="{producto}_color_{k}{f.suffix.lower()}"'
+        )
+    return FileResponse(str(f), headers=cabeceras)
 
 
 @router.get("/variantes/miniatura")
