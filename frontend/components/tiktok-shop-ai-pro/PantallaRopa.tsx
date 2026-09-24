@@ -27,9 +27,7 @@ import {
   useCarpetasRopa,
   useCrearMiPrenda,
   useEscribirGuionesRopa,
-  useQuitarFotoColorRopa,
   useQuitarVariantesRopa,
-  useSubirFotoColorRopa,
   useSubirVariantesRopa,
   useExtraerTextosRopa,
   usePrendas,
@@ -420,7 +418,6 @@ export function PantallaRopa({
   const subidos = items.filter((p) => p.uploaded).length;
   const conGuion = items.filter((p) => p.guion).length;
   const [soloConUrl, setSoloConUrl] = useState(false);
-  const enPantalla = soloConUrl ? items.filter((p) => p.product_url) : items;
   const [verEscaparate, setVerEscaparate] = useState(false);
   const [verVendidos, setVerVendidos] = useState(false);
   const pendientesEscaparate = items.filter((p) => !p.en_escaparate).length;
@@ -492,6 +489,18 @@ export function PantallaRopa({
     (e) => e.clave === modoEstilo,
   );
   const hayPlazos = !!estiloActivo?.plazos;
+  // Los formatos que viven de enseñar colores (Tienda Colores) piden un
+  // mínimo de variantes: con menos no hay gancho. Se filtran de salida, con
+  // un interruptor para verlas todas — las que no llegan se graban con otro
+  // modo, no es que estén mal.
+  const [soloAptas, setSoloAptas] = useState(true);
+  const minVariantes = estiloActivo?.minimo_variantes ?? 0;
+  const apta = (p: PrendaItem) => (p.variantes_producto ?? 1) >= minVariantes;
+  const aptas = minVariantes > 0 ? items.filter(apta).length : items.length;
+  const conFiltroColores = minVariantes > 0 && soloAptas ? items.filter(apta) : items;
+  const enPantalla = soloConUrl
+    ? conFiltroColores.filter((p) => p.product_url)
+    : conFiltroColores;
   const conPlazos = items.filter((p) => p.clean_photo_id && p.plazos).length;
   const sinPlazos = items.filter((p) => p.clean_photo_id && !p.plazos).length;
 
@@ -1322,6 +1331,28 @@ export function PantallaRopa({
           conUrl={items.filter((p) => p.product_url).length}
           total={items.length}
         />
+        {/* Solo las que tienen colores suficientes para este formato. El ZIP
+            de la web trae las fotos de cada variante (`Producto_N_Color_K`):
+            si una carpeta salió a cero, hay que volver a subir su ZIP. */}
+        {minVariantes > 0 && (
+          <button
+            type="button"
+            onClick={() => setSoloAptas((v) => !v)}
+            className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs transition ${
+              soloAptas
+                ? "border-sky-500/60 bg-sky-500/10 text-sky-300"
+                : "border-border/60 text-muted-foreground hover:border-foreground/30"
+            }`}
+          >
+            <span>
+              🎨 Solo prendas con {minVariantes} colores o más
+              {aptas === 0 && " · ninguna en esta carpeta"}
+            </span>
+            <span className="tabular-nums">
+              {aptas}/{items.length}
+            </span>
+          </button>
+        )}
         {/* Dos por fila desde tablet, como los productos del POV BOF: en una
             sola columna hay que bajar diez pantallas para ver la carpeta
             entera, y lo que se hace aquí es ir saltando de prenda en prenda. */}
@@ -1419,11 +1450,6 @@ function PrendaCard({
   const quitarClip = useQuitarClipRopa();
   const subirVariantes = useSubirVariantesRopa();
   const quitarVariantes = useQuitarVariantesRopa();
-  const subirFotoColor = useSubirFotoColorRopa();
-  const quitarFotoColor = useQuitarFotoColorRopa();
-  // Qué color se está subiendo: sin esto el botón no cambiaba hasta que
-  // volvía el listado y el operador no sabía si había entrado.
-  const [subiendoColor, setSubiendoColor] = useState("");
   const [escribiendo, setEscribiendo] = useState(false);
   const qc = useQueryClient();
   // Con XHR y no `fetch` para tener progreso REAL de subida: un clip son
@@ -1832,62 +1858,23 @@ function PrendaCard({
       {conColores && (prenda.guion_colores ?? []).length > 1 && (
         <div className="space-y-1">
           <p className="text-[10px] text-muted-foreground">
-            📷 Foto de cada color (en Flow, mismo chat que la imagen 1): copia
-            el prompt (es el mismo para todos), adjunta la foto del producto en
-            ese color —el color lo manda la foto, no el nombre—, genera y sube.
-            O, sin subirlas, prueba que Omni haga los colores con las fotos
-            como ingredientes:
+            🎨 En el MISMO chat de Flow que la imagen 1, genera la imagen en
+            cada color (botón 📋, adjuntando la foto del producto en ese
+            color) y luego mete las cuatro como INGREDIENTES del clip 1: los
+            cambios de color los hace el propio vídeo, aquí no se sube nada.
           </p>
-          {/* Las fotos del producto en otros colores que trajo el ZIP: se
-              adjuntan en Flow con el prompt de cada color para que el tono
-              sea el de verdad (con el nombre solo no lo clavaba). Se abren en
-              otra pestaña para guardarlas; si no las hay, vale una captura
-              de la miniatura del selector de la ficha. */}
-          {/* Las miniaturas recortadas de la captura del selector, con su
-              nombre: la foto del producto en cada color, para adjuntar en
-              Flow junto al prompt 📋. Salen solas al subir la captura. */}
-          {(prenda.miniaturas_variantes ?? []).length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-              🧵 De la captura:
-              {(prenda.miniaturas_variantes ?? []).map((c) => (
-                <a
+          {imagenColor && (
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+              {(prenda.guion_colores ?? []).slice(0, -1).map((c) => (
+                <button
                   key={c}
-                  href={`${api.baseUrl}/api/v1/nicho-ropa/variantes/miniatura?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&color=${encodeURIComponent(c)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex flex-col items-center overflow-hidden rounded border border-border/60"
-                  title={`Miniatura de «${c}»: ábrela y adjúntala en Flow con el prompt de ese color`}
+                  type="button"
+                  title={`Copiar el prompt de Flow para la imagen en ${c}`}
+                  onClick={() => onCopiar(`Imagen en ${c}`, imagenColor.replace("{{COLOR}}", c))}
+                  className="flex min-w-0 items-center justify-center gap-1 rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30"
                 >
-                  <img
-                    src={`${api.baseUrl}/api/v1/nicho-ropa/variantes/miniatura?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&color=${encodeURIComponent(c)}`}
-                    alt={c}
-                    className="h-12 w-10 object-cover"
-                    loading="lazy"
-                  />
-                  <span className="max-w-10 truncate px-0.5">{c}</span>
-                </a>
-              ))}
-            </div>
-          )}
-          {(prenda.fotos_color_producto ?? 0) > 0 && (
-            <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
-              🧵 Producto en otros colores (del ZIP):
-              {Array.from({ length: prenda.fotos_color_producto ?? 0 }, (_, i) => i + 1).map((k) => (
-                <a
-                  key={k}
-                  href={`${api.baseUrl}/api/v1/nicho-ropa/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&k=${k}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="overflow-hidden rounded border border-border/60"
-                  title={`Foto ${k} del producto en otro color: ábrela y adjúntala en Flow`}
-                >
-                  <img
-                    src={`${api.baseUrl}/api/v1/nicho-ropa/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&k=${k}`}
-                    alt={`color ${k}`}
-                    className="h-10 w-10 object-cover"
-                    loading="lazy"
-                  />
-                </a>
+                  📋 <span className="truncate">{c}</span>
+                </button>
               ))}
             </div>
           )}
@@ -1925,83 +1912,6 @@ function PrendaCard({
               🎬 Guion 2 · en Omni (de espaldas, sentadilla y cierre)
             </button>
           )}
-          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
-            {(prenda.guion_colores ?? []).slice(0, -1).map((c) => {
-              const puesta = (prenda.colores_con_foto ?? []).includes(c);
-              return (
-                <div key={c} className="flex items-center gap-0.5">
-                  <label
-                    className={`flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1 rounded-md border px-1.5 py-1 text-[11px] transition ${
-                      puesta
-                        ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-                        : "border-border/60 hover:border-foreground/30"
-                    }`}
-                    title={puesta ? `Foto de «${c}» subida. Toca para sustituirla.` : `Sube la imagen 1 con el pantalón en ${c}`}
-                  >
-                    {subiendoColor === c ? (
-                      <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
-                    ) : (
-                      <Upload className="h-3 w-3 shrink-0" />
-                    )}
-                    <span className="truncate">
-                      {c}
-                      {subiendoColor === c ? " · subiendo…" : puesta ? " ✓" : ""}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (!file) return;
-                        setSubiendoColor(c);
-                        subirFotoColor.mutate(
-                          { carpeta, producto: prenda.producto, color: c, file },
-                          {
-                            onSuccess: () => toast.success(`Foto de ${c} guardada ✓`),
-                            onError: (e2) =>
-                              toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
-                            onSettled: () => setSubiendoColor(""),
-                          },
-                        );
-                      }}
-                    />
-                  </label>
-                  {imagenColor && (
-                    <button
-                      type="button"
-                      title={`Copiar el prompt de Flow para la imagen en ${c}`}
-                      onClick={() => onCopiar(`Imagen en ${c}`, imagenColor.replace("{{COLOR}}", c))}
-                      className="rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30"
-                    >
-                      📋
-                    </button>
-                  )}
-                  {puesta && (
-                    <button
-                      type="button"
-                      aria-label={`Quitar la foto de ${c}`}
-                      title="Quitar esta foto"
-                      onClick={() =>
-                        quitarFotoColor.mutate(
-                          { carpeta, producto: prenda.producto, color: c },
-                          {
-                            onSuccess: () => toast.success(`Foto de ${c} quitada`),
-                            onError: (e2) =>
-                              toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
-                          },
-                        )
-                      }
-                      className="rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
       {conGuion && (

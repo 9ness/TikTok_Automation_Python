@@ -66,6 +66,9 @@ class EstiloMof10(BaseModel):
     video_omni: str = ""
     # Lo mismo para el clip 2 (de espaldas, sentadilla y cierre).
     video_omni2: str = ""
+    # Colores mínimos que necesita una prenda para este formato (0 = da
+    # igual). El de la tienda pide tres: con menos no hay gancho.
+    minimo_variantes: int = 0
 
 
 class ModoRopa(BaseModel):
@@ -206,6 +209,9 @@ class PrendaInfo(BaseModel):
     # Cuántas fotos del producto en OTROS colores trajo el ZIP (`colores/`):
     # se adjuntan en Flow junto a la imagen 1 para clavar cada color.
     fotos_color_producto: int = 0
+    # Colores en que se vende, contando el de la foto principal: es lo que
+    # decide si la prenda vale para el formato de la tienda.
+    variantes_producto: int = 1
     # Variantes cuya miniatura se recortó de la captura del selector: la foto
     # del producto en ese color, para adjuntar en Flow.
     miniaturas_variantes: list[str] = Field(default_factory=list)

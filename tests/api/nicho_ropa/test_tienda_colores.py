@@ -604,3 +604,43 @@ class TestRecolorEnVideo:
         colores.aplicar(clip, ["rosa", "verde"], work, on_log=avisos.append, tonos={}, fotos_colores={"rosa": tmp_path / "rosa.png"})
         assert any("sin tono" in a for a in avisos)
         assert sup["fotos"] == [tmp_path / "rosa.png"]
+
+
+class TestMinimoDeVariantes:
+    """El formato vive de enseñar colores: una prenda de un solo color no
+    vale, y la pantalla la filtra con el número que dice el estilo."""
+
+    def test_el_estilo_pide_tres_colores(self):
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        assert e["minimo_variantes"] == 3
+        assert config.minimo_variantes("tienda_colores") == 3
+        from src.api.schemas.nicho_ropa.models import EstiloMof10
+
+        assert EstiloMof10(**e).minimo_variantes == 3
+
+    def test_los_demas_formatos_no_piden_ninguno(self):
+        for modo in ("espejo", "calle_dividido", "camara"):
+            assert config.minimo_variantes(modo) == 0
+            (e,) = config.prompts_mof10("mujer", False, modo)
+            assert e["minimo_variantes"] == 0
+
+    def test_el_importador_cuenta_los_colores_del_zip(self, tmp_path):
+        import io
+        import zipfile
+
+        from src.nicho_pov_bof.services import productos_web as pov_web
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            # Producto 1: principal + 3 colores = 4 variantes (apto).
+            zf.writestr("Carpeta 9/Producto_1_Principal.jpeg", b"a")
+            zf.writestr("Carpeta 9/Producto_1_Ficha.png", b"b")
+            for k in (1, 2, 3):
+                zf.writestr(f"Carpeta 9/Producto_1_Color_{k}.jpeg", f"c{k}".encode())
+            # Producto 2: solo la principal = 1 variante (no apto).
+            zf.writestr("Carpeta 9/Producto_2_Principal.jpeg", b"d")
+            zf.writestr("Carpeta 9/Producto_2_Ficha.png", b"e")
+        r = pov_web.importar_zip(buf.getvalue(), "Carpeta 9.zip", raiz=tmp_path)
+        carpeta = tmp_path / r["carpeta"]
+        assert 1 + len(pov_web.fotos_color_de(carpeta, "1")) == 4
+        assert 1 + len(pov_web.fotos_color_de(carpeta, "2")) == 1

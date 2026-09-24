@@ -270,6 +270,12 @@ def caracteres_por_clip(meta: dict) -> int:
     return (segundos - 1) * CARACTERES_POR_SEGUNDO_CLIP
 
 
+def minimo_variantes(modo: str) -> int:
+    """Cuántos colores necesita una prenda para poder grabarse con ese modo.
+    0 = da igual (todos los formatos menos el de la tienda)."""
+    return int((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("minimo_variantes") or 0)
+
+
 def partes_de_modo(modo: str) -> int:
     """En cuántos clips se graba ese formato. 1 = como siempre."""
     return int((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("partes") or 1)
@@ -923,6 +929,11 @@ ESTILOS_MOF10: dict[str, dict] = {
         "subtitulos": True,
         "flecha": True,
         "colores": True,
+        # El formato vive de enseñar varios colores: con menos de tres
+        # variantes no hay gancho (el vídeo se queda en "mira este pantalón")
+        # y esa prenda es mejor grabarla con otro modo. Se cuenta la del
+        # producto más las `Producto_N_Color_K` que trajo el ZIP.
+        "minimo_variantes": 3,
         "imagen2": "prompt_mof10_tienda_colores_imagen2.md",
         # La misma imagen 1 con el pantalón en cada uno de los otros colores
         # (una por color, en Flow): son las fotos de los cortes de color.
@@ -1150,6 +1161,8 @@ def prompts_mof10(
             # Si el montaje intercala los cortes de color al principio (los
             # genera la app, no el operador): la pantalla lo avisa.
             "colores": bool(meta.get("colores")),
+            # Colores mínimos para que la prenda valga en este formato.
+            "minimo_variantes": int(meta.get("minimo_variantes") or 0),
             # La plantilla para pedir en Flow la imagen 1 en otro color
             # (`{{COLOR}}` lo rellena la pantalla con cada variante).
             "imagen_color": _limpio(meta["imagen_color"]) if meta.get("imagen_color") else "",

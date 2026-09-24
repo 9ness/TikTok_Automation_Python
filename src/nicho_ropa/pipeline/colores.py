@@ -48,7 +48,52 @@ RECOLOR_IA = os.getenv("TIENDA_COLORES_RECOLOR_IA", "0").strip().lower() in ("1"
 # vez de tapar con fotos: gratis, con movimiento, y con el tono del hex de
 # cada variante. Solo cuando el color puesto se deja aislar (ver
 # `recolor_video.aislable`); si no, se cae a las fotos como antes.
-RECOLOR_VIDEO = os.getenv("TIENDA_COLORES_RECOLOR_VIDEO", "1").strip().lower() in ("1", "true", "si", "sí")
+# APAGADO desde el 24/9/2026: los cambios de color los hace el propio
+# generador (clip 1 con las imágenes de cada color como ingredientes), así
+# que el montaje no tiene que tocar el vídeo. El código se queda por si
+# alguna vez el generador deja de hacerlos: `TIENDA_COLORES_RECOLOR_VIDEO=1`.
+RECOLOR_VIDEO = os.getenv("TIENDA_COLORES_RECOLOR_VIDEO", "0").strip().lower() in ("1", "true", "si", "sí")
+
+
+# Cuánto tiene que cambiar el tono de la prenda entre una palabra de color y
+# otra para dar por hecho que el vídeo YA trae los cortes. Medido: entre dos
+# colores de verdad la distancia pasa de 25; el mismo color en dos instantes
+# se mueve menos de 6 por la luz.
+DE_YA_HECHO = 15.0
+
+
+def _ya_trae_colores(clip: Path, tiempos: list[float], on_log: OnLog) -> bool:
+    """¿El clip cambia el color de la prenda al nombrar cada color?"""
+    try:
+        import cv2
+        import numpy as np
+
+        from src.nicho_ropa.pipeline import recolor_video as rv
+
+        cap = cv2.VideoCapture(str(clip))
+        medidos = []
+        for t in tiempos:
+            cap.set(cv2.CAP_PROP_POS_MSEC, (t + 0.25) * 1000)
+            ok, frame = cap.read()
+            if ok:
+                medidos.append(rv.color_prenda(frame))
+        cap.release()
+        if len(medidos) < 2:
+            return False
+        distancias = [
+            float(np.hypot(a[1] - b[1], a[2] - b[2]))
+            for a, b in zip(medidos, medidos[1:])
+        ]
+    except Exception as e:  # noqa: BLE001 — ante la duda, se monta como siempre
+        on_log(f"[colores] no se pudo comprobar si el clip ya trae colores ({str(e)[:80]})")
+        return False
+    if sum(1 for d in distancias if d >= DE_YA_HECHO) >= max(1, len(distancias) - 1):
+        on_log(
+            "[colores] el clip YA cambia de color al nombrarlos "
+            f"(distancias {', '.join(f'{d:.0f}' for d in distancias)}): se deja tal cual"
+        )
+        return True
+    return False
 
 
 def _recolorear_en_video(
@@ -151,6 +196,10 @@ def aplicar(
     # deja aislar y hay tono para cada color: es lo más parecido al viral, y
     # sin contenido estático. Si no se puede, fotos.
     if RECOLOR_VIDEO:
+        # Si el clip YA cambia de color (lo hizo el generador), no se toca:
+        # repintarlo encima sería recolorear lo ya recoloreado.
+        if _ya_trae_colores(Path(clip), tiempos, on_log):
+            return Path(clip)
         hecho = _recolorear_en_video(Path(clip), colores, tiempos, tonos, subidas, work_dir, on_log)
         if hecho:
             return hecho

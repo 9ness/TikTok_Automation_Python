@@ -64,7 +64,13 @@ def pegar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
         # es el hueco entre las dos mitades, que se oía como un corte. El
         # último conserva su cola, que es donde se ve la flecha.
         quitar_ini = _silencio_inicial(Path(clip))
-        quitar_fin = _silencio_final(Path(clip)) if i < len(clips) else 0.0
+        if i < len(clips):
+            quitar_fin = _silencio_final(Path(clip))
+        else:
+            # El último: se le deja una cola corta (para la flecha) y se
+            # recorta el resto del silencio.
+            hueco = _silencio_final(Path(clip), margen=0.0, tope=_MAX_RECORTE_COLA_S)
+            quitar_fin = max(0.0, hueco - _COLA_FINAL_S)
         dur = probe_duration(Path(clip))
         largo = max(0.5, dur - quitar_ini - quitar_fin)
         if quitar_ini or quitar_fin:
@@ -107,9 +113,17 @@ _RUIDO_DB = -35
 _MIN_SILENCIO_S = 0.15
 _MARGEN_FINAL_S = 0.15
 _MAX_RECORTE_FINAL_S = 1.5
+# Al ÚLTIMO clip se le deja esta cola de silencio y se recorta lo que pase:
+# ahí va la flecha al carrito, pero un vídeo que acaba con dos segundos de
+# nadie hablando se abandona antes. Medido en un clip real de Omni: la voz
+# acabó en 6,2 s de 8.
+_COLA_FINAL_S = 1.2
+_MAX_RECORTE_COLA_S = 3.0
 
 
-def _silencio_final(clip: Path) -> float:
+def _silencio_final(
+    clip: Path, margen: float = _MARGEN_FINAL_S, tope: float = _MAX_RECORTE_FINAL_S,
+) -> float:
     """Cuánto dura el hueco del final, 0 si acaba hablando."""
     from src.nicho_pov_bof.pipeline.duration_match import probe_duration
 
@@ -143,8 +157,8 @@ def _silencio_final(clip: Path) -> float:
         return 0.0
     if ultimo_fin is not None and ultimo_fin < dur - 0.1:
         return 0.0
-    hueco = dur - ultimo_inicio - _MARGEN_FINAL_S
-    return max(0.0, min(hueco, _MAX_RECORTE_FINAL_S))
+    hueco = dur - ultimo_inicio - margen
+    return max(0.0, min(hueco, tope))
 
 
 def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:

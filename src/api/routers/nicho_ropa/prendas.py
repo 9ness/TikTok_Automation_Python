@@ -598,6 +598,8 @@ def list_prendas(
                 if variantes._slug_color(c) in fotos_color.get(pid, set())
             ],
             fotos_color_producto=len(prendas_web.fotos_color(carpeta, pid)),
+            # La principal más las del ZIP: los colores en que se vende.
+            variantes_producto=1 + len(prendas_web.fotos_color(carpeta, pid)),
             miniaturas_variantes=variantes.miniaturas_de(carpeta, pid, variantes.leidos(prod)["colores"]),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),

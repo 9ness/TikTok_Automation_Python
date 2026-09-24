@@ -44,6 +44,8 @@ export interface EstiloMof10 {
   video_omni?: string;
   /** Lo mismo para el clip 2 (de espaldas, sentadilla y cierre). */
   video_omni2?: string;
+  /** Colores mínimos que pide el formato (0 = da igual). */
+  minimo_variantes?: number;
   /** Tope de caracteres que se le pide al guion. */
   caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
@@ -156,6 +158,8 @@ export interface PrendaItem {
   colores_con_foto?: string[];
   /** Fotos del producto en otros colores que trajo el ZIP (para Flow). */
   fotos_color_producto?: number;
+  /** Colores en que se vende (la foto principal más las del ZIP). */
+  variantes_producto?: number;
   /** Variantes con miniatura recortada de la captura (foto para Flow). */
   miniaturas_variantes?: string[];
   guion_dice?: string;
