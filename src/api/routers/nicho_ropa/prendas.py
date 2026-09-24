@@ -641,8 +641,27 @@ def list_prendas(
         textos_extraidos=bool(doc.get("textos_extraidos")),
         # Con los guiones en la cola, la lista también se sondea mientras se
         # escriben: si no, había que recargar para ver aparecer los botones.
-        montando=bool(activos) or _escribiendo_guiones(queue, carpeta),
+        montando=(
+            bool(activos)
+            or _escribiendo_guiones(queue, carpeta)
+            or _extrayendo_textos(queue, carpeta)
+        ),
     )
+
+
+def _extrayendo_textos(queue: JobQueue | None, carpeta: str) -> bool:
+    """Si hay una lectura de textos de esta carpeta en cola o en curso."""
+    if queue is None:
+        return False
+    try:
+        return any(
+            job.mode == JobMode.NICHO_ROPA_TEXTOS
+            and str(job.params.get("carpeta") or "") == carpeta
+            and job.status in (JobStatus.PENDING, JobStatus.RUNNING)
+            for job in queue.get_all()
+        )
+    except Exception:  # noqa: BLE001 — el sondeo es un adorno
+        return False
 
 
 def _escribiendo_guiones(queue: JobQueue | None, carpeta: str) -> bool:
@@ -760,13 +779,26 @@ def set_producto_estado(
 def extraer_textos(
     queue: Annotated[JobQueue, Depends(get_queue)] = None,
     carpeta: Annotated[str, Query()] = "",
+    # Con `cola=1` se encola y se contesta al momento: la lectura son varias
+    # llamadas con imágenes y tarda minutos, así que salirse de la pantalla
+    # (o que el móvil corte la petición) dejaba el trabajo a medias.
+    cola: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> PrendasListResponse:
-    """Lee las capturas con Gemini y guarda título, tienda, caption y emojis.
-
-    Va síncrono como en el otro nicho: es UNA llamada con todas las imágenes.
-    """
+    """Lee las capturas con Gemini y guarda título, tienda, caption y emojis."""
     carpeta = carpeta or config.CARPETA_DEFECTO
+    if cola:
+        from src.queue.models import JobMode
+
+        if _extrayendo_textos(queue, carpeta):
+            raise APIError("Esa carpeta ya está leyéndose.", status_code=409)
+        queue.enqueue(
+            JobMode.NICHO_ROPA_TEXTOS,
+            title=f"🔤 Textos · {config.carpeta_label(carpeta)}",
+            params={"carpeta": carpeta},
+            enqueued_by=usuario or None,
+        )
+        return list_prendas(queue=queue, carpeta=carpeta, usuario=usuario)
     logs: list[str] = []
     try:
         textos = text_extractor.extract_texts(carpeta, on_log=logs.append)

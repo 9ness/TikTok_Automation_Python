@@ -1876,6 +1876,30 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
     )
 
 
+def run_nicho_ropa_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Lee las capturas de una carpeta con Gemini y guarda los textos.
+
+    Por la COLA y no dentro de la petición: son varias llamadas con imágenes
+    (la carpeta va en lotes de cuatro) y tardan minutos — si el operador se
+    salía de la pantalla, se perdía lo andado y había que empezar de cero.
+
+    Params: carpeta.
+    """
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.repos import product_repo
+    from src.nicho_ropa.services import text_extractor
+
+    carpeta = str(job.params.get("carpeta") or ropa_config.CARPETA_DEFECTO)
+    on_progress(0.05, "🔤 Leyendo las capturas…")
+    textos = text_extractor.extract_texts(carpeta, on_log=on_log)
+    if not textos:
+        raise RuntimeError("No se pudo extraer ningún texto de esta carpeta.")
+    on_progress(0.9, "💾 Guardando…")
+    product_repo.save_extracted_texts(carpeta, textos)
+    on_progress(1.0, "✅ Listo")
+    return f"{len(textos)} prenda(s) con textos"
+
+
 def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Monta el vídeo de UNA prenda: encuadre 9:16 y sin audio.
 
@@ -4983,6 +5007,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.NICHO_POV_BOF_TEXTOS: run_nicho_pov_bof_textos,
     JobMode.NICHO_POV_BOF_WEB_IMPORT: run_nicho_pov_bof_web_import,
     JobMode.NICHO_ROPA_GUIONES: run_nicho_ropa_guiones,
+    JobMode.NICHO_ROPA_TEXTOS: run_nicho_ropa_textos,
     JobMode.NICHO_POV_BOF_REVISAR: run_nicho_pov_bof_revisar,
     JobMode.NICHO_POV_BOF_VIDEO: run_nicho_pov_bof_video,
     JobMode.NICHO_ROPA_VIDEO: run_nicho_ropa_video,
@@ -5021,6 +5046,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.NICHO_POV_BOF_TEXTOS: "viralizacion",
     JobMode.NICHO_POV_BOF_WEB_IMPORT: "viralizacion",
     JobMode.NICHO_ROPA_GUIONES: "viralizacion",
+    JobMode.NICHO_ROPA_TEXTOS: "viralizacion",
     JobMode.NICHO_POV_BOF_REVISAR: "viralizacion",
     JobMode.NICHO_POV_BOF_VIDEO: "viralizacion",
     JobMode.NICHO_ROPA_VIDEO: "viralizacion",

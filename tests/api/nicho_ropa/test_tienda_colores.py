@@ -742,3 +742,35 @@ class TestContadorDeCarpeta:
         assert prendas_web.cuantas_con_colores(slug, 2) == 2
         # Los modos que no piden colores no cuentan nada (ni leen el disco).
         assert prendas_web.cuantas_con_colores(slug, 0) == 0
+
+
+class TestTextosPorLaCola:
+    def test_el_modo_de_trabajo_existe_y_tiene_runner(self):
+        from src.queue.models import JobMode, MODE_LABELS
+        from src.queue.runners import _RUNNERS
+
+        assert JobMode.NICHO_ROPA_TEXTOS in _RUNNERS
+        assert MODE_LABELS[JobMode.NICHO_ROPA_TEXTOS]
+
+    def test_el_runner_guarda_lo_leido(self, monkeypatch):
+        from src.nicho_ropa.repos import product_repo
+        from src.nicho_ropa.services import text_extractor
+        from src.queue.models import Job, JobMode
+        from src.queue.runners import run_nicho_ropa_textos
+
+        monkeypatch.setattr(text_extractor, "extract_texts", lambda c, on_log=None: {"1": {"titulo": "X"}})
+        guardado = {}
+        monkeypatch.setattr(product_repo, "save_extracted_texts", lambda c, t: guardado.update(carpeta=c, textos=t))
+        job = Job(mode=JobMode.NICHO_ROPA_TEXTOS, params={"carpeta": "mujer_web__Carpeta_1"})
+        assert "1 prenda" in run_nicho_ropa_textos(job, lambda _m: None, lambda _p, _m: None)
+        assert guardado["carpeta"] == "mujer_web__Carpeta_1"
+
+    def test_sin_textos_falla_en_vez_de_guardar_vacio(self, monkeypatch):
+        from src.nicho_ropa.services import text_extractor
+        from src.queue.models import Job, JobMode
+        from src.queue.runners import run_nicho_ropa_textos
+
+        monkeypatch.setattr(text_extractor, "extract_texts", lambda c, on_log=None: {})
+        job = Job(mode=JobMode.NICHO_ROPA_TEXTOS, params={"carpeta": "c"})
+        with pytest.raises(RuntimeError, match="ningún texto"):
+            run_nicho_ropa_textos(job, lambda _m: None, lambda _p, _m: None)

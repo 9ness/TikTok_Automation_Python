@@ -513,6 +513,10 @@ export function PantallaRopa({
   // modo, no es que estén mal.
   const [soloAptas, setSoloAptas] = useState(true);
   const minVariantes = estiloActivo?.minimo_variantes ?? 0;
+  // Los formatos que leen muchas imágenes (el de colores) mandan la lectura
+  // de textos a la cola; `montando` del listado dice si sigue en marcha.
+  const porCola = !!estiloActivo?.colores;
+  const leyendoTextos = !!prendas.data?.montando;
   const apta = (p: PrendaItem) => (p.variantes_producto ?? 1) >= minVariantes;
   const aptas = minVariantes > 0 ? items.filter(apta).length : items.length;
   const conFiltroColores = minVariantes > 0 && soloAptas ? items.filter(apta) : items;
@@ -863,19 +867,31 @@ export function PantallaRopa({
       >
         <button
           type="button"
-          disabled={extraer.isPending || items.length === 0}
+          disabled={extraer.isPending || items.length === 0 || (porCola && leyendoTextos)}
           onClick={() =>
-            extraer.mutate(carpeta, {
-              onSuccess: () => toast.success("Textos extraídos"),
-              onError: (e) =>
-                toast.error(e instanceof ApiError ? e.message : String(e)),
-            })
+            // En el formato de colores va por la COLA: son varias llamadas
+            // con imágenes y tarda minutos, así que salirse de la pantalla
+            // dejaba el trabajo a medias.
+            extraer.mutate(
+              { carpeta, cola: porCola },
+              {
+                onSuccess: () =>
+                  toast.success(
+                    porCola
+                      ? "En la cola: puedes salir de la pantalla"
+                      : "Textos extraídos",
+                  ),
+                onError: (e) =>
+                  toast.error(e instanceof ApiError ? e.message : String(e)),
+              },
+            )
           }
           className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
         >
-          {extraer.isPending ? (
+          {extraer.isPending || (porCola && leyendoTextos) ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Leyendo capturas…
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Leyendo
+              capturas{porCola ? " (en la cola)…" : "…"}
             </>
           ) : (
             <>

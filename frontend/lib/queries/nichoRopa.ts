@@ -187,13 +187,25 @@ export function usePrendas(carpeta: string, modo = "espejo") {
 /** Tarda ~1 min: lee todas las capturas con Gemini en una sola llamada. */
 export function useExtraerTextosRopa() {
   const qc = useQueryClient();
-  return useMutation<PrendasListResponse, Error, string>({
-    mutationFn: (carpeta) =>
-      api.post<PrendasListResponse>(
-        `${ROOT}/extraer-textos?carpeta=${encodeURIComponent(carpeta)}`,
-      ),
-    onSuccess: (res, carpeta) =>
-      qc.setQueryData(nichoRopaKeys.prendas(carpeta), res),
+  return useMutation<
+    PrendasListResponse,
+    Error,
+    string | { carpeta: string; cola?: boolean }
+  >({
+    mutationFn: (arg) => {
+      const { carpeta, cola } = typeof arg === "string" ? { carpeta: arg, cola: false } : arg;
+      return api.post<PrendasListResponse>(
+        `${ROOT}/extraer-textos?carpeta=${encodeURIComponent(carpeta)}` +
+          (cola ? "&cola=1" : ""),
+      );
+    },
+    // Se INVALIDA en vez de escribir la respuesta: por la cola, lo que
+    // vuelve es el listado de ANTES de leer (el trabajo acaba de empezar).
+    onSuccess: (res, arg) => {
+      const carpeta = typeof arg === "string" ? arg : arg.carpeta;
+      qc.setQueryData(nichoRopaKeys.prendas(carpeta), res);
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.prendas(carpeta) });
+    },
   });
 }
 
