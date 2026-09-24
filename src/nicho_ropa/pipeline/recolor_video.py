@@ -90,17 +90,33 @@ def hex_a_lab(hexcolor: str) -> np.ndarray:
     return _lab(np.array([[[b, g, r]]], dtype=np.uint8))[0, 0]
 
 
+# Zona ESTRECHA para medir en la foto de un color: solo el centro de las
+# piernas, donde no entra ni el suelo ni el top aunque la prenda sea negra o
+# beige (sin croma, el filtro de "píxeles con color" no sirve para aislarla).
+ZONA_FOTO = (0.40, 0.60, 0.48, 0.68)
+
+
 def color_de_foto(foto: Path) -> np.ndarray | None:
     """El color (Lab) del pantalón en la foto de ese color hecha en Flow: es
     la misma chica y el mismo encuadre que el clip, así que se mide en la
     misma zona. Mejor que el hex de la miniatura de la ficha, que es
-    diminuta y sale con el tono que le dé el modelo."""
+    diminuta y sale con el tono que le dé el modelo.
+
+    Aquí NO se filtra por croma: un negro o un beige no lo tienen, y con el
+    filtro la mediana caía en el suelo (el "oscuro" salió gris claro). Se
+    mide la mediana de una franja estrecha en el centro de las piernas.
+    """
     import cv2
 
     im = cv2.imread(str(foto))
     if im is None:
         return None
-    return color_prenda(im)
+    h, w = im.shape[:2]
+    x0, x1, y0, y1 = ZONA_FOTO
+    zona = _lab(im[int(h * y0):int(h * y1), int(w * x0):int(w * x1)]).reshape(-1, 3)
+    if len(zona) == 0:
+        return None
+    return np.median(zona, axis=0)
 
 
 def _a_lab(destino) -> np.ndarray:
