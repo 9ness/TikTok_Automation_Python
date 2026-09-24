@@ -911,11 +911,14 @@ ESTILOS_MOF10: dict[str, dict] = {
         "label": "Tienda colores · 15s en dos clips",
         "voz": True,
         "segundos_clip": 8,
-        # Más corto que calle dividido: medido en el primer vídeo real, el
-        # clip 2 con 102 caracteres llegó hablando al segundo 8 (Omni repitió
-        # "y con la sentadilla") y se comió el cierre. ~95 por clip.
-        "caracteres": 190,
-        "caracteres_clip": 95,
+        # Medido sobre clips reales de Omni: locuta a 12-14 car/s (no a los
+        # 17-18 de los formatos de Flow), así que en los ~7,3 s útiles de un
+        # clip de 8 caben unos 100 caracteres. No más: en la toma lenta (12
+        # car/s) 105 ya se sale y el generador se come el final del guion,
+        # que es peor que quedarse corto — el silencio del último clip lo
+        # aprovecha la flecha al carrito.
+        "caracteres": 200,
+        "caracteres_clip": 100,
         "partes": 2,
         "subtitulos": True,
         "flecha": True,

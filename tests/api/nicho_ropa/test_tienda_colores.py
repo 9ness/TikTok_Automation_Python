@@ -40,8 +40,8 @@ class TestConfig:
         assert e["imagen2"].strip()
         assert "DE ESPALDAS" in e["imagen2"]
         assert e["escrito_fuera"]  # lleva {{CARACTERES}}: hay botón de guiones
-        assert e["caracteres"] == 190
-        assert e["caracteres_clip"] == 95
+        assert e["caracteres"] == 200
+        assert e["caracteres_clip"] == 100
         assert "{{" not in e["guion"] and "{{" not in e["imagen"]
 
     def test_el_esquema_de_la_api_no_pierde_el_campo(self):
