@@ -928,6 +928,7 @@ ESTILOS_MOF10: dict[str, dict] = {
         # con las fotos de cada color como ingredientes (sin subirlas a la
         # app). `{{DICE}}` y `{{COLORES}}` los rellena la pantalla del guion.
         "video_omni": "prompt_mof10_tienda_colores_video_omni.md",
+        "video_omni2": "prompt_mof10_tienda_colores_video_omni2.md",
         "por_sexo": {
             "mujer": (
                 "prompt_mof10_tienda_colores_imagen.md",
@@ -1150,6 +1151,7 @@ def prompts_mof10(
             # (`{{COLOR}}` lo rellena la pantalla con cada variante).
             "imagen_color": _limpio(meta["imagen_color"]) if meta.get("imagen_color") else "",
             "video_omni": _limpio(meta["video_omni"]) if meta.get("video_omni") else "",
+            "video_omni2": _limpio(meta["video_omni2"]) if meta.get("video_omni2") else "",
             "segundos_clip": int(meta.get("segundos_clip") or 0),
             "guion": _nota_plazos(
                 _nota_duracion(

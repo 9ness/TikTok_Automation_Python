@@ -1352,6 +1352,7 @@ export function PantallaRopa({
               conColores={!!estiloActivo?.colores}
               imagenColor={estiloActivo?.imagen_color ?? ""}
               videoOmni={estiloActivo?.video_omni ?? ""}
+              videoOmni2={estiloActivo?.video_omni2 ?? ""}
               caracteresClip={estiloActivo?.caracteres_clip ?? 0}
               modalidadDuracion={duracion}
               onCopiar={copiar}
@@ -1376,6 +1377,7 @@ function PrendaCard({
   conColores = false,
   imagenColor = "",
   videoOmni = "",
+  videoOmni2 = "",
   caracteresClip = 0,
   modalidadDuracion = "10",
   onCopiar,
@@ -1398,6 +1400,8 @@ function PrendaCard({
   imagenColor?: string;
   /** Clip 1 con los colores hechos por Omni (`{{DICE}}`, `{{COLORES}}`). */
   videoOmni?: string;
+  /** Clip 2 hecho por Omni (de espaldas, sentadilla y cierre). */
+  videoOmni2?: string;
   /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
   nichoCaption?: string;
   /** Lo que cabe en cada clip: el botón del guion se pinta en ámbar si se
@@ -1902,6 +1906,23 @@ function PrendaCard({
               title="Clip 1 con los cambios de color hechos por Omni: adjunta como ingredientes la imagen 1 en cada color (la puesta la última). NO subas fotos de color a la app."
             >
               🎬 Guion 1 · colores en Omni (fotos como ingredientes)
+            </button>
+          )}
+          {videoOmni2 && (
+            <button
+              type="button"
+              onClick={() => {
+                const dice = /«([^«»]*)[«»]/.exec(prenda.guiones?.[1] ?? "")?.[1]?.trim() ?? "";
+                const cols = (prenda.guion_colores ?? []).join(", ");
+                onCopiar(
+                  "Guion 2 · en Omni",
+                  videoOmni2.replace("{{DICE}}", dice).replaceAll("{{COLORES}}", cols),
+                );
+              }}
+              className="w-full rounded-md border border-fuchsia-500/60 px-2 py-1.5 text-[11px] text-fuchsia-300 transition hover:bg-fuchsia-500/10"
+              title="Clip 2 en Omni: de espaldas, sentadilla y cierre con el perchero. Frame inicial: la imagen 2 (de espaldas)."
+            >
+              🎬 Guion 2 · en Omni (de espaldas, sentadilla y cierre)
             </button>
           )}
           <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">

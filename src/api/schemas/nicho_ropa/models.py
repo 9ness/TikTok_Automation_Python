@@ -64,6 +64,8 @@ class EstiloMof10(BaseModel):
     # Variante del clip 1 con los cambios de color hechos por Omni (fotos de
     # cada color como ingredientes). `{{DICE}}` y `{{COLORES}}`.
     video_omni: str = ""
+    # Lo mismo para el clip 2 (de espaldas, sentadilla y cierre).
+    video_omni2: str = ""
 
 
 class ModoRopa(BaseModel):

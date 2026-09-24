@@ -42,6 +42,8 @@ export interface EstiloMof10 {
   imagen_color?: string;
   /** Clip 1 con los colores hechos por Omni (fotos como ingredientes). */
   video_omni?: string;
+  /** Lo mismo para el clip 2 (de espaldas, sentadilla y cierre). */
+  video_omni2?: string;
   /** Tope de caracteres que se le pide al guion. */
   caracteres?: number;
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
