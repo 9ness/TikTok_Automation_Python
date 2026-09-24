@@ -39,6 +39,38 @@ CROMA_MIN = 12.0
 # rosa, pero mucha más b, amarillenta).
 DE_DENTRO = 6.0
 DE_FUERA = 11.0
+# Segunda vuelta (histéresis): los píxeles algo más lejos en tono entran SI
+# tocan al pantalón ya detectado (bajo quemado por la luz, brillos). La
+# distancia es RELATIVA al croma del pantalón (con un rosa pálido de croma
+# 16, un tope fijo de 20 metía el suelo y la pared, que están a 16) y el
+# crecimiento se limita a unas pocas dilataciones para que no se arrastre
+# por el suelo.
+DE_CONECTADO_FRACCION = 0.8
+HISTERESIS_PASOS = 6
+# La máscara se ENCOGE unos píxeles antes de difuminar el borde: los píxeles
+# del contorno son mezcla de pantalón y fondo, y al recolorearlos a un color
+# oscuro dejaban un reborde negro alrededor de la pierna y sobre las
+# zapatillas. Encogida, el borde queda dentro de la tela.
+# Se DILATA un poco (no se encoge): encogida dejaba un filo del color
+# original —rosa sobre negro, que canta— alrededor de la pierna. Dilatada y
+# con el borde difuminado, lo que sobra es un par de píxeles del color nuevo
+# sobre el fondo, que se lee como la sombra de la tela.
+DILATACION_PX = 0
+BLUR_BORDE = 7
+# El contorno del pantalón son píxeles MEZCLA (tela + fondo): dejarlos sin
+# tocar deja un filo del color viejo (rosa sobre negro, que canta) y
+# pintarlos del todo deja un reborde del nuevo sobre el fondo. Se tratan
+# aparte: en un anillo alrededor de la prenda, los píxeles cuyo tono aún
+# recuerda al original se corrigen A MEDIAS hacia el destino.
+ANILLO_PX = 3
+# Cuánto se encoge la región para marcar el "dentro seguro": la corona que
+# queda es el borde, donde manda el color del píxel.
+NUCLEO_PX = 11
+DE_ANILLO = 12.0
+# Cuánto contraste de luz se conserva al recolorear: 1 = el del vídeo tal
+# cual desplazado al destino. Escalar la luz (×0,15 para un negro) aplastaba
+# los pliegues y el pantalón salía como un recorte plano.
+CONTRASTE_L = 0.75
 # Luz mínima del píxel para ser pantalón (fuera las mallas negras y el suelo
 # oscuro, que sin croma podrían colarse por tono).
 L_MIN = 45.0
@@ -124,38 +156,71 @@ def _a_lab(destino) -> np.ndarray:
 
 
 def mascara(lab: np.ndarray, origen: np.ndarray) -> np.ndarray:
-    """Máscara 0..1 de los píxeles que son del pantalón, con borde suave."""
+    """Máscara 0..1 de los píxeles que son del pantalón.
+
+    Dos capas, porque cada una arregla un defecto de la otra:
+      - la REGIÓN (morfología: núcleo + histéresis + componentes grandes)
+        dice DÓNDE está la prenda y deja fuera la piel, el fondo y el suelo;
+      - el ALFA POR COLOR dice CUÁNTO de cada píxel es tela, y es continuo,
+        así el borde sigue la tela de verdad. Con la región sola el contorno
+        salía a bloques (los del códec) y se veía el recorte.
+    """
     import cv2
 
     de = np.sqrt(((lab[..., 1:] - origen[1:]) ** 2).sum(axis=2))
-    m = np.clip((DE_FUERA - de) / (DE_FUERA - DE_DENTRO), 0.0, 1.0)
-    m[(lab[..., 0] < L_MIN) | (lab[..., 0] > L_MAX)] = 0.0
+    alfa = np.clip((DE_FUERA - de) / (DE_FUERA - DE_DENTRO), 0.0, 1.0)
     h = lab.shape[0]
-    m[: int(h * Y_MIN), :] = 0.0
-    # Cerrar agujeritos (costuras, brillos) y suavizar el borde.
-    m8 = (m * 255).astype(np.uint8)
-    m8 = cv2.morphologyEx(m8, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
-    m8 = cv2.medianBlur(m8, 7)
-    # Solo las manchas grandes: el pantalón es una (o dos, una por pierna).
-    # Las pequeñas son reflejos del color en el bajo del top o en la piel.
-    n, etiquetas, stats, _ = cv2.connectedComponentsWithStats((m8 > 100).astype(np.uint8), connectivity=8)
+    validos = (lab[..., 0] >= L_MIN) & (lab[..., 0] <= L_MAX)
+    validos[: int(h * Y_MIN), :] = False
+    alfa[~validos] = 0.0
+
+    # Histéresis: lo que está algo más lejos en tono pero PEGADO al pantalón
+    # (bajo quemado por la luz, brillos) también es pantalón.
+    nucleo = (alfa > 0.5).astype(np.uint8)
+    croma = float(np.hypot(origen[1] - 128, origen[2] - 128))
+    tope = max(DE_FUERA, min(20.0, croma * DE_CONECTADO_FRACCION))
+    candidato = ((de < tope) & validos).astype(np.uint8)
+    k = np.ones((5, 5), np.uint8)
+    region = nucleo & candidato
+    for _ in range(HISTERESIS_PASOS):
+        siguiente = cv2.dilate(region, k) & candidato
+        if np.array_equal(siguiente, region):
+            break
+        region = siguiente
+    # Cerrar agujeros (costuras, brillos) y quitar manchas sueltas.
+    region = cv2.morphologyEx(region * 255, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))
+    region = cv2.medianBlur(region, 7)
+    n, etiquetas, stats, _ = cv2.connectedComponentsWithStats((region > 100).astype(np.uint8), connectivity=8)
     if n > 1:
         areas = stats[1:, cv2.CC_STAT_AREA]
-        tope = max(areas.max() * 0.08, 400)
-        grandes = np.isin(etiquetas, [i + 1 for i, a in enumerate(areas) if a >= tope])
-        m8 = np.where(grandes, m8, 0).astype(np.uint8)
-    return cv2.GaussianBlur(m8, (9, 9), 0).astype(np.float32) / 255.0
+        minimo = max(areas.max() * 0.08, 400)
+        grandes = np.isin(etiquetas, [i + 1 for i, ar in enumerate(areas) if ar >= minimo])
+        region = np.where(grandes, region, 0).astype(np.uint8)
+    # Dentro de la prenda se pinta SIEMPRE; el color solo decide en el
+    # borde. Si el alfa por color mandara también dentro, los pliegues
+    # quemados por la luz (tono pálido) se quedaban del color viejo — con el
+    # negro se veían manchas rosas en medio de la pierna.
+    region = cv2.dilate(region, np.ones((ANILLO_PX, ANILLO_PX), np.uint8))
+    dentro = cv2.erode(region, np.ones((NUCLEO_PX, NUCLEO_PX), np.uint8))
+    borde = cv2.subtract(region, dentro)
+    alfa_borde = np.clip((DE_ANILLO - de) / (DE_ANILLO - DE_DENTRO), 0.0, 1.0)
+    alfa_borde[~validos] = 0.0
+    m = np.maximum(
+        dentro.astype(np.float32) / 255.0,
+        (borde.astype(np.float32) / 255.0) * alfa_borde,
+    )
+    return cv2.GaussianBlur(m, (BLUR_BORDE, BLUR_BORDE), 0)
 
 
 def recolorear_frame(frame_bgr: np.ndarray, origen: np.ndarray, destino: np.ndarray, m: np.ndarray | None = None) -> np.ndarray:
     lab = _lab(frame_bgr)
     if m is None:
         m = mascara(lab, origen)
-    # Luz: se conserva la del vídeo, escalada a la del destino (un negro
-    # baja mucho, un beige claro sube un poco). Tono: el del destino.
-    escala = float(np.clip((destino[0] + 1.0) / (origen[0] + 1.0), 0.15, 1.6))
+    # Luz: la del vídeo DESPLAZADA a la del destino conservando el
+    # contraste (pliegues, sombras). Un negro queda oscuro pero con relieve;
+    # escalarla lo dejaba plano.
     nuevo = lab.copy()
-    nuevo[..., 0] = np.clip(lab[..., 0] * escala, 0, 255)
+    nuevo[..., 0] = np.clip(destino[0] + (lab[..., 0] - origen[0]) * CONTRASTE_L, 0, 255)
     nuevo[..., 1] = destino[1] + (lab[..., 1] - origen[1]) * 0.35
     nuevo[..., 2] = destino[2] + (lab[..., 2] - origen[2]) * 0.35
     out = _de_lab(nuevo).astype(np.float32)
