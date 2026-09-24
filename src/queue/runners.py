@@ -1782,6 +1782,8 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
 
             # La captura NO se adjunta: con tres imágenes Gemini bloqueó la
             # petición entera. Lo leído de ella (al subirla) va como texto.
+            from src.nicho_ropa.services import prendas_web as web_svc
+
             leido = variantes.leidos(prod)
             captura = variantes.ruta(carpeta, pid)
             if not leido["colores"] and captura:
@@ -1801,10 +1803,26 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                     "y ponlo el ÚLTIMO de la lista."
                 )
             else:
-                on_log(
-                    f"[nicho_ropa] {pid}: sin captura de variantes — los colores "
-                    "saldrán solo de lo que se vea en la ficha"
-                )
+                # Sin captura del selector, los colores salen de las FOTOS del
+                # producto en cada color que trae el ZIP: se adjuntan y se le
+                # pide que los nombre mirándolas.
+                otras = web_svc.fotos_color(carpeta, pid)
+                if otras:
+                    fotos += otras
+                    notas = (
+                        f"Las {len(otras)} ÚLTIMAS imágenes adjuntas son ESTE MISMO "
+                        "producto en sus otros colores. Mira cada una y nombra su "
+                        "color en español, con el nombre que usaría una tienda "
+                        "(beige, marrón, verde militar, azul marino…). Esos son los "
+                        "colores en que se vende, junto con el de la foto principal, "
+                        "que va el ÚLTIMO de la lista. No inventes ninguno más."
+                    )
+                    on_log(f"[nicho_ropa] {pid}: {len(otras)} foto(s) de color del ZIP")
+                else:
+                    on_log(
+                        f"[nicho_ropa] {pid}: sin fotos de otros colores — el guion "
+                        "saldrá con un solo color"
+                    )
         # El formato de la tienda vale para cualquier prenda, pero el gesto y
         # las zonas cambian: un pantalón se sube, a un jersey se le tira del
         # bajo y un cárdigan se abre. Se rellena con la familia del título.

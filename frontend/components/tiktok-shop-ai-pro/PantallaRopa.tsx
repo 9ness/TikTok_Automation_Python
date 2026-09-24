@@ -1604,6 +1604,30 @@ function PrendaCard({
         ) : (
           <div className="h-16 w-16 shrink-0 rounded-lg bg-muted" />
         )}
+        {/* Los OTROS colores en que se vende, tal como vinieron en el ZIP:
+            se ven al lado de la foto y se descargan de una en una, que es lo
+            que se adjunta en Flow para que el tono sea el de verdad. */}
+        {(prenda.fotos_color_producto ?? 0) > 0 && (
+          <div className="flex shrink-0 flex-wrap gap-1" style={{ maxWidth: "6rem" }}>
+            {Array.from({ length: prenda.fotos_color_producto ?? 0 }, (_, i) => i + 1).map((k) => {
+              const url = `${api.baseUrl}/api/v1/nicho-ropa/foto-color-producto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}&k=${k}`;
+              return (
+                <a
+                  key={k}
+                  href={url}
+                  download={`${prenda.producto}_color_${k}.jpg`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`Color ${k} — tocar para descargar y adjuntarlo en Flow`}
+                  className="overflow-hidden rounded border border-border/60 transition hover:opacity-80"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`color ${k}`} loading="lazy" className="h-[30px] w-[30px] object-cover" />
+                </a>
+              );
+            })}
+          </div>
+        )}
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs font-semibold">
             <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -1776,90 +1800,6 @@ function PrendaCard({
           y se pega en el generador junto con la imagen del paso 1; el botón de
           rehacerlo está porque cada pasada da un tono distinto y a veces la
           primera no convence (cuesta una llamada a la IA). */}
-      {/* La captura del selector de colores de la ficha (formato de la
-          tienda). Va ANTES de escribir el guion: la ficha del Drive casi
-          nunca llega hasta el selector, y los nombres tienen que ser los de
-          TikTok letra por letra. Al montar sirve además de referencia de
-          tono para recolorear. */}
-      {conColores && (
-        <div className="flex items-center gap-1">
-          <label
-            className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] transition ${
-              prenda.variantes_foto
-                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-                : "border-sky-500/60 text-sky-300 hover:bg-sky-500/10"
-            }`}
-            title={
-              prenda.variantes_foto
-                ? "Captura del selector de colores subida. Toca para sustituirla."
-                : "Sube la captura del selector \"Color\" de la ficha de TikTok Shop (miniaturas con su nombre) antes de escribir el guion"
-            }
-          >
-            {subirVariantes.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Upload className="h-3.5 w-3.5" />
-            )}
-            {prenda.variantes_foto ? "🎨 Variantes ✓" : "🎨 Captura de variantes"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (!file) return;
-                subirVariantes.mutate(
-                  { carpeta, producto: prenda.producto, file },
-                  {
-                    onSuccess: (r) =>
-                      r.aviso
-                        ? toast.warning(r.aviso)
-                        : toast.success(
-                            r.colores?.length
-                              ? `Colores leídos: ${r.colores.join(", ")}`
-                              : "Captura de variantes guardada",
-                          ),
-                    onError: (e2) =>
-                      toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
-                  },
-                );
-              }}
-            />
-          </label>
-          {prenda.variantes_foto && (
-            <>
-              <a
-                href={`${api.baseUrl}/api/v1/nicho-ropa/variantes/foto?carpeta=${encodeURIComponent(carpeta)}&producto=${encodeURIComponent(prenda.producto)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
-                title="Ver la captura subida"
-              >
-                👁
-              </a>
-              <button
-                type="button"
-                aria-label="Quitar la captura de variantes"
-                title="Quitar la captura"
-                onClick={() =>
-                  quitarVariantes.mutate(
-                    { carpeta, producto: prenda.producto },
-                    {
-                      onSuccess: () => toast.success("Captura quitada"),
-                      onError: (e2) =>
-                        toast.error(e2 instanceof ApiError ? e2.message : String(e2)),
-                    },
-                  )
-                }
-                className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
-              >
-                ✕
-              </button>
-            </>
-          )}
-        </div>
-      )}
       {/* Los colores que nombra el guion (formato de la tienda), el puesto
           el último: son los que se recolorean al montar. Se enseñan para
           poder cotejarlos con la ficha ANTES de generar el clip. */}
