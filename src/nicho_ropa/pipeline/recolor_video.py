@@ -190,12 +190,24 @@ def mascara(lab: np.ndarray, origen: np.ndarray) -> np.ndarray:
     # Cerrar agujeros (costuras, brillos) y quitar manchas sueltas.
     region = cv2.morphologyEx(region * 255, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8))
     region = cv2.medianBlur(region, 7)
+    # SOLO lo que es la prenda: las manchas que quedan del mismo tono (la
+    # ropa del perchero, el reflejo en el espejo, la pared) están separadas,
+    # así que valen las componentes que pisan la zona donde se mide el
+    # pantalón —el centro del encuadre— y son grandes. Sin esto, al pintar el
+    # interior entero se teñían el perchero y el espejo.
     n, etiquetas, stats, _ = cv2.connectedComponentsWithStats((region > 100).astype(np.uint8), connectivity=8)
     if n > 1:
+        hh, ww = region.shape[:2]
+        x0, x1, y0, y1 = ZONA_MEDIDA
+        caja = etiquetas[int(hh * y0):int(hh * y1), int(ww * x0):int(ww * x1)]
+        centrales = {int(e) for e in np.unique(caja) if e}
         areas = stats[1:, cv2.CC_STAT_AREA]
-        minimo = max(areas.max() * 0.08, 400)
-        grandes = np.isin(etiquetas, [i + 1 for i, ar in enumerate(areas) if ar >= minimo])
-        region = np.where(grandes, region, 0).astype(np.uint8)
+        minimo = max(areas.max() * 0.05, 400)
+        buenas = [
+            i + 1 for i, ar in enumerate(areas)
+            if ar >= minimo and (not centrales or (i + 1) in centrales)
+        ]
+        region = np.where(np.isin(etiquetas, buenas), region, 0).astype(np.uint8)
     # Dentro de la prenda se pinta SIEMPRE; el color solo decide en el
     # borde. Si el alfa por color mandara también dentro, los pliegues
     # quemados por la luz (tono pálido) se quedaban del color viejo — con el
