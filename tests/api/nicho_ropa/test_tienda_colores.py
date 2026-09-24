@@ -261,6 +261,9 @@ class TestAplicar:
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
         monkeypatch.setattr(colores, "RECOLOR_IA", True)
+        # El recolor sobre el vídeo se deja apagado salvo que el caso lo pida:
+        # con él encendido no se llega a la rama de las fotos.
+        monkeypatch.setattr(colores, "RECOLOR_VIDEO", False)
         work = tmp_path / "w"
         work.mkdir()
         (work / "color_rosa.png").write_bytes(b"png")
@@ -285,6 +288,9 @@ class TestAplicar:
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
         monkeypatch.setattr(colores, "RECOLOR_IA", True)
+        # El recolor sobre el vídeo se deja apagado salvo que el caso lo pida:
+        # con él encendido no se llega a la rama de las fotos.
+        monkeypatch.setattr(colores, "RECOLOR_VIDEO", False)
         work = tmp_path / "w"
         monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.0), ("beige", 0.8), ("verde", 1.6)))
         monkeypatch.setattr(colores, "_run", lambda cmd, on_log: Path(cmd[-1]).write_bytes(b"jpg"))
@@ -302,6 +308,9 @@ class TestAplicar:
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
         monkeypatch.setattr(colores, "RECOLOR_IA", True)
+        # El recolor sobre el vídeo se deja apagado salvo que el caso lo pida:
+        # con él encendido no se llega a la rama de las fotos.
+        monkeypatch.setattr(colores, "RECOLOR_VIDEO", False)
         work = tmp_path / "w"
         monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.1), ("beige", 0.9), ("verde", 1.7)))
         instantes = []
@@ -412,9 +421,16 @@ class TestFotosDeColorSubidas:
     """Las fotos de cada color las hace Flow (gratis) y las sube el operador:
     son las que se cortan. Gemini solo si se enciende a propósito."""
 
-    def _monta(self, tmp_path, monkeypatch, fotos_colores):
+    def _monta(self, tmp_path, monkeypatch, fotos_colores, ia=True, video=False):
         import src.nicho_pov_bof.pipeline.video_editor as pov
 
+        # Con las dos vías apagadas la edición no toca nada (es lo normal
+        # desde que los colores los trae el vídeo), así que estos casos
+        # encienden la de IA para poder probar la rama de las fotos.
+        monkeypatch.setattr(colores, "RECOLOR_IA", ia)
+        # El recolor sobre el vídeo se deja apagado salvo que el caso lo pida:
+        # con él encendido no se llega a la rama de las fotos.
+        monkeypatch.setattr(colores, "RECOLOR_VIDEO", video)
         work = tmp_path / "w"
         monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: _palabras(("rosa", 0.1), ("beige", 0.9), ("verde", 1.7)))
         monkeypatch.setattr(colores, "_run", lambda cmd, on_log: Path(cmd[-1]).write_bytes(b"jpg"))
@@ -429,7 +445,6 @@ class TestFotosDeColorSubidas:
         return salida, pagadas, superpuesto, avisos
 
     def test_con_todas_las_fotos_no_se_paga_nada(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(colores, "RECOLOR_IA", False)
         fotos = {"rosa": tmp_path / "rosa.png", "Beige": tmp_path / "beige.png"}
         salida, pagadas, sup, _ = self._monta(tmp_path, monkeypatch, fotos)
         assert salida.name == "clip1_colores.mp4"
@@ -437,15 +452,15 @@ class TestFotosDeColorSubidas:
         assert sup["fotos"] == [tmp_path / "rosa.png", tmp_path / "beige.png"]
 
     def test_sin_ia_el_color_sin_foto_se_salta_y_avisa(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(colores, "RECOLOR_IA", False)
-        salida, pagadas, sup, avisos = self._monta(tmp_path, monkeypatch, {"rosa": tmp_path / "rosa.png"})
+        salida, pagadas, sup, avisos = self._monta(
+            tmp_path, monkeypatch, {"rosa": tmp_path / "rosa.png"}, ia=False, video=True,
+        )
         assert not pagadas
         assert sup["fotos"] == [tmp_path / "rosa.png", None]
         assert any("sin foto para: beige" in a for a in avisos)
 
     def test_sin_ninguna_foto_el_clip_sale_tal_cual(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(colores, "RECOLOR_IA", False)
-        salida, pagadas, sup, _ = self._monta(tmp_path, monkeypatch, {})
+        salida, pagadas, sup, _ = self._monta(tmp_path, monkeypatch, {}, ia=False, video=True)
         assert salida.name == "clip1.mp4" and not pagadas and not sup
 
     def test_con_ia_encendida_recolorea_lo_que_falte(self, tmp_path, monkeypatch):
@@ -706,3 +721,24 @@ class TestFamiliasDePrenda:
         assert PromptsRopaResponse(
             imagen="x", video_con_manos="x", video_sin_manos="x", familias=fams,
         ).familias["punto"]["gesto"]
+
+
+class TestContadorDeCarpeta:
+    def test_cuenta_las_prendas_con_colores_suficientes(self, tmp_path, monkeypatch):
+        from src.nicho_pov_bof.services import productos_web as pov_web
+        from src.nicho_ropa.services import prendas_web
+
+        raiz = tmp_path / "mujer_web" / "Carpeta 5"
+        (raiz / pov_web.SUBDIR_COLORES).mkdir(parents=True)
+        # Producto 1: 3 fotos de color + la principal = 4 (apto).
+        # Producto 2: 1 foto  = 2 colores (no apto). Producto 3: ninguna.
+        for n in (1, 2, 3):
+            (raiz / pov_web.SUBDIR_COLORES / f"1_{n}.jpg").write_bytes(b"x")
+        (raiz / pov_web.SUBDIR_COLORES / "2_1.jpg").write_bytes(b"x")
+        monkeypatch.setattr(prendas_web, "_dir_genero", lambda g: tmp_path / g)
+        prendas_web._invalidar()
+        slug = config.slug_web("mujer_web", "Carpeta 5")
+        assert prendas_web.cuantas_con_colores(slug, 3) == 1
+        assert prendas_web.cuantas_con_colores(slug, 2) == 2
+        # Los modos que no piden colores no cuentan nada (ni leen el disco).
+        assert prendas_web.cuantas_con_colores(slug, 0) == 0

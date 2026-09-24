@@ -729,6 +729,18 @@ export function PantallaRopa({
                     {(c.con_url ?? 0) >= c.total ? c.total : `${c.con_url ?? 0}/${c.total}`}
                   </span>
                 )}
+                {/* Las que valen para el formato de colores: sin al menos
+                    tres, el vídeo se queda sin el gancho del principio. Solo
+                    sale en ese modo, y en azul para no confundirlo con el
+                    verde de las fichas enlazadas. */}
+                {!!c.total && (c.con_colores ?? 0) > 0 && (
+                  <span
+                    title={`${c.con_colores} prenda(s) con colores suficientes para este formato`}
+                    className="ml-1 rounded-full bg-sky-500/15 px-1 py-px text-[9px] font-semibold text-sky-400"
+                  >
+                    🎨{c.con_colores}
+                  </span>
+                )}
               </button>
             );
           })}

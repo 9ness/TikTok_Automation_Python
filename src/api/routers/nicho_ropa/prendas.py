@@ -137,6 +137,19 @@ def importar_urls(body: dict) -> dict:
         raise APIError(str(e), status_code=503) from e
 
 
+def _contar_colores(slug: str, modo: str) -> int:
+    """Prendas de la carpeta que valen para el formato de la tienda."""
+    from src.nicho_ropa.services import prendas_web
+
+    minimo = config.minimo_variantes(modo)
+    if minimo < 2:
+        return 0
+    try:
+        return prendas_web.cuantas_con_colores(slug, minimo)
+    except Exception:  # noqa: BLE001 — el contador es un adorno del chip
+        return 0
+
+
 def _contar_en_drive(slug: str) -> int:
     """Cuántas prendas hay en la carpeta según el Drive (memoizado). Solo para
     las que aún no tienen documento en Redis."""
@@ -262,6 +275,15 @@ def list_carpetas(
         for i in visibles:
             for campo, valor in (resumen.get(i.slug) or {}).items():
                 setattr(i, campo, valor)
+        # Las que valen para el formato de la tienda. Va aparte del resumen
+        # de Redis porque se cuenta en el disco (las fotos del ZIP), y solo
+        # cuando el modo lo pide: en los demás no se lee nada.
+        if config.minimo_variantes(modo) >= 2:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=8, thread_name_prefix="colores-ropa") as pool:
+                for i, n in zip(visibles, pool.map(lambda x: _contar_colores(x.slug, modo), visibles)):
+                    i.con_colores = n
         # Solo las carpetas SIN documento (nunca abiertas) se cuentan en el
         # Drive, en paralelo y con el presupuesto: son las recién importadas.
         from concurrent.futures import ThreadPoolExecutor

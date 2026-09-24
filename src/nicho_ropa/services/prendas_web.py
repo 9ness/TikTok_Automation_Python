@@ -295,6 +295,31 @@ def fotos_color(slug: str, producto: str) -> list[Path]:
     return pov_web.fotos_color_de(_dir_genero(genero) / carpeta, producto)
 
 
+def cuantas_con_colores(slug: str, minimo: int) -> int:
+    """Prendas de la carpeta con al menos `minimo` colores (la principal más
+    las `Producto_N_Color_K` del ZIP). MEMOIZADO: lo pide el chip de cada
+    carpeta, o sea una vez por carpeta en cada carga de la pantalla, y es un
+    listado del Drive montado."""
+    from src.nicho_pov_bof.services import productos_web as pov_web
+
+    if minimo < 2 or not config.es_carpeta_web(slug):
+        return 0
+
+    def contar() -> int:
+        genero, carpeta = config.partes_web(slug)
+        d = _dir_genero(genero) / carpeta / pov_web.SUBDIR_COLORES
+        if not d.is_dir():
+            return 0
+        cuantas: dict[str, int] = {}
+        for f in d.iterdir():
+            if f.is_file() and f.suffix.lower() in _EXTS and "_" in f.stem:
+                producto = f.stem.split("_")[0]
+                cuantas[producto] = cuantas.get(producto, 0) + 1
+        return sum(1 for n in cuantas.values() if n + 1 >= minimo)
+
+    return _memo(f"colores:{slug}:{minimo}", contar)
+
+
 def importar_zip(datos: bytes, nombre_zip: str, genero: str) -> dict:
     """Mete un ZIP de la web en el género que toque. Repetible.
 

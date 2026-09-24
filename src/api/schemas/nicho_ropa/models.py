@@ -142,6 +142,9 @@ class CarpetaRopa(BaseModel):
     total: int = 0
     con_url: int = 0
     con_video: int = 0
+    # Prendas con colores suficientes para el formato de la tienda (0 en los
+    # demás modos, que no piden ninguno).
+    con_colores: int = 0
     # Lo que marca a mano quien trabaja, como en el POV BOF: la carpeta dada
     # por hecha, o con los vídeos hechos pero pendientes de subir. Por usuario
     # y por MODO (terminarla frente al espejo no la termina en la calle).

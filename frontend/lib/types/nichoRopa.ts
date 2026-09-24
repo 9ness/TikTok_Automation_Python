@@ -104,6 +104,8 @@ export interface CarpetaRopa {
    *  cuando se piden las carpetas de un sexo concreto. */
   total?: number;
   con_url?: number;
+  /** Prendas con colores suficientes para el formato de la tienda. */
+  con_colores?: number;
   con_video?: number;
   /** Marcada a mano como hecha, o con los vídeos hechos y pendientes de
    *  subir. Por usuario y por modo, como en el POV BOF. */
