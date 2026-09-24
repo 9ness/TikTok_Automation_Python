@@ -292,9 +292,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "jogger", "cargo", "short", "bermuda", "falda", "legging", "wide leg",
         ),
         "gesto": (
-            "está ligeramente encorvada, tirando de la prenda hacia arriba con las "
-            "dos manos desde el muslo, por encima de sus mallas negras, como quien "
-            "se la acaba de poner"
+            "está de tres cuartos, algo encorvada, tirando de la prenda hacia arriba "
+            "con las dos manos desde el muslo, por encima de unas mallas cortas "
+            "negras tipo ciclista, como quien se la acaba de poner; el cuerpo "
+            "girado deja ver la curva de la cadera de perfil"
         ),
         "final_gesto": (
             "termina de subírsela, la asienta en la cintura y se yergue del todo, "
@@ -312,17 +313,20 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         ),
         "detalle_3": (
             "Plano entero de espaldas, cuerpo entero, cámara fija, con las manos en "
-            "la cintura y la cabeza girada por encima del hombro; mueve un poco la "
-            "cadera para que se vea cómo sienta por detrás"
+            "la cintura y la cabeza girada por encima del hombro. Se gira despacio "
+            "sobre sí misma y arquea un poco la espalda, marcando la curva de la "
+            "cadera, para que se vea cómo sienta la prenda por detrás"
         ),
         "prueba": (
-            "Hace una sentadilla completa, baja del todo y se levanta despacio, para "
-            "que se vea que la cintura no se baja ni se mueve"
+            "Plano más cerrado, de la espalda a las rodillas, con la cámara algo más "
+            "cerca: hace una sentadilla completa, baja del todo y se levanta "
+            "despacio, para que se vea de cerca que la cintura no se baja ni se "
+            "abre y que la tela no transparenta"
         ),
         "zonas": "la cintura (alta, elástica, con cordón o botón, los bolsillos) y la pierna (ancha, la caída, el tejido)",
-        "pose_imagen": "the trousers are pulled up only to mid-thigh and she is about to pull them up, so her plain black leggings are visible above them; the trousers keep their full length and their hem reaches the shoes.",
+        "pose_imagen": "the trousers are pulled up only to mid-thigh and she is about to pull them up, so her plain black bike shorts are visible above them; her body is in three-quarter view so the curve of her hip shows; the trousers keep their full length and their hem reaches the shoes.",
         "manos_imagen": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
-        "ropa_base": "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted leggings or black bike shorts, visible above them.",
+        "ropa_base": "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted bike shorts (mid-thigh sports shorts), visible above them. Nothing revealing: only normal sportswear.",
     },
     "punto": {
         "label": "Jersey, chaleco o camiseta",
@@ -351,7 +355,8 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         ),
         "detalle_3": (
             "Plano entero de espaldas, cuerpo entero, cámara fija, con la cabeza "
-            "girada por encima del hombro, para que se vea la caída por detrás"
+            "girada por encima del hombro. Gira despacio sobre sí misma para que "
+            "se vea cómo cae por detrás y cómo sienta de perfil"
         ),
         "prueba": (
             "Levanta y estira los dos brazos y los baja, para que se vea que el punto "
