@@ -53,20 +53,37 @@ RECOLOR_VIDEO = os.getenv("TIENDA_COLORES_RECOLOR_VIDEO", "1").strip().lower() i
 
 def _recolorear_en_video(
     clip: Path, colores: list[str], tiempos: list[float], tonos: dict[str, str],
-    work_dir: Path, on_log: OnLog,
+    fotos: dict[str, Path], work_dir: Path, on_log: OnLog,
 ) -> Path | None:
     """El clip con cada tramo de color recoloreado sobre el vídeo, o None si
-    no se puede (sin tono para algún color, o color puesto no aislable)."""
+    no se puede (sin tono para algún color, o color puesto no aislable).
+
+    El tono de cada color sale, por este orden, de la FOTO de ese color que
+    subió el operador (misma chica y encuadre: se mide el pantalón ahí) y, si
+    no la hay, del hex leído de la miniatura de la ficha.
+    """
     from src.nicho_ropa.pipeline import recolor_video as rv
 
-    faltan = [c for c in colores[:-1] if not tonos.get(c.lower())]
-    if faltan:
-        on_log(f"[colores] sin tono (hex) para {', '.join(faltan)}: no se recolorea el vídeo")
-        return None
     tramos = []
+    faltan = []
     for i, color in enumerate(colores[:-1]):
+        destino = None
+        foto = fotos.get(color.lower())
+        if foto:
+            destino = rv.color_de_foto(foto)
+            if destino is not None:
+                on_log(f"[colores] «{color}»: tono medido en la foto subida")
+        if destino is None and tonos.get(color.lower()):
+            destino = tonos[color.lower()]
+            on_log(f"[colores] «{color}»: tono del hex de la ficha ({destino})")
+        if destino is None:
+            faltan.append(color)
+            continue
         desde = 0.0 if i == 0 else tiempos[i]
-        tramos.append((desde, tiempos[i + 1], tonos[color.lower()]))
+        tramos.append((desde, tiempos[i + 1], destino))
+    if faltan:
+        on_log(f"[colores] sin tono para {', '.join(faltan)} (ni foto ni hex): no se recolorea el vídeo")
+        return None
     destino = clip.with_name(f"{clip.stem}_colores.mp4")
     try:
         import cv2
@@ -134,7 +151,7 @@ def aplicar(
     # deja aislar y hay tono para cada color: es lo más parecido al viral, y
     # sin contenido estático. Si no se puede, fotos.
     if RECOLOR_VIDEO:
-        hecho = _recolorear_en_video(Path(clip), colores, tiempos, tonos, work_dir, on_log)
+        hecho = _recolorear_en_video(Path(clip), colores, tiempos, tonos, subidas, work_dir, on_log)
         if hecho:
             return hecho
 

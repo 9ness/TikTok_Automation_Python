@@ -90,6 +90,23 @@ def hex_a_lab(hexcolor: str) -> np.ndarray:
     return _lab(np.array([[[b, g, r]]], dtype=np.uint8))[0, 0]
 
 
+def color_de_foto(foto: Path) -> np.ndarray | None:
+    """El color (Lab) del pantalón en la foto de ese color hecha en Flow: es
+    la misma chica y el mismo encuadre que el clip, así que se mide en la
+    misma zona. Mejor que el hex de la miniatura de la ficha, que es
+    diminuta y sale con el tono que le dé el modelo."""
+    import cv2
+
+    im = cv2.imread(str(foto))
+    if im is None:
+        return None
+    return color_prenda(im)
+
+
+def _a_lab(destino) -> np.ndarray:
+    return hex_a_lab(destino) if isinstance(destino, str) else np.asarray(destino, dtype=np.float32)
+
+
 def mascara(lab: np.ndarray, origen: np.ndarray) -> np.ndarray:
     """Máscara 0..1 de los píxeles que son del pantalón, con borde suave."""
     import cv2
@@ -131,12 +148,13 @@ def recolorear_frame(frame_bgr: np.ndarray, origen: np.ndarray, destino: np.ndar
 
 
 def recolorear_tramos(
-    clip: Path, tramos: list[tuple[float, float, str]], destino_path: Path,
+    clip: Path, tramos: list[tuple[float, float, object]], destino_path: Path,
     on_log: OnLog = _noop, t_medida: float | None = None,
 ) -> tuple[Path, float]:
-    """Escribe `destino_path`: el clip con cada tramo `(t0, t1, "#rrggbb")`
-    recoloreado. Devuelve la ruta y el croma medido del color puesto (para que
-    quien llama sepa lo fiable que es). Audio intacto."""
+    """Escribe `destino_path`: el clip con cada tramo `(t0, t1, destino)`
+    recoloreado, donde `destino` es un hex `"#rrggbb"` o un color Lab ya
+    medido (`color_de_foto`). Devuelve la ruta y el croma medido del color
+    puesto (para que quien llama sepa lo fiable que es). Audio intacto."""
     import cv2
 
     cap = cv2.VideoCapture(str(clip))
@@ -153,7 +171,7 @@ def recolorear_tramos(
         raise RuntimeError("no se pudo leer el fotograma de referencia")
     origen = color_prenda(ref)
     croma = float(np.hypot(origen[1] - 128, origen[2] - 128))
-    destinos = [(t0, t1, hex_a_lab(hx)) for t0, t1, hx in tramos]
+    destinos = [(t0, t1, _a_lab(d)) for t0, t1, d in tramos]
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     tmp = destino_path.with_suffix(".video.mp4")
