@@ -109,6 +109,11 @@ class PromptsRopaResponse(BaseModel):
     # situaciones de calle son de hombre). La lista la manda el backend para
     # que la pantalla no tenga que saberse los formatos.
     modos: list[ModoRopa] = Field(default_factory=list)
+    # Los reemplazos de cada familia de prenda (pantalón, punto, chaqueta…):
+    # los prompts del formato de la tienda vienen con marcadores y la
+    # pantalla los rellena con la familia de CADA prenda. Van aquí y no en
+    # cada prenda porque son cinco textos, no uno por producto.
+    familias: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class CarpetaRopa(BaseModel):
@@ -212,6 +217,9 @@ class PrendaInfo(BaseModel):
     # Colores en que se vende, contando el de la foto principal: es lo que
     # decide si la prenda vale para el formato de la tienda.
     variantes_producto: int = 1
+    # Qué familia de prenda es, deducida del título: decide el gesto y los
+    # planos del formato de la tienda.
+    familia: str = ""
     # Variantes cuya miniatura se recortó de la captura del selector: la foto
     # del producto en ese color, para adjuntar en Flow.
     miniaturas_variantes: list[str] = Field(default_factory=list)

@@ -1805,9 +1805,13 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                     f"[nicho_ropa] {pid}: sin captura de variantes — los colores "
                     "saldrán solo de lo que se vea en la ficha"
                 )
+        # El formato de la tienda vale para cualquier prenda, pero el gesto y
+        # las zonas cambian: un pantalón se sube, a un jersey se le tira del
+        # bajo y un cárdigan se abre. Se rellena con la familia del título.
+        prompt_guion = ropa_config.con_familia(estilo["guion"], str(prod.get("titulo") or ""))
         try:
             escrito = guionista.escribir(
-                prompt=estilo["guion"],
+                prompt=prompt_guion,
                 titulo=str(prod.get("titulo") or ""),
                 tienda=str(prod.get("tienda") or ""),
                 caption=str(prod.get("caption") or ""),

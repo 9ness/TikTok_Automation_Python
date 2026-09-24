@@ -270,6 +270,246 @@ def caracteres_por_clip(meta: dict) -> int:
     return (segundos - 1) * CARACTERES_POR_SEGUNDO_CLIP
 
 
+# ---------------------------------------------------------------------------
+# Familias de prenda (formato Tienda Colores)
+# ---------------------------------------------------------------------------
+# El formato es el mismo para cualquier prenda —cortes de color al ritmo de
+# la voz, dos detalles y cierre con el perchero— pero el GESTO y las ZONAS
+# cambian con lo que se enseña. Sale de medir diez virales: solo en los
+# pantalones se la suben; en las prendas de arriba el cambio de color se hace
+# con un gesto neutro repetido (sostenerla delante, abrir el cárdigan, tirar
+# del bajo del jersey) y corte seco.
+#
+# `palabras` detecta la familia por el título, como el filtro de calzado.
+# `gesto` es lo que hace mientras nombra los colores; `detalle_1/2` los dos
+# planos del clip 1; `detalle_3` el primero del clip 2; `zonas` lo que el
+# guion tiene que nombrar, en ese orden.
+FAMILIAS_PRENDA: dict[str, dict] = {
+    "pantalon": {
+        "label": "Pantalón, falda o short",
+        "palabras": (
+            "pantalon", "pantalón", "jean", "vaquero", "palazzo", "culotte",
+            "jogger", "cargo", "short", "bermuda", "falda", "legging", "wide leg",
+        ),
+        "gesto": (
+            "está ligeramente encorvada, tirando de la prenda hacia arriba con las "
+            "dos manos desde el muslo, por encima de sus mallas negras, como quien "
+            "se la acaba de poner"
+        ),
+        "final_gesto": (
+            "termina de subírsela, la asienta en la cintura y se yergue del todo, "
+            "quedando de pie con las manos en las caderas"
+        ),
+        "detalle_1": (
+            "Primer plano de la cintura y las caderas, la cámara se acerca. Con las "
+            "dos manos estira la cinturilla hacia fuera y enseña el cordón y los "
+            "bolsillos; la tela se ve de cerca, con su textura real"
+        ),
+        "detalle_2": (
+            "Plano de las piernas, del pecho a los pies, cámara fija. Estira la tela "
+            "de las dos perneras hacia los lados para que se vea el ancho, y da un "
+            "paso o balancea una pierna para que se vea la caída"
+        ),
+        "detalle_3": (
+            "Plano entero de espaldas, cuerpo entero, cámara fija, con las manos en "
+            "la cintura y la cabeza girada por encima del hombro; mueve un poco la "
+            "cadera para que se vea cómo sienta por detrás"
+        ),
+        "prueba": (
+            "Hace una sentadilla completa, baja del todo y se levanta despacio, para "
+            "que se vea que la cintura no se baja ni se mueve"
+        ),
+        "zonas": "la cintura (alta, elástica, con cordón o botón, los bolsillos) y la pierna (ancha, la caída, el tejido)",
+        "pose_imagen": "the trousers are pulled up only to mid-thigh and she is about to pull them up, so her plain black leggings are visible above them; the trousers keep their full length and their hem reaches the shoes.",
+        "manos_imagen": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
+        "ropa_base": "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted leggings or black bike shorts, visible above them.",
+    },
+    "punto": {
+        "label": "Jersey, chaleco o camiseta",
+        "palabras": (
+            "jersey", "sueter", "suéter", "sweater", "punto", "chaleco", "camiseta",
+            "top", "blusa", "camisa", "polo", "sudadera",
+        ),
+        "gesto": (
+            "está de pie, de frente, y agarra el bajo de la prenda con las dos manos "
+            "dándole un tirón corto hacia abajo para colocársela, como quien se la "
+            "acaba de poner"
+        ),
+        "final_gesto": (
+            "suelta el bajo, se coloca el cuello con una mano y se queda de pie, "
+            "relajada, mirando a cámara"
+        ),
+        "detalle_1": (
+            "Primer plano del cuello y los hombros, la cámara se acerca. Se coloca el "
+            "cuello con las dos manos y pasa la mano por el punto para que se vea la "
+            "textura de cerca"
+        ),
+        "detalle_2": (
+            "Plano medio, del pecho a las caderas, cámara fija. Agarra el bajo de la "
+            "prenda con las dos manos, lo estira hacia los lados y se lo mete y lo "
+            "saca del pantalón para enseñar cómo queda de las dos maneras"
+        ),
+        "detalle_3": (
+            "Plano entero de espaldas, cuerpo entero, cámara fija, con la cabeza "
+            "girada por encima del hombro, para que se vea la caída por detrás"
+        ),
+        "prueba": (
+            "Levanta y estira los dos brazos y los baja, para que se vea que el punto "
+            "no tira ni se deforma"
+        ),
+        "zonas": "el cuello y el tejido (suave, grueso, cómodo) y el corte (holgado, la caída, cómo queda por dentro o por fuera del pantalón)",
+        "pose_imagen": "she holds the hem of the garment with both hands and gives it a short downward tug to settle it.",
+        "manos_imagen": "both hands holding the hem of the garment at hip height, tugging it down",
+        "ropa_base": "Below the referenced garment she wears plain wide-leg blue jeans and simple white sneakers; if the garment is open or sleeveless, a plain white fitted top underneath.",
+    },
+    "abierta": {
+        "label": "Chaqueta, cárdigan o abrigo",
+        "palabras": (
+            "cardigan", "cárdigan", "chaqueta", "abrigo", "blazer", "americana",
+            "kimono", "trench", "gabardina", "chaquetón", "capa",
+        ),
+        "gesto": (
+            "está de pie, de frente, y abre la prenda agarrándola por los dos "
+            "delanteros y separándolos, y la vuelve a cerrar, como quien se la acaba "
+            "de poner"
+        ),
+        "final_gesto": (
+            "suelta los delanteros, se recoloca los hombros y se queda de pie, "
+            "relajada, mirando a cámara"
+        ),
+        "detalle_1": (
+            "Plano medio, del pecho a las caderas, cámara fija. Abre los dos brazos "
+            "en cruz para que se vea la amplitud de la prenda y los baja despacio"
+        ),
+        "detalle_2": (
+            "Primer plano del pecho y la manga, la cámara se acerca. Pasa la mano por "
+            "el tejido y se frota el antebrazo para que se vea el punto de cerca y el "
+            "largo de la manga"
+        ),
+        "detalle_3": (
+            "Plano entero, cámara fija. Gira despacio sobre sí misma para que se vea "
+            "la espalda y cómo cae la prenda de perfil"
+        ),
+        "prueba": (
+            "Se cruza la prenda por delante y se abraza con los dos brazos, para que "
+            "se vea que abriga y no tira de los hombros"
+        ),
+        "zonas": "el tejido y la amplitud (suave, holgada, cómo cae) y el corte (el largo, la manga, cómo queda abierta o cerrada)",
+        "pose_imagen": "she holds both front panels of the open garment, one in each hand, slightly opened, as if she had just put it on.",
+        "manos_imagen": "each hand holding one front panel of the open garment at chest height",
+        "ropa_base": "Under the referenced garment she wears a plain white fitted t-shirt, and below plain wide-leg blue jeans and simple white sneakers.",
+    },
+    "capucha": {
+        "label": "Sudadera con capucha o cremallera",
+        "palabras": ("capucha", "hoodie", "cremallera", "zip", "chandal", "chándal"),
+        "gesto": (
+            "está de pie, de frente, con la prenda abierta y las manos agarrando los "
+            "dos lados de la cremallera, moviéndolos un poco, como quien se la acaba "
+            "de poner"
+        ),
+        "final_gesto": (
+            "sube la cremallera hasta arriba de un tirón y se queda de pie, relajada, "
+            "mirando a cámara"
+        ),
+        "detalle_1": (
+            "Primer plano del pecho y la cintura, la cámara se acerca. Sube la "
+            "cremallera de abajo arriba despacio para que se vea el tirador y el "
+            "cordón, y mete las manos en los bolsillos"
+        ),
+        "detalle_2": (
+            "Plano medio, cámara fija. Se pone la capucha con las dos manos, se la "
+            "coloca y se la vuelve a quitar"
+        ),
+        "detalle_3": (
+            "Plano entero de espaldas, cuerpo entero, cámara fija, con la capucha "
+            "puesta y la cabeza girada por encima del hombro"
+        ),
+        "prueba": (
+            "Se ajusta el puño de una manga con la otra mano y se cierra la prenda "
+            "cruzándose los brazos, para que se vea que abriga"
+        ),
+        "zonas": "la cremallera y el tejido (suave, de invierno, con capucha) y el corte (holgado, el largo, los bolsillos)",
+        "pose_imagen": "the garment is open and she holds both sides of the zip, about to zip it up.",
+        "manos_imagen": "both hands holding the two sides of the open zip at waist height",
+        "ropa_base": "Under the referenced garment she wears a plain white fitted top, and below plain black leggings and simple white sneakers.",
+    },
+    "mono": {
+        "label": "Mono o vestido",
+        "palabras": ("mono", "jumpsuit", "vestido", "peto", "conjunto"),
+        "gesto": (
+            "está de pie, de frente, y se coloca la prenda tirando del escote con una "
+            "mano y de la cintura con la otra, como quien se la acaba de poner"
+        ),
+        "final_gesto": (
+            "suelta la prenda, abre un poco los brazos para enseñarla entera y se "
+            "queda de pie, mirando a cámara"
+        ),
+        "detalle_1": (
+            "Primer plano del escote y el hombro, la cámara se acerca. Se coloca el "
+            "escote con la mano y pasa los dedos por el borde para que se vea de cerca"
+        ),
+        "detalle_2": (
+            "Plano medio, de los hombros a las caderas, cámara fija. Estira la goma "
+            "de la cintura con los dedos y la suelta, para que se vea que es elástica"
+        ),
+        "detalle_3": (
+            "Plano entero, cámara fija. Gira despacio sobre sí misma para que se vea "
+            "cómo queda por detrás y cómo cae la falda o la pierna"
+        ),
+        "prueba": (
+            "Da dos pasos y se gira para que la tela se mueva y se vea la caída"
+        ),
+        "zonas": "el escote y la cintura (elástica, fruncida, favorecedora) y la caída (la pierna ancha o el vuelo, el tejido)",
+        "pose_imagen": "she is settling the garment, one hand at the neckline and the other at the waist.",
+        "manos_imagen": "one hand at the neckline and the other at the waistband, settling the garment",
+        "ropa_base": "She wears nothing over the referenced garment; only simple neutral shoes.",
+    },
+}
+FAMILIA_DEFECTO = "pantalon"
+
+
+def familia_de(titulo: str) -> str:
+    """Qué familia de prenda es, por el título. Se mira en orden: las
+    específicas (capucha, abierta, mono) antes que las generales, porque
+    "sudadera con capucha" es de las dos y manda la capucha."""
+    plano = _sin_acentos(titulo or "")
+    for clave in ("capucha", "abierta", "mono", "pantalon", "punto"):
+        if any(pal in plano for pal in FAMILIAS_PRENDA[clave]["palabras"]):
+            return clave
+    return FAMILIA_DEFECTO
+
+
+def _sin_acentos(txt: str) -> str:
+    import unicodedata
+
+    plano = unicodedata.normalize("NFKD", txt or "")
+    return "".join(c for c in plano if not unicodedata.combining(c)).lower()
+
+
+def con_familia(texto: str, titulo: str) -> str:
+    """Rellena los marcadores de familia de un prompt con los de esa prenda."""
+    fam = FAMILIAS_PRENDA[familia_de(titulo)]
+    for clave in (
+        "gesto", "final_gesto", "detalle_1", "detalle_2", "detalle_3", "prueba",
+        "zonas", "pose_imagen", "manos_imagen", "ropa_base",
+    ):
+        texto = texto.replace("{{" + clave.upper() + "}}", fam[clave])
+    return texto
+
+
+def familias_para_pantalla() -> dict[str, dict]:
+    """Los reemplazos de cada familia, para que la pantalla rellene los
+    prompts sin pedir nada más: son cinco familias, no una por prenda."""
+    campos = (
+        "gesto", "final_gesto", "detalle_1", "detalle_2", "detalle_3", "prueba",
+        "zonas", "pose_imagen", "manos_imagen", "ropa_base",
+    )
+    return {
+        clave: {"label": fam["label"], **{c: fam[c] for c in campos}}
+        for clave, fam in FAMILIAS_PRENDA.items()
+    }
+
+
 def minimo_variantes(modo: str) -> int:
     """Cuántos colores necesita una prenda para poder grabarse con ese modo.
     0 = da igual (todos los formatos menos el de la tienda)."""

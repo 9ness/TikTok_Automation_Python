@@ -172,6 +172,13 @@ def aplicar(
     colores = [c.strip() for c in colores if c and c.strip()]
     if len(colores) < 2:
         return Path(clip)
+    # Con las dos vías apagadas no hay nada que hacer: los cambios de color
+    # los trae el propio clip. Se sale ANTES de mirar las fotos subidas —
+    # dejarlas actuar era lo que seguía tapando el vídeo con fotos fijas de
+    # montajes anteriores.
+    if not RECOLOR_VIDEO and not RECOLOR_IA:
+        on_log("[colores] los colores los trae el vídeo: la edición no los toca")
+        return Path(clip)
     from src.nicho_pov_bof.pipeline.video_editor import _transcribir_voz
 
     work_dir.mkdir(parents=True, exist_ok=True)

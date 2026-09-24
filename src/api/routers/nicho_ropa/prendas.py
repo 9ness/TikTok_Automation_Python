@@ -95,6 +95,7 @@ def get_prompts(
             # Los modos de ESA modalidad: personajes aleatorios (los de
             # siempre) o marca personal. Son cuentas distintas, no un ajuste.
             modos=config.modos_de(sexo, modalidad or config.MODALIDAD_DEFECTO),
+            familias=config.familias_para_pantalla(),
         )
     except OSError as e:
         raise APIError(f"No se pudieron leer los prompts: {e}", status_code=500) from e
@@ -600,6 +601,7 @@ def list_prendas(
             fotos_color_producto=len(prendas_web.fotos_color(carpeta, pid)),
             # La principal más las del ZIP: los colores en que se vende.
             variantes_producto=1 + len(prendas_web.fotos_color(carpeta, pid)),
+            familia=config.familia_de(str(prod.get("titulo") or "")),
             miniaturas_variantes=variantes.miniaturas_de(carpeta, pid, variantes.leidos(prod)["colores"]),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),

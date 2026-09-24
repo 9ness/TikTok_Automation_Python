@@ -151,11 +151,18 @@ class TestPlazosEnElPrompt:
         # marcadores (para poder derivar el de mujer), y se servía "literal" —
         # o sea, con las llaves puestas: el operador pegaba en ChatGPT un
         # «{{EL_SUJETO_MAY}} dice en español» y el guion salía con eso dentro.
+        # El de la tienda es la excepción: sus marcadores son de FAMILIA de
+        # prenda (gesto, planos) y los rellena `con_familia` con el título de
+        # cada producto, así que ahí se comprueba ya rellenado.
         for sexo in ("hombre", "mujer"):
             for plazos in (True, False):
                 for estilo in config.prompts_mof10(sexo, plazos):
-                    assert "{{" not in estilo["guion"], (sexo, estilo["clave"])
-                    assert "{{" not in estilo["imagen"], (sexo, estilo["clave"])
+                    guion, imagen = estilo["guion"], estilo["imagen"]
+                    if estilo["clave"] == "tienda_colores":
+                        guion = config.con_familia(guion, "Pantalón wide leg")
+                        imagen = config.con_familia(imagen, "Pantalón wide leg")
+                    assert "{{" not in guion, (sexo, estilo["clave"])
+                    assert "{{" not in imagen, (sexo, estilo["clave"])
 
 
 class TestPlazosDeLaFicha:

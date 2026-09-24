@@ -42,7 +42,14 @@ class TestConfig:
         assert e["escrito_fuera"]  # lleva {{CARACTERES}}: hay botón de guiones
         assert e["caracteres"] == 200
         assert e["caracteres_clip"] == 100
-        assert "{{" not in e["guion"] and "{{" not in e["imagen"]
+        # Los marcadores de duración y plazos vienen ya rellenos; los de
+        # FAMILIA siguen puestos a propósito (los rellena `con_familia` con
+        # el tipo de prenda de cada producto).
+        for marcador in ("{{CARACTERES}}", "{{MINIMO}}", "{{SEGUNDOS}}", "{{FRASE_PLAZOS}}"):
+            assert marcador not in e["guion"] and marcador not in e["imagen"]
+        limpio = config.con_familia(e["guion"], "Pantalón wide leg")
+        assert "{{" not in limpio
+        assert "{{" not in config.con_familia(e["imagen"], "Pantalón wide leg")
 
     def test_el_esquema_de_la_api_no_pierde_el_campo(self):
         """Pydantic descarta las claves que no declara (learnings 878)."""
@@ -644,3 +651,58 @@ class TestMinimoDeVariantes:
         carpeta = tmp_path / r["carpeta"]
         assert 1 + len(pov_web.fotos_color_de(carpeta, "1")) == 4
         assert 1 + len(pov_web.fotos_color_de(carpeta, "2")) == 1
+
+
+class TestFamiliasDePrenda:
+    """El formato vale para cualquier prenda, pero el gesto y los planos
+    cambian: un pantalón se sube, a un jersey se le tira del bajo y un
+    cárdigan se abre (medido en diez virales)."""
+
+    @pytest.mark.parametrize(
+        "titulo,familia",
+        [
+            ("STELLARSEEK Pantalón Wide Leg deportivo", "pantalon"),
+            ("Falda midi plisada", "pantalon"),
+            ("Jersey oversize de cuello alto", "punto"),
+            ("Chaleco de punto con volantes", "punto"),
+            ("Cárdigan largo de punto abierto", "abierta"),
+            ("Chaqueta de pana", "abierta"),
+            ("Sudadera larga con capucha y cremallera", "capucha"),
+            ("Mono palabra de honor pierna ancha", "mono"),
+            ("Vestido midi satinado", "mono"),
+            ("Algo que no se sabe qué es", "pantalon"),
+        ],
+    )
+    def test_familia_por_el_titulo(self, titulo, familia):
+        assert config.familia_de(titulo) == familia
+
+    def test_la_capucha_gana_a_la_sudadera(self):
+        # "sudadera" es de punto y "capucha" de cremallera: manda la capucha.
+        assert config.familia_de("Sudadera con capucha") == "capucha"
+        assert config.familia_de("Sudadera básica") == "punto"
+
+    def test_los_prompts_se_rellenan_enteros(self):
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        for titulo in ("Pantalón wide leg", "Jersey de punto", "Cárdigan", "Sudadera con capucha", "Mono largo"):
+            for campo in ("imagen", "guion", "video_omni", "video_omni2"):
+                t = config.con_familia(e[campo], titulo)
+                sobran = [x for x in ("GESTO", "FINAL_GESTO", "DETALLE_1", "DETALLE_2", "DETALLE_3", "PRUEBA", "ZONAS", "POSE_IMAGEN", "MANOS_IMAGEN", "ROPA_BASE") if "{{" + x + "}}" in t]
+                assert not sobran, (titulo, campo, sobran)
+
+    def test_cada_familia_dice_algo_distinto(self):
+        gestos = {f["gesto"] for f in config.FAMILIAS_PRENDA.values()}
+        assert len(gestos) == len(config.FAMILIAS_PRENDA)
+        # Y el pantalón es el único que se sube.
+        sube = [k for k, f in config.FAMILIAS_PRENDA.items() if "hacia arriba" in f["gesto"]]
+        assert sube == ["pantalon"]
+
+    def test_la_tabla_que_va_a_la_pantalla(self):
+        from src.api.schemas.nicho_ropa.models import PromptsRopaResponse
+
+        fams = config.familias_para_pantalla()
+        assert set(fams) == set(config.FAMILIAS_PRENDA)
+        assert all(f["label"] and f["zonas"] and f["pose_imagen"] for f in fams.values())
+        # El esquema la deja pasar tal cual (Pydantic tira lo que no declara).
+        assert PromptsRopaResponse(
+            imagen="x", video_con_manos="x", video_sin_manos="x", familias=fams,
+        ).familias["punto"]["gesto"]

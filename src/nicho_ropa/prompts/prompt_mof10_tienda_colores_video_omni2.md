@@ -8,7 +8,8 @@
      cómo sienta (6-8 s del viral), sentadilla completa (8-11 s) y cierre de
      pie junto al perchero con los otros colores (11-15 s). Como en el clip
      1, los cortes van atados a la VOZ y no a segundos exactos.
-     `{{DICE}}` es la frase del clip 2 y `{{COLORES}}` la lista de colores. -->
+     `{{DICE}}` es la frase del clip 2 y `{{COLORES}}` la lista de colores;
+     `{{DETALLE_3}}` y `{{PRUEBA}}` salen de la familia de la prenda. -->
 
 La mujer dice en español:
 «{{DICE}}»
@@ -19,11 +20,11 @@ Movimiento:
 
 Crea un vídeo UGC totalmente realista de 8 segundos, grabado con un móvil en una tienda de ropa, con la creadora de la imagen adjunta, que lleva puesto el pantalón. Es la continuación del clip anterior: misma chica, misma tienda, misma luz, mismo pantalón y mismo color. El vídeo son TRES planos con CORTE SECO entre ellos (nada de fundidos ni transiciones), y cada corte va SINCRONIZADO CON LA VOZ: se pasa al plano siguiente justo cuando ella empieza la frase que le toca, no antes. Manda la voz, no el reloj.
 
-PARTE 1 — por detrás (mientras dice la frase de cómo queda por detrás). Plano entero de espaldas, cuerpo entero de la cabeza a los pies, cámara fija. Está de pie con las manos en la cintura y la cabeza girada por encima del hombro mirando a cámara; mueve un poco la cadera para que se vea cómo sienta la prenda por detrás. CORTE SECO.
+PARTE 1 — por detrás (mientras dice la frase de cómo queda por detrás). {{DETALLE_3}}. CORTE SECO.
 
-PARTE 2 — la sentadilla (mientras dice la frase de agacharse). Plano entero, de tres cuartos de espaldas, cámara fija. Hace una sentadilla completa, baja del todo y se levanta despacio, para que se vea que la cintura no se baja ni se mueve. CORTE SECO.
+PARTE 2 — la prueba (mientras dice la frase de que es cómoda). Plano entero, cámara fija. {{PRUEBA}}. CORTE SECO.
 
-PARTE 3 — el cierre (mientras dice la última frase, hasta el final). Plano entero de frente, cámara fija. Se ha girado hacia la cámara, sonríe y con una mano sostiene o señala una percha con el mismo pantalón en los otros colores ({{COLORES}}), que cuelgan a su lado; termina mirando a cámara.
+PARTE 3 — el cierre (mientras dice la última frase, hasta el final). Plano entero de frente, cámara fija. Se ha girado hacia la cámara, sonríe y con una mano sostiene o señala una percha con la misma prenda en los otros colores ({{COLORES}}), que cuelgan a su lado; termina mirando a cámara.
 
 En todos los planos: la misma creadora, la misma tienda, la misma luz y el mismo pantalón, que conserva exactamente su diseño, tejido, color, corte y detalles. Sin filtros, efectos, textos ni elementos artificiales. Cámara con pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Movimiento de labios sincronizado con la narración cuando la cara está en plano, con la misma voz femenina española, juvenil y natural del clip anterior.
 

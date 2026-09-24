@@ -9,9 +9,10 @@
      luego enseña la cintura y los bolsillos, se da la vuelta, se agacha y
      cierra con "varios colores en tienda".
 
-     Esta imagen es el PRIMER fotograma del clip 1: la chica con mallas
-     negras y el pantalón A MEDIO PONER (a mitad de muslo), que es el "guau"
-     de los virales —empiezan en mallas y se lo suben—. El plano 1 del clip
+     Esta imagen es el PRIMER fotograma del clip 1. La pose sale de la
+     FAMILIA de la prenda (`config.con_familia`): un pantalón a medio poner
+     —el "guau" de los virales—, un jersey al que se le tira del bajo, un
+     cárdigan que se abre… El plano 1 del clip
      es subírselo mientras nombra los colores. Los cortes de color NO se
      generan en Flow: al montar, la app recolorea el fotograma del instante
      en que nombra cada color (con el pantalón a la altura que esté).
@@ -21,7 +22,7 @@
 
 {
   "subject": {
-    "description": "A completely random adult woman standing in three-quarter view (body slightly turned, face to the camera) inside a real clothing store, caught in the middle of PUTTING ON the referenced trousers: the trousers are pulled up only to mid-thigh, both hands holding the waistband, about to pull them up. Underneath she wears plain black fitted leggings (visible above the trousers, between the waistband and the top). She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
+    "description": "A completely random adult woman standing in three-quarter view (body slightly turned, face to the camera) inside a real clothing store, wearing the referenced garment and settling it: {{POSE_IMAGEN}} She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
     "appearance": "entirely random",
     "age": "random adult age between 20 and 32",
     "expression": "natural, confident, slight smile, as if about to start talking",
@@ -35,12 +36,12 @@
     "source": "The female subject MUST wear exactly the garment shown in the provided reference image.",
     "instructions": [
       "Use the provided reference image exclusively as the garment reference.",
-      "The female subject is putting on the exact garment shown in the reference image, in the exact same color: it is pulled up to mid-thigh, not yet at the waist.",
-      "The garment KEEPS ITS FULL LENGTH: because it is only at mid-thigh, its hem reaches down to the ankles / the shoes and bunches on them. It must NOT look like shorts or a cropped garment — the total length of the legs of the garment is the same as in the reference image.",
+      "The female subject wears the exact garment shown in the reference image, in the exact same color, and it keeps its full original length, cut and proportions.",
+      "Do not crop, shorten or restyle the garment: it looks exactly like the reference, only worn.",
       "Replicate every detail with maximum accuracy: color, fabric, texture, seams, pleats, waistband, drawstring, buttons, pockets, fit, cut, length and proportion.",
       "Do not reinterpret, redesign, replace, simplify, recolor, add or omit any part of the referenced garment.",
       "The referenced garment must remain exactly the same and must be the main visual focus, fully visible from the waistband to the hem.",
-      "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text: a fitted white t-shirt or a fitted white long-sleeve top, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted leggings or black bike shorts, visible from the waist down to where the trousers currently are (mid-thigh).",
+      "{{ROPA_BASE}}",
       "Shoes: simple and neutral (white or light grey sneakers, or plain sandals or flats), chosen to match the garment; never shoes that draw attention.",
       "No jacket, coat, bag, belt or any garment that covers or overlaps the referenced garment, unless a belt is part of the reference image.",
       "The complete outfit must look clean, simple and coordinated: the garment is the star and the white top is a neutral canvas.",
@@ -56,11 +57,11 @@
     "instructions": "Preserve any accessories visible in the reference image. Otherwise at most small, discreet accessories (thin bracelets, small earrings) that do not cover the garment. No sunglasses, no hats, no bags."
   },
   "pose": {
-    "stance": "standing in a THREE-QUARTER turn (body turned about 30-45 degrees away from the camera, face still towards it), feet slightly apart, full body from head to toe, slightly bent forward as she pulls the trousers up, so the curve of her hip and bottom is visible in profile",
-    "arms": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
+    "stance": "standing in a THREE-QUARTER turn (body turned about 30-45 degrees away from the camera, face still towards it), feet slightly apart, full body from head to toe",
+    "arms": "{{MANOS_IMAGEN}}",
     "gaze": "the woman must look directly into the camera",
     "head_position": "her face must remain naturally oriented toward the camera",
-    "full_body_visibility": "The female subject's full body must remain clearly visible from head to toe, with some floor visible below her shoes; the trousers hang from mid-thigh down to the shoes, full length, and their color and fabric are clearly visible."
+    "full_body_visibility": "The female subject's full body must remain clearly visible from head to toe, with some floor visible below her shoes, and the referenced garment fully visible with its real colour and fabric."
   },
   "photography": {
     "camera_style": "Casual smartphone UGC video frame, recorded by another person holding a phone in front of her.",

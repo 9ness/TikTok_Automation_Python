@@ -67,6 +67,9 @@ export interface PromptsRopaResponse {
   /** Los modos de grabación que existen para ESE sexo. Los manda el backend:
    *  el curso no publica los mismos formatos para hombre y para mujer. */
   modos?: ModoRopa[];
+  /** Reemplazos por familia de prenda (pantalón, punto, chaqueta…): los
+   *  prompts del formato de la tienda vienen con marcadores. */
+  familias?: Record<string, Record<string, string>>;
 }
 
 export interface ModoRopa {
@@ -160,6 +163,8 @@ export interface PrendaItem {
   fotos_color_producto?: number;
   /** Colores en que se vende (la foto principal más las del ZIP). */
   variantes_producto?: number;
+  /** Familia de la prenda, deducida del título (decide gesto y planos). */
+  familia?: string;
   /** Variantes con miniatura recortada de la captura (foto para Flow). */
   miniaturas_variantes?: string[];
   guion_dice?: string;

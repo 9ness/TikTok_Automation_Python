@@ -55,6 +55,23 @@ import { portadaDe } from "@/lib/tiktok-shop-ai-pro/modulos";
 import type { ModoRopa } from "@/lib/types/nichoRopa";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
 
+/** Rellena los marcadores de familia de un prompt (`{{GESTO}}`, `{{ZONAS}}`…)
+ *  con los textos de la familia de ESA prenda. El formato de la tienda vale
+ *  para cualquier prenda, pero el gesto y los planos cambian: un pantalón se
+ *  sube, a un jersey se le tira del bajo y un cárdigan se abre. */
+function conFamilia(
+  texto: string,
+  familia: string | undefined,
+  familias: Record<string, Record<string, string>> | undefined,
+): string {
+  const fam = familias?.[familia || ""] ?? familias?.pantalon;
+  if (!fam) return texto;
+  return Object.entries(fam).reduce(
+    (acc, [k, v]) => acc.replaceAll(`{{${k.toUpperCase()}}}`, v),
+    texto,
+  );
+}
+
 /** Los modos de grabación: dónde está la cámara. Cada uno es un vídeo
  *  distinto de la MISMA prenda y guarda su propio estado — igual que los
  *  estilos de guion del POV BOF Largo. Añadir uno es añadirlo aquí y en
@@ -1384,6 +1401,9 @@ export function PantallaRopa({
               imagenColor={estiloActivo?.imagen_color ?? ""}
               videoOmni={estiloActivo?.video_omni ?? ""}
               videoOmni2={estiloActivo?.video_omni2 ?? ""}
+              familias={prompts.data?.familias}
+              imagen1={estiloActivo?.imagen ?? ""}
+              imagen2={estiloActivo?.imagen2 ?? ""}
               caracteresClip={estiloActivo?.caracteres_clip ?? 0}
               modalidadDuracion={duracion}
               onCopiar={copiar}
@@ -1409,6 +1429,9 @@ function PrendaCard({
   imagenColor = "",
   videoOmni = "",
   videoOmni2 = "",
+  familias,
+  imagen1 = "",
+  imagen2 = "",
   caracteresClip = 0,
   modalidadDuracion = "10",
   onCopiar,
@@ -1433,6 +1456,11 @@ function PrendaCard({
   videoOmni?: string;
   /** Clip 2 hecho por Omni (de espaldas, sentadilla y cierre). */
   videoOmni2?: string;
+  /** Reemplazos por familia: los prompts del formato vienen con marcadores. */
+  familias?: Record<string, Record<string, string>>;
+  /** Los prompts de imagen del estilo, para poder darlos ya por prenda. */
+  imagen1?: string;
+  imagen2?: string;
   /** Qué pantalla es, para los hashtags que solo van en algunos nichos. */
   nichoCaption?: string;
   /** Lo que cabe en cada clip: el botón del guion se pinta en ámbar si se
@@ -1857,6 +1885,33 @@ function PrendaCard({
           por ninguna IA de pago. */}
       {conColores && (prenda.guion_colores ?? []).length > 1 && (
         <div className="space-y-1">
+          {/* Las dos imágenes, ya con el gesto de SU tipo de prenda: el
+              botón del estilo sirve para los demás formatos, pero aquí un
+              jersey no se sube como un pantalón. */}
+          {(imagen1 || imagen2) && (
+            <div className="grid grid-cols-2 gap-1">
+              {imagen1 && (
+                <button
+                  type="button"
+                  onClick={() => onCopiar("Imagen 1", conFamilia(imagen1, prenda.familia, familias))}
+                  className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+                  title={`Imagen 1 para ${familias?.[prenda.familia || ""]?.label ?? "esta prenda"}`}
+                >
+                  🖼️ Imagen 1
+                </button>
+              )}
+              {imagen2 && (
+                <button
+                  type="button"
+                  onClick={() => onCopiar("Imagen 2", conFamilia(imagen2, prenda.familia, familias))}
+                  className="rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-foreground/30"
+                  title="Imagen 2 (de espaldas), en el mismo chat de Flow"
+                >
+                  🖼️ Imagen 2
+                </button>
+              )}
+            </div>
+          )}
           <p className="text-[10px] text-muted-foreground">
             🎨 En el MISMO chat de Flow que la imagen 1, genera la imagen en
             cada color (botón 📋, adjuntando la foto del producto en ese
@@ -1886,7 +1941,9 @@ function PrendaCard({
                 const cols = (prenda.guion_colores ?? []).join(", ");
                 onCopiar(
                   "Guion 1 · colores en Omni",
-                  videoOmni.replace("{{DICE}}", dice).replaceAll("{{COLORES}}", cols),
+                  conFamilia(videoOmni, prenda.familia, familias)
+                    .replace("{{DICE}}", dice)
+                    .replaceAll("{{COLORES}}", cols),
                 );
               }}
               className="w-full rounded-md border border-fuchsia-500/60 px-2 py-1.5 text-[11px] text-fuchsia-300 transition hover:bg-fuchsia-500/10"
@@ -1903,7 +1960,9 @@ function PrendaCard({
                 const cols = (prenda.guion_colores ?? []).join(", ");
                 onCopiar(
                   "Guion 2 · en Omni",
-                  videoOmni2.replace("{{DICE}}", dice).replaceAll("{{COLORES}}", cols),
+                  conFamilia(videoOmni2, prenda.familia, familias)
+                    .replace("{{DICE}}", dice)
+                    .replaceAll("{{COLORES}}", cols),
                 );
               }}
               className="w-full rounded-md border border-fuchsia-500/60 px-2 py-1.5 text-[11px] text-fuchsia-300 transition hover:bg-fuchsia-500/10"
