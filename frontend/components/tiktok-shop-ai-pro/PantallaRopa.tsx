@@ -1025,6 +1025,55 @@ export function PantallaRopa({
               {/* Se pinta SIEMPRE, no solo en los formatos raros: son dos
                   pegadas seguidas en dos sitios distintos y equivocarse no da
                   ningún error, sale otro vídeo. */}
+              {/* El formato de la tienda no se parece a los demás: dos
+                  clips, imágenes por color como ingredientes y los cortes los
+                  hace el propio generador. Lleva sus propios pasos, y el de
+                  "escribir guiones" se da por sabido. */}
+              {e.colores ? (
+                <ul className="space-y-0.5 rounded-md bg-muted/40 px-2 py-1 text-[10px] leading-snug text-muted-foreground">
+                  <li>
+                    1️⃣ En cada tarjeta, <strong className="text-foreground">🎨</strong>{" "}
+                    descarga las fotos del producto en sus otros colores (las
+                    del ZIP), que son las que dan el tono de verdad.
+                  </li>
+                  <li>
+                    2️⃣ <strong className="text-foreground">🖼️ Imagen 1</strong> de
+                    la tarjeta en Flow, con la foto de la prenda: sale la chica
+                    con la prenda del color de la foto principal.
+                  </li>
+                  <li>
+                    3️⃣ En el MISMO chat, el botón{" "}
+                    <strong className="text-foreground">📋</strong> de cada
+                    color, adjuntando su foto del paso 1: una imagen por color.
+                    Y <strong className="text-foreground">🖼️ Imagen 2</strong>{" "}
+                    (de espaldas) para el clip 2.
+                  </li>
+                  <li>
+                    4️⃣ <strong className="text-foreground">🎬 Guion 1 · colores
+                    en Omni</strong> con TODAS las imágenes de color como{" "}
+                    <strong className="text-foreground">INGREDIENTES</strong>{" "}
+                    (la del color puesto, la última) · 8 s · 9:16. Los cambios
+                    de color los hace el vídeo, sincronizados con la voz.
+                  </li>
+                  <li>
+                    5️⃣ <strong className="text-foreground">🎬 Guion 2</strong> con
+                    la imagen 2 como{" "}
+                    <strong className="text-foreground">FRAME INICIAL</strong>{" "}
+                    · 8 s: por detrás, la prueba y el cierre con el perchero.
+                  </li>
+                  <li>6️⃣ Sube los 2 clips aquí abajo, en su tarjeta.</li>
+                  <li className="text-sky-300">
+                    La edición NO toca los colores: solo pega los dos clips,
+                    quema los subtítulos, pone la flecha al carrito y limpia
+                    los metadatos.
+                  </li>
+                  <li className="text-sky-300">
+                    Solo salen las prendas con{" "}
+                    {e.minimo_variantes || 3} colores o más: con menos, el
+                    gancho del principio no existe.
+                  </li>
+                </ul>
+              ) : (
               <ul className="space-y-0.5 rounded-md bg-muted/40 px-2 py-1 text-[10px] leading-snug text-muted-foreground">
                 <li>
                   1️⃣ Pega el <strong className="text-foreground">prompt de
@@ -1077,7 +1126,7 @@ export function PantallaRopa({
                     ? "🔇 Sale mudo: la música se pone en TikTok al publicar"
                     : "🗣️ El clip sale ya hablado: se publica con su voz, sin texto quemado"}
                 </li>
-                {(e.partes ?? 1) > 1 && (
+                {(e.partes ?? 1) > 1 && !e.colores && (
                   <li className="text-fuchsia-300">
                     ✂️ Este formato va PARTIDO en {e.partes} clips: copia
                     también la <strong className="text-foreground">imagen 2</strong>{" "}
@@ -1086,22 +1135,6 @@ export function PantallaRopa({
                       : "la misma chica en otra calle"}
                     ) y usa un guion por clip — cada uno lleva su texto y su
                     movimiento.
-                  </li>
-                )}
-                {e.colores && (
-                  <li className="text-sky-300">
-                    🎨 ANTES de escribir los guiones, sube en cada tarjeta la{" "}
-                    <strong className="text-foreground">captura del selector
-                    &quot;Color&quot;</strong> de la ficha de TikTok Shop
-                    (miniaturas con su nombre): de ahí salen los nombres
-                    exactos. Los cortes de color del principio los monta la
-                    app con las fotos de cada color que subas, al
-                    ritmo de las palabras. La imagen 1 es la chica con mallas
-                    negras y el pantalón a medio poner: en el clip se queda así
-                    mientras nombra los colores y se lo sube al decir el último,
-                    que es el que lleva puesto. Tras el guion, genera en el MISMO chat de Flow la
-                    imagen 1 en cada uno de los otros colores (botón 📋 de cada
-                    color en la tarjeta) y súbelas: son los cortes, gratis.
                   </li>
                 )}
                 <li>
@@ -1117,6 +1150,7 @@ export function PantallaRopa({
                   </li>
                 )}
               </ul>
+              )}
               {(e.duraciones ?? []).length > 1 && (
                 <div className="flex gap-1.5">
                   {(e.duraciones ?? []).map((d) => (
