@@ -143,7 +143,7 @@ del 22/9 y no tiene los colores: avisa.)
 6. Clip 1: **«🎬 Guion 1 · colores en Omni (fotos como ingredientes)»** →
    Flow, vídeo Omni, **8 s**, 9:16, con **TODAS las imágenes de color como
    INGREDIENTES**, **la del color que lleva puesto, la ÚLTIMA** → `clip_1.mp4`.
-   Revisa que el pantalón cambia de color cuando la chica nombra cada uno.
+   Revisa que la prenda cambia de color cuando la chica nombra cada uno.
 7. Clip 2: **«🎬 Guion 2 · en Omni (de espaldas, sentadilla y cierre)»** →
    FRAME INICIAL = `imagen_2.png`, 8 s → `clip_2.mp4`.
 8. Sube «Clip 1» y «Clip 2». La app NO toca los colores: pega, subtitula,
@@ -151,6 +151,60 @@ del 22/9 y no tiene los colores: avisa.)
 
 Los botones **«✍️ Guion 1 / 2»** de estas tarjetas son solo el texto que dice
 la chica (para comprobar); lo que se pega en Flow son los **«🎬 … en Omni»**.
+
+#### Tienda Colores con una modelo FIJA (p. ej. «Lucía»)
+
+Si el operador quiere la MISMA chica en todos los vídeos (la aleatoria cambia
+entre el clip 1 y el 2), se trabaja así. Salió de una prueba de 4 h
+(Carpeta_11, prenda 1, 25/9/2026): sigue el orden y te ahorras los fallos.
+
+**La chica.** Su ficha JSON está guardada en la app (Moda › crear chica) y en
+Flow tiene dos referencias: `lucia_cara` y `lucia_cuerpo`. Cara Y cuerpo
+(curvas) tienen que coincidir en todo: imagen y vídeo.
+
+**Fotos (Nano Banana 2, gratis: repite hasta que salgan bien).**
+1. **Base, en el color que se queda puesto** (el último del guion): la chica
+   con la prenda **puesta sobre los hombros, con las mangas, abierta por
+   delante**, cogiendo los delanteros. Tiene que VERSE lo que identifica a la
+   prenda (cuello, botones, cinturón…). ⚠️ Si la prenda está a medio caer o las
+   manos tapan el cuello, Omni no sabe cómo es y en el vídeo la cambia por otra
+   (blazer con solapas, parka). Si el cuello sale mal, parte de una foto de la
+   chica con la prenda CERRADA y pide solo «desabróchala y ábrela».
+2. **Los otros colores**: base + foto de producto de ese color → «Crea otra
+   imagen EXACTAMENTE igual… cambiando ÚNICAMENTE el color…». Misma pose en
+   todas. Revisa que cada color **se distinga de sus vecinos**: el azul marino
+   tiene que verse AZUL y el negro, negro (si no, Omni los funde en uno).
+3. **Foto cerrada** (inicio del clip 2): la chica con la prenda abrochada, de
+   frente, cuerpo entero.
+
+**Clip 1 · Omni · INGREDIENTES · 8 s · 9:16.**
+- Ingredientes en orden: un color por imagen, **en el orden en que se dicen**
+  (el que lleva puesto, el último) + **la foto limpia del producto al final**
+  como referencia.
+- En el prompt, cada imagen con su color («la imagen adjunta 1 es la NEGRA…»,
+  «la 5 NO es un plano: es la FOTO DEL PRODUCTO…»), y que diga los colores
+  **despacio, con una pausa clara entre cada uno** (cada color ~0,9 s). Si
+  va rápido, se come los del medio.
+- ❌ **Nada de puntos suspensivos** en lo que dice («Negro… verde…»): la voz
+  salió en un idioma inventado. Comas normales.
+- ❌ Nada de rótulos tipo «PARTE 1» en el prompt: los escribe en el vídeo.
+- Sin fotograma final: solo ingredientes.
+
+**Clip 2 · Omni · FOTOGRAMAS · solo INICIO = la foto cerrada · 8 s.** Sin
+fotograma final. Empieza de frente y se gira (no empieza de espaldas: de
+espaldas la cara no se reconoce).
+
+**Coste.** Primero **360p (6 pts)**. El operador lo mira; solo con su «ok» se
+genera a **720p (12 pts, es OTRA generación)** y se baja en «1080p Resolución
+mejorada». Nunca subas a 720p sin su visto bueno.
+
+**Subir.** «Clip 1» + «Clip 2». La app los pega, corta la palabra que Omni
+deja a medias tras el guion, subtitula y pone la flecha. No mete fotos fijas:
+los colores tienen que venir en el vídeo.
+
+**Flow.** Un proyecto con cientos de generaciones se cuelga: abre uno limpio y
+sube solo lo que vas a usar (la base, los colores, la foto cerrada y las fotos
+de producto).
 
 ## API útil (solo lectura)
 
