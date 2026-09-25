@@ -720,11 +720,11 @@ class TestFamiliasDePrenda:
     @pytest.mark.parametrize("titulo", ["Chaqueta de punto", "Vestido de encaje", "Sudadera con capucha"])
     def test_solo_el_pantalon_dice_pantalon(self, titulo):
         """Las imágenes de color, la de espaldas y los clips decían
-        "pantalón", "mallas" y "bolsillos traseros" para cualquier prenda."""
+        "pantalón" y "bolsillos traseros" para cualquier prenda."""
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
         for campo in ("imagen_color", "imagen2", "video_omni", "video_omni2"):
             t = config.con_familia(e[campo], titulo).lower()
-            assert "pantal" not in t and "mallas" not in t and "bolsillos traseros" not in t, (titulo, campo)
+            assert "pantal" not in t and "bolsillos traseros" not in t, (titulo, campo)
 
     def test_cada_familia_dice_algo_distinto(self):
         gestos = {f["gesto"] for f in config.FAMILIAS_PRENDA.values()}

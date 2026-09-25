@@ -286,8 +286,11 @@ def caracteres_por_clip(meta: dict) -> int:
 # guion tiene que nombrar, en ese orden. `pose_color` y `espalda_imagen` van
 # en las imágenes de color y de espaldas: antes decían "pantalón" y
 # "bolsillos traseros" fuera cual fuera la prenda, y una chaqueta salía mal.
-# En TODAS la chica se la está PONIENDO (el "guau" del viral): con "se la
-# coloca" o "sujeta los delanteros" salía quieta, posando, y no es el formato.
+# En TODAS la chica se la está PONIENDO, a MEDIAS, como en los virales (Drive
+# del operador): el pantalón subiendo desde el muslo, el jersey recogido en el
+# pecho enseñando el top de debajo, la chaqueta resbalando por los brazos, el
+# vestido recogido en la cintura sobre las mallas. Con "se la coloca" o
+# "sujeta los delanteros" salía posando, y no es el formato.
 FAMILIAS_PRENDA: dict[str, dict] = {
     "pantalon": {
         "label": "Pantalón, falda o short",
@@ -342,8 +345,8 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "jersey", "sueter", "suéter", "sweater", "punto", "chaleco", "camiseta",
             "top", "blusa", "camisa", "polo", "sudadera",
         ),
-        "gesto": "está de pie, de frente, terminando de ponerse la prenda: el bajo todavía está recogido a la altura de las costillas y tira de él hacia abajo con las dos manos, como quien se la está poniendo",
-        "final_gesto": "termina de bajársela, se la coloca en la cadera, se ajusta el cuello con una mano y se queda de pie, relajada, mirando a cámara",
+        "gesto": "está de pie, de frente, con la prenda ya metida por la cabeza pero todavía subida y recogida a la altura del pecho, dejando ver el top blanco de debajo, y tira de ella hacia abajo con las dos manos, como quien se la está poniendo",
+        "final_gesto": "termina de bajársela, la estira sobre la cadera y se queda de pie, relajada, mirando a cámara",
         "detalle_1": (
             "Primer plano del cuello y los hombros, la cámara se acerca. Se coloca el "
             "cuello con las dos manos y pasa la mano por el punto para que se vea la "
@@ -364,10 +367,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "no tira ni se deforma"
         ),
         "zonas": "el cuello y el tejido (suave, grueso, cómodo) y el corte (holgado, la caída, cómo queda por dentro o por fuera del pantalón)",
-        "pose_imagen": "she is in the middle of putting the garment on: it is already over her head and arms, but the hem is still bunched up at her ribs and she is pulling it down with both hands; the neckline, sleeves and front of the garment are clearly visible.",
-        "manos_imagen": "both hands gripping the bunched-up hem at rib height, pulling it down",
-        "ropa_base": "Below the referenced garment she wears plain wide-leg blue jeans and simple white sneakers; if the garment is open or sleeveless, a plain white fitted top underneath.",
-        "pose_color": "poniéndose la prenda, con el bajo todavía recogido en las costillas y tirando de él hacia abajo con las dos manos",
+        "pose_imagen": "she is in the middle of putting the garment on: it is already over her head and arms, but it is still pulled up and bunched at her chest, so her plain white crop top shows underneath, and she is pulling it down with both hands; the neckline, sleeves and knit are clearly visible.",
+        "manos_imagen": "both hands gripping the bunched-up hem at chest height, pulling it down",
+        "ropa_base": "Under the referenced garment she wears a plain white fitted crop top (visible because the garment is still pulled up), and below plain wide-leg blue jeans and simple white sneakers.",
+        "pose_color": "poniéndose la prenda, todavía subida y recogida en el pecho, enseñando el top blanco, y tirando de ella hacia abajo con las dos manos",
         "espalda_imagen": (
             "con los brazos relajados a los lados, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (hombros, espalda y bajo)"
         ),
@@ -378,8 +381,8 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "cardigan", "cárdigan", "chaqueta", "abrigo", "blazer", "americana",
             "kimono", "trench", "gabardina", "chaquetón", "capa",
         ),
-        "gesto": "está de pie, de frente, poniéndose la prenda: con un brazo ya metido, mete el otro en la manga y se la sube al hombro, como quien se la está poniendo",
-        "final_gesto": "termina de ponérsela, se coloca el cuello y los delanteros con las dos manos y se queda de pie, relajada, mirando a cámara",
+        "gesto": "está de pie, de frente, con la prenda a medio poner, resbalando por los brazos, y con las dos manos en el cuello se la sube a los hombros, como quien se la está poniendo",
+        "final_gesto": "se la asienta en los hombros, abre los delanteros hacia los lados para enseñarla y se queda de pie, relajada, mirando a cámara",
         "detalle_1": (
             "Plano medio, del pecho a las caderas, cámara fija. Abre los dos brazos "
             "en cruz para que se vea la amplitud de la prenda y los baja despacio"
@@ -398,10 +401,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "se vea que abriga y no tira de los hombros"
         ),
         "zonas": "el tejido y la amplitud (suave, holgada, cómo cae) y el corte (el largo, la manga, cómo queda abierta o cerrada)",
-        "pose_imagen": "she is in the middle of putting the garment on: her right arm is already in its sleeve and the garment sits on her right shoulder, and she is sliding her left arm into the other sleeve while her right hand pulls the garment up over her left shoulder; the collar, front and fabric are clearly visible.",
-        "manos_imagen": "left arm halfway into its sleeve, right hand pulling the garment up over the left shoulder",
+        "pose_imagen": "she is in the middle of putting the garment on: it is still half off her shoulders, slipping down her upper arms, and with both hands at the collar she is pulling it up onto her shoulders; the front, collar and fabric are clearly visible.",
+        "manos_imagen": "both hands at the collar, pulling the garment up onto her shoulders",
         "ropa_base": "Under the referenced garment she wears a plain white fitted t-shirt, and below plain wide-leg blue jeans and simple white sneakers.",
-        "pose_color": "poniéndose la prenda, con un brazo ya metido y metiendo el otro en la manga",
+        "pose_color": "poniéndose la prenda, todavía resbalando por los brazos, y subiéndosela a los hombros con las dos manos en el cuello",
         "espalda_imagen": (
             "con los brazos relajados a los lados, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (hombros, espalda, mangas y largo)"
         ),
@@ -409,8 +412,8 @@ FAMILIAS_PRENDA: dict[str, dict] = {
     "capucha": {
         "label": "Sudadera con capucha o cremallera",
         "palabras": ("capucha", "hoodie", "cremallera", "zip", "chandal", "chándal"),
-        "gesto": "está de pie, de frente, poniéndose la prenda abierta: con un brazo ya metido, mete el otro en la manga y se la sube al hombro, dejando ver la cremallera y la capucha, como quien se la está poniendo",
-        "final_gesto": "termina de ponérsela, sube la cremallera hasta arriba de un tirón y se queda de pie, relajada, mirando a cámara",
+        "gesto": "está de pie, de frente, con la prenda abierta a medio poner, resbalando por los brazos, y con las dos manos en el cuello se la sube a los hombros, dejando ver la cremallera y la capucha, como quien se la está poniendo",
+        "final_gesto": "se la asienta en los hombros, sube la cremallera hasta arriba de un tirón y se queda de pie, relajada, mirando a cámara",
         "detalle_1": (
             "Primer plano del pecho y la cintura, la cámara se acerca. Sube la "
             "cremallera de abajo arriba despacio para que se vea el tirador y el "
@@ -429,10 +432,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "cruzándose los brazos, para que se vea que abriga"
         ),
         "zonas": "la cremallera y el tejido (suave, de invierno, con capucha) y el corte (holgado, el largo, los bolsillos)",
-        "pose_imagen": "she is in the middle of putting the garment on: it is open, her right arm is already in its sleeve and she is sliding her left arm into the other sleeve, pulling the garment up over her left shoulder with her right hand; the hood, zip and fabric are clearly visible.",
-        "manos_imagen": "left arm halfway into its sleeve, right hand pulling the garment up over the left shoulder",
+        "pose_imagen": "she is in the middle of putting the garment on: it is open and still half off her shoulders, slipping down her upper arms, and with both hands at the collar she is pulling it up onto her shoulders; the hood, zip and fabric are clearly visible.",
+        "manos_imagen": "both hands at the collar, pulling the open garment up onto her shoulders",
         "ropa_base": "Under the referenced garment she wears a plain white fitted top, and below plain black leggings and simple white sneakers.",
-        "pose_color": "poniéndose la prenda abierta, con un brazo ya metido y metiendo el otro en la manga",
+        "pose_color": "poniéndose la prenda abierta, todavía resbalando por los brazos, y subiéndosela a los hombros con las dos manos en el cuello",
         "espalda_imagen": (
             "con los brazos relajados a los lados y la capucha bajada, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (capucha, espalda y bajo)"
         ),
@@ -440,11 +443,8 @@ FAMILIAS_PRENDA: dict[str, dict] = {
     "mono": {
         "label": "Mono o vestido",
         "palabras": ("mono", "jumpsuit", "vestido", "peto", "conjunto"),
-        "gesto": "está de pie, de frente, terminando de ponerse la prenda: con una mano se sube el tirante o el hombro de la prenda y con la otra baja la tela por la cadera, como quien se la está poniendo",
-        "final_gesto": (
-            "suelta la prenda, abre un poco los brazos para enseñarla entera y se "
-            "queda de pie, mirando a cámara"
-        ),
+        "gesto": "está de pie, de frente, con la parte de arriba ya puesta y la de abajo todavía subida y recogida en la cintura, por encima de unas mallas cortas negras, y tira de ella hacia abajo con las dos manos, como quien se la está poniendo",
+        "final_gesto": "termina de bajársela, la prenda cae entera hasta el bajo, se la coloca en la cintura y se queda de pie, mirando a cámara",
         "detalle_1": (
             "Primer plano del escote y el hombro, la cámara se acerca. Se coloca el "
             "escote con la mano y pasa los dedos por el borde para que se vea de cerca"
@@ -461,10 +461,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
             "Da dos pasos y se gira para que la tela se mueva y se vea la caída"
         ),
         "zonas": "el escote y la cintura (elástica, fruncida, favorecedora) y la caída (la pierna ancha o el vuelo, el tejido)",
-        "pose_imagen": "she has just slipped the garment on and is still putting it on: with one hand she pulls the strap (or the shoulder of the garment) up onto her shoulder and with the other she pulls the fabric down at her hip.",
-        "manos_imagen": "one hand pulling the strap or shoulder of the garment up onto her shoulder, the other pulling the fabric down at the hip",
-        "ropa_base": "She wears nothing over the referenced garment; only simple neutral shoes.",
-        "pose_color": "poniéndose la prenda, subiéndose el tirante al hombro con una mano y bajando la tela por la cadera con la otra",
+        "pose_imagen": "she is in the middle of putting the garment on: the top part is already on, but the lower part is still pulled up and bunched around her waist and hips, so her plain black bike shorts are visible underneath, and she is pulling it down with both hands; the neckline, straps and fabric are clearly visible.",
+        "manos_imagen": "both hands gripping the bunched-up fabric at hip height, pulling it down",
+        "ropa_base": "Underneath the referenced garment she wears plain BLACK fitted bike shorts (mid-thigh sports shorts), visible because the garment is still pulled up; nothing over the garment; only simple neutral shoes. Nothing revealing: only normal sportswear.",
+        "pose_color": "poniéndose la prenda, con la parte de abajo todavía recogida en la cintura por encima de las mallas negras, y tirando de ella hacia abajo con las dos manos",
         "espalda_imagen": (
             "con una mano apoyada en la cintura, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (espalda, cintura y caída hasta el bajo)"
         ),
