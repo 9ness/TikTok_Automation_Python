@@ -40,13 +40,20 @@ def _run(cmd: list[str], on_log: OnLog) -> None:
         raise RuntimeError(f"ffmpeg falló: {proc.stderr[-500:]}")
 
 
-def pegar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
+def pegar(
+    clips: list[Path], destino: Path, on_log: OnLog = _noop,
+    guiones: list[str] | None = None,
+) -> Path:
     """Pega los clips de un vídeo que se graba por partes, CON su audio.
 
     Los `concatenar` del POV BOF y del BOF Cine no valen: tiran el audio
     (`a=0`) y aquí los clips vienen hablados. Se hace como en el Nicho
     General: cada clip a la misma caja y códec, y luego concat por lista sin
     recodificar.
+
+    `guiones` (lo que dice cada clip, en el mismo orden) sirve para cortar la
+    palabra que el generador empieza DESPUÉS del guion y deja a medias al
+    acabarse los 8 s: sin silencio al final, el recorte de silencio no la ve.
     """
     if len(clips) == 1:
         return Path(clips[0])
@@ -72,6 +79,11 @@ def pegar(clips: list[Path], destino: Path, on_log: OnLog = _noop) -> Path:
             hueco = _silencio_final(Path(clip), margen=0.0, tope=_MAX_RECORTE_COLA_S)
             quitar_fin = max(0.0, hueco - _COLA_FINAL_S)
         dur = probe_duration(Path(clip))
+        guion = (guiones or [])[i - 1] if guiones and len(guiones) == len(clips) else ""
+        if guion:
+            quitar_fin = max(quitar_fin, _palabra_a_medias(
+                Path(clip), guion, dur, work, on_log, ultimo=i == len(clips),
+            ))
         largo = max(0.5, dur - quitar_ini - quitar_fin)
         if quitar_ini or quitar_fin:
             on_log(
@@ -119,6 +131,60 @@ _MAX_RECORTE_FINAL_S = 1.5
 # acabó en 6,2 s de 8.
 _COLA_FINAL_S = 1.2
 _MAX_RECORTE_COLA_S = 3.0
+
+
+# Aire que se deja tras la última palabra del guion al cortar lo que sobra.
+_MARGEN_TRAS_GUION_S = 0.12
+
+
+def _palabra_a_medias(
+    clip: Path, guion: str, dur: float, work: Path, on_log: OnLog,
+    ultimo: bool = False,
+) -> float:
+    """Segundos a quitar del final si, acabado el guion, el clip sigue hablando.
+
+    Omni a veces empieza otra palabra tras la última del guion y los 8 s la
+    cortan por la mitad. Se busca en Whisper la última palabra del guion y, si
+    detrás hay voz (otra palabra, o el clip no acaba en silencio), se corta
+    justo después de ella. Si no se encuentra la palabra, no se toca nada.
+    En los clips de en medio basta con que no acabe en silencio (Whisper no
+    siempre oye media sílaba); en el último hace falta oír la palabra de más.
+    """
+    import difflib
+
+    from src.nicho_pov_bof.pipeline.video_editor import _norm_palabra, _transcribir_voz
+
+    palabras_guion = [_norm_palabra(p) for p in guion.split()]
+    palabras_guion = [p for p in palabras_guion if p]
+    if not palabras_guion:
+        return 0.0
+    sub = work / f"fin_{clip.stem}"
+    sub.mkdir(parents=True, exist_ok=True)
+    words = _transcribir_voz(clip, sub, on_log) or []
+    oidas = [_norm_palabra(w.get("word", "")) for w in words]
+    ultima = None
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(
+        None, palabras_guion, oidas, autojunk=False,
+    ).get_opcodes():
+        if op == "equal" and i2 == len(palabras_guion):
+            ultima = j2 - 1
+    if ultima is None:
+        return 0.0
+    fin_guion = float(words[ultima]["end"])
+    sobran = words[ultima + 1:]
+    corte = fin_guion + _MARGEN_TRAS_GUION_S
+    if sobran:
+        corte = min(corte, max(fin_guion, float(sobran[0]["start"]) - 0.03))
+    elif ultimo or _silencio_final(clip, margen=0.0, tope=dur) > 0:
+        # Acaba en silencio (de eso ya se encarga el recorte de silencio), o es
+        # el último clip: su cola es la de la flecha y, sin otra palabra oída,
+        # lo que queda puede ser solo ruido de la tienda.
+        return 0.0
+    quitar = dur - corte
+    if quitar > 0.05:
+        on_log(f"[nicho_ropa] {clip.name}: fuera {quitar:.2f}s tras el guion (palabra a medias)")
+        return quitar
+    return 0.0
 
 
 def _silencio_final(

@@ -796,3 +796,43 @@ class TestTextosPorLaCola:
         job = Job(mode=JobMode.NICHO_ROPA_TEXTOS, params={"carpeta": "c"})
         with pytest.raises(RuntimeError, match="ningún texto"):
             run_nicho_ropa_textos(job, lambda _m: None, lambda _p, _m: None)
+
+
+class TestPalabraAMedias:
+    """Omni empieza otra palabra tras el guion y los 8 s la cortan: se quita."""
+
+    GUION = "Cuello alto y corte estilizan un montón."
+
+    def _palabras(self, *extra):
+        base = [("Cuello", 5.4, 5.7), ("alto", 5.7, 5.9), ("y", 6.0, 6.1),
+                ("corte", 6.2, 6.6), ("estilizan", 6.6, 7.2), ("un", 7.2, 7.26),
+                ("montón.", 7.26, 7.58)]
+        return [{"word": w, "start": a, "end": b} for w, a, b in base + list(extra)]
+
+    def _medir(self, monkeypatch, tmp_path, palabras, silencio=0.0, ultimo=False):
+        from src.nicho_pov_bof.pipeline import video_editor as pov
+        from src.nicho_ropa.pipeline import video_editor as ve
+
+        monkeypatch.setattr(pov, "_transcribir_voz", lambda *a, **k: palabras)
+        monkeypatch.setattr(ve, "_silencio_final", lambda *a, **k: silencio)
+        return ve._palabra_a_medias(
+            Path("clip.mp4"), self.GUION, 8.0, tmp_path, lambda _: None, ultimo=ultimo,
+        )
+
+    def test_otra_palabra_tras_el_guion_se_corta(self, monkeypatch, tmp_path):
+        quitar = self._medir(monkeypatch, tmp_path, self._palabras(("Hay", 7.65, 8.0)))
+        assert quitar == pytest.approx(8.0 - 7.62, abs=0.01)
+
+    def test_sin_silencio_en_clip_intermedio_se_corta(self, monkeypatch, tmp_path):
+        quitar = self._medir(monkeypatch, tmp_path, self._palabras())
+        assert quitar == pytest.approx(8.0 - 7.70, abs=0.01)
+
+    def test_ultimo_sin_palabra_de_mas_no_toca_la_cola(self, monkeypatch, tmp_path):
+        assert self._medir(monkeypatch, tmp_path, self._palabras(), ultimo=True) == 0.0
+
+    def test_acaba_en_silencio_no_toca(self, monkeypatch, tmp_path):
+        assert self._medir(monkeypatch, tmp_path, self._palabras(), silencio=0.4) == 0.0
+
+    def test_sin_encontrar_el_guion_no_toca(self, monkeypatch, tmp_path):
+        otras = [{"word": "hola", "start": 0.0, "end": 0.5}]
+        assert self._medir(monkeypatch, tmp_path, otras) == 0.0

@@ -2014,6 +2014,9 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
         on_progress(0.3, f"🔗 Pegando {len(rutas)} clips…")
         raw_path = video_editor.pegar(
             rutas, raw_path.with_name(f"{raw_path.stem}_pegado.mp4"), on_log,
+            # Ya en el orden del guion: con él se corta la palabra que el
+            # generador empieza tras el texto y deja a medias.
+            guiones=[e["guion"] for e in escenas] if len(escenas) == len(rutas) else None,
         )
 
     # Los subtítulos solo los pide el formato que los lleva, y solo tienen
