@@ -511,7 +511,7 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
         for col in colores[:-1]:
             out["imagenes"].append({
                 "archivo": f"imagen_color_{_norm(col).replace(' ', '_')}.png",
-                "prompt": (est.get("imagen_color") or "").replace("{{COLOR}}", col),
+                "prompt": _con_familia(est.get("imagen_color") or "", familia, fam).replace("{{COLOR}}", col),
                 "adjuntar": [f"la foto del producto en color {col} (de fotos_color)"],
                 "donde": f"{FLOW} · en el MISMO chat que imagen_1", "formato": "9:16",
             })

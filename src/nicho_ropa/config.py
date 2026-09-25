@@ -283,7 +283,9 @@ def caracteres_por_clip(meta: dict) -> int:
 # `palabras` detecta la familia por el título, como el filtro de calzado.
 # `gesto` es lo que hace mientras nombra los colores; `detalle_1/2` los dos
 # planos del clip 1; `detalle_3` el primero del clip 2; `zonas` lo que el
-# guion tiene que nombrar, en ese orden.
+# guion tiene que nombrar, en ese orden. `pose_color` y `espalda_imagen` van
+# en las imágenes de color y de espaldas: antes decían "pantalón" y
+# "bolsillos traseros" fuera cual fuera la prenda, y una chaqueta salía mal.
 FAMILIAS_PRENDA: dict[str, dict] = {
     "pantalon": {
         "label": "Pantalón, falda o short",
@@ -327,6 +329,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "the trousers are pulled up only to mid-thigh and she is about to pull them up, so her plain black bike shorts are visible above them; her body is in three-quarter view so the curve of her hip shows; the trousers keep their full length and their hem reaches the shoes.",
         "manos_imagen": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
         "ropa_base": "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted bike shorts (mid-thigh sports shorts), visible above them. Nothing revealing: only normal sportswear.",
+        "pose_color": "poniéndose el pantalón, a mitad de muslo, con las mallas negras debajo",
+        "espalda_imagen": (
+            "con las manos apoyadas en la cintura o metidas en los bolsillos traseros, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (cintura, bolsillos traseros y largo)"
+        ),
     },
     "punto": {
         "label": "Jersey, chaleco o camiseta",
@@ -366,6 +372,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she holds the hem of the garment with both hands and gives it a short downward tug to settle it.",
         "manos_imagen": "both hands holding the hem of the garment at hip height, tugging it down",
         "ropa_base": "Below the referenced garment she wears plain wide-leg blue jeans and simple white sneakers; if the garment is open or sleeveless, a plain white fitted top underneath.",
+        "pose_color": "agarrando el bajo de la prenda con las dos manos para colocársela",
+        "espalda_imagen": (
+            "con los brazos relajados a los lados, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (hombros, espalda y bajo)"
+        ),
     },
     "abierta": {
         "label": "Chaqueta, cárdigan o abrigo",
@@ -403,6 +413,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she holds both front panels of the open garment, one in each hand, slightly opened, as if she had just put it on.",
         "manos_imagen": "each hand holding one front panel of the open garment at chest height",
         "ropa_base": "Under the referenced garment she wears a plain white fitted t-shirt, and below plain wide-leg blue jeans and simple white sneakers.",
+        "pose_color": "sujetando los dos delanteros de la prenda abierta, uno en cada mano",
+        "espalda_imagen": (
+            "con los brazos relajados a los lados, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (hombros, espalda, mangas y largo)"
+        ),
     },
     "capucha": {
         "label": "Sudadera con capucha o cremallera",
@@ -437,6 +451,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "the garment is open and she holds both sides of the zip, about to zip it up.",
         "manos_imagen": "both hands holding the two sides of the open zip at waist height",
         "ropa_base": "Under the referenced garment she wears a plain white fitted top, and below plain black leggings and simple white sneakers.",
+        "pose_color": "agarrando los dos lados de la cremallera abierta",
+        "espalda_imagen": (
+            "con los brazos relajados a los lados y la capucha bajada, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (capucha, espalda y bajo)"
+        ),
     },
     "mono": {
         "label": "Mono o vestido",
@@ -468,6 +486,10 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she is settling the garment, one hand at the neckline and the other at the waist.",
         "manos_imagen": "one hand at the neckline and the other at the waistband, settling the garment",
         "ropa_base": "She wears nothing over the referenced garment; only simple neutral shoes.",
+        "pose_color": "colocándose la prenda, con una mano en el escote y la otra en la cintura",
+        "espalda_imagen": (
+            "con una mano apoyada en la cintura, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (espalda, cintura y caída hasta el bajo)"
+        ),
     },
 }
 FAMILIA_DEFECTO = "pantalon"
@@ -496,7 +518,8 @@ def con_familia(texto: str, titulo: str) -> str:
     fam = FAMILIAS_PRENDA[familia_de(titulo)]
     for clave in (
         "gesto", "final_gesto", "detalle_1", "detalle_2", "detalle_3", "prueba",
-        "zonas", "pose_imagen", "manos_imagen", "ropa_base",
+        "zonas", "pose_imagen", "manos_imagen", "ropa_base", "pose_color",
+        "espalda_imagen",
     ):
         texto = texto.replace("{{" + clave.upper() + "}}", fam[clave])
     return texto
@@ -507,7 +530,8 @@ def familias_para_pantalla() -> dict[str, dict]:
     prompts sin pedir nada más: son cinco familias, no una por prenda."""
     campos = (
         "gesto", "final_gesto", "detalle_1", "detalle_2", "detalle_3", "prueba",
-        "zonas", "pose_imagen", "manos_imagen", "ropa_base",
+        "zonas", "pose_imagen", "manos_imagen", "ropa_base", "pose_color",
+        "espalda_imagen",
     )
     return {
         clave: {"label": fam["label"], **{c: fam[c] for c in campos}}

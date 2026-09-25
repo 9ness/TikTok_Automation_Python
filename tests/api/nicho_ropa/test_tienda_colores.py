@@ -104,6 +104,19 @@ class TestGuionPorClip:
         # Sin enumeración al principio, no se toca.
         assert r("Mira este pantalón beige.", ["beige", "taupe"]) == "Mira este pantalón beige."
 
+    def test_forzar_enumeracion(self):
+        f = guionista.forzar_enumeracion
+        # Nombra un color que no tiene y le falta otro: manda la lista.
+        assert f("Beige, marrón, verde militar y azul marino. Tejido suave.", ["negro", "verde militar", "azul marino", "beige"]) == "Negro, verde militar, azul marino y beige. Tejido suave."
+        # No nombra ninguno: se abre con la lista.
+        assert f("Mira este vestido. Qué escote.", ["granate", "negro"]) == "Granate y negro. Mira este vestido. Qué escote."
+        # Ya casa (con otro orden o acentos): solo se reordena.
+        assert f("Beige, marrón y negro. Mira.", ["negro", "beige", "marron"]).startswith("Negro, beige y marron.")
+        # Una frase de adjetivos no es una lista de colores.
+        assert f("Suave, fresca y cómoda. Mola.", ["rosa", "negro"]) == "Rosa y negro. Suave, fresca y cómoda. Mola."
+        # Con un color no hay lista.
+        assert f("Mira esta chaqueta.", ["negro"]) == "Mira esta chaqueta."
+
     def test_el_color_puesto_va_el_ultimo(self, monkeypatch):
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
         import src.tiktok_shop.api.gemini as gemini
@@ -488,7 +501,7 @@ class TestFotosDeColorSubidas:
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
         # Ya no nombra el color: lo manda la foto de producto adjunta.
         assert "foto de producto que adjunto" in e["imagen_color"] and "<!--" not in e["imagen_color"]
-        assert "{{" not in e["imagen_color"]
+        assert "{{" not in config.con_familia(e["imagen_color"], "Cárdigan largo")
         from src.api.schemas.nicho_ropa.models import EstiloMof10
 
         assert EstiloMof10(**e).imagen_color == e["imagen_color"]
@@ -699,10 +712,19 @@ class TestFamiliasDePrenda:
     def test_los_prompts_se_rellenan_enteros(self):
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
         for titulo in ("Pantalón wide leg", "Jersey de punto", "Cárdigan", "Sudadera con capucha", "Mono largo"):
-            for campo in ("imagen", "guion", "video_omni", "video_omni2"):
+            for campo in ("imagen", "guion", "video_omni", "video_omni2", "imagen_color", "imagen2"):
                 t = config.con_familia(e[campo], titulo)
-                sobran = [x for x in ("GESTO", "FINAL_GESTO", "DETALLE_1", "DETALLE_2", "DETALLE_3", "PRUEBA", "ZONAS", "POSE_IMAGEN", "MANOS_IMAGEN", "ROPA_BASE") if "{{" + x + "}}" in t]
+                sobran = [x for x in ("GESTO", "FINAL_GESTO", "DETALLE_1", "DETALLE_2", "DETALLE_3", "PRUEBA", "ZONAS", "POSE_IMAGEN", "MANOS_IMAGEN", "ROPA_BASE", "POSE_COLOR", "ESPALDA_IMAGEN") if "{{" + x + "}}" in t]
                 assert not sobran, (titulo, campo, sobran)
+
+    @pytest.mark.parametrize("titulo", ["Chaqueta de punto", "Vestido de encaje", "Sudadera con capucha"])
+    def test_solo_el_pantalon_dice_pantalon(self, titulo):
+        """Las imágenes de color, la de espaldas y los clips decían
+        "pantalón", "mallas" y "bolsillos traseros" para cualquier prenda."""
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        for campo in ("imagen_color", "imagen2", "video_omni", "video_omni2"):
+            t = config.con_familia(e[campo], titulo).lower()
+            assert "pantal" not in t and "mallas" not in t and "bolsillos traseros" not in t, (titulo, campo)
 
     def test_cada_familia_dice_algo_distinto(self):
         gestos = {f["gesto"] for f in config.FAMILIAS_PRENDA.values()}

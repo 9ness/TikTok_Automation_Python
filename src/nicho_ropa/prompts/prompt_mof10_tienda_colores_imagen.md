@@ -44,7 +44,7 @@
       "{{ROPA_BASE}}",
       "Shoes: simple and neutral (white or light grey sneakers, or plain sandals or flats), chosen to match the garment; never shoes that draw attention.",
       "No jacket, coat, bag, belt or any garment that covers or overlaps the referenced garment, unless a belt is part of the reference image.",
-      "The complete outfit must look clean, simple and coordinated: the garment is the star and the white top is a neutral canvas.",
+      "The complete outfit must look clean, simple and coordinated: the garment is the star and the rest of the outfit is a neutral canvas.",
       "The garment is the only fixed visual element. The woman and the store must be completely different and random in every generation."
     ]
   },
@@ -106,7 +106,7 @@
   },
   "atmosphere": {
     "mood": "Casual, spontaneous, realistic try-on video in a clothing store: a friend showing you a garment she just tried on.",
-    "randomization": "The woman, her identity, face, age, body, hair, skin tone, shoes, small accessories and the store must be completely random in every generation. Only the referenced garment (and its exact color) and the plain white fitted top are fixed.",
+    "randomization": "The woman, her identity, face, age, body, hair, skin tone, shoes, small accessories and the store must be completely random in every generation. Only the referenced garment (and its exact color) and the base outfit described above are fixed.",
     "final_style": "The final result must look like a real, unedited frame from a smartphone video recorded inside an ordinary clothing store, with no cinematic appearance, no artificial blur and no professional photography effects."
   }
 }

@@ -1966,7 +1966,7 @@ function PrendaCard({
                   key={c}
                   type="button"
                   title={`Copiar el prompt de Flow para la imagen en ${c}`}
-                  onClick={() => onCopiar(`Imagen en ${c}`, imagenColor.replace("{{COLOR}}", c))}
+                  onClick={() => onCopiar(`Imagen en ${c}`, conFamilia(imagenColor, prenda.familia, familias).replace("{{COLOR}}", c))}
                   className="flex min-w-0 items-center justify-center gap-1 rounded-md border border-border/60 px-1.5 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/30"
                 >
                   📋 <span className="truncate">{c}</span>

@@ -572,7 +572,7 @@ def _escribir_por_clips(
     if colores and len(lista_colores) >= 2 and clips:
         # La frase del clip 1 tiene que enumerar los colores en ESE orden:
         # es lo que casa cada palabra con su foto al montar.
-        clips[0] = reordenar_enumeracion(clips[0], lista_colores)
+        clips[0] = forzar_enumeracion(clips[0], lista_colores, on_log)
         videos[0] = (_montar_video(prompt, clips[0], parte=1) or clips[0]) + nota_tiempos(segundos)
     salida = {"dice": " ".join(clips), "video": videos[0], "videos": videos}
     if colores:
@@ -593,6 +593,65 @@ def _color_de_la_lista(nombre: str, lista: list[str]) -> str:
         if plano in _sin_acentos(c) or _sin_acentos(c) in plano:
             return c
     return ""
+
+
+# Palabras con las que empieza un nombre de color: sirven para reconocer que
+# la primera frase del clip 1 es la lista de colores aunque nombre alguno que
+# no está en la lista guardada ("beige, marrón…" en una prenda sin marrón).
+_PALABRAS_COLOR = frozenset((
+    "negro", "negra", "blanco", "blanca", "gris", "beige", "marron", "azul",
+    "verde", "rojo", "roja", "rosa", "amarillo", "naranja", "morado", "lila",
+    "granate", "burdeos", "crudo", "camel", "caqui", "kaki", "taupe",
+    "terracota", "mostaza", "coral", "turquesa", "plata", "dorado", "nude",
+    "vino", "arena", "chocolate", "marino", "militar", "celeste", "fucsia",
+    "malva", "violeta", "salmon", "hueso", "topo", "ceniza", "vainilla",
+    "oliva", "denim", "cafe", "tostado", "perla", "piedra", "mocca", "moka",
+))
+
+
+def _es_lista_de_colores(frase: str, colores: list[str]) -> bool:
+    """Si la frase es una enumeración de colores ("Gris, negro y azul")."""
+    import re as _re
+
+    partes = [x for x in _re.split(r"\s*,\s*|\s+(?:y|e)\s+", frase.strip()) if x]
+    if len(partes) < 2 or any(len(x.split()) > 3 for x in partes):
+        return False
+    conocidos = {_sin_acentos(c) for c in colores}
+    color = sum(
+        1 for x in partes
+        if _sin_acentos(x) in conocidos or _sin_acentos(x).split()[0] in _PALABRAS_COLOR
+    )
+    return color * 2 >= len(partes)
+
+
+def forzar_enumeracion(texto: str, colores: list[str], on_log: OnLog = _noop) -> str:
+    """El clip 1 abre SIEMPRE con la lista de colores guardada, en su orden.
+
+    Gemini devuelve la lista y la frase por separado y no siempre casan: en
+    la Carpeta 11 de mujer salió «Beige, marrón, verde militar y azul
+    marino» para una chaqueta en negro, verde militar, azul marino y beige,
+    y dos vestidos sin nombrar ningún color. Las imágenes y el perchero van
+    con la lista, así que es la frase la que se corrige: se sustituye la
+    enumeración que haya o, si no hay, se pone delante."""
+    import re as _re
+
+    if len(colores) < 2:
+        return texto
+    reordenado = reordenar_enumeracion(texto, colores)
+    if reordenado != texto:
+        return reordenado
+    lista = ", ".join(colores[:-1]) + " y " + colores[-1]
+    lista = lista[0].upper() + lista[1:]
+    resto = texto.strip()
+    m = _re.match(r"([^.!?¡¿]+)[.!?]\s*", resto)
+    if m and _es_lista_de_colores(m.group(1), colores):
+        if _sin_acentos(m.group(1).strip()) == _sin_acentos(lista):
+            return texto
+        on_log(f"[nicho_ropa] la frase nombraba «{m.group(1).strip()}»: se cambia por «{lista}»")
+        resto = resto[m.end():]
+    else:
+        on_log(f"[nicho_ropa] la frase no nombraba los colores: se abre con «{lista}»")
+    return f"{lista}. {resto}".strip()
 
 
 def reordenar_enumeracion(texto: str, colores: list[str]) -> str:

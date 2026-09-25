@@ -30,7 +30,7 @@ Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamen
 
 Movimiento:
 
-Crea un vídeo UGC totalmente realista de 8 segundos, grabado con un móvil en una tienda de ropa, con la creadora de las imágenes adjuntas. Las imágenes adjuntas son la MISMA chica, la misma pose y la misma tienda con el pantalón en distintos colores, en este orden: {{COLORES}}. El vídeo es un montaje de planos con CORTE SECO entre ellos (nada de fundidos ni transiciones), así:
+Crea un vídeo UGC totalmente realista de 8 segundos, grabado con un móvil en una tienda de ropa, con la creadora de las imágenes adjuntas. Las imágenes adjuntas son la MISMA chica, la misma pose y la misma tienda con la prenda en distintos colores, en este orden: {{COLORES}}. El vídeo es un montaje de planos con CORTE SECO entre ellos (nada de fundidos ni transiciones), así:
 
 PARTE 1 — los colores (desde el primer fotograma hasta que termina de nombrarlos). Plano medio, de la cintura a los pies, cámara fija. La creadora {{GESTO}}. Empieza con la prenda del PRIMER color de la lista, igual que en su imagen adjunta.
 
