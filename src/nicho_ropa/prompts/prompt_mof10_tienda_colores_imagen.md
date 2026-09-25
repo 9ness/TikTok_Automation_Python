@@ -33,7 +33,7 @@
     "gaze": "direct eye contact with the camera",
     "head_orientation": "naturally facing the camera",
     "hair": "long, glossy, well-groomed hair (random color and texture), worn loose, in soft waves or in a sleek high ponytail",
-    "body_type": "slim or fit, toned, the kind of figure of a fashion try-on creator",
+    "body_type": "{{CUERPO_IMAGEN}}",
     "skin_tone": "completely random natural skin tone"
   },
   "clothing": {

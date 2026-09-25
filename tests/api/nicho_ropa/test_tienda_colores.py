@@ -714,7 +714,7 @@ class TestFamiliasDePrenda:
         for titulo in ("Pantalón wide leg", "Jersey de punto", "Cárdigan", "Sudadera con capucha", "Mono largo"):
             for campo in ("imagen", "guion", "video_omni", "video_omni2", "imagen_color", "imagen2"):
                 t = config.con_familia(e[campo], titulo)
-                sobran = [x for x in ("GESTO", "FINAL_GESTO", "DETALLE_1", "DETALLE_2", "DETALLE_3", "PRUEBA", "ZONAS", "POSE_IMAGEN", "MANOS_IMAGEN", "ROPA_BASE", "POSE_COLOR", "ESPALDA_IMAGEN") if "{{" + x + "}}" in t]
+                sobran = [x for x in ("GESTO", "FINAL_GESTO", "DETALLE_1", "DETALLE_2", "DETALLE_3", "PRUEBA", "ZONAS", "POSE_IMAGEN", "MANOS_IMAGEN", "ROPA_BASE", "POSE_COLOR", "ESPALDA_IMAGEN", "CUERPO_IMAGEN") if "{{" + x + "}}" in t]
                 assert not sobran, (titulo, campo, sobran)
 
     @pytest.mark.parametrize("titulo", ["Chaqueta de punto", "Vestido de encaje", "Sudadera con capucha"])

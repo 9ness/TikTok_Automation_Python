@@ -289,7 +289,9 @@ def caracteres_por_clip(meta: dict) -> int:
 # En TODAS la chica se la está PONIENDO, a MEDIAS, como en los virales (Drive
 # del operador): el pantalón subiendo desde el muslo, el jersey recogido en el
 # pecho enseñando el top de debajo, la chaqueta resbalando por los brazos, el
-# vestido recogido en la cintura sobre las mallas. Con "se la coloca" o
+# vestido recogido en la cintura sobre las mallas. `cuerpo_imagen`: el cuerpo
+# que realza ESA prenda (caderas y curvas en un pantalón, cintura en un
+# vestido), como en los virales. Con "se la coloca" o
 # "sujeta los delanteros" salía posando, y no es el formato.
 FAMILIAS_PRENDA: dict[str, dict] = {
     "pantalon": {
@@ -334,6 +336,7 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "the trousers are pulled up only to mid-thigh and she is about to pull them up, so her plain black bike shorts are visible above them; her body is in three-quarter view so the curve of her hip shows; the trousers keep their full length and their hem reaches the shoes.",
         "manos_imagen": "both hands gripping the waistband of the trousers at mid-thigh height, mid-motion, about to pull them up",
         "ropa_base": "On top she wears a plain, fitted, PLAIN WHITE top with no print, no logo and no text, cropped so her waist is visible. Underneath the referenced trousers she wears plain BLACK fitted bike shorts (mid-thigh sports shorts), visible above them. Nothing revealing: only normal sportswear.",
+        "cuerpo_imagen": "young slim-waisted figure with curvy, well-defined hips and a rounded, toned silhouette and long legs, the kind of body that shows off how trousers fit at the waist and hips",
         "pose_color": "poniéndose el pantalón, a mitad de muslo, con las mallas negras debajo",
         "espalda_imagen": (
             "con las manos apoyadas en la cintura o metidas en los bolsillos traseros, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (cintura, bolsillos traseros y largo)"
@@ -370,6 +373,7 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she is in the middle of putting the garment on: it is already over her head and arms, but it is still pulled up and bunched at her chest, so her plain white crop top shows underneath, and she is pulling it down with both hands; the neckline, sleeves and knit are clearly visible.",
         "manos_imagen": "both hands gripping the bunched-up hem at chest height, pulling it down",
         "ropa_base": "Under the referenced garment she wears a plain white fitted crop top (visible because the garment is still pulled up), and below plain wide-leg blue jeans and simple white sneakers.",
+        "cuerpo_imagen": "young slim, toned figure with a defined waist, so the knit drapes nicely over the body",
         "pose_color": "poniéndose la prenda, todavía subida y recogida en el pecho, enseñando el top blanco, y tirando de ella hacia abajo con las dos manos",
         "espalda_imagen": (
             "con los brazos relajados a los lados, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (hombros, espalda y bajo)"
@@ -404,6 +408,7 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she is in the middle of putting the garment on: it is still half off her shoulders, slipping down her upper arms, and with both hands at the collar she is pulling it up onto her shoulders; the front, collar and fabric are clearly visible.",
         "manos_imagen": "both hands at the collar, pulling the garment up onto her shoulders",
         "ropa_base": "Under the referenced garment she wears a plain white fitted t-shirt, and below plain wide-leg blue jeans and simple white sneakers.",
+        "cuerpo_imagen": "young tall, slender and elegant figure with defined shoulders and a slim waist, so the jacket hangs beautifully",
         "pose_color": "poniéndose la prenda, todavía resbalando por los brazos, y subiéndosela a los hombros con las dos manos en el cuello",
         "espalda_imagen": (
             "con los brazos relajados a los lados, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (hombros, espalda, mangas y largo)"
@@ -435,6 +440,7 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she is in the middle of putting the garment on: it is open and still half off her shoulders, slipping down her upper arms, and with both hands at the collar she is pulling it up onto her shoulders; the hood, zip and fabric are clearly visible.",
         "manos_imagen": "both hands at the collar, pulling the open garment up onto her shoulders",
         "ropa_base": "Under the referenced garment she wears a plain white fitted top, and below plain black leggings and simple white sneakers.",
+        "cuerpo_imagen": "young slim, fit and sporty figure with a defined waist",
         "pose_color": "poniéndose la prenda abierta, todavía resbalando por los brazos, y subiéndosela a los hombros con las dos manos en el cuello",
         "espalda_imagen": (
             "con los brazos relajados a los lados y la capucha bajada, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (capucha, espalda y bajo)"
@@ -464,6 +470,7 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         "pose_imagen": "she is in the middle of putting the garment on: the top part is already on, but the lower part is still pulled up and bunched around her waist and hips, so her plain black bike shorts are visible underneath, and she is pulling it down with both hands; the neckline, straps and fabric are clearly visible.",
         "manos_imagen": "both hands gripping the bunched-up fabric at hip height, pulling it down",
         "ropa_base": "Underneath the referenced garment she wears plain BLACK fitted bike shorts (mid-thigh sports shorts), visible because the garment is still pulled up; nothing over the garment; only simple neutral shoes. Nothing revealing: only normal sportswear.",
+        "cuerpo_imagen": "young feminine hourglass figure with a defined waist and curvy hips, so the garment falls beautifully over the body",
         "pose_color": "poniéndose la prenda, con la parte de abajo todavía recogida en la cintura por encima de las mallas negras, y tirando de ella hacia abajo con las dos manos",
         "espalda_imagen": (
             "con una mano apoyada en la cintura, y la cabeza girada un poco por encima del hombro mirando a cámara. La prenda se ve entera por detrás (espalda, cintura y caída hasta el bajo)"
@@ -497,7 +504,7 @@ def con_familia(texto: str, titulo: str) -> str:
     for clave in (
         "gesto", "final_gesto", "detalle_1", "detalle_2", "detalle_3", "prueba",
         "zonas", "pose_imagen", "manos_imagen", "ropa_base", "pose_color",
-        "espalda_imagen",
+        "espalda_imagen", "cuerpo_imagen",
     ):
         texto = texto.replace("{{" + clave.upper() + "}}", fam[clave])
     return texto
@@ -509,7 +516,7 @@ def familias_para_pantalla() -> dict[str, dict]:
     campos = (
         "gesto", "final_gesto", "detalle_1", "detalle_2", "detalle_3", "prueba",
         "zonas", "pose_imagen", "manos_imagen", "ropa_base", "pose_color",
-        "espalda_imagen",
+        "espalda_imagen", "cuerpo_imagen",
     )
     return {
         clave: {"label": fam["label"], **{c: fam[c] for c in campos}}
