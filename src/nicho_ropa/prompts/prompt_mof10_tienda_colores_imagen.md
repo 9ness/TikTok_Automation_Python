@@ -18,18 +18,22 @@
      en que nombra cada color (con el pantalón a la altura que esté).
 
      La segunda imagen (`prompt_mof10_tienda_colores_imagen2.md`) es la misma
-     chica de espaldas, en la misma tienda: es el arranque del clip 2. -->
+     chica de espaldas, en la misma tienda: es el arranque del clip 2.
+
+     La chica: joven (20-25) y con pinta de creadora de moda, como en los
+     virales. Con "random adult 20-32" y "random body type" salían mujeres
+     que aparentaban 35-40 y el operador lo rechazó (sep 2026). -->
 
 {
   "subject": {
-    "description": "A completely random adult woman standing in three-quarter view (body slightly turned, face to the camera) inside a real clothing store, wearing the referenced garment and settling it: {{POSE_IMAGEN}} She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
+    "description": "A young, attractive adult woman (early twenties), like a stylish fashion content creator, standing in three-quarter view (body slightly turned, face to the camera) inside a real clothing store, wearing the referenced garment and settling it: {{POSE_IMAGEN}} She looks at the camera. Her identity, face, body, hair, skin tone, age and overall appearance must be entirely random in every generation. She is being recorded in a casual UGC style with a smartphone by another person. Her full body must be visible from head to toe.",
     "appearance": "entirely random",
-    "age": "random adult age between 20 and 32",
-    "expression": "natural, confident, slight smile, as if about to start talking",
+    "age": "young adult, clearly between 20 and 25 years old, fresh and youthful look (never older-looking, never a teenager)",
+    "expression": "natural, confident, charming smile, lively and expressive, as if about to start talking",
     "gaze": "direct eye contact with the camera",
     "head_orientation": "naturally facing the camera",
-    "hair": "completely random hair type, length, color and style, worn loose or in a ponytail",
-    "body_type": "completely random body type",
+    "hair": "long, glossy, well-groomed hair (random color and texture), worn loose, in soft waves or in a sleek high ponytail",
+    "body_type": "slim or fit, toned, the kind of figure of a fashion try-on creator",
     "skin_tone": "completely random natural skin tone"
   },
   "clothing": {
@@ -49,9 +53,9 @@
     ]
   },
   "face": {
-    "instructions": "Generate a completely random adult female face. Do not follow, reproduce or imitate any specific facial identity, facial description or predefined appearance.",
-    "skin_texture": "completely random natural and realistic skin texture, with visible pores and no excessive retouching",
-    "makeup": "light natural makeup or no makeup"
+    "instructions": "Generate a completely random, attractive, youthful adult female face (early twenties), with harmonious features. Do not follow, reproduce or imitate any specific facial identity, facial description or predefined appearance.",
+    "skin_texture": "fresh, healthy, glowing young skin, natural and realistic, with visible pores and no excessive retouching",
+    "makeup": "soft natural glam makeup: groomed brows, subtle mascara, glowy skin, nude lips"
   },
   "accessories": {
     "instructions": "Preserve any accessories visible in the reference image. Otherwise at most small, discreet accessories (thin bracelets, small earrings) that do not cover the garment. No sunglasses, no hats, no bags."
@@ -106,7 +110,7 @@
   },
   "atmosphere": {
     "mood": "Casual, spontaneous, realistic try-on video in a clothing store: a friend showing you a garment she just tried on.",
-    "randomization": "The woman, her identity, face, age, body, hair, skin tone, shoes, small accessories and the store must be completely random in every generation. Only the referenced garment (and its exact color) and the base outfit described above are fixed.",
+    "randomization": "The woman, her identity, face, hair color, skin tone, shoes, small accessories and the store must be completely random in every generation. Only the referenced garment (and its exact color) and the base outfit described above are fixed.",
     "final_style": "The final result must look like a real, unedited frame from a smartphone video recorded inside an ordinary clothing store, with no cinematic appearance, no artificial blur and no professional photography effects."
   }
 }
