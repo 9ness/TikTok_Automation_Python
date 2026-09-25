@@ -171,15 +171,16 @@ async def productos(ctx: Context, menu: str, catalogo: str, carpeta: str, modo: 
 async def preparar_carpeta(ctx: Context, menu: str, catalogo: str, carpeta: str,
                            modo: str = "", gancho: str = "", duracion: str = "",
                            clip_s: int = 0, estilo_guion: str = "",
-                           rehacer: bool = False) -> str:
+                           rehacer: bool = False, productos: str = "") -> str:
     """El «Paso 1» de la web: lee los textos de las fichas que falten y escribe
     los guiones/escenas que falten. Devuelve un `tarea_id` para `estado`.
     POV BOF / Largo: `clip_s` (8|10) fija la duración de clip de toda la carpeta;
     Largo: `estilo_guion` (precio|dolor). `rehacer=True` REESCRIBE lo que ya
-    está: solo si el operador lo pide."""
+    está: solo si el operador lo pide. Moda: `productos` ("1,3,5") limita los
+    guiones a esas prendas (sin él, toda la carpeta)."""
     c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion)
     tid = tareas.lanzar(f"Preparar {c.m.label} · {c.carpeta}",
-                        lambda: menus.preparar(c, clip_s, estilo_guion, rehacer))
+                        lambda: menus.preparar(c, clip_s, estilo_guion, rehacer, productos))
     return _json({"tarea_id": tid, "que": "Leyendo textos y encolando guiones. "
                   "Consulta `estado(tarea_id)`; los guiones van por la cola (varios minutos)."})
 

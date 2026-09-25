@@ -304,8 +304,13 @@ def ruta_video(c: Ctx, prod: str) -> str:
 # ---------------------------------------------------------------------------
 # Preparar: textos + guiones/escenas
 # ---------------------------------------------------------------------------
-async def preparar(c: Ctx, clip_s: int = 0, estilo_guion: str = "", rehacer: bool = False) -> dict:
-    """Lo que en la web es el Paso 1. Devuelve qué ha hecho y qué ha encolado."""
+async def preparar(c: Ctx, clip_s: int = 0, estilo_guion: str = "", rehacer: bool = False,
+                   productos: str = "") -> dict:
+    """Lo que en la web es el Paso 1. Devuelve qué ha hecho y qué ha encolado.
+    `productos` ("1,3,5") limita los guiones de Moda a esas prendas: rehacer la
+    carpeta entera le escribía guion también a las que no tocaba (una prenda de
+    un solo color en Tienda Colores)."""
+    solo = [x.strip() for x in (productos or "").split(",") if x.strip()]
     hecho: list[str] = []
     t = c.m.tipo
     if t == "largo" and estilo_guion:
@@ -352,12 +357,15 @@ async def preparar(c: Ctx, clip_s: int = 0, estilo_guion: str = "", rehacer: boo
             hecho.append("escenas → en la cola")
     elif t == "ropa":
         est = await estilo_ropa(c)
+        if solo:
+            items = [p for p in items if str(p.get("producto")) in solo]
         if est.get("escrito_fuera") and (
             rehacer or any(not (p.get("guion") or p.get("guiones")) for p in items)
         ):
             await c.api.post(f"{ROPA}/guiones", {"carpeta": c.carpeta, "modo": c.modo,
-                                                "duracion": c.duracion, "rehacer": rehacer})
-            hecho.append("guiones → en la cola")
+                                                "duracion": c.duracion, "rehacer": rehacer,
+                                                "productos": solo})
+            hecho.append("guiones" + (f" de {', '.join(solo)}" if solo else "") + " → en la cola")
         elif not est.get("escrito_fuera"):
             hecho.append("este modo no lleva guion por prenda (diálogo fijo o movimiento)")
     return {"hecho": hecho or ["nada que hacer: todo estaba listo"]}
