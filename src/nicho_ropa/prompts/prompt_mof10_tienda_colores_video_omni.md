@@ -26,7 +26,7 @@
 La mujer dice en español:
 «{{DICE}}»
 
-Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un timbre cálido, amigable y cercano. Ritmo conversacional ágil y natural, ligeramente enérgico, como una creadora UGC real enseñando ropa. Pronunciación española clara, sin tono de locutora publicitaria y sin entonación robótica. Pronunciación perfecta. Sin errores de pronunciación. La misma voz debe mantenerse en los dos clips, con sincronización labial precisa.
+Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un timbre cálido, amigable y cercano. Ritmo conversacional ágil y natural, ligeramente enérgico, como una creadora UGC real enseñando ropa. Acento de ESPAÑA (castellano peninsular, de Madrid): pronuncia la «c» y la «z» como en España (distinción), con entonación española. NADA de acento latinoamericano ni neutro. Pronunciación española clara, sin tono de locutora publicitaria y sin entonación robótica. Pronunciación perfecta. Sin errores de pronunciación. La misma voz debe mantenerse en los dos clips, con sincronización labial precisa.
 
 Movimiento:
 
@@ -34,7 +34,7 @@ Crea un vídeo UGC totalmente realista de 8 segundos, grabado con un móvil en u
 
 PARTE 1 — los colores (desde el primer fotograma hasta que termina de nombrarlos). Plano medio, de la cintura a los pies, cámara fija. La creadora {{GESTO}}. Empieza con la prenda del PRIMER color de la lista, igual que en su imagen adjunta.
 
-REGLA MÁS IMPORTANTE DE TODO EL VÍDEO: cada cambio de color va SINCRONIZADO CON LA VOZ. El corte al siguiente color ocurre EXACTAMENTE en el instante en que ella empieza a pronunciar ese color, ni antes ni después; mientras dice un color, la prenda es ese color y no cambia. Si al locutar tarda más en decirlos, los planos duran más: manda la voz, no el reloj. En cada corte la postura, el encuadre y la cámara son IDÉNTICOS: lo único que cambia es el color de la prenda, copiado de su imagen adjunta.
+Dice los colores despacio, con una pequeña pausa entre cada uno, y CADA color de la lista tiene su propio plano: ninguno se salta ni dura menos que los demás. REGLA MÁS IMPORTANTE DE TODO EL VÍDEO: cada cambio de color va SINCRONIZADO CON LA VOZ. El corte al siguiente color ocurre EXACTAMENTE en el instante en que ella empieza a pronunciar ese color, ni antes ni después; mientras dice un color, la prenda es ese color y no cambia. Si al locutar tarda más en decirlos, los planos duran más: manda la voz, no el reloj. En cada corte la postura, el encuadre y la cámara son IDÉNTICOS: lo único que cambia es el color de la prenda, copiado de su imagen adjunta.
 
 Al decir el ÚLTIMO color de la lista (el que lleva puesto el resto del vídeo) {{FINAL_GESTO}}. Ese plano dura un poco más que los anteriores. CORTE SECO.
 

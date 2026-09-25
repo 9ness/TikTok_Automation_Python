@@ -14,7 +14,7 @@
 La mujer dice en español:
 «{{DICE}}»
 
-Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un timbre cálido, amigable y cercano. Ritmo conversacional ágil y natural, ligeramente enérgico, como una creadora UGC real enseñando ropa. Pronunciación española clara, sin tono de locutora publicitaria y sin entonación robótica. Pronunciación perfecta. Sin errores de pronunciación. Es la MISMA voz del clip anterior, con sincronización labial precisa.
+Voz femenina ligera, viva y luminosa, perteneciente a una mujer de aproximadamente 25 años. Tono medio-agudo, brillante y claro, con un timbre cálido, amigable y cercano. Ritmo conversacional ágil y natural, ligeramente enérgico, como una creadora UGC real enseñando ropa. Acento de ESPAÑA (castellano peninsular, de Madrid): pronuncia la «c» y la «z» como en España (distinción), con entonación española. NADA de acento latinoamericano ni neutro. Pronunciación española clara, sin tono de locutora publicitaria y sin entonación robótica. Pronunciación perfecta. Sin errores de pronunciación. Es la MISMA voz del clip anterior, con sincronización labial precisa.
 
 Movimiento:
 
