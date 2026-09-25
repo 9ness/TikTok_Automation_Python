@@ -978,3 +978,4 @@
 - [2026-09-25] Tienda Colores (Omni): la voz salía con acento latino y un color (azul marino) se saltaba al enumerar deprisa. Las plantillas piden ahora acento de España con distinción c/z y una pausa + plano propio por color.
 - Tienda Colores: NUNCA meter fotos fijas en el vídeo para los cortes de color (prohibido por el operador); los colores tienen que salir en vídeo real — revertido 691d00ed.
 - Tienda Colores/Omni: los rótulos «PARTE N» del prompt acaban escritos en el vídeo aunque se prohíba; redactar los planos en prosa (Primero/Después/Por último). Y las fotos de color de Omni deben tener la MISMA pose (recolorear una sola base): si una difiere, se salta colores.
+- Tienda Colores/Omni: en los primeros planos (sin imagen de referencia de cerca) Omni reinventa la prenda; «el punto de cerca» del detalle de chaqueta la volvía de punto fina. Detalles sin tejido supuesto + regla de misma prenda en planos cercanos.
