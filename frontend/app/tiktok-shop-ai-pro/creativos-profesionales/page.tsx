@@ -61,6 +61,7 @@ import {
   ANCHO_VISOR,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
+import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -172,6 +173,7 @@ export default function CreativosProPage() {
               Un creativo publicitario por producto · sin vídeo
             </p>
           </div>
+          <GuiaIA guia="creativos-pro" />
         </div>
       </header>
 

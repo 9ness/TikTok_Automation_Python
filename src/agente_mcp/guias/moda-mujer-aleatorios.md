@@ -1,0 +1,166 @@
+# Moda Mujer · Aleatorios — `/tiktok-shop-ai-pro/nicho-ropa-mujer`
+
+Lee antes [`README.md`](README.md) y las tres guías de [`comun/`](comun/).
+La misma pantalla sirve para [Ropa Hombre](ropa-hombre.md) y
+[Marca Personal](moda-mujer-marca.md); cambian los modos.
+
+## Qué sale
+
+Un vídeo por prenda y por **modo**: una **chica distinta cada vez** (generada)
+con la prenda PUESTA, que **habla dentro del clip** (la voz la hace el
+generador de vídeo, no la app). Por eso **el clip se hace en Google Flow**
+(modelo Omni), el único que locuta. La app recorta a 1080×1920 (se come la
+marca de agua), pega los clips si son dos, pone subtítulos y flecha en los
+formatos de 15 s, y limpia metadatos.
+
+Cuenta de TikTok nueva → **máximo 10 vídeos al día**. Y el curso pide
+**mezclar modos**: no hagas 10 del mismo.
+
+## Los seis modos
+
+Se eligen en «Dónde trabajas» → **«Modo de grabación»** (🗣️ = hablado,
+🔇 = mudo). El progreso de la carpeta va **por modo**.
+
+| Botón | Clips | Imagen(es) | Guion del clip | Duración |
+|---|---|---|---|---|
+| 🪞 **BOF Frente a Espejo** | 1 | 1 · foto de la prenda | lo escribe la app por prenda | 10 s (Omni) u 8 s — se elige |
+| 🤳 **BOF Selfie** | 1 | 1 · foto de la prenda | lo escribe la app · ⚠️ **promete plazos siempre** | 10 s u 8 s |
+| 🚶 **Situación Real 1** | 1 | 1 · foto de la prenda | diálogo fijo del curso, igual para todas | 10 s |
+| ☕ **Situación Real 2** | 1 | 1 · foto de la prenda | diálogo fijo del curso | 10 s |
+| 🚶‍♀️ **Calle Dividido 15s** | 2 | 2 · la misma chica en dos calles | la app escribe Guion 1 y Guion 2 | 2 × 8 s |
+| 🏬 **Tienda Colores 15s** | 2 | 1 por color + 1 de espaldas | la app escribe los dos prompts de Omni | 2 × 8 s |
+
+## Qué preguntar además de lo común
+
+- **Modo** (de la tabla). Si piden «hazme la carpeta» sin modo, propón
+  repartir entre dos o tres.
+- **10 s u 8 s** en Espejo y Selfie (selector de duración del Paso 3).
+- **Plazos**: si una prenda ofrece pago a plazos, ¿quieres el guion que lo
+  dice? (por defecto **no**: el de la app no lo menciona y siempre es válido).
+
+## Paso a paso (común a los seis)
+
+### 0. Situarte
+1. Abre `/tiktok-shop-ai-pro/nicho-ropa-mujer`.
+2. «📁 Dónde trabajas» → **«Modo de grabación»** → el modo.
+3. **«Catálogo»**: «📦 Inventario» (el de la web del curso), «🎁 Muestras» o
+   «💼 Tareas» → chip **«Carpeta_N»**. El chip dice `con ficha/total`
+   (en Tienda Colores, también `🎨N` = prendas con 3+ colores).
+
+### 1. Paso 1 · «Textos de la ficha»
+**«✨ Obtener textos (x/N)»** si x < N. En Tienda Colores va a la cola.
+
+### 2. Paso 2 · «Bajar las fotos»
+**«Todas (N)»** → fotos limpias de las prendas. (Si salen «Sin plazos» /
+«💳 Con plazos», es para separarlas por grupo.) Guárdalas en
+`<Carpeta>/<nº>_<título>/foto_limpia.jpg`.
+
+### 3. Paso 3 · «Copiar el prompt»
+Arriba de todo, los accesos a **🖼️ Google Flow** (foto) y **🎬 Google Flow**
+(vídeo). Después, el bloque del modo con su lista de pasos 1️⃣ 2️⃣ 3️⃣ — **léela
+en pantalla**: dice si la imagen va como FRAME INICIAL o INGREDIENTE. Lo
+concreto de cada modo va abajo.
+
+### 4. Subir el clip (en la tarjeta de cada prenda)
+- Chip de voz: **«Su voz»** (lo normal: se queda la voz del clip). No elijas
+  «Mudo», «Voz H» ni «Voz M» salvo que lo pidan.
+- **«Subir»** (1 clip) o **«Clip 1»** + **«Clip 2»**. Con el primero de dos
+  sale «Clip 1 guardado. Falta el 2 para montar.»; al subir el segundo
+  empieza el montaje («montando…»). Los dos clips la app los **ordena por lo
+  que dicen**, pero súbelos en orden igualmente.
+- Revisa con «▶ Ver vídeo».
+
+### 5. Paso 4 · «Descargar lo ya montado»
+**«Vídeos x/N»** o **«🔗 Con URL (n)»** → `<Carpeta>/videos/`. En el VPS:
+`~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
+
+### 6. Marcas (solo si te lo piden)
+Tarjeta: «🏪 Escaparate · 📤 Subido · 💰 Vendió». Carpeta (por modo):
+«Completada» / «Pendiente».
+
+---
+
+## Detalle por modo
+
+### 🪞 BOF Frente a Espejo · 🤳 BOF Selfie
+1. Paso 3: elige **«10 s · Omni»** u **«8 s · GenAI Pro (Veo)»** en el
+   selector (ojo: aunque diga GenAI Pro, el clip habla → hazlo en **Flow** a
+   8 s). El selector cambia la longitud de los guiones.
+2. **«✍️ Escribir guiones (x/N)»** → la app escribe un guion por prenda
+   (cola, ~1 min). Aparece en cada tarjeta **«✍️ Copiar guion · N car»**
+   (🔁 = rehacer ese, no lo uses sin motivo).
+3. **«1 · Imagen (Flow)»** → Flow, imagen, Nano Banana 2, 9:16, adjunta
+   **solo la foto de la prenda**, pega. Revisa → `imagen_1.png`.
+4. Tarjeta → **«✍️ Copiar guion»** → Flow, vídeo Omni, **FRAME INICIAL** =
+   `imagen_1.png`, 9:16, 10 s u 8 s. Revisa (habla español de España, dice el
+   guion entero, no se corta) → descarga 1080p → `clip_1.mp4`.
+5. **Selfie**: el guion del curso **promete pago a plazos**. Úsalo solo con
+   prendas que los tengan (la tarjeta dice «💳 Con pago a plazos»); si no,
+   **borra esa frase** del guion antes de pegarlo en Flow.
+6. Solo si el operador lo pide, **«2 · Guion con plazos 💳»**: es un encargo
+   para ChatGPT (con la foto de la ficha) que devuelve el guion con la frase
+   de la financiación. Solo para prendas con plazos.
+
+### 🚶 Situación Real 1 · ☕ Situación Real 2
+1. **«1 · Imagen (Flow)»** → imagen con la foto de la prenda → `imagen_1.png`.
+2. **«2 · Guion (Flow)»** → es un **diálogo cerrado**, el mismo para todas
+   las prendas: se pega tal cual en Flow, vídeo Omni, FRAME INICIAL, 10 s.
+3. No hay «Escribir guiones» en estos dos modos.
+4. «Situación Real 1» sale con la etiqueta **«derivado»**: el texto lo
+   adaptamos nosotros del de hombre; revisa con más cuidado que suene natural.
+
+### 🚶‍♀️ Calle Dividido 15s (dos clips)
+1. **«✍️ Escribir guiones (x/N)»** → cada tarjeta enseña **«✍️ Guion 1 · N»**
+   y **«✍️ Guion 2 · N»**. Si uno sale en rojo con «⚠️», es demasiado largo:
+   pulsa 🔁 en esa prenda antes de seguir.
+2. **«1 · Imagen»** → Flow, con la foto de la prenda → `imagen_1.png`.
+3. **«1b · Imagen 2»** → en el **MISMO chat** de Flow (sin adjuntar nada
+   nuevo): la misma chica en otra calle → `imagen_2.png`. Comprueba que es la
+   misma persona y la misma prenda.
+4. Clip 1: Flow, vídeo Omni, FRAME INICIAL = `imagen_1.png`, **8 s**, pega
+   **Guion 1** → `clip_1.mp4`.
+5. Clip 2: FRAME INICIAL = `imagen_2.png`, 8 s, pega **Guion 2** → `clip_2.mp4`.
+6. Sube «Clip 1» y «Clip 2». La app los pega, pone subtítulos y flecha.
+
+### 🏬 Tienda Colores 15s (dos clips)
+Solo prendas con **3 colores o más**: activa el filtro **«🎨 Solo prendas con
+3 colores o más»**. (Si los chips no enseñan 🎨, la carpeta se importó antes
+del 22/9 y no tiene los colores: avisa.)
+
+1. **«✍️ Escribir guiones (x/N)»** — sin esto **no aparecen** los botones de
+   imagen ni de color en las tarjetas. Esto escribe, por prenda, los dos
+   prompts de vídeo para Omni con los nombres reales de sus colores.
+2. En la tarjeta, **«🎨 N»** → baja las fotos de la prenda en sus otros
+   colores → `color_<nombre>.jpg`.
+3. **«🖼️ Imagen 1»** (tarjeta) → Flow, imagen, con la foto principal de la
+   prenda → la chica en la tienda con la prenda de ese color →
+   `imagen_1.png`.
+4. En el **MISMO chat**: un botón **«📋 <color>»** por color, adjuntando la foto
+   de ese color → una imagen por color (`imagen_color_<nombre>.png`). Revisa
+   que es la misma chica y la misma prenda, solo cambia el color.
+5. En el mismo chat, **«🖼️ Imagen 2»** → la chica de espaldas →
+   `imagen_2.png`.
+6. Clip 1: **«🎬 Guion 1 · colores en Omni (fotos como ingredientes)»** →
+   Flow, vídeo Omni, **8 s**, 9:16, con **TODAS las imágenes de color como
+   INGREDIENTES**, **la del color que lleva puesto, la ÚLTIMA** → `clip_1.mp4`.
+   Revisa que el pantalón cambia de color cuando la chica nombra cada uno.
+7. Clip 2: **«🎬 Guion 2 · en Omni (de espaldas, sentadilla y cierre)»** →
+   FRAME INICIAL = `imagen_2.png`, 8 s → `clip_2.mp4`.
+8. Sube «Clip 1» y «Clip 2». La app NO toca los colores: pega, subtitula,
+   flecha y metadatos.
+
+Los botones **«✍️ Guion 1 / 2»** de estas tarjetas son solo el texto que dice
+la chica (para comprobar); lo que se pega en Flow son los **«🎬 … en Omni»**.
+
+## API útil (solo lectura)
+
+- `GET /api/v1/nicho-ropa/carpetas?sexo=mujer&modo=<modo>&catalogo=<web|muestras|tareas>`
+- `GET /api/v1/nicho-ropa/prendas?carpeta=<slug carpeta>&modo=<modo>` → guiones por prenda (slug de carpeta: `mujer_web__Carpeta 24`).
+- `GET /api/v1/nicho-ropa/prompts?carpeta=<slug>&modo=<modo>&duracion=10|8`
+
+Claves de modo: `espejo`, `camara` (Selfie), `calle_1`, `calle_2`,
+`calle_dividido`, `tienda_colores`.
+
+## Con el MCP
+
+Con el MCP: `menu="moda_mujer"`, `catalogo="web"|"muestras"|"tareas"`, `modo=` una de las claves de arriba y `duracion="10"|"8"`. `plan_producto` ya trae cada prompt montado para ESA prenda (en Tienda Colores, los de color y los dos de Omni con sus colores).

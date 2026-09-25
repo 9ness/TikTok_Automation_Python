@@ -40,6 +40,8 @@ import {
 } from "@/lib/queries/nichoRopa";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
 import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
+import { PersonajeMarca } from "@/components/tiktok-shop-ai-pro/PersonajeMarca";
+import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -546,9 +548,18 @@ export function PantallaRopa({
               <p className="text-[11px] text-muted-foreground">
                 {esMarca
                   ? "Tu personaje fijo · un clip de 8-10s por formato"
-                  : "La prenda PUESTA, grabada con el móvil · un clip de 10s por modo"}
+                  : "La prenda PUESTA, grabada con el móvil · un clip de 8-10s, o dos de 8s en los de 15s"}
               </p>
             </div>
+            <GuiaIA
+              guia={
+                esMarca
+                  ? "moda-mujer-marca"
+                  : sexo === "hombre"
+                    ? "ropa-hombre"
+                    : "moda-mujer-aleatorios"
+              }
+            />
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
             {esMarca ? (
@@ -562,8 +573,8 @@ export function PantallaRopa({
               <>
                 Las prendas entran por ZIP desde la web del curso y este
                 inventario es solo de {sexo}: el otro va en su pantalla. El clip
-                sale del generador ya hablado, así que se le respeta su voz y no
-                lleva ningún texto quemado.
+                sale del generador ya hablado, así que se le respeta su voz; solo
+                los formatos de 15s llevan subtítulos y flecha.
               </>
             )}
           </p>
@@ -1013,6 +1024,7 @@ export function PantallaRopa({
             que el vídeo puede ir en GenAI Pro; en los formatos hablados los
             dos pasos son de Flow, que es lo único que locuta. */}
         {esWeb && <HerramientasIA video={esMarca ? "genaipro" : "flow"} />}
+        {esMarca && <PersonajeMarca />}
         {esWeb &&
           (prompts.data?.mof10 ?? []).map((e) => (
             /* Dos pasos: la imagen se hace en Flow y esa imagen se anima con

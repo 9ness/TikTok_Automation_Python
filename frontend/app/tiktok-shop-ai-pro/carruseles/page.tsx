@@ -90,6 +90,7 @@ import {
   useSources,
 } from "@/lib/queries/nichoPovBof";
 import type { ProductoItem } from "@/lib/types/nichoPovBof";
+import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -363,6 +364,7 @@ export default function CarruselesPage() {
               Dos fotos: chica sorprendida + producto, con el texto quemado
             </p>
           </div>
+          <GuiaIA guia="carruseles" />
         </div>
       </header>
 

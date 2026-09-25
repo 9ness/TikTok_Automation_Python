@@ -49,6 +49,7 @@ import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
 import { VideoModal } from "@/components/ui/video-modal";
+import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
 /** Nicho General · UGC — el anuncio de TRES clips.
  *
@@ -153,6 +154,7 @@ export function PantallaUGC() {
               CTA
             </p>
           </div>
+          <GuiaIA guia="ugc" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Cada escena se genera aparte y se pegan al final. La continuidad sale

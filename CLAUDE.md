@@ -438,6 +438,29 @@ BOF (reusa sus endpoints), pero el **progreso es individual**: carpeta hecha
 `nicho_pov_bof_largo:` (`/producto/estado`). Dos progresos son GLOBALES a
 propósito (ver "Escaparate y vendidos" abajo).
 
+### Agentes de IA (MCP) — transversal al Programa 4
+
+[`src/agente_mcp/`](src/agente_mcp/) deja que Claude / ChatGPT / Codex hagan
+el trabajo de un menú: servidor MCP (paquete `mcp` 2.x, `MCPServer`) montado
+en la propia API en `POST /api/mcp/<token>` (Streamable HTTP sin estado,
+JSON). Las herramientas **no reimplementan nada**: llaman a los endpoints de
+cada nicho en proceso (`interno.py`, `httpx.ASGITransport`) con la cookie
+firmada del usuario del token, así que permisos, cola, coste y progreso por
+usuario son los de la web. Adaptador por menú en `menus.py` (POV BOF, Largo,
+Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
+
+- **Token** = `<usuario>.<HMAC(AUTH_COOKIE_KEY, MCP_TOKEN_SALT)>`: no se guarda
+  en ningún sitio; cambiar `MCP_TOKEN_SALT` revoca todos. La URL de cada uno
+  sale en Settings › «Conectar una IA (MCP)» (`/api/v1/agente/mi-conexion`).
+- **Bandeja**: `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/` en el Drive — el MCP deja
+  fotos + `PLAN.md` por producto, el agente guarda al lado lo que genera y el
+  MCP lo sube a la app. Es lo único que vale igual para un agente de
+  escritorio (Drive sincronizado) y uno del VPS (mount).
+- **Guías** (`src/agente_mcp/guias/*.md`): la misma fuente la lee el MCP
+  (`guia`), la API la sirve pública en `/api/v1/agente/guias/…` y cada
+  pantalla la enlaza con «Guía IA». **Si cambias el flujo de una pantalla,
+  cambia su guía.**
+
 ### Mi menú — la sidebar, por usuario
 
 Cada persona esconde y reordena su menú lateral desde `/settings` ("Mi menú",
@@ -628,6 +651,9 @@ PIXABAY_API_KEY=...
 # NICHO_POV_BOF_LARGO_REDIS_PREFIX=nicho_pov_bof_largo:  # default
 # ZOOM_MARCA_AGUA=1.05                       # ampliación que se come la marca
 # ESQUINA_MARCA_AGUA=abajo-derecha           #   de agua del generador de vídeo
+# PUBLIC_BASE_URL=https://factory.nebulabsmedia.com  # URL pública del MCP y sus enlaces
+# MCP_TOKEN_SALT=1                           # cambiarlo revoca todos los tokens del MCP
+# AGENTE_BANDEJA_DIR=                        # solo dev/tests: bandeja fuera del Drive
 ```
 
 ---
@@ -708,6 +734,7 @@ herramientas del mismo grupo en el futuro.
 | [`TTSHOP_AI_PRO_WEB.md`](TTSHOP_AI_PRO_WEB.md) | **La web del curso** — cómo funciona `ttshopaiproapp.com`, de donde salen prompts, ZIP y fichas. Está tras login del operador: ningún agente puede mirarla, así que lo que se sepa se escribe ahí |
 | [`UI_NICHOS.md`](UI_NICHOS.md) | **Estándar visual de las pantallas de nicho** (Programa 4) — anatomía de pantalla y de tarjeta, colores con significado, piezas que se reutilizan. Obligatorio antes de crear o retocar una |
 | [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Programa 4 — banco de candidatos sin repetir, 3 estilos de subtítulo, jitter anti-fingerprint, numeración de rondas |
+| [`src/agente_mcp/guias/`](src/agente_mcp/guias/README.md) | **Guías para agentes de IA** (una por menú del Programa 4): las lee el MCP con `guia`, se sirven en `/api/v1/agente/guias/…` y cada pantalla las enlaza con «Guía IA». Si cambias el flujo de una pantalla, actualiza su guía. Skill: `.claude/skills/operar-tiktok-ai-pro` |
 | [`WEB_CURSO.md`](WEB_CURSO.md) | **Web del curso (`ttshopaiproapp.com`)** — mapa de menús y hashes, inventarios, cómo entran ZIP/enlaces en nuestra app, prompts publicados, precios de Compras, peticiones de mejora pendientes |
 | [`EDITOR_DEBUGGING.md`](EDITOR_DEBUGGING.md) | **Playbook de depuración del cortador de vídeo** — LEER antes de tocar `silence_cutter.py`: jerarquía de señales (silero>energía>Whisper), pipeline, casuística de bugs reales (proteína…), cómo diagnosticar una queja, gotchas de cola/deploy, auto-corrección |
 | [`PronosticosAuto.md`](PronosticosAuto.md) | Nicho Pronósticos — schema Redis bet-ai-master, segmentos, overlays |

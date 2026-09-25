@@ -126,6 +126,7 @@ import {
 } from "@/lib/subidaNativa";
 import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
+import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
 /** EchoTik apagado a petición del operador: su cuota gratis no da para el
  *  volumen diario y de momento no lo usa. Poniéndolo a `true` vuelven el panel
@@ -702,16 +703,17 @@ export default function NichoPovBofPage() {
           <div className="min-w-0">
             <h1 className="text-base font-bold sm:text-lg">Nicho POV BOF</h1>
             <p className="text-[11px] text-muted-foreground">
-              Un vídeo por producto: la mano enseña el producto y la voz sale
-              del banco de audios · UN clip de 10s
+              Un vídeo por producto: la mano enseña el producto y la voz lee
+              un guion escrito para él · 1 clip de 10s o 2 de 8s
             </p>
           </div>
+          <GuiaIA guia="pov-bof" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Los productos salen del Drive del curso (solo lectura) y lo que
-          marques aquí —textos, escaparate, subido— es de este nicho. Todos los
-          vídeos llevan dos clips; los que pasan de 40 € cambian la voz por el
-          guion de plazos.
+          marques aquí —textos, escaparate, subido— es de este nicho. Cuántos
+          clips lleva cada vídeo lo dice su tarjeta; la frase de plazos solo
+          entra si la ficha del producto los ofrece.
         </p>
       </header>
 

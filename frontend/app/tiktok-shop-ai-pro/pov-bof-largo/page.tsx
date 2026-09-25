@@ -118,6 +118,7 @@ import type {
 import type { ProductoLargo } from "@/lib/types/povBofLargo";
 import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
+import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -681,6 +682,7 @@ export default function PovBofLargoPage() {
               cada producto · DOS clips, normalmente de 8s
             </p>
           </div>
+          <GuiaIA guia="pov-bof-largo" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Mismo catálogo y carpetas que el POV BOF; el progreso es aparte. El

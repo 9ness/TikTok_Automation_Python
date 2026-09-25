@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { DeployPanel } from "@/components/settings/DeployPanel";
 import { MenuPersonalizado } from "@/components/settings/MenuPersonalizado";
+import { ConectarIA } from "@/components/settings/ConectarIA";
 import { ApiError, api } from "@/lib/api";
 import { checkApiHealth, type HealthResponse } from "@/lib/queries/queue";
 
@@ -58,6 +59,9 @@ export default function SettingsPage() {
 
       {/* El menú, justo debajo: es lo único de aquí que se toca a diario. */}
       <MenuPersonalizado />
+
+      {/* La URL del MCP para que Claude/ChatGPT trabajen con la app. */}
+      <ConectarIA />
 
       {/* API colapsada por defecto — config raramente toca, no necesita
           ocupar espacio. Se abre con click si hay que ver/testar conexión. */}

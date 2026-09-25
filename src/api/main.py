@@ -199,9 +199,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     backup_stop = asyncio.Event()
     backup_task = asyncio.create_task(backup_diario_bucle(backup_stop))
 
+    # Servidor MCP para agentes (src/agente_mcp): su gestor de sesiones vive
+    # mientras viva la app. Si falta el paquete `mcp`, la app arranca igual.
+    from contextlib import AsyncExitStack
+
+    pila_mcp = AsyncExitStack()
+    try:
+        from src.agente_mcp.servidor import sesiones as mcp_sesiones
+
+        await pila_mcp.enter_async_context(mcp_sesiones())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("MCP de agentes desactivado: %s", e)
+
     try:
         yield
     finally:
+        await pila_mcp.aclose()
         backup_stop.set()
         try:
             await asyncio.wait_for(backup_task, timeout=5)
@@ -349,6 +362,15 @@ def create_app() -> FastAPI:
     app.include_router(deploy_router)
     app.include_router(diagnostics_router)
     app.include_router(queue_ws_router)
+    # MCP para agentes (Claude, ChatGPT…): rutas de ficheros/guías y el
+    # protocolo en /api/mcp/<token>. Opcional: sin el paquete `mcp` no se monta.
+    try:
+        from src.agente_mcp.servidor import MiddlewareMCP, router as agente_router
+
+        app.include_router(agente_router)
+        app.add_middleware(MiddlewareMCP)
+    except ImportError as e:
+        logger.warning("MCP de agentes no disponible: %s", e)
     return app
 
 
@@ -386,6 +408,9 @@ _PREFIJOS_PRO = (
     # por eso va la ruta exacta y no el prefijo `/api/v1/deploy`.
     "/api/v1/deploy/status",
     "/api/v1/queue",
+    # Guías y conexión del MCP de agentes. El MCP en sí (/api/mcp/<token>) va
+    # sin cookie y actúa como el usuario del token, con SUS permisos.
+    "/api/v1/agente",
     "/api/v1/auth",
     "/api/v1/health",
     "/ws/queue",

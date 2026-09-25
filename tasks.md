@@ -129,6 +129,38 @@ subir con el ⬆ de esa fila → quemar textos.
   salen en la tarjeta (🧵). Las 29 carpetas importadas antes NO las tienen:
   hay que resubir sus ZIP (no toca lo demás).
 
+## 🤖 Agentes de IA: guías + MCP (25 sep 2026)
+
+Hechos: guías en `src/agente_mcp/guias/` (botón «Guía IA» en cada nicho,
+`/api/v1/agente/guias/…`, skill `.claude/skills/operar-tiktok-ai-pro`) y el MCP
+en `/api/mcp/<token>` (URL en Settings › Conectar una IA). Cubre POV BOF,
+Largo, Moda Mujer (Aleatorios y Marca), Ropa Hombre, UGC y Creativos.
+Pendiente:
+
+- [ ] **Conectarlo de verdad** en Claude (conector personalizado) y en ChatGPT
+  (modo desarrollador) y hacer una carpeta pequeña de punta a punta.
+- [ ] Herramientas de **Carruseles** (tandas por escenario, foto 2, quemar).
+- [ ] **Probar las guías con un agente real** (Claude en Chrome y ChatGPT
+  Agent) en una carpeta pequeña y corregir lo que no cuadre con la pantalla.
+- [ ] Confirmar las URLs de los **spaces de Magnific** (las de la guía son de
+  antes de dejarlo, sep 2026).
+- [ ] Guías de los menús que faltan si se siguen usando (BOF Cine, Gorras,
+  Cuenta Piloto, Sin humanos).
+- [ ] Encontrado al mapear, sin arreglar:
+  - POV BOF Largo: con clips de 8 s y guion de 40 s pide 5 clips, pero la
+    tarjeta solo pinta 4 huecos (`Math.min(4…)`) → el montaje no arranca.
+  - Marca Personal / Ropa Hombre: el filtro de calzado/categoría existe
+    (`es_calzado`, `categoria`) pero la pantalla no lo aplica.
+  - `_PREFIJOS_PRO` (`src/api/main.py`) no incluye `/api/v1/nicho-general` ni
+    `/api/v1/plantillas` → 403 para ana/mauro si entran.
+  - UGC guarda en `<mount>/TIKTOK_SHOP_AI_PRO/Nicho_General/…` sin el prefijo
+    `NEBULABS_AUTOMATED_TIKTOK/` que usan los demás.
+  - `PRECIO_MIN_PLAZOS` vale 20 en `nicho_pov_bof/config.py`; CLAUDE.md dice 40.
+  - «Sin humanos» comparte la clave de modo guardado con Moda Mujer Aleatorios
+    (`ropa-web:mujer:aleatorios:modo`) y oculta el chip de voz.
+  - `NICHO_POV_BOF_MODULE.md` desfasado (nombres de salida, Veo3/Kling, banco
+    de audios).
+
 ## 👤 Tareas Humanas
 
 - [ ] **APK nueva (WebView) — lo que queda por probar**: los CARRUSELES, que es lo único que baja por `blob:` (base64) y no se ha visto con tandas grandes. Lo demás ya está en uso: descargas a `Download/TTShopAIPro/`, subida de clips con el móvil bloqueado y el aviso de versión nueva (probado con el salto 2.0 → 2.1). Falta avisar a Ana y a Mauro de que actualicen — les sale el banner al entrar — y de que tendrán que meter el PIN otra vez.

@@ -46,7 +46,10 @@ Siempre este orden. El contenedor es
 ### 1. Cabecera
 
 De texto: icono + `h1` + una línea de qué hace + un párrafo de contexto (de
-dónde salen los productos y qué progreso es de este nicho).
+dónde salen los productos y qué progreso es de este nicho). A la derecha del
+título, `<GuiaIA guia="…" />`: el enlace a la guía de esa pantalla para
+agentes de IA (`src/agente_mcp/guias/`). Si la pantalla cambia, su guía
+también.
 
 **Nunca la portada del curso.** Ocupa media pantalla en el móvil y dice menos
 que dos líneas; lo primero que hay que ver es dónde estás trabajando. Solo la

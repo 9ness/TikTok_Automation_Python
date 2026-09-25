@@ -84,6 +84,7 @@ en VPS Hetzner con Tailscale Funnel.
 | [`deploy/README.md`](deploy/README.md), [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Despliegue VPS y acceso SSH |
 | [`learnings.md`](learnings.md) | Historial técnico (1 línea por fix/aprendizaje) |
 | [`tasks.md`](tasks.md) | TODO pendientes (incluye tareas humanas: claves, planes de pago) |
+| [`src/agente_mcp/guias/README.md`](src/agente_mcp/guias/README.md) | **Si te piden HACER el trabajo de un menú de Tiktok Shop AI Pro** (bajar fotos, generar en Flow, subir clips…): el proceso paso a paso de cada pantalla, y el MCP (`src/agente_mcp/`) que lo automatiza. Si cambias el flujo de una pantalla, actualiza su guía |
 | [`SESSION_STATE.md`](SESSION_STATE.md) | Handoff del refactor TikTok Shop (mayo 2026) |
 
 ---
