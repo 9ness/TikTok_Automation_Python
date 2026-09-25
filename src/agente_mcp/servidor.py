@@ -626,7 +626,17 @@ def mi_conexion(request: Request) -> dict:
     u = usuario_de_request(request) or ""
     if not u:
         return {"error": "Entra en la app primero."}
-    return {"usuario": u, "url": config.url_mcp(u),
-            "subir": f"{config.url_mcp(u)}/subir",
-            "guias": f"{config.base_publica()}/api/v1/agente/guias/README.md"}
+    from src.api import users
+
+    datos = {"usuario": u, "url": config.url_mcp(u),
+             "subir": f"{config.url_mcp(u)}/subir",
+             "guias": f"{config.base_publica()}/api/v1/agente/guias/README.md"}
+    # El admin reparte las conexiones: los demás no pueden entrar en Settings,
+    # y el conector de cada cuenta lo monta él en su PC.
+    if users.es_admin(u):
+        datos["todos"] = [
+            {"usuario": x["username"], "nombre": x["nombre"], "url": config.url_mcp(x["username"])}
+            for x in users.listar()
+        ]
+    return datos
 

@@ -9,7 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
 
-type Conexion = { usuario?: string; url?: string; subir?: string; guias?: string; error?: string };
+type Fila = { usuario: string; nombre: string; url: string };
+type Conexion = {
+  usuario?: string; url?: string; subir?: string; guias?: string; error?: string;
+  /** Solo para el admin: la de cada usuario, que es quien monta los conectores. */
+  todos?: Fila[];
+};
+
+function oculta(url: string): string {
+  return url.replace(/\/api\/mcp\/.*/, "/api/mcp/••••••••");
+}
 
 /** La URL del MCP de este usuario, para conectar Claude o ChatGPT a la app.
  *
@@ -46,19 +55,42 @@ export function ConectarIA() {
         {q.data?.error ? (
           <p className="text-amber-500">{q.data.error}</p>
         ) : (
-          <div className="flex gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
-              {url ? (ver ? url : url.replace(/\/api\/mcp\/.*/, "/api/mcp/••••••••")) : "…"}
-            </code>
-            <Button size="icon" variant="outline" onClick={() => setVer((v) => !v)}
-              aria-label={ver ? "Ocultar" : "Mostrar"} disabled={!url}>
-              {ver ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </Button>
-            <Button size="icon" variant="outline" onClick={() => copiar(url, "URL")}
-              aria-label="Copiar" disabled={!url}>
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
+          (q.data?.todos?.length
+            ? q.data.todos
+            : [{ usuario: q.data?.usuario ?? "", nombre: "", url }]
+          ).map((f) => (
+            <div key={f.usuario || "yo"} className="space-y-0.5">
+              {q.data?.todos?.length ? (
+                <p className="text-[11px] font-medium">
+                  {f.nombre || f.usuario}{" "}
+                  <span className="text-muted-foreground">· {f.usuario}</span>
+                  {f.usuario === q.data?.usuario && (
+                    <span className="text-muted-foreground"> (tú)</span>
+                  )}
+                </p>
+              ) : null}
+              <div className="flex gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 font-mono text-[11px]">
+                  {f.url ? (ver ? f.url : oculta(f.url)) : "…"}
+                </code>
+                <Button size="icon" variant="outline" onClick={() => setVer((v) => !v)}
+                  aria-label={ver ? "Ocultar" : "Mostrar"} disabled={!f.url}>
+                  {ver ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+                <Button size="icon" variant="outline"
+                  onClick={() => copiar(f.url, `URL de ${f.nombre || f.usuario || "tu usuario"}`)}
+                  aria-label="Copiar" disabled={!f.url}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+        {!!q.data?.todos?.length && (
+          <p className="text-[11px] text-muted-foreground">
+            Un conector por cuenta: añade cada URL con su nombre («TikTok AI Pro ·
+            Ana»…) y en cada chat activa solo el de la cuenta con la que trabajas.
+          </p>
         )}
         <ul className="space-y-1 text-[11px] text-muted-foreground sm:text-xs">
           <li>
