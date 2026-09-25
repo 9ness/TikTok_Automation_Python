@@ -176,14 +176,7 @@ def aplicar(
     # los trae el propio clip. Se sale ANTES de mirar las fotos subidas —
     # dejarlas actuar era lo que seguía tapando el vídeo con fotos fijas de
     # montajes anteriores.
-    # Con fotos de cada color subidas (hechas en Flow) se cortan ellas aunque
-    # las dos vías de recolor estén apagadas: Omni NO hace de fiar los tres
-    # cortes en 2,5 s (sep 2026: se comía el azul marino, o dos colores, y si
-    # se le rotulaban los planos escribía los rótulos). El clip 1 se genera
-    # entonces solo con el color puesto y los cortes los pone el montaje, a la
-    # palabra. Si el clip ya cambia de color, no se toca (ver abajo).
-    hay_fotos = any(Path(v).is_file() for v in (fotos_colores or {}).values())
-    if not RECOLOR_VIDEO and not RECOLOR_IA and not hay_fotos:
+    if not RECOLOR_VIDEO and not RECOLOR_IA:
         on_log("[colores] los colores los trae el vídeo: la edición no los toca")
         return Path(clip)
     from src.nicho_pov_bof.pipeline.video_editor import _transcribir_voz
@@ -217,9 +210,6 @@ def aplicar(
         hecho = _recolorear_en_video(Path(clip), colores, tiempos, tonos, subidas, work_dir, on_log)
         if hecho:
             return hecho
-
-    if hay_fotos and not RECOLOR_VIDEO and _ya_trae_colores(Path(clip), tiempos, on_log):
-        return Path(clip)
 
     fotos: list[Path] = []
     sin_foto: list[str] = []

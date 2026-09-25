@@ -976,4 +976,3 @@
 - [2026-09-25] Tienda Colores: en TODAS las familias la chica se está PONIENDO la prenda (brazo en la manga, bajo recogido, tirante subiendo); con «se la coloca / sujeta los delanteros» salía posando quieta — el operador lo cazó en la primera imagen.
 - [2026-09-25] Tienda Colores (Omni): con los rótulos «PARTE 2 —» del prompt, Flow quemó «PART 2» en el vídeo. Se avisa en la plantilla de que son instrucciones y no se escriben.
 - [2026-09-25] Tienda Colores (Omni): la voz salía con acento latino y un color (azul marino) se saltaba al enumerar deprisa. Las plantillas piden ahora acento de España con distinción c/z y una pausa + plano propio por color.
-- [2026-09-25] Tienda Colores: Omni no es fiable haciendo 3 cortes de color en ~2,5 s con 4 ingredientes (se come colores; si se rotulan los planos escribe los rótulos). Se reactiva el corte en montaje (pipeline/colores.py) cuando la prenda tiene fotos de color subidas: el clip 1 se genera solo con el color puesto.
