@@ -20,12 +20,12 @@ Movimiento:
 
 Crea un vídeo UGC totalmente realista de 8 segundos, grabado con un móvil en una tienda de ropa, con la creadora de la imagen adjunta, que lleva puesta la prenda. Es la continuación del clip anterior: misma chica, misma tienda, misma luz, misma prenda y mismo color. El vídeo son TRES planos con CORTE SECO entre ellos (nada de fundidos ni transiciones), y cada corte va SINCRONIZADO CON LA VOZ: se pasa al plano siguiente justo cuando ella empieza la frase que le toca, no antes. Manda la voz, no el reloj.
 
-PARTE 1 — por detrás (mientras dice la frase de cómo queda por detrás). {{DETALLE_3}}. CORTE SECO.
+Primero, mientras dice la frase de cómo queda por detrás: {{DETALLE_3}}. CORTE SECO.
 
-PARTE 2 — la prueba (mientras dice la frase de que es cómoda). Plano entero, cámara fija. {{PRUEBA}}. CORTE SECO.
+Después, mientras dice la frase de que es cómoda: Plano entero, cámara fija. {{PRUEBA}}. CORTE SECO.
 
-PARTE 3 — el cierre (mientras dice la última frase, hasta el final). Plano entero de frente, cámara fija. Se ha girado hacia la cámara, sonríe y con una mano sostiene o señala una percha con la misma prenda en los otros colores ({{COLORES}}), que cuelgan a su lado; termina mirando a cámara.
+Por último, mientras dice la última frase y hasta el final: Plano entero de frente, cámara fija. Se ha girado hacia la cámara, sonríe y con una mano sostiene o señala una percha con la misma prenda en los otros colores ({{COLORES}}), que cuelgan a su lado; termina mirando a cámara.
 
-En todos los planos: la misma creadora, la misma tienda, la misma luz y la misma prenda, que conserva exactamente su diseño, tejido, color, corte y detalles. Sin filtros, efectos, textos ni elementos artificiales. SIN música ni sonido añadido en ningún momento (tampoco al final): solo su voz y el ambiente de la tienda. Los rótulos «PARTE 1», «PARTE 2» y «PARTE 3» son solo instrucciones para ti: NO aparecen escritos en el vídeo, ni ningún otro texto. Cámara con pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Movimiento de labios sincronizado con la narración cuando la cara está en plano, con la misma voz femenina española, juvenil y natural del clip anterior.
+En todos los planos: la misma creadora, la misma tienda, la misma luz y la misma prenda, que conserva exactamente su diseño, tejido, color, corte y detalles. Sin filtros ni efectos. NINGÚN texto sobreimpreso en el vídeo (ni rótulos, ni títulos, ni subtítulos, ni nombres de colores escritos). SIN música ni sonido añadido en ningún momento (tampoco al final): solo su voz y el ambiente de la tienda. Cámara con pequeñas vibraciones reales de grabación manual, iluminación natural de tienda y calidad propia de un iPhone. Movimiento de labios sincronizado con la narración cuando la cara está en plano, con la misma voz femenina española, juvenil y natural del clip anterior.
 
 Tiempos: el clip dura 8 segundos. Empieza a hablar DESDE EL PRIMER FOTOGRAMA, sin silencio de entrada. Habla a ritmo natural y sin prisa, y termina la última frase antes del último segundo, dejando un instante de silencio al final. Di el texto completo, sin cortar ninguna palabra.
