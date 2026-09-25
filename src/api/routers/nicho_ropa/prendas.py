@@ -962,6 +962,81 @@ def get_foto_limpia(
     raise APIError(f"No existe la prenda {producto}.", status_code=404)
 
 
+# ---------------------------------------------------------------------------
+# Personaje fijo de Marca Personal (el que se adjunta en Flow con la prenda)
+# ---------------------------------------------------------------------------
+@router.get("/personaje-marca/estado")
+def estado_personaje_marca(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    from src.nicho_ropa.services import personaje_marca
+
+    return personaje_marca.estado(usuario)
+
+
+@router.get("/personaje-marca")
+def ver_personaje_marca(
+    descargar: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    """Sirve la foto del personaje. Auth por `?api_key=` (va en un `<img src>`)."""
+    from src.nicho_ropa.services import personaje_marca
+
+    ruta = personaje_marca.obtener(usuario)
+    if not ruta:
+        raise APIError(
+            "No hay personaje de Marca Personal. Súbelo desde la pantalla.",
+            status_code=404,
+        )
+    media = "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
+    headers = {"Cache-Control": "private, max-age=86400"}
+    if descargar:
+        headers["Content-Disposition"] = (
+            f'attachment; filename="personaje_marca{ruta.suffix.lower()}"'
+        )
+    return FileResponse(ruta, media_type=media, headers=headers)
+
+
+@router.post("/personaje-marca")
+async def subir_personaje_marca(
+    archivo: Annotated[UploadFile, File()],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    from src.nicho_ropa.services import personaje_marca
+
+    nombre = (archivo.filename or "").lower()
+    if not any(nombre.endswith(e) for e in (".jpg", ".jpeg", ".png", ".webp")):
+        raise APIError(
+            f"Formato no soportado ({archivo.filename!r}). Acepta jpg, jpeg, png o webp.",
+            status_code=400,
+        )
+    datos = await archivo.read()
+    if not datos:
+        raise APIError("La foto llegó vacía.", status_code=400)
+    if len(datos) > 12 * 1024 * 1024:
+        raise APIError(
+            f"La foto pesa {len(datos) / 1e6:.0f} MB; el tope son 12 MB.",
+            status_code=400,
+        )
+    try:
+        await run_in_threadpool(
+            personaje_marca.guardar, usuario, datos, archivo.filename or "",
+        )
+    except OSError as e:
+        raise APIError(f"No se pudo guardar el personaje: {e}", status_code=500) from e
+    return personaje_marca.estado(usuario)
+
+
+@router.delete("/personaje-marca")
+def borrar_personaje_marca(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    from src.nicho_ropa.services import personaje_marca
+
+    personaje_marca.borrar(usuario)
+    return personaje_marca.estado(usuario)
+
+
 @router.post("/variantes/upload")
 async def subir_variantes(
     carpeta: Annotated[str, Form()],

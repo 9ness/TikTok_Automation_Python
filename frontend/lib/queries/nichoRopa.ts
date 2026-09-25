@@ -480,3 +480,35 @@ export function useCopiarDePovBof() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["nicho-ropa"] }),
   });
 }
+
+/** El personaje fijo de Marca Personal: la foto que se adjunta en Flow con la
+ *  prenda para que salga siempre la misma persona. Uno por usuario. */
+export type PersonajeMarcaEstado = { hay: boolean; v: number };
+
+export function usePersonajeMarca(activo = true) {
+  return useQuery<PersonajeMarcaEstado>({
+    enabled: activo,
+    queryKey: [...nichoRopaKeys.all, "personaje-marca"],
+    queryFn: () => api.get<PersonajeMarcaEstado>(`${ROOT}/personaje-marca/estado`),
+    staleTime: 60_000,
+  });
+}
+
+export function useSubirPersonajeMarca() {
+  const qc = useQueryClient();
+  return useMutation<PersonajeMarcaEstado, Error, File>({
+    mutationFn: (file) => {
+      const fd = new FormData();
+      fd.append("archivo", file);
+      return api.post(`${ROOT}/personaje-marca`, fd);
+    },
+    onSuccess: (r) =>
+      qc.setQueryData([...nichoRopaKeys.all, "personaje-marca"], r),
+  });
+}
+
+export function buildPersonajeMarcaUrl(v: number, descargar = false): string {
+  return conApiKey(
+    `${ROOT}/personaje-marca?v=${v}` + (descargar ? "&descargar=1" : ""),
+  );
+}
