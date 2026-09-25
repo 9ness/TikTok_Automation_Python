@@ -90,6 +90,7 @@
   "background": {
     "setting": "The inside of a real, bright clothing store or showroom: garment racks and shelves with folded clothes behind and beside her, a clean floor (light tiles, wood or a large rug), track lighting or large windows, maybe a full-length mirror in the distance.",
     "instructions": [
+      "INDOORS ONLY: she is INSIDE the store, never outdoors, never in a patio, a street or the doorway. The season is only visible through the shop windows and in the light.",
       "Do not specify or reproduce any real brand, store name, logo or recognizable shop.",
       "Choose a completely different random store interior for every generation.",
       "Racks may hold garments in neutral, muted tones so they do not compete with the referenced garment.",
