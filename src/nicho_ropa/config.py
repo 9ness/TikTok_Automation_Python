@@ -393,8 +393,8 @@ FAMILIAS_PRENDA: dict[str, dict] = {
         ),
         "detalle_2": (
             "Primer plano del pecho y la manga, la cámara se acerca. Pasa la mano por "
-            "el tejido y se frota el antebrazo para que se vea el punto de cerca y el "
-            "largo de la manga"
+            "el tejido y por la manga para que se vean de cerca el tejido, el grosor "
+            "y los detalles (cuello, botones, cinturón si los tiene)"
         ),
         "detalle_3": (
             "Plano entero, cámara fija. Gira despacio sobre sí misma para que se vea "
