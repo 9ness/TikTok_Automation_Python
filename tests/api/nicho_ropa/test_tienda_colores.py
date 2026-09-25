@@ -415,6 +415,27 @@ class TestBloqueoDeGemini:
         # movimiento vuelven aunque a Gemini no se le mandaran.
         assert "Movimiento:" in salida["videos"][1] and "de espaldas" in salida["videos"][1]
 
+    def test_el_intento_corto_conserva_el_formato_json(self, monkeypatch):
+        """Sin el formato, Gemini devolvía texto suelto y el guion se tiraba."""
+        import src.tiktok_shop.api.gemini as gemini
+
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        prompts = []
+
+        def falso(system_prompt, user_prompt, images=None, **kw):
+            prompts.append(system_prompt)
+            if len(prompts) < 3:
+                raise gemini.GeminiBlockedError("Gemini bloqueó la petición (4)")
+            return {"colores": ["rosa", "verde"], "clips": ["Rosa y verde. Mira.", "Por detrás. Elige."]}
+
+        monkeypatch.setattr(gemini, "generate_json", falso)
+        guionista.escribir(
+            prompt=e["guion"], titulo="x", fotos=[Path("/tmp/a.jpg")], partes=2,
+            caracteres_clip=119, segundos_clip=8, colores=True,
+        )
+        cola = prompts[0][-200:]
+        assert prompts[2].endswith(cola), "el intento corto perdió las instrucciones de formato"
+
     def test_solo_instrucciones_corta_en_la_voz(self):
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
         corto = guionista.solo_instrucciones(e["guion"])

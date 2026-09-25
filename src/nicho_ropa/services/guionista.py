@@ -409,7 +409,7 @@ def escribir(
             segundos_clip, on_log, colores=colores,
         )
 
-    datos = _json_o_sin_fotos(generate_json, prompt + _FORMATO, descripcion, imagenes, on_log)
+    datos = _json_o_sin_fotos(generate_json, prompt, descripcion, imagenes, on_log, formato=_FORMATO)
     if not isinstance(datos, dict):
         raise ValueError(
             f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}"
@@ -498,7 +498,10 @@ def solo_instrucciones(prompt: str) -> str:
     return prompt[: m.start()].rstrip() if m else prompt
 
 
-def _json_o_sin_fotos(generate_json, prompt: str, descripcion: str, imagenes, on_log: OnLog):
+def _json_o_sin_fotos(
+    generate_json, prompt: str, descripcion: str, imagenes, on_log: OnLog,
+    formato: str = "",
+):
     """Con las fotos; y si Gemini BLOQUEA la petición, cada vez con menos.
 
     El bloqueo (cero candidatos, PROHIBITED_CONTENT) no es determinista: el
@@ -507,15 +510,20 @@ def _json_o_sin_fotos(generate_json, prompt: str, descripcion: str, imagenes, on
     las instrucciones + ejemplo — la voz y el movimiento no hacen falta para
     escribir el texto y son lo que más pesa en el filtro. Mejor un guion de
     oídas que ninguno.
+
+    `formato` (qué JSON devolver) va aparte para que el recorte del paso (3) no
+    se lo coma: sin él Gemini contestaba con texto suelto y el guion se tiraba
+    («no devolvió lo que se dice en los clips»). El bloqueo que más sale aquí
+    es el 4 (RECITATION), no el de contenido.
     """
     from src.tiktok_shop.api.gemini import GeminiBlockedError
 
-    intentos = [(prompt, imagenes, "con fotos")]
+    intentos = [(prompt + formato, imagenes, "con fotos")]
     if imagenes:
-        intentos.append((prompt, None, "sin fotos"))
+        intentos.append((prompt + formato, None, "sin fotos"))
     corto = solo_instrucciones(prompt)
     if corto != prompt:
-        intentos.append((corto, None, "sin fotos y sin voz/movimiento"))
+        intentos.append((corto + formato, None, "sin fotos y sin voz/movimiento"))
     ultimo: Exception | None = None
     for i, (texto, fotos, como) in enumerate(intentos):
         try:
@@ -535,8 +543,8 @@ def _escribir_por_clips(
     from src.tiktok_shop.api.gemini import generate_json
 
     datos = _json_o_sin_fotos(
-        generate_json, prompt + _formato_clips(partes, tope, segundos, colores),
-        descripcion, imagenes, on_log,
+        generate_json, prompt, descripcion, imagenes, on_log,
+        formato=_formato_clips(partes, tope, segundos, colores),
     )
     lista_colores = limpiar_colores((datos or {}).get("colores")) if colores else []
     hex_colores = limpiar_hex((datos or {}).get("colores_hex"), lista_colores) if colores else {}
