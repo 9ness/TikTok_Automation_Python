@@ -204,7 +204,38 @@ los colores tienen que venir en el vídeo.
 
 **Flow.** Un proyecto con cientos de generaciones se cuelga: abre uno limpio y
 sube solo lo que vas a usar (la base, los colores, la foto cerrada y las fotos
-de producto).
+de producto). Un proyecto cada 2 prendas va bien.
+
+**Receta rápida por prenda (probada en 6 prendas, 25/9/2026):**
+1. **Base** en el color que se queda puesto: adjunta `LUCIA_ref` (Lucía en la
+   tienda, cuerpo entero) + `LUCIA_cara` + foto de producto de ese color, y
+   pide «la chica de la 1.ª, con la cara de la 2.ª, en la MISMA tienda y el
+   mismo encuadre, con la prenda de la 3.ª EXACTAMENTE igual: <descripción>».
+   Vestidos y pantalones: puestos; chaquetas y abrigos: con las mangas y
+   abiertos. Pose tipo «acabo de ponérmelo».
+2. **Colores**: base + foto de producto de cada color → «EXACTAMENTE igual…
+   cambiando ÚNICAMENTE el color». Revisa en una hoja los N colores juntos;
+   si un color sale apagado o del tono que no es (el beige tostado, el negro
+   gris pizarra), repite solo ese.
+3. **Clip 1 · 360p**: ingredientes en el orden del guion + foto de producto.
+   Al final del prompt, una línea «MUY IMPORTANTE: la prenda es TODA ella…
+   (lo que la define), en todos los colores y planos; nunca…». Sin esa línea,
+   un 720p cambió el vestido de flores por uno liso.
+4. **Clip 2 · 360p**: fotogramas, solo inicio = la base.
+5. **Revisión** (hoja de fotogramas a 2,5 fps + Whisper): colores todos y a su
+   palabra, prenda fiel en todos los planos (también primeros planos), misma
+   chica, texto dicho entero y SIN repeticiones («y verás, y verás» = otro
+   intento), sin texto ni música. Si Whisper duda, transcribe solo ese tramo
+   con el modelo `medium`.
+6. **720p** (es otra generación: vuelve a revisarlo igual que el 360p) →
+   descarga «1080p» → `/subir` + `subir_clip` 1 y 2.
+
+**Trucos de automatización** (Claude in Chrome): los prompts largos se cargan
+en la página con un `<input type=file>` temporal + `file_upload` y se guardan
+en `localStorage` (vale para todos los proyectos de Flow); el `fetch` a
+`localhost` lo bloquea Chrome. El botón «360p» lleva un icono y no se encuentra
+por su texto: haz clic por coordenadas. Con la pestaña oculta o minimizada
+Flow no responde: la pestaña tiene que estar delante.
 
 ## API útil (solo lectura)
 
