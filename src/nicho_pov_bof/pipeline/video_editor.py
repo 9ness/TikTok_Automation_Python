@@ -37,6 +37,7 @@ import difflib
 import hashlib
 import random
 import re
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -2025,10 +2026,16 @@ def build_video(
         on_progress(0.84, "Sin flecha")
 
     # 6) Mux de audio final → destino
+    # El mux y la limpieza se hacen en `work_dir` (local) y el resultado se
+    # MUEVE al destino: `+faststart` reabre el fichero para mover el moov al
+    # principio, y sobre el Drive montado con rclone eso falla a ratos
+    # ("Unable to re-open … for shifting data") y se perdía el montaje.
     on_log("[5/5] Mezclando audio final…")
+    final_local = work_dir / "06_final.mp4"
+    _mux_audio(arrowed, audio_path, final_local, on_log)
+    limpiar_metadatos(final_local, on_log)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    _mux_audio(arrowed, audio_path, output_path, on_log)
-    limpiar_metadatos(output_path, on_log)
+    shutil.move(str(final_local), str(output_path))
     on_progress(1.0, "Listo")
 
     dur_out = probe_duration(output_path)
