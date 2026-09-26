@@ -277,7 +277,9 @@ fi
 # 3. Si requirements.txt cambió → reinstalar deps (Streamlit venv)
 # ============================================================
 CHANGED_FILES=$(git diff --name-only "$LOCAL_SHA" "$NEW_SHA")
-if echo "$CHANGED_FILES" | grep -qE "^requirements\.txt$"; then
+# Sin venv no hay Streamlit que actualizar: se retiró en sep 2026 (la app
+# entera va en Docker y el venv eran 7,7 GB de disco).
+if [[ -x "${APP_DIR}/venv/bin/pip" ]] && echo "$CHANGED_FILES" | grep -qE "^requirements\.txt$"; then
     echo "[deploy_safe] requirements.txt modificado, reinstalando deps del venv…"
     if ! "${APP_DIR}/venv/bin/pip" install --quiet -r "${APP_DIR}/requirements.txt"; then
         echo "[deploy_safe] ⚠️ pip install falló — sigo con el restart, pero revisa logs"
@@ -473,8 +475,13 @@ fi
 # ============================================================
 # 4. Reiniciar tiktok-factory (sudo NOPASSWD ya configurado en setup.sh)
 # ============================================================
-echo "[deploy_safe] reiniciando tiktok-factory…"
-if sudo systemctl restart tiktok-factory; then
+if [[ ! -x "${APP_DIR}/venv/bin/streamlit" ]]; then
+    # Streamlit retirado (sin venv): no hay nada que reiniciar. Sin esto el
+    # restart fallaba, el deploy salía como "failed" y se saltaba la
+    # recogida de pushes que llegaron mientras desplegaba.
+    echo "[deploy_safe] Streamlit retirado (sin venv) — no se reinicia tiktok-factory"
+    write_status "success" "\"finished_at\":$(date +%s),\"started_at\":${START_TS},\"previous_sha\":\"${LOCAL_SHA:0:7}\""
+elif echo "[deploy_safe] reiniciando tiktok-factory…" && sudo systemctl restart tiktok-factory; then
     # Streamlit tarda 6-12s en estar 'active' (carga faster-whisper, moviepy,
     # etc). Esperamos hasta 30s con polling cada 2s — más robusto que un
     # sleep fijo. Si tras 30s sigue activating, lo marcamos failed.
