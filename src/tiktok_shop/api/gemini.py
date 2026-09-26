@@ -559,7 +559,8 @@ def generate_json(
         except json.JSONDecodeError as e:
             ultimo = e
             log_warning(
-                f"[gemini] JSON inválido (intento {intento + 1}/{_INTENTOS_JSON}): {e}"
+                _LOGGER_NAME,
+                f"[gemini] JSON inválido (intento {intento + 1}/{_INTENTOS_JSON}): {e}",
             )
     raise ValueError(f"Gemini devolvió JSON inválido: {ultimo}\nRespuesta: {raw[:500]}")
 
