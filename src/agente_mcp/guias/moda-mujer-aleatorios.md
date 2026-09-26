@@ -267,6 +267,15 @@ de producto). Un proyecto cada 2 prendas va bien.
   estampado <descríbelo tal cual se ve: rombos, zigzag, flores…> de las
   imágenes adjuntas; solo cambia el color del fondo». Con eso salió bien a la
   primera. Describe el dibujo que se VE en la foto, no el que diga el título.
+- **Prendas con capas o mangas raras (C14):** una rebeca de manga murciélago
+  con camisa blanca debajo salió, en los colores oscuros, con manga larga y
+  sin la camisa. Mismo remedio que el estampado: bloque «ATUENDO» antes de
+  «ENERGÍA» (manga hasta dónde llega, qué asoma por debajo, «también en el
+  negro y el <último color>»). En las fotos de color pasa igual: un conjunto
+  de pantalón salió con FALDA y una camisa blanca se volvió rosa — añade al
+  prompt de recolorear «la parte de abajo es un PANTALÓN largo, nunca falda»
+  / «la camisa de debajo sigue BLANCA». Las fotos son gratis: repite hasta
+  que salgan bien.
 
 **Trucos de automatización** (Claude in Chrome): los prompts largos se cargan
 en la página con un `<input type=file>` temporal + `file_upload` y se guardan
@@ -276,7 +285,11 @@ por su texto: haz clic por coordenadas. Con la pestaña oculta o minimizada
 Flow va lento (los temporizadores se frenan): evita esperas largas dentro del
 JS y usa esperas del navegador. Si una foto subida no aparece en el buscador
 de ingredientes, súbela otra vez con otro nombre. Si la ventana se hace
-pequeña, «Descargar» pasa al menú «Más opciones» del vídeo.
+pequeña, «Descargar» pasa al menú «Más opciones» del vídeo. El botón «+»
+de ingredientes a veces se queda en estado «close» sin diálogo y un
+`.click()` por JS no lo abre: dispara la secuencia completa
+`pointerdown/mousedown/pointerup/mouseup/click` sobre él, espera ~5 s (la
+pestaña va lenta) y comprueba que hay `[role=listbox]` antes de buscar.
 
 ## API útil (solo lectura)
 
