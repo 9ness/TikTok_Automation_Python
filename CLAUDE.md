@@ -744,6 +744,7 @@ herramientas del mismo grupo en el futuro.
 | [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Runbook SSH al server (IP, paths, comandos comunes) |
 | [`deploy/CLAUDE_REMOTE.md`](deploy/CLAUDE_REMOTE.md) | Claude Code en el VPS (Remote Control + chat web): qué ocupa, cómo quitarlo y cómo reinstalarlo |
 | [`deploy/CODEX_REMOTE.md`](deploy/CODEX_REMOTE.md) | Codex en el VPS (remote-control con cuenta ChatGPT): qué ocupa, limpiar versiones viejas, quitarlo y reinstalarlo |
+| [`deploy/NAVEGADOR_REMOTO.md`](deploy/NAVEGADOR_REMOTO.md) | Chrome con pantalla virtual en el VPS (noVNC + CDP) para que un agente genere en Flow/Magnific sin el PC — NO montado, cómo montarlo |
 | [`learnings.md`](learnings.md) | Historial técnico (1 línea por aprendizaje/fix) — **escribir al resolver bug o patrón nuevo** |
 | [`tasks.md`](tasks.md) | TODO pendientes — mover a `## ✅ Done` al cerrar |
 | [`README.md`](README.md) | Onboarding general del repo |

@@ -24,5 +24,9 @@ Pasos:
 5. Revisa cada imagen y clip con `comun/revision-calidad.md` antes de subirlo.
 6. Termina con el informe por producto que pide el README.
 
+Si corres en el VPS y no tienes navegador para Flow / Magnific, lee
+`deploy/NAVEGADOR_REMOTO.md`: hay una forma de tener un Chrome remoto con la
+sesión del operador. Propónlo, no lo montes sin permiso.
+
 Si la pantalla no coincide con la guía, para y avisa: la guía se ha quedado
 vieja y hay que actualizarla (`src/agente_mcp/guias/`).
