@@ -259,6 +259,14 @@ de producto). Un proyecto cada 2 prendas va bien.
   contra la foto del producto (en C11 una chaqueta salió con 6 botones y tenía
   4, y el vídeo no se pudo subir).
 - Tras aprobar dos prendas a 360p, el resto de la carpeta va directo a 720p.
+- **Prendas estampadas (C13):** Omni ALISA el estampado aunque las fotos de
+  color lo tengan (un mono ikat azul salió liso en los cuatro colores) → eso
+  es producto incoherente y se repite. Añade a los dos prompts, antes de
+  «ENERGÍA», un bloque «ESTAMPADO (lo más importante del vídeo): la prenda NO
+  es lisa; lleva en todo momento, en todos los colores y planos, el mismo
+  estampado <descríbelo tal cual se ve: rombos, zigzag, flores…> de las
+  imágenes adjuntas; solo cambia el color del fondo». Con eso salió bien a la
+  primera. Describe el dibujo que se VE en la foto, no el que diga el título.
 
 **Trucos de automatización** (Claude in Chrome): los prompts largos se cargan
 en la página con un `<input type=file>` temporal + `file_upload` y se guardan
