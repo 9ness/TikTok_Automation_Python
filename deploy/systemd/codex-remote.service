@@ -1,0 +1,23 @@
+[Unit]
+Description=Codex Remote Control daemon (app-server, cuenta ChatGPT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# El CLI es un CLIENTE que arranca el daemon y sale: por eso oneshot +
+# RemainAfterExit. `start` es idempotente (responde alreadyRunning), asi que
+# un restart no duplica procesos.
+Type=oneshot
+RemainAfterExit=yes
+User=nebulabsai
+Environment=HOME=/home/nebulabsai
+Environment=PATH=/home/nebulabsai/.local/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/home/nebulabsai/proyectos
+ExecStart=/home/nebulabsai/.local/bin/codex remote-control start
+ExecStop=/home/nebulabsai/.local/bin/codex remote-control stop
+# El daemon vive fuera del ciclo del ExecStart; no lo mates al terminar este.
+KillMode=process
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
