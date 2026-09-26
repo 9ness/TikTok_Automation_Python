@@ -17,6 +17,10 @@ export interface ProductoLargo {
   producto: string;
   /** Su ficha de TikTok ya no abre (retirado del catálogo). Compartido. */
   sin_stock?: boolean;
+  /** El operador ha visto algo mal: hay que rehacer el vídeo. Propio de este
+   *  nicho y usuario; se apaga solo al montar uno nuevo. */
+  rehacer?: boolean;
+  rehacer_nota?: string;
   /** De qué carpeta es. Solo en el listado de TODAS las carpetas (Top
    *  vendidos por ventas). */
   folder?: string;
@@ -113,6 +117,8 @@ export interface FolderLargo {
   /** No está en el Drive: la compone la app con los que esperan stock. */
   virtual?: boolean;
   esperando?: number;
+  /** Cuántos productos de la carpeta están marcados para rehacer. */
+  rehacer?: number;
   name: string;
   id: string;
   completed: boolean;
@@ -160,4 +166,7 @@ export interface EstadoLargoRequest {
   /** "Su ficha de TikTok ya no abre". Va a los textos COMPARTIDOS del POV BOF:
    *  es del producto, así que marcarlo aquí lo marca en todos los nichos. */
   sin_stock?: boolean;
+  /** "Este vídeo hay que rehacerlo" y qué está mal. Quitarlo borra la nota. */
+  rehacer?: boolean;
+  rehacer_nota?: string;
 }

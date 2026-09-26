@@ -813,6 +813,15 @@ export default function PovBofLargoPage() {
                   {f.con_url}
                 </span>
               )}
+              {/* Vídeos que el operador ha marcado para rehacer. */}
+              {!!f.rehacer && (
+                <span
+                  title={`${f.rehacer} vídeo(s) para rehacer`}
+                  className="ml-1 rounded-full bg-orange-500/15 px-1 py-px text-[9px] font-semibold text-orange-500"
+                >
+                  🔁{f.rehacer}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -1781,6 +1790,8 @@ function ProductoCard({
     uploaded?: boolean;
     sold?: boolean;
     sin_stock?: boolean;
+    rehacer?: boolean;
+    rehacer_nota?: string;
   }) {
     setEstado.mutate(
       { source, folder, producto: p.producto, ...patch },
@@ -2046,6 +2057,33 @@ function ProductoCard({
             className="inline-flex items-center gap-1 break-words leading-tight rounded-md border border-rose-500/50 bg-rose-500/10 px-2 py-1 text-[11px] font-medium text-rose-400 transition hover:border-emerald-500/50 hover:text-emerald-500"
           >
             🚫 Sin stock · ¿ha vuelto?
+          </button>
+        )}
+        {/* "Este vídeo hay que rehacerlo": lo marca el operador al revisarlo y
+            quien rehace los clips (él o un agente por el MCP) lo ve de un
+            vistazo, con la nota de qué está mal. Se apaga solo al montar el
+            vídeo nuevo. */}
+        {!p.rehacer ? (
+          <button
+            type="button"
+            title="Algo está mal en el vídeo: marcarlo para rehacerlo"
+            onClick={() => {
+              const nota = window.prompt("¿Qué hay que rehacer? (opcional)", "");
+              if (nota === null) return;
+              push({ rehacer: true, rehacer_nota: nota });
+            }}
+            className="inline-flex items-center gap-1 break-words leading-tight rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-orange-500/50 hover:text-orange-500"
+          >
+            🔁 Rehacer
+          </button>
+        ) : (
+          <button
+            type="button"
+            title="Quitar la marca de rehacer"
+            onClick={() => push({ rehacer: false })}
+            className="inline-flex max-w-full items-center gap-1 break-words text-left leading-tight rounded-md border border-orange-500/60 bg-orange-500/10 px-2 py-1 text-[11px] font-semibold text-orange-500 transition hover:border-emerald-500/50 hover:text-emerald-500"
+          >
+            🔁 Rehacer{p.rehacer_nota ? `: ${p.rehacer_nota}` : ""} · quitar
           </button>
         )}
         {/* Copiar el producto a un catálogo de Moda. Solo en los tuyos: las

@@ -236,6 +236,29 @@ def update_carpeta(
     return len(ids)
 
 
+def rehacer_por_carpeta(
+    source: str, folders: list[str], usuario: str = "", estilo: str = "",
+) -> dict[str, int]:
+    """`{carpeta: cuántos}` marcados "rehacer" por este usuario en este modo.
+
+    Una sola lectura (`mget`) para todas las carpetas: sale en el listado de
+    carpetas, que se pinta a cada rato.
+    """
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available() or not folders:
+        return {}
+    docs = r.mget_json([_key(source, n, usuario, estilo) for n in folders])
+    salida: dict[str, int] = {}
+    for carpeta, doc in zip(folders, docs):
+        n = sum(
+            1 for prod in ((doc or {}).get("productos") or {}).values()
+            if (prod or {}).get("rehacer")
+        )
+        if n:
+            salida[carpeta] = n
+    return salida
+
+
 def esperando_stock(
     source: str, folders: list[str], usuario: str = "", estilo: str = "",
 ) -> dict[str, list[str]]:

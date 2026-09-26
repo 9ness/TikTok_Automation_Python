@@ -22,6 +22,11 @@ class ProductoLargo(BaseModel):
     producto: str
     # Su ficha de TikTok no abre (retirado del catálogo). Dato compartido.
     sin_stock: bool = False
+    # El operador ha visto algo mal en el vídeo y hay que rehacerlo. Es de SU
+    # vídeo (documento propio del Largo, por usuario y modo); se apaga solo
+    # cuando se monta uno nuevo.
+    rehacer: bool = False
+    rehacer_nota: str = ""
     # De qué carpeta es. Solo se rellena en el listado de TODAS las carpetas
     # (Top vendidos ordenado por ventas): ahí cada producto viene de una.
     folder: str = ""
@@ -137,6 +142,10 @@ class ProductoEstadoLargoRequest(BaseModel):
     # es del producto, no de cómo se grabe, así que marcarlo aquí lo marca en
     # todos los nichos.
     sin_stock: bool | None = None
+    # "Este vídeo hay que rehacerlo" + qué está mal. Propio de este nicho y
+    # usuario. Desmarcarlo borra la nota.
+    rehacer: bool | None = None
+    rehacer_nota: str | None = None
 
 
 class FolderLargo(BaseModel):
@@ -156,6 +165,8 @@ class FolderLargo(BaseModel):
     virtual: bool = False
     # Cuántos hay dentro (solo en la virtual, para pintarlo en el chip).
     esperando: int = 0
+    # Cuántos productos de la carpeta están marcados "rehacer".
+    rehacer: int = 0
 
 
 class FoldersLargoResponse(BaseModel):

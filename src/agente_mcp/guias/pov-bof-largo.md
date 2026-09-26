@@ -103,7 +103,12 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
   todavía salen aquí; no trabajes en ellas salvo que te lo pidan.
 - No hay botón de «volver a montar con los clips que ya están»: si un montaje
   falla, vuelve a subir los clips.
-- «🚫 Sin stock» → sáltalo. Sin ficha («URL» en gris) → se puede hacer, pero
+- «🚫 Sin stock» → sáltalo.
+- «🔁 Rehacer» (lo marca el operador al revisar un vídeo; el chip de la
+  carpeta cuenta cuántos hay y el MCP lo da en `avisos` y en `rehacer` con su
+  nota): rehaz ese producto —fotos nuevas en Flow si hace falta, otro
+  escenario para cada clip, y la nota dice qué falló— y vuelve a subir los
+  clips. La marca se quita sola al montarse el vídeo nuevo. Sin ficha («URL» en gris) → se puede hacer, pero
   no se podrá publicar con carrito: pregunta.
 
 ## API útil (solo lectura, con la sesión del navegador)

@@ -167,7 +167,8 @@ async def carpetas(m: Menu, api: Interno, catalogo: str, modo: str = "") -> list
     datos = await api.get(f"{base}/folders", source=catalogo)
     return [
         {"carpeta": f["name"], **({"productos": f["total"]} if f.get("total") else {}), "con_ficha": f.get("con_url", 0),
-         "sin_stock": f.get("sin_stock", 0), "completada": f.get("completed", False)}
+         "sin_stock": f.get("sin_stock", 0), "completada": f.get("completed", False),
+         **({"rehacer": f["rehacer"]} if f.get("rehacer") else {})}
         for f in datos.get("items", []) if not f.get("virtual")
     ]
 
@@ -231,6 +232,9 @@ def resumen(c: Ctx, p: dict) -> dict:
               f"Caption arriesgado: {p.get('caption_riesgo')}") if a]
     if p.get("sin_stock"):
         avisos.append("SIN STOCK: sáltalo")
+    if p.get("rehacer"):
+        nota = str(p.get("rehacer_nota") or "").strip()
+        avisos.append(f"REHACER (lo marcó el operador){': ' + nota if nota else ''}")
     r = {
         "producto": p.get("producto"),
         "titulo": " ".join(str(p.get("titulo") or "").split()),
@@ -245,6 +249,8 @@ def resumen(c: Ctx, p: dict) -> dict:
         "escaparate": bool(p.get("en_escaparate")),
         "avisos": avisos,
     }
+    if p.get("rehacer"):
+        r["rehacer"] = str(p.get("rehacer_nota") or "") or True
     if c.m.tipo in ("pov", "largo"):
         r.update(guion=bool(p.get("guion")), clips_necesarios=p.get("clips_necesarios", 2),
                  clip_s=p.get("clip_s"))

@@ -2504,6 +2504,8 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         source, folder, producto, usuario=operator, estilo=estilo,
         video_path=str(salida), video_listo_at=int(time.time()),
         voz_label=info["voz_label"], voz_sexo=sexo,
+        # Vídeo nuevo: lo que el operador marcó para rehacer queda atendido.
+        rehacer=False, rehacer_nota="",
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)

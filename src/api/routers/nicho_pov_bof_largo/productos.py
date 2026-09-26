@@ -310,6 +310,15 @@ def list_folders(
         )
     except Exception:  # noqa: BLE001
         con_url = {}
+    # Cuántos vídeos de cada carpeta ha marcado el operador para rehacer.
+    try:
+        from src.nicho_pov_bof_largo.repos import product_repo as largo_repo
+
+        rehacer = largo_repo.rehacer_por_carpeta(
+            source, [c.get("name", "") for c in carpetas], usuario,
+        )
+    except Exception:  # noqa: BLE001
+        rehacer = {}
     items = [
         FolderLargo(
             name=c.get("name"), id=c.get("id", ""),
@@ -317,6 +326,7 @@ def list_folders(
             desde_copia=bool(c.get("desde_copia")),
             con_url=int(con_url.get(c.get("name", ""), 0)),
             pendiente_subir=c.get("name") in pendientes,
+            rehacer=int(rehacer.get(c.get("name", ""), 0)),
         )
         for c in carpetas
     ]
@@ -515,6 +525,8 @@ def _listar(
             producto=pid,
             segundos_guion=float(textos.get("segundos_guion") or 0),
             sin_stock=bool(textos.get("sin_stock")),
+            rehacer=bool(mio.get("rehacer")),
+            rehacer_nota=str(mio.get("rehacer_nota") or ""),
             desde_copia=desde_copia,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
@@ -888,6 +900,15 @@ def set_producto_estado(
                     f"{' o '.join(config.ESTILOS_TEXTO)}, recibido: {estilo!r}"
                 )
             campos["estilo_texto"] = estilo
+        # "Rehacer": del vídeo de este usuario, no del producto. Quitarlo
+        # borra la nota; la nota sola (sin tocar el flag) se puede corregir.
+        if body.rehacer is not None:
+            campos["rehacer"] = bool(body.rehacer)
+            campos["rehacer_at"] = time.time() if body.rehacer else 0
+            if not body.rehacer:
+                campos["rehacer_nota"] = ""
+        if body.rehacer_nota is not None and body.rehacer is not False:
+            campos["rehacer_nota"] = body.rehacer_nota.strip()[:300]
         # Va a los textos del POV BOF (documento compartido): las dos pantallas
         # lo leen de ahí, así que pedir 30s en una vale para la otra.
         # "Sin stock" es del PRODUCTO y va también al compartido: el mismo
@@ -971,6 +992,8 @@ def set_producto_estado(
             producto=body.producto,
             segundos_guion=float(textos.get("segundos_guion") or 0),
             sin_stock=bool(textos.get("sin_stock")),
+            rehacer=bool(mio.get("rehacer")),
+            rehacer_nota=str(mio.get("rehacer_nota") or ""),
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),

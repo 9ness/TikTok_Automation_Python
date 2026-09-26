@@ -331,6 +331,9 @@ export function useSetEstadoLargo() {
         clips_necesarios: updated.clips_necesarios,
         segundos_min: updated.segundos_min,
         segundos_max: updated.segundos_max,
+        sin_stock: updated.sin_stock,
+        rehacer: updated.rehacer,
+        rehacer_nota: updated.rehacer_nota,
       });
       qc.setQueryData<ProductosLargoResponse>(
         largoKeys.productos(vars.source, vars.folder),
@@ -367,6 +370,11 @@ export function useSetEstadoLargo() {
       }
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
+      }
+      // El chip de la carpeta cuenta los "rehacer" y la carpeta virtual los
+      // "sin stock": sin esto se quedaban con el número viejo hasta recargar.
+      if (vars.rehacer !== undefined || vars.sin_stock !== undefined) {
+        void qc.invalidateQueries({ queryKey: largoKeys.folders(vars.source) });
       }
     },
   });
