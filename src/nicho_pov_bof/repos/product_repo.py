@@ -1621,6 +1621,29 @@ def mover_venta(
     r.sadd(_key_vendidos_index(usuario), ref_n)
 
 
+def borrar_ventas(
+    source: str, folder: str, numeros: list[str], usuario: str = "",
+) -> int:
+    """Tira las ventas de varios productos de una carpeta de una vez.
+
+    Lo mismo que `mover_venta(..., "")` por número, pero mirando antes el
+    índice: casi ningún producto tiene venta y preguntar por cada uno eran
+    tres idas a Upstash por número y usuario — vaciar una carpeta entera
+    (99 números × 3 usuarios) tardaba seis minutos sin borrar nada.
+    """
+    r = get_nicho_pov_bof_redis()
+    if not r.is_available() or not numeros:
+        return 0
+    refs = {_ref_vendido(source, folder, str(n)) for n in numeros}
+    indice = _key_vendidos_index(usuario)
+    tiradas = 0
+    for ref in refs & set(r.smembers(indice)):
+        r.delete(_key_vendido(ref, usuario))
+        r.srem(indice, ref)
+        tiradas += 1
+    return tiradas
+
+
 def desmarcar_vendido(
     source: str, folder: str, producto: str, usuario: str = "",
 ) -> None:

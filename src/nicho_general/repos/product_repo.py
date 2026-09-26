@@ -74,21 +74,24 @@ def borrar_productos(source: str, folder: str, numeros: list[str]) -> int:
     if not r.is_available():
         return 0
 
+    claves = [
+        _key(source, folder, usuario, gancho, duracion)
+        for usuario in sorted({u or "ness" for u in _USUARIOS})
+        for gancho in config.GANCHOS
+        for duracion in config.DURACIONES
+    ]
     borradas = 0
-    for usuario in {u or "ness" for u in _USUARIOS}:
-        for gancho in config.GANCHOS:
-            for duracion in config.DURACIONES:
-                clave = _key(source, folder, usuario, gancho, duracion)
-                doc = r.get_json(clave) or {}
-                productos = doc.get("productos") or {}
-                quedan = {
-                    k: v for k, v in productos.items() if str(k) not in fuera
-                }
-                if len(quedan) == len(productos):
-                    continue
-                borradas += len(productos) - len(quedan)
-                doc["productos"] = quedan
-                r.set_json(clave, doc)
+    # De una tacada: son doce documentos y pedirlos sueltos era una ida a
+    # Upstash por cada uno.
+    for clave, doc in zip(claves, r.mget_json(claves)):
+        doc = doc or {}
+        productos = doc.get("productos") or {}
+        quedan = {k: v for k, v in productos.items() if str(k) not in fuera}
+        if len(quedan) == len(productos):
+            continue
+        borradas += len(productos) - len(quedan)
+        doc["productos"] = quedan
+        r.set_json(clave, doc)
     return borradas
 
 

@@ -61,6 +61,24 @@ def mover(source: str, folder: str, mapa: dict[str, str]) -> None:
         r.set_json(clave, {mapa.get(str(k), str(k)): v for k, v in doc.items()})
 
 
+def quitar(source: str, folder: str, numeros: list[str]) -> None:
+    """Desmarca de golpe varios productos, en los tres usuarios (borrado).
+
+    Una lectura por usuario y solo se escribe si había algo: `marcar(False)`
+    por número eran dos idas a Upstash por número y usuario.
+    """
+    r = get_nicho_carruseles_redis()
+    fuera = {str(n) for n in numeros}
+    if not fuera or not r.is_available():
+        return
+    for usuario in ("", "ana", "mauro"):
+        clave = _key(source, folder, usuario)
+        doc = r.get_json(clave)
+        if not doc or not fuera & {str(k) for k in doc}:
+            continue
+        r.set_json(clave, {k: v for k, v in doc.items() if str(k) not in fuera})
+
+
 def marcar(
     source: str, folder: str, producto: str, subido: bool, usuario: str = "",
 ) -> None:

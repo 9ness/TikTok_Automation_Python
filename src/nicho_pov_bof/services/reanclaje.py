@@ -177,17 +177,6 @@ def mover_productos(
         except Exception as e:  # noqa: BLE001
             log.warning("reanclaje: %s no se pudo mover (%s)", modulo, e)
 
-    # El UGC no entra en el barrido de arriba: sus claves llevan dentro el
-    # gancho y la duración, así que son cuatro documentos por usuario y no uno.
-    # Y es donde más se nota olvidarse — lo guardado son las tres escenas
-    # escritas para el producto anterior.
-    try:
-        from src.nicho_general.repos import product_repo as ugc
-
-        borradas += ugc.borrar_productos(source, folder, sorted(fuera))
-    except Exception as e:  # noqa: BLE001
-        log.warning("borrado: ugc no se pudo limpiar (%s)", e)
-
     # Creativos Pro guarda `{producto: hora}` de lo ya publicado.
     try:
         from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis
@@ -214,8 +203,9 @@ def mover_productos(
     try:
         from src.nicho_pov_bof.repos import product_repo as pov
 
-        for viejo, nuevo in mapa.items():
-            pov.mover_venta(source, folder, viejo, nuevo, usuario)
+        for u in _USUARIOS:
+            for viejo, nuevo in mapa.items():
+                pov.mover_venta(source, folder, viejo, nuevo, u)
     except Exception as e:  # noqa: BLE001
         log.warning("reanclaje: ventas no se pudieron mover (%s)", e)
 
@@ -320,6 +310,17 @@ def borrar_productos(source: str, folder: str, numeros: list[str]) -> int:
         except Exception as e:  # noqa: BLE001 — un nicho caído no para a los demás
             log.warning("borrado: %s no se pudo limpiar (%s)", modulo, e)
 
+    # El UGC no entra en el barrido de arriba: sus claves llevan dentro el
+    # gancho y la duración, así que son cuatro documentos por usuario y no uno.
+    # Y es donde más se nota olvidarse — lo guardado son las tres escenas
+    # escritas para el producto anterior.
+    try:
+        from src.nicho_general.repos import product_repo as ugc
+
+        borradas += ugc.borrar_productos(source, folder, sorted(fuera))
+    except Exception as e:  # noqa: BLE001
+        log.warning("borrado: ugc no se pudo limpiar (%s)", e)
+
     # Creativos Pro guarda `{producto: hora}` de lo ya publicado.
     try:
         from src.nicho_creativos.repos.redis_base import get_nicho_creativos_redis
@@ -336,24 +337,22 @@ def borrar_productos(source: str, folder: str, numeros: list[str]) -> int:
     except Exception as e:  # noqa: BLE001
         log.warning("borrado: creativos no se pudo limpiar (%s)", e)
 
-    # Carruseles: lo mismo con lo que marca como subido.
+    # Carruseles: lo mismo con lo que marca como subido. En lote: número a
+    # número eran ~600 idas a Upstash al vaciar una carpeta entera.
     try:
         from src.nicho_carruseles.repos import subidos_repo as carr_subidos
 
-        for u in ("", "ana", "mauro"):
-            for n in fuera:
-                carr_subidos.marcar(source, folder, n, False, u)
+        carr_subidos.quitar(source, folder, sorted(fuera))
     except Exception:  # noqa: BLE001
         pass
 
-    # La venta: `mover_venta` sin destino la borra. Se va con el producto — si
-    # no, el que ocupe su número nacería marcado como vendido.
+    # La venta se va con el producto — si no, el que ocupe su número nacería
+    # marcado como vendido.
     try:
         from src.nicho_pov_bof.repos import product_repo as pov
 
         for u in _USUARIOS:
-            for n in fuera:
-                pov.mover_venta(source, folder, n, "", u)
+            pov.borrar_ventas(source, folder, sorted(fuera), u)
     except Exception as e:  # noqa: BLE001
         log.warning("borrado: ventas no se pudieron limpiar (%s)", e)
 
