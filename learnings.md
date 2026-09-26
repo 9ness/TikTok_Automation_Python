@@ -985,3 +985,4 @@
 - 2026-09-26 nicho_ropa guiones: las prendas de la web (ZIP) NO guardan `clean_photo_id`/`titled_photo_id` en la ficha → el runner de guiones escribía sin ver la prenda. Ahora las saca de `text_extractor.pares(carpeta)` (como /foto-limpia).
 - 2026-09-26 · POV BOF: el mux final con +faststart sobre el Drive montado (rclone) fallaba a ratos («Unable to re-open … for shifting data»); ahora se escribe en work_dir y se mueve al destino (`build_video`).
 - 2026-09-26 · Gemini `generate_json`: el aviso de JSON inválido llamaba a `log_warning` sin logger y rompía con TypeError; tumbaba la detección de voz «auto» del POV BOF Largo (montaje fallido).
+- 2026-09-26 Tienda Colores con Lucía: el clip 2 (fotogramas) cambiaba la prenda a otro color a mitad → fijar en el prompt el color puesto durante TODO el vídeo; si Omni pinta el último color con otro tono, la foto de inicio del clip 2 se rehace con ese tono. Repetir solo por inconsistencias visuales, no por tropiezos de voz.

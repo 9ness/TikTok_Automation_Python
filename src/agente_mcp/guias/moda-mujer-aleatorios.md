@@ -230,12 +230,40 @@ de producto). Un proyecto cada 2 prendas va bien.
 6. **720p** (es otra generación: vuelve a revisarlo igual que el 360p) →
    descarga «1080p» → `/subir` + `subir_clip` 1 y 2.
 
+**Lo que se aprendió en la Carpeta_12 (26/9/2026):**
+- **Energía.** Sin pedirla, todos los vídeos salen iguales y monótonos. Añade a
+  los dos prompts un bloque «ENERGÍA»: creadora con chispa, entusiasmada, voz
+  animada, cara expresiva y el cuerpo nunca quieto. En los colores, un gesto
+  distinto en cada uno pero SIN moverse del sitio, para que los cortes cuadren
+  con la voz. Y cambia las acciones de cada prenda para que no se repitan:
+  sentadilla en shorts y monos, andar hacia la cámara, pasarela, sentarse en
+  un taburete, recogerse el pelo, vuelta con la falda…
+- **Clip 2: fija el color.** Si no, a mitad del clip la prenda cambia a otro de
+  los colores. Añade: «lo que lleva puesto es <prenda> en <COLOR> durante TODO
+  el vídeo y nunca cambia; los otros colores solo en la percha; la ropa sin
+  chapas ni logos».
+- **Clip 2 empieza donde acaba el clip 1.** Si Omni pinta el último color con
+  otro tono (p. ej. «verde militar» sale verde y no marrón), haz la foto de
+  inicio del clip 2 con ese tono (base + un fotograma del clip 1, «cambia solo
+  el color»). Si no, el vídeo pegado cambia de color entre clips.
+- **Qué se repite y qué no.** Solo lo visual (prenda o color que cambian, detalle
+  que no coincide con el producto, otra chica): eso es sanción. Un tropiezo al
+  hablar («al mover, al moverte») se queda. Y si falla un clip, se repite SOLO
+  ese.
+- **Antes de dar la foto base por buena**, cuenta botones, bolsillos y detalles
+  contra la foto del producto (en C11 una chaqueta salió con 6 botones y tenía
+  4, y el vídeo no se pudo subir).
+- Tras aprobar dos prendas a 360p, el resto de la carpeta va directo a 720p.
+
 **Trucos de automatización** (Claude in Chrome): los prompts largos se cargan
 en la página con un `<input type=file>` temporal + `file_upload` y se guardan
 en `localStorage` (vale para todos los proyectos de Flow); el `fetch` a
 `localhost` lo bloquea Chrome. El botón «360p» lleva un icono y no se encuentra
 por su texto: haz clic por coordenadas. Con la pestaña oculta o minimizada
-Flow no responde: la pestaña tiene que estar delante.
+Flow va lento (los temporizadores se frenan): evita esperas largas dentro del
+JS y usa esperas del navegador. Si una foto subida no aparece en el buscador
+de ingredientes, súbela otra vez con otro nombre. Si la ventana se hace
+pequeña, «Descargar» pasa al menú «Más opciones» del vídeo.
 
 ## API útil (solo lectura)
 
