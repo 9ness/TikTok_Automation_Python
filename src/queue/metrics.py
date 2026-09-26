@@ -78,9 +78,9 @@ def _bucket_signature(job: Job) -> tuple[str, float | None]:
     if mode == JobMode.TIKTOK_SHOP:
         tier = str(p.get("tier", "")) or "default"
         return (f"t={tier}", None)
-    if mode == JobMode.PRONOSTICOS_DIARIOS:
+    if mode == JobMode.PRONOSTICOS:
         return ("", None)
-    if mode == JobMode.PRESIDENTS_TOP5:
+    if mode == JobMode.PRESIDENTS:
         n = p.get("num_presidents", 5)
         return (f"n={n}", None)
     return ("", None)
