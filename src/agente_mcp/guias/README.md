@@ -194,7 +194,15 @@ vídeos).
    `montar`).
 10. `estado()` hasta que acabe → `videos_montados(…, copiar_a_bandeja=True)`
     deja los vídeos editados en `<carpeta>/videos/` de la bandeja.
-11. `marcar(…)` solo si el operador lo pide.
+11. `marcar_carpeta(menu, catalogo, carpeta, pendiente=True)` al terminar los
+    vídeos de una carpeta: es el «📤 Pendiente» que le dice al operador que
+    tiene que subirlos. `completada=True` solo si él lo pide.
+12. `marcar(…)` solo si el operador lo pide (Subido / Escaparate / Vendió). En
+    POV BOF Largo, `rehacer` + `nota_rehacer` es la marca «🔁 Rehacer»; la pone
+    él al revisar y los productos marcados te salen en `avisos`.
+13. `borrar_productos(catalogo, carpeta, productos?, confirmar=True)`: solo en
+    los catálogos propios (Muestras / Tareas) y solo si el operador lo pide.
+    Sin `productos` vacía la carpeta entera. No se deshace.
 
 Lo que el MCP **no** hace: generar imágenes o vídeos (Flow, GenAI Pro y
 Magnific no tienen API) ni publicar en TikTok. Carruseles aún no tiene

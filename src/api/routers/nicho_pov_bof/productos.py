@@ -1516,6 +1516,31 @@ def borrar_mi_producto(
     return {"ok": True}
 
 
+@router.post("/mis-productos/borrar")
+def borrar_mis_productos(body: dict) -> dict:
+    """Borra VARIOS productos propios de una carpeta, o la carpeta entera.
+
+    `{source, carpeta, productos?: [..]}` — sin `productos` vacía la carpeta y
+    la quita. Una sola pasada por el Drive y por los datos de los nichos: de
+    uno en uno, limpiar una carpeta de diez eran diez vueltas de todo.
+    """
+    from src.nicho_pov_bof.services import mis_productos
+
+    source = str(body.get("source") or "").strip()
+    carpeta = str(body.get("carpeta") or "").strip()
+    productos = body.get("productos")
+    if not nicho_config.es_catalogo_operador(source):
+        raise _bad_request(f"{source!r} no es un catálogo tuyo.")
+    if not carpeta:
+        raise _bad_request("Falta la carpeta.")
+    if productos is not None and not isinstance(productos, list):
+        raise _bad_request("`productos` tiene que ser una lista.")
+    return mis_productos.borrar_lote(
+        carpeta, [str(p) for p in productos] if productos is not None else None,
+        source=source,
+    )
+
+
 @router.post("/producto/limpiar")
 def limpiar_producto(
     body: dict,

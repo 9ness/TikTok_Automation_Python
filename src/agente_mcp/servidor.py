@@ -487,12 +487,42 @@ async def videos_montados(ctx: Context, menu: str, catalogo: str, carpeta: str,
 @_herramienta(structured_output=False)
 async def marcar(ctx: Context, menu: str, catalogo: str, carpeta: str, producto: str,
                  subido: bool | None = None, escaparate: bool | None = None,
-                 vendio: bool | None = None, gancho: str = "", duracion: str = "") -> str:
-    """Marca «📤 Subido», «🏪 Escaparate» o «💰 Vendió». SOLO si el operador te lo
-    pide: son marcas de lo que ha hecho él en su cuenta de TikTok."""
+                 vendio: bool | None = None, gancho: str = "", duracion: str = "",
+                 rehacer: bool | None = None, nota_rehacer: str = "") -> str:
+    """Marca «📤 Subido», «🏪 Escaparate» o «💰 Vendió» SOLO si el operador te lo
+    pide: son marcas de lo que ha hecho él en su cuenta de TikTok.
+    `rehacer` (POV BOF Largo): marca/quita «🔁 Rehacer» con `nota_rehacer`; se
+    quita sola al montarse el vídeo nuevo."""
     c = await _ctx(ctx, menu, catalogo, carpeta, "", gancho, duracion)
-    r = await menus.marcar(c, producto, subido, escaparate, vendio)
+    r = await menus.marcar(c, producto, subido, escaparate, vendio, rehacer, nota_rehacer)
     return _json({"ok": True, "producto": r.get("producto", producto)})
+
+
+@_herramienta(structured_output=False)
+async def marcar_carpeta(ctx: Context, menu: str, catalogo: str, carpeta: str,
+                         completada: bool | None = None,
+                         pendiente: bool | None = None) -> str:
+    """Botones de la carpeta: «Completada» y «📤 Pendiente» (vídeos hechos, falta
+    subirlos). Cuando termines los vídeos de una carpeta, márcala `pendiente=True`
+    para que el operador sepa que tiene que subirlos. «Completada» solo si te lo
+    pide. POV BOF y POV BOF Largo (en el Largo, del modo de guion activo)."""
+    c = await _ctx(ctx, menu, catalogo, carpeta)
+    return _json({"ok": True, **(await menus.marcar_carpeta(c, completada, pendiente))})
+
+
+@_herramienta(structured_output=False)
+async def borrar_productos(ctx: Context, catalogo: str, carpeta: str,
+                           productos: list[str] | None = None,
+                           confirmar: bool = False) -> str:
+    """BORRA productos de los catálogos PROPIOS del operador —«Muestras productos»
+    (mis_productos) o «Tareas Productos» (tareas_productos)—: sus fotos y todo lo
+    guardado (textos, guion, clips, vídeo, subido). Sin `productos` vacía la
+    carpeta entera y la quita. No se deshace: solo si el operador lo ha pedido,
+    y con `confirmar=True`. Los catálogos del curso no se pueden borrar."""
+    if not confirmar:
+        raise ErrorApp("Borrar no se deshace. Repite con confirmar=True si el operador lo ha pedido.")
+    c = await _ctx(ctx, "pov_bof", catalogo, carpeta)
+    return _json({"ok": True, **(await menus.borrar_productos(c, productos))})
 
 
 # ---------------------------------------------------------------------------

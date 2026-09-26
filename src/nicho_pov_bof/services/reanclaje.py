@@ -283,6 +283,16 @@ def borrar_productos(source: str, folder: str, numeros: list[str]) -> int:
         if u:
             claves.add(f"folder:{source}:{folder}:u:{u}")
         claves.add(f"folder:{source}:{folder}:u:{u or 'ness'}")
+    # El POV BOF Largo guarda aparte cada modo de guion que no es el de por
+    # defecto (`...:u:<usuario>:m:<modo>`): sin esto el vídeo "dolor" de un
+    # producto borrado se lo quedaba el siguiente que ocupara su número.
+    try:
+        from src.nicho_pov_bof_largo import config as largo_config
+
+        otros = [e for e in largo_config.ESTILOS_GUION if e != largo_config.ESTILO_GUION_DEFECTO]
+    except Exception:  # noqa: BLE001
+        otros = []
+    claves |= {f"{c}:m:{e}" for c in list(claves) if ":u:" in c for e in otros}
 
     ordenadas = sorted(claves)
     for modulo, getter in _DOCS:

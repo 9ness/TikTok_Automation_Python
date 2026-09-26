@@ -631,12 +631,51 @@ async def montar(c: Ctx, prod: str) -> dict:
     raise ErrorApp(f"En {c.m.label} el montaje arranca solo al subir el último clip.")
 
 
+async def marcar_carpeta(c: Ctx, completada: bool | None, pendiente: bool | None) -> dict:
+    """«Completada» y «📤 Pendiente» (vídeos hechos, falta subirlos) de una carpeta.
+    En el Largo van por usuario Y por modo de guion, como en la web."""
+    if c.m.tipo not in ("pov", "largo"):
+        raise ErrorApp("Marcar carpetas desde el MCP: solo POV BOF y POV BOF Largo.")
+    if completada is None and pendiente is None:
+        raise ErrorApp("Nada que marcar: pasa `completada` y/o `pendiente`.")
+    base = LARGO if c.m.tipo == "largo" else POV
+    hecho: dict = {"carpeta": c.carpeta}
+    if completada is not None:
+        await c.api.post(f"{base}/complete", {"source": c.catalogo, "folder": c.carpeta,
+                                              "completed": bool(completada)})
+        hecho["completada"] = bool(completada)
+    if pendiente is not None:
+        await c.api.post(f"{base}/pendiente", {"source": c.catalogo, "folder": c.carpeta,
+                                               "pendiente": bool(pendiente)})
+        hecho["pendiente"] = bool(pendiente)
+    return hecho
+
+
+async def borrar_productos(c: Ctx, productos: list[str] | None) -> dict:
+    """Borra productos de un catálogo propio (Muestras / Tareas) o la carpeta
+    entera (`productos=None`). Fotos + todo lo guardado en los nichos."""
+    if c.catalogo not in ("mis_productos", "tareas_productos"):
+        raise ErrorApp("Solo se borra en los catálogos propios: mis_productos (Muestras) "
+                       "o tareas_productos (Tareas). Los del curso no se tocan.")
+    body: dict = {"source": c.catalogo, "carpeta": c.carpeta}
+    if productos is not None:
+        body["productos"] = [str(p) for p in productos]
+    return {"carpeta": c.carpeta, **(await c.api.post(f"{POV}/mis-productos/borrar", body))}
+
+
 async def marcar(c: Ctx, prod: str, subido: bool | None, escaparate: bool | None,
-                 vendio: bool | None) -> dict:
+                 vendio: bool | None, rehacer: bool | None = None,
+                 nota_rehacer: str = "") -> dict:
     p = await producto(c, prod)
     pid = str(p["producto"])
     cambios = {k: v for k, v in (("uploaded", subido), ("en_escaparate", escaparate),
                                  ("sold", vendio)) if v is not None}
+    if rehacer is not None:
+        if c.m.tipo != "largo":
+            raise ErrorApp("«Rehacer» de momento solo existe en POV BOF Largo.")
+        cambios["rehacer"] = bool(rehacer)
+        if rehacer and nota_rehacer:
+            cambios["rehacer_nota"] = nota_rehacer
     if not cambios:
         raise ErrorApp("Nada que marcar.")
     t = c.m.tipo

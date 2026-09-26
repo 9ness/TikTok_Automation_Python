@@ -279,6 +279,56 @@ def borrar_producto(
     return True
 
 
+def borrar_lote(
+    carpeta: str, productos: list[str] | None = None, *, source: str = SOURCE,
+) -> dict:
+    """Borra VARIOS productos de una carpeta —o la carpeta entera— de una vez.
+
+    Borrar de uno en uno era lento: cada producto listaba la carpeta del Drive
+    montado y limpiaba los datos de todos los nichos por separado (una ronda a
+    Upstash por producto). Aquí se lista UNA vez, se tiran los ficheros y los
+    datos se limpian en una sola pasada.
+
+    `productos=None` vacía la carpeta y la quita. No renumera: el hueco lo
+    cierra "reordenar" cuando el operador quiera (ver `borrar_mi_producto`).
+    """
+    d = _dir(source) / carpeta
+    if not d.is_dir():
+        return {"borrados": [], "ficheros": 0, "carpeta_borrada": False}
+    quitar = None if productos is None else {str(p) for p in productos}
+    numeros: set[str] = set()
+    ficheros = 0
+    for f in list(d.iterdir()):
+        if not f.is_file():
+            continue
+        m = re.match(r"^(\d+)(\(\d+\))?$", f.stem)
+        if not m or (quitar is not None and m.group(1) not in quitar):
+            continue
+        f.unlink(missing_ok=True)
+        numeros.add(m.group(1))
+        ficheros += 1
+
+    from src.nicho_pov_bof.services import reanclaje
+
+    # Carpeta entera: también lo guardado de números que ya no tenían fotos.
+    datos = sorted(numeros) if quitar is None else sorted(quitar)
+    if quitar is None:
+        datos = [str(n) for n in range(1, 100)]
+    reanclaje.borrar_productos(source, carpeta, datos)
+
+    carpeta_borrada = False
+    if quitar is None:
+        # En el Drive quedan a veces `desktop.ini` y similares: sin fotos, fuera.
+        if not any(config.is_image(f.name) for f in d.iterdir() if f.is_file()):
+            shutil.rmtree(d, ignore_errors=True)
+            carpeta_borrada = not d.exists()
+    _invalidar(source)
+    return {
+        "borrados": sorted(numeros, key=int), "ficheros": ficheros,
+        "carpeta_borrada": carpeta_borrada,
+    }
+
+
 def _numeros(carpeta: str, source: str = SOURCE) -> list[int]:
     """Los números de producto que hay HOY en la carpeta, ordenados."""
     d = _dir(source) / carpeta
