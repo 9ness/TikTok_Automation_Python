@@ -242,6 +242,11 @@ de producto). Un proyecto cada 2 prendas va bien.
   los colores. Añade: «lo que lleva puesto es <prenda> en <COLOR> durante TODO
   el vídeo y nunca cambia; los otros colores solo en la percha; la ropa sin
   chapas ni logos».
+- **Clip 1: fija también el último color.** Sin esa línea, en los planos de
+  detalle volvía a otro color (un halter NEGRO salió crudo al hablar del escote).
+  Añade tras el último color: «a partir de aquí y hasta el final (también en los
+  planos de detalle) lleva puesto <prenda> en <COLOR>, el de la imagen N; nunca
+  vuelve a los otros colores».
 - **Clip 2 empieza donde acaba el clip 1.** Si Omni pinta el último color con
   otro tono (p. ej. «verde militar» sale verde y no marrón), haz la foto de
   inicio del clip 2 con ese tono (base + un fotograma del clip 1, «cambia solo
