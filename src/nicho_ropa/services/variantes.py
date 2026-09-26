@@ -106,6 +106,30 @@ def extraer(captura: Path) -> dict:
     return {"colores": colores, "hex": limpiar_hex((datos or {}).get("hex"), colores)}
 
 
+def colores_de_fotos(fotos: list[Path]) -> dict:
+    """`{"colores": [...], "hex": {...}}` mirando las fotos de la prenda en cada color.
+
+    Para cuando no hay captura del selector. Va en su PROPIA llamada, corta y
+    solo con las fotos: metido dentro del guion, Gemini cortaba por
+    RECITATION, se reintentaba sin fotos y los colores salían inventados
+    (copiaba el ejemplo del prompt: "beige, marrón, verde militar…"). La
+    primera foto es la principal y su color va el ÚLTIMO (el que lleva
+    puesto el resto del vídeo). Lanza si Gemini no contesta.
+    """
+    from src.nicho_ropa.services.guionista import _color_de_la_lista, limpiar_colores, limpiar_hex
+    from src.tiktok_shop.api.gemini import generate_json
+
+    prompt = config._limpio("colores_de_fotos.md")
+    datos = generate_json(
+        prompt, "Nombra los colores de esta prenda.", images=[str(f) for f in fotos],
+    )
+    colores = limpiar_colores((datos or {}).get("colores"))
+    puesto = _color_de_la_lista(str((datos or {}).get("puesto") or ""), colores)
+    if puesto and colores and colores[-1] != puesto:
+        colores = [c for c in colores if c != puesto] + [puesto]
+    return {"colores": colores, "hex": limpiar_hex((datos or {}).get("hex"), colores)}
+
+
 def detectar_miniaturas(captura: Path) -> list[tuple[int, int, int, int]]:
     """Las tarjetas del selector de color, de izquierda a derecha: `(x, y, w, h)`.
 

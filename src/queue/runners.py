@@ -1766,10 +1766,13 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         # que el curso adjunta en ChatGPT. La limpia va también: sin ella el
         # guion habla de la prenda de oídas.
         fotos = []
+        limpia = []  # la foto del color puesto, para leer los colores
         for clave in ("titled_photo_id", "clean_photo_id"):
             if prod.get(clave):
                 try:
                     fotos.append(drive_client.fetch_photo(str(prod[clave])))
+                    if clave == "clean_photo_id":
+                        limpia = [fotos[-1]]
                 except (RuntimeError, ValueError) as e:  # noqa: PERF203
                     on_log(f"[nicho_ropa] {pid}: sin {clave} ({e})")
         # Formato de la tienda: la captura del selector de colores, si el
@@ -1777,6 +1780,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         # los nombres tienen que ser los de TikTok, letra por letra.
         notas = ""
         hex_leidos: dict = {}
+        colores_fijos: list[str] | None = None
         if estilo.get("colores"):
             from src.nicho_ropa.services import variantes
 
@@ -1804,19 +1808,42 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                 )
             else:
                 # Sin captura del selector, los colores salen de las FOTOS del
-                # producto en cada color que trae el ZIP: se adjuntan y se le
-                # pide que los nombre mirándolas.
+                # producto en cada color que trae el ZIP. Se leen en una
+                # llamada aparte y corta: pedírselos al guion hacía que, si
+                # Gemini lo bloqueaba (RECITATION) y se reintentaba sin
+                # fotos, se inventara los colores. Leídos, van como lista
+                # cerrada y mandan sobre lo que escriba el guion.
                 otras = web_svc.fotos_color(carpeta, pid)
                 if otras:
-                    fotos += otras
-                    notas = (
-                        f"Las {len(otras)} ÚLTIMAS imágenes adjuntas son ESTE MISMO "
-                        "producto en sus otros colores. Mira cada una y nombra su "
-                        "color en español, con el nombre que usaría una tienda "
-                        "(beige, marrón, verde militar, azul marino…). Esos son los "
-                        "colores en que se vende, junto con el de la foto principal, "
-                        "que va el ÚLTIMO de la lista. No inventes ninguno más."
-                    )
+                    try:
+                        vistos = (
+                            variantes.colores_de_fotos(limpia + otras) if limpia
+                            else {"colores": [], "hex": {}}
+                        )
+                    except Exception as e:  # noqa: BLE001 — se cae al modo de antes
+                        on_log(f"[nicho_ropa] {pid}: no se leyeron los colores de las fotos ({str(e)[:100]})")
+                        vistos = {"colores": [], "hex": {}}
+                    if len(vistos["colores"]) >= 2:
+                        colores_fijos = vistos["colores"]
+                        hex_leidos = vistos["hex"]
+                        notas = (
+                            "COLORES en que se vende, vistos en sus fotos (nombres "
+                            "EXACTOS, no los cambies ni añadas otros): "
+                            + ", ".join(colores_fijos)
+                            + f". El de la foto de la prenda es «{colores_fijos[-1]}» "
+                            "y va el ÚLTIMO de la lista."
+                        )
+                        on_log(f"[nicho_ropa] {pid}: colores vistos en las fotos: {', '.join(colores_fijos)}")
+                    else:
+                        fotos += otras
+                        notas = (
+                            f"Las {len(otras)} ÚLTIMAS imágenes adjuntas son ESTE MISMO "
+                            "producto en sus otros colores. Mira cada una y nombra su "
+                            "color en español, con el nombre que usaría una tienda. "
+                            "Esos son los colores en que se vende, junto con el de la "
+                            "foto principal, que va el ÚLTIMO de la lista. No inventes "
+                            "ninguno más."
+                        )
                     on_log(f"[nicho_ropa] {pid}: {len(otras)} foto(s) de color del ZIP")
                 else:
                     on_log(
@@ -1842,6 +1869,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                 segundos_clip=int(estilo.get("segundos_clip") or 8),
                 # Formato de la tienda: pide también los colores que nombra.
                 colores=bool(estilo.get("colores")),
+                colores_fijos=colores_fijos,
                 on_log=on_log,
             )
         except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda

@@ -381,6 +381,10 @@ def escribir(
     # Algo más que decirle sobre las fotos adjuntas (p. ej. que la última es
     # la captura del selector de colores). Va en la descripción del producto.
     notas: str = "",
+    # Colores ya sabidos (leídos de la captura o de las fotos, el puesto el
+    # último): mandan sobre los que devuelva Gemini, que en un reintento sin
+    # fotos se los inventa.
+    colores_fijos: list[str] | None = None,
     on_log: OnLog = _noop,
 ) -> dict:
     """`{dice, video, videos[, colores]}` para una prenda. Lanza si Gemini no lo escribe."""
@@ -406,7 +410,7 @@ def escribir(
     if partes > 1 and caracteres_clip:
         return _escribir_por_clips(
             prompt, descripcion, imagenes, partes, caracteres_clip,
-            segundos_clip, on_log, colores=colores,
+            segundos_clip, on_log, colores=colores, colores_fijos=colores_fijos,
         )
 
     datos = _json_o_sin_fotos(generate_json, prompt, descripcion, imagenes, on_log, formato=_FORMATO)
@@ -538,6 +542,7 @@ def _json_o_sin_fotos(
 def _escribir_por_clips(
     prompt: str, descripcion: str, imagenes, partes: int, tope: int,
     segundos: int, on_log: OnLog, colores: bool = False,
+    colores_fijos: list[str] | None = None,
 ) -> dict:
     """Un texto por clip, cada uno con su tope y sus tiempos."""
     from src.tiktok_shop.api.gemini import generate_json
@@ -547,9 +552,13 @@ def _escribir_por_clips(
         formato=_formato_clips(partes, tope, segundos, colores),
     )
     lista_colores = limpiar_colores((datos or {}).get("colores")) if colores else []
+    if colores and colores_fijos and len(colores_fijos) >= 2:
+        if lista_colores != list(colores_fijos):
+            on_log(f"[nicho_ropa] colores del guion {lista_colores} → los leídos: {list(colores_fijos)}")
+        lista_colores = list(colores_fijos)
     hex_colores = limpiar_hex((datos or {}).get("colores_hex"), lista_colores) if colores else {}
     puesto = ""
-    if colores:
+    if colores and not colores_fijos:
         # El puesto va el ÚLTIMO: es donde el montaje deja de poner fotos y
         # sigue el vídeo real. Gemini lo identifica pero no siempre lo
         # ordena (dejó "beige, marron, taupe y verde militar" llevando taupe).

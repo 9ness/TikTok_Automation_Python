@@ -436,6 +436,36 @@ class TestBloqueoDeGemini:
         cola = prompts[0][-200:]
         assert prompts[2].endswith(cola), "el intento corto perdió las instrucciones de formato"
 
+    def test_los_colores_fijos_mandan_sobre_los_del_guion(self, monkeypatch):
+        """Leídos de las fotos, el guion no puede cambiarlos (se los inventaba)."""
+        import src.tiktok_shop.api.gemini as gemini
+
+        (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
+        monkeypatch.setattr(gemini, "generate_json", lambda *a, **k: {
+            "colores": ["beige", "marrón", "verde militar", "azul marino"],
+            "clips": ["Beige, marrón, verde militar y azul marino. Mira.", "Por detrás. Elige."],
+        })
+        salida = guionista.escribir(
+            prompt=e["guion"], titulo="x", fotos=[Path("/tmp/a.jpg")], partes=2,
+            caracteres_clip=119, segundos_clip=8, colores=True,
+            colores_fijos=["gris", "negro", "rosa"],
+        )
+        assert salida["colores"] == ["gris", "negro", "rosa"]
+
+    def test_colores_de_fotos_pone_el_puesto_el_ultimo(self, monkeypatch):
+        import src.tiktok_shop.api.gemini as gemini
+        from src.nicho_ropa.services import variantes
+
+        vistos = []
+        def falso(system_prompt, user_prompt, images=None, **kw):
+            vistos.append(images)
+            return {"colores": ["negro", "gris", "Negro", "camel"], "puesto": "gris",
+                    "hex": {"negro": "#111111", "gris": "#888888"}}
+        monkeypatch.setattr(gemini, "generate_json", falso)
+        r = variantes.colores_de_fotos([Path("/tmp/l.jpg"), Path("/tmp/c1.jpg")])
+        assert r["colores"][-1] == "gris" and set(r["colores"]) == {"negro", "gris", "camel"}
+        assert len(vistos[0]) == 2 and r["hex"]["negro"] == "#111111"
+
     def test_solo_instrucciones_corta_en_la_voz(self):
         (e,) = config.prompts_mof10("mujer", False, "tienda_colores")
         corto = guionista.solo_instrucciones(e["guion"])
