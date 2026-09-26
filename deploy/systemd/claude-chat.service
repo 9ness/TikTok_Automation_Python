@@ -1,0 +1,15 @@
+[Unit]
+Description=Claude Chat backend (Agent SDK, host)
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+[Service]
+Type=simple
+User=nebulabsai
+WorkingDirectory=/home/nebulabsai/claude_chat
+Environment=HOME=/home/nebulabsai
+Environment=PATH=/home/nebulabsai/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/nebulabsai/.claude-sdk-test/bin/uvicorn app:app --host 172.18.0.1 --port 8765
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target

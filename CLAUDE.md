@@ -742,6 +742,7 @@ herramientas del mismo grupo en el futuro.
 | [`DEV_SETUP.md`](DEV_SETUP.md) | Arranque local (uvicorn + npm run dev), troubleshooting WS/cache |
 | [`deploy/README.md`](deploy/README.md) | Despliegue VPS Hetzner + Docker stack + Tailscale Funnel + webhook |
 | [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Runbook SSH al server (IP, paths, comandos comunes) |
+| [`deploy/CLAUDE_REMOTE.md`](deploy/CLAUDE_REMOTE.md) | Claude Code en el VPS (Remote Control + chat web): qué ocupa, cómo quitarlo y cómo reinstalarlo |
 | [`learnings.md`](learnings.md) | Historial técnico (1 línea por aprendizaje/fix) — **escribir al resolver bug o patrón nuevo** |
 | [`tasks.md`](tasks.md) | TODO pendientes — mover a `## ✅ Done` al cerrar |
 | [`README.md`](README.md) | Onboarding general del repo |

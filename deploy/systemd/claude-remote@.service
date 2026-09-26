@@ -1,0 +1,15 @@
+[Unit]
+Description=Claude Remote Control - %i
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=nebulabsai
+WorkingDirectory=/home/nebulabsai/proyectos/%i
+Environment=HOME=/home/nebulabsai
+Environment=PATH=/home/nebulabsai/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/nebulabsai/.local/bin/claude remote-control --name "%i" --spawn same-dir
+Restart=on-failure
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
