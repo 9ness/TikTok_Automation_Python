@@ -1726,7 +1726,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
     from src.nicho_pov_bof.services import drive_client
     from src.nicho_ropa import config as ropa_config
     from src.nicho_ropa.repos import product_repo
-    from src.nicho_ropa.services import guionista
+    from src.nicho_ropa.services import guionista, text_extractor
 
     p = job.params or {}
     carpeta = str(p.get("carpeta") or ropa_config.CARPETA_DEFECTO)
@@ -1751,6 +1751,7 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
     doc = product_repo.load(carpeta, usuario)
     guardados = doc.get("productos") or {}
     pedidos = pedidos_fijos or list(guardados)
+    par_de: dict | None = None  # emparejado de fotos, solo si hace falta
     hechos, saltados, fallos = 0, 0, []
 
     for i, pid in enumerate(pedidos):
@@ -1767,10 +1768,26 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
         # guion habla de la prenda de oídas.
         fotos = []
         limpia = []  # la foto del color puesto, para leer los colores
-        for clave in ("titled_photo_id", "clean_photo_id"):
-            if prod.get(clave):
+        # Las prendas de la web (ZIP) no guardan el id de sus fotos en la
+        # ficha: salen del emparejado de la carpeta, como en /foto-limpia.
+        # Sin esto el guion se escribía sin ver la prenda.
+        ids = {c: prod.get(c) for c in ("titled_photo_id", "clean_photo_id")}
+        if not any(ids.values()):
+            if par_de is None:
                 try:
-                    fotos.append(drive_client.fetch_photo(str(prod[clave])))
+                    par_de = {x["producto"]: x for x in text_extractor.pares(carpeta)}
+                except Exception as e:  # noqa: BLE001 — sin fotos antes que sin guion
+                    on_log(f"[nicho_ropa] no se pudieron emparejar las fotos ({str(e)[:100]})")
+                    par_de = {}
+            par = par_de.get(pid) or {}
+            ids = {
+                "titled_photo_id": (par.get("titled") or {}).get("id"),
+                "clean_photo_id": (par.get("clean") or {}).get("id"),
+            }
+        for clave, fid in ids.items():
+            if fid:
+                try:
+                    fotos.append(drive_client.fetch_photo(str(fid)))
                     if clave == "clean_photo_id":
                         limpia = [fotos[-1]]
                 except (RuntimeError, ValueError) as e:  # noqa: PERF203
