@@ -1193,14 +1193,28 @@ def ver_foto_color_producto(
     producto: Annotated[str, Query()],
     k: Annotated[int, Query()] = 1,
     descargar: Annotated[bool, Query()] = False,
+    w: Annotated[int, Query()] = 0,
 ):
-    """La foto k-ésima (1…) del producto en otro color, tal como vino en el ZIP."""
+    """La foto k-ésima (1…) del producto en otro color, tal como vino en el ZIP.
+
+    Con `w` sale encogida: la tarjeta pinta cada color a 30 px y pedía el
+    original — treinta fotos de megas por carpeta que ocupaban las seis
+    conexiones del navegador, y `/prendas` de la carpeta siguiente se quedaba
+    en cola detrás («Leyendo la carpeta de Drive…» sin acabar nunca).
+    """
     from fastapi.responses import FileResponse
 
     fotos = prendas_web.fotos_color(carpeta, producto)
     if k < 1 or k > len(fotos):
         raise APIError("Esa prenda no tiene esa foto de color.", status_code=404)
     f = fotos[k - 1]
+    if w and not descargar:
+        try:
+            from src.nicho_pov_bof.services import thumbs
+
+            f = thumbs.miniatura(f, w) or f
+        except Exception:  # noqa: BLE001 — sin miniatura se sirve la original
+            pass
     cabeceras = {"Cache-Control": "public, max-age=86400"}
     if descargar:
         # Con nombre: en el móvil, sin esto la foto se guarda como

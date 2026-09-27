@@ -1737,7 +1737,8 @@ function PrendaCard({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={buildFotoColorProductoUrl(carpeta, prenda.producto, k)}
+                    // 64 px: se pinta a 30 y el original pesa megas.
+                    src={buildFotoColorProductoUrl(carpeta, prenda.producto, k, false, 64)}
                     alt={`color ${k}`}
                     loading="lazy"
                     className="h-[30px] w-[30px] object-cover"
