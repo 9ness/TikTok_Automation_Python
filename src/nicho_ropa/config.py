@@ -681,9 +681,11 @@ NOTA_SIN_TEXTO_VIDEO = (
 
 _MANO_BOLSO = (
     "Para que el clip tenga movimiento: una mano de mujer con manicura cuidada "
-    "entra en el plano, acaricia despacio el bolso y juega con el asa, y se "
-    "retira. Solo una mano, con cinco dedos. El bolso no cambia de forma, "
-    "color, tamaño ni posición y no se mueve solo."
+    "entra por el lateral del plano, se apoya en el bolso, lo acaricia despacio "
+    "y juega con el asa, y se retira por el mismo lado. La mano nunca pasa por "
+    "delante de la cámara ni tapa el bolso, y no gesticula en el aire: siempre "
+    "está tocando el bolso. Solo una mano, con cinco dedos. El bolso no cambia "
+    "de forma, color, tamaño ni posición y no se mueve solo."
 )
 _MANO_BOTA = (
     "Para que el clip tenga movimiento: la mano que sujeta el zapato lo gira "
