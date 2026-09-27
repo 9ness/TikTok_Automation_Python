@@ -1,3 +1,15 @@
+## 🎛️ Multimodo — dos rarezas vistas el 27 sep 2026
+
+- **`/multimodo/tandas` devolvió datos atrasados** dos veces (6 en vez de 11, y 11
+  en vez de 24, con los montajes ya completados); al recargar la página salía
+  bien. Sin service worker ni caché en el proceso: la petición tardó 16s con el
+  servidor montando. Mirar si el `mget_json` de 51 claves de Upstash lee de una
+  réplica atrasada o si otra instancia de la API contesta.
+- **`/prendas` tarda 30-70s** al cambiar de formato/carpeta mientras hay montajes
+  en cola (en reposo, 2,6s). Cada formato vuelve a pedir `/prendas` y
+  `/carpetas`: cachear la parte de Drive por carpeta o no refetchear al cambiar
+  de modo.
+
 ## 🎠 Carruseles — dónde se quedó (18 ago 2026, madrugada)
 
 Catálogo `2 Prod Aleatorios 2`: **152 productos aptos**, todos con su foto de
