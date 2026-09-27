@@ -532,6 +532,8 @@ export interface VideoMultimodo {
   musica?: { busqueda: string; alternativas: string[]; estilo: string };
   caption?: string;
   emojis?: string;
+  /** Id para `/foto` de la foto limpia: la miniatura de la fila. */
+  foto_id?: string;
 }
 
 export interface TandasMultimodoResponse {

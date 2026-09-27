@@ -376,6 +376,11 @@ def multimodo_tandas(
         v["carpeta_label"] = config.carpeta_label(v["carpeta"])
         v["formato_label"] = config.MODOS.get(v["formato"], {}).get("label", v["formato"])
         v["musica"] = config.musica_de(v["formato"], f"{v['carpeta']}/{v['producto']}")
+        # Miniatura para reconocer el producto sin abrir el vídeo.
+        try:
+            v["foto_id"] = prendas_web.foto_limpia_id(v["carpeta"], v["producto"])
+        except Exception:  # noqa: BLE001 — sin foto, la fila sale igual
+            v["foto_id"] = ""
         if v.get("caption") and not v.get("emojis"):
             from src.nicho_pov_bof.services import emojis as emojis_svc
 

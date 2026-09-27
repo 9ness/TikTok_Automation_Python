@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { bajarEnOrden, nombreDescarga } from "@/lib/descargas";
 import {
+  buildFotoRopaUrl,
   buildVideoRopaUrl,
   useMarcarSubidoMultimodo,
   useTandasMultimodo,
@@ -129,6 +130,25 @@ export function TandasMultimodo() {
                         <span className="w-5 shrink-0 text-[10px] text-muted-foreground">
                           {i + 1}
                         </span>
+                        {v.foto_id ? (
+                          <a
+                            href={buildFotoRopaUrl(v.foto_id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Ver la foto del producto"
+                            className="shrink-0"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={buildFotoRopaUrl(v.foto_id, 96)}
+                              alt=""
+                              loading="lazy"
+                              className="h-10 w-10 rounded-md border border-border/40 bg-white object-contain sm:h-12 sm:w-12"
+                            />
+                          </a>
+                        ) : (
+                          <div className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border/40 sm:h-12 sm:w-12" />
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[11px] font-medium sm:text-xs">
                             {v.titulo || `Producto ${v.producto}`}

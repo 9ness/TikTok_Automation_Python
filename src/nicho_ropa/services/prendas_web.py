@@ -285,6 +285,18 @@ def listar_fotos_como_drive(slug: str) -> list[dict]:
     return _memo(f"fotos:{slug}", leer)
 
 
+def foto_limpia_id(slug: str, producto: str) -> str:
+    """El id (para `/foto`) de la foto limpia del producto, o "" si no está.
+
+    Por el convenio de nombres, la limpia es la que se llama como el producto
+    (`3.jpg`; la ficha es `3(1).jpg`). Sale de la lista memoizada del disco:
+    las tandas lo piden para cincuenta vídeos y no pueden ir a Drive."""
+    for f in listar_fotos_como_drive(slug):
+        if Path(f["name"]).stem == str(producto):
+            return f["id"]
+    return ""
+
+
 def fotos_color(slug: str, producto: str) -> list[Path]:
     """Las fotos del producto en OTROS colores que trajo el ZIP (`colores/`)."""
     from src.nicho_pov_bof.services import productos_web as pov_web
