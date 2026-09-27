@@ -5,6 +5,14 @@
   bien. Sin service worker ni caché en el proceso: la petición tardó 16s con el
   servidor montando. Mirar si el `mget_json` de 51 claves de Upstash lee de una
   réplica atrasada o si otra instancia de la API contesta.
+- **Causa probable de las dos: el Drive montado del VPS.** `rclone.log` trae
+  `403 Quota exceeded ... Requests per minute` de drive.googleapis.com, y un
+  `ls` de una carpeta del mount tardó 44s (el pacer reintenta). El mount lleva
+  `--dir-cache-time 30s`, así que vuelve a listar cada carpeta a los 30s; y
+  `/multimodo/tandas` y `/carpetas` recorren 51 carpetas. Subir
+  `--dir-cache-time` (p. ej. 10m, las escrituras propias invalidan igual) y/o
+  cachear en proceso los listados de `prendas_web`. Tocar el mount = reiniciar
+  `gdrive-mount.service`: con la cola vacía y avisando.
 - **`/prendas` tarda 30-70s** al cambiar de formato/carpeta mientras hay montajes
   en cola (en reposo, 2,6s). Cada formato vuelve a pedir `/prendas` y
   `/carpetas`: cachear la parte de Drive por carpeta o no refetchear al cambiar
