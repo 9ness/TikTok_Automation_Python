@@ -170,6 +170,10 @@ orden de salida»: se cruzan.
   rechaza, aunque parezcan buenas: salen deformes o inventadas («POEAOP»,
   «2024», «PIAPIODMIRMA»).
 - En Zapatos POV el rótulo va arriba para no tapar el zapato.
+- El rótulo respeta las **zonas seguras de TikTok** (`SAFE_X`/`SAFE_Y`: ni bajo
+  los botones de la derecha ni sobre la descripción de abajo): el montaje lo
+  centra en la franja segura y lo empuja hacia dentro. Un texto que venga
+  pegado en la imagen NO pasa por ahí — otra razón para que no haya ninguno.
 
 ### Que no salga estático
 

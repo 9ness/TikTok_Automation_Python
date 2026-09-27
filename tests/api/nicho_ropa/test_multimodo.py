@@ -155,3 +155,18 @@ class TestOrdenParaPublicar:
                 self._v("mm_espejo", 3, True, 40)]
         orden = config.orden_para_publicar(vids)
         assert [v["formato"] for v in orden] == ["mm_espejo", "mm_botas_2", "mm_bolso_1"]
+
+
+class TestRotuloEnZonaSegura:
+    def test_centrado_en_la_franja_y_dentro_de_margenes(self, tmp_path):
+        from PIL import Image
+
+        from src.nicho_pov_bof import config as pov
+        from src.nicho_ropa.pipeline import video_editor
+
+        png = tmp_path / "t.png"
+        Image.new("RGBA", (1000, 300)).save(png)
+        x, y = video_editor._posicion_segura(png, 0.9)
+        w, h = Image.open(png).size
+        assert x >= int(1080 * pov.SAFE_X[0]) and x + w <= int(1080 * pov.SAFE_X[1])
+        assert y >= int(1920 * pov.SAFE_Y[0]) and y + h <= int(1920 * pov.SAFE_Y[1])

@@ -539,10 +539,11 @@ def _quemar_texto(
         )
         seg = float(texto.get("segundos") or 0)
         enable = f":enable='between(t,0,{seg:.2f})'" if seg > 0 else ""
+        x, y = _posicion_segura(png, float(texto.get("y") or _TEXTO_Y))
         _run([
             "ffmpeg", "-y", "-v", "error", "-i", str(salida), "-i", str(png),
             "-filter_complex",
-            f"[0:v][1:v]overlay=(main_w-overlay_w)/2:main_h*{float(texto.get('y') or _TEXTO_Y)}{enable}[v]",
+            f"[0:v][1:v]overlay={x}:{y}{enable}[v]",
             "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "medium", "-crf", "18",
             "-c:a", "copy", "-movflags", "+faststart", str(tmp),
@@ -595,6 +596,32 @@ FILTRO_MARCA = (
 )
 # El texto va centrado y a media altura, como en los vídeos de referencia.
 _TEXTO_Y = 0.42
+
+
+def _posicion_segura(png: Path, y_pedida: float) -> tuple[int, int]:
+    """Esquina del rótulo DENTRO de las zonas seguras de TikTok.
+
+    Centrado en todo el ancho, un rótulo largo se metía por la derecha bajo
+    los botones (me gusta, comentarios, compartir); y la `y` de cada estilo es
+    la del borde de arriba, así que un bloque alto podía acabar pisando la
+    descripción de abajo. Se centra en la franja segura horizontal y se
+    empuja hacia dentro si se sale por arriba o por abajo. Si el PNG es más
+    ancho que la franja (sombra y emojis suman), se encoge ahí mismo.
+    """
+    from PIL import Image
+
+    w_v, h_v = pov_config.TARGET_W, pov_config.TARGET_H
+    x0, x1 = (int(w_v * f) for f in pov_config.SAFE_X)
+    y0, y1 = (int(h_v * f) for f in pov_config.SAFE_Y)
+    im = Image.open(png)
+    if im.width > x1 - x0:
+        k = (x1 - x0) / im.width
+        im = im.resize((x1 - x0, max(1, int(im.height * k))), Image.LANCZOS)
+        im.save(png)
+    x = x0 + (x1 - x0 - im.width) // 2
+    y = int(h_v * y_pedida)
+    y = max(y0, min(y, y1 - im.height))
+    return x, y
 _TEXTO_CUERPO = 74
 _TEXTO_BAJADA = 0.75      # de la línea de arriba (medido sobre las capturas)
 
