@@ -530,6 +530,8 @@ export interface VideoMultimodo {
   /** Qué música ponerle en TikTok: una búsqueda para la biblioteca de
    *  sonidos, otras de repuesto y el estilo en una frase. */
   musica?: { busqueda: string; alternativas: string[]; estilo: string };
+  caption?: string;
+  emojis?: string;
 }
 
 export interface TandasMultimodoResponse {

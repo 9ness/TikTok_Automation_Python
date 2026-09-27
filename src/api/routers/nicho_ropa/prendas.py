@@ -376,6 +376,10 @@ def multimodo_tandas(
         v["carpeta_label"] = config.carpeta_label(v["carpeta"])
         v["formato_label"] = config.MODOS.get(v["formato"], {}).get("label", v["formato"])
         v["musica"] = config.musica_de(v["formato"], f"{v['carpeta']}/{v['producto']}")
+        if v.get("caption") and not v.get("emojis"):
+            from src.nicho_pov_bof.services import emojis as emojis_svc
+
+            v["emojis"] = emojis_svc.emojis_para(v["producto"], v.get("titulo", ""), v["caption"])
         if indice is not None:
             v["product_url"] = pov_repo.url_de(v, indice) or ""
     tandas = [

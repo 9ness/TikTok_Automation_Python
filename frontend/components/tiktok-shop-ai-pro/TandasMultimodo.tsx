@@ -11,6 +11,8 @@ import {
   useTandasMultimodo,
 } from "@/lib/queries/nichoRopa";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
+import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { useHashtags } from "@/lib/queries/nichoPovBof";
 
 /** Los vídeos hechos del Multimodo en tandas de diez.
  *
@@ -19,6 +21,11 @@ import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
  *  orden de montaje, bajando una tanda entera y marcando lo que se sube. */
 export function TandasMultimodo() {
   const tandas = useTandasMultimodo();
+  // Los mismos hashtags que las tarjetas de Moda Mujer: el caption se copia
+  // entero (texto, emojis y hashtags), que es lo que se pega en TikTok.
+  const hashtags = useHashtags("nicho-ropa-mujer").data ?? [];
+  const captionDe = (v: { caption?: string; emojis?: string }) =>
+    v.caption ? [v.caption, v.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : "";
   const marcar = useMarcarSubidoMultimodo();
   const [bajando, setBajando] = useState<number | null>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -65,7 +72,7 @@ export function TandasMultimodo() {
     <Caja
       icono="📦"
       titulo="Vídeos listos por tandas"
-      hint="Todo lo montado del multimodo, de cualquier carpeta, de diez en diez. Baja la tanda y marca lo que subas. 🎵 es la música que le va: tócala para copiar la búsqueda y pégala en TikTok › Añadir sonido › Buscar (elige uno con muchos vídeos y bájale el volumen)."
+      hint="Todo lo montado del multimodo, de cualquier carpeta, de diez en diez. Baja la tanda, copia el caption y la música de cada vídeo y pulsa «Marcar subido» al publicarlo. 🎵 es la música que le va: tócala para copiar la búsqueda y pégala en TikTok › Añadir sonido › Buscar (elige uno con muchos vídeos y bájale el volumen)."
       extra={datos ? `${datos.subidos}/${datos.total} subidos` : undefined}
     >
       {tandas.isLoading ? (
@@ -129,17 +136,20 @@ export function TandasMultimodo() {
                           <p className="truncate text-[10px] text-muted-foreground">
                             {v.formato_label} · {v.carpeta_label} · P{v.producto}
                           </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                          <CopyChip label="✍️ Caption" text={captionDe(v)} siempre />
                           {v.musica?.busqueda ? (
                             <button
                               type="button"
                               onClick={() => void copiarMusica(v.musica!.busqueda)}
                               title={`${v.musica.estilo}. Otras: ${v.musica.alternativas.join(" · ")}`}
-                              className="mt-0.5 flex max-w-full items-center gap-1 truncate rounded bg-violet-500/10 px-1.5 py-px text-[10px] text-violet-300 hover:bg-violet-500/20"
+                              className="flex max-w-full items-center gap-1 truncate rounded bg-violet-500/10 px-1.5 py-px text-[10px] text-violet-300 hover:bg-violet-500/20"
                             >
                               🎵 <span className="truncate">{v.musica.busqueda}</span>
                               <Copy className="h-2.5 w-2.5 shrink-0" />
                             </button>
                           ) : null}
+                          </div>
                         </div>
                         <a
                           href={buildVideoRopaUrl(
@@ -178,7 +188,7 @@ export function TandasMultimodo() {
                           }`}
                         >
                           <Check className="h-3 w-3" />
-                          {v.uploaded ? "Subido" : "Subir"}
+                          {v.uploaded ? "Subido" : "Marcar subido"}
                         </button>
                       </li>
                     ))}

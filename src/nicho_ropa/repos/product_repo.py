@@ -186,6 +186,9 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
                 "product_url": str(vista.get("product_url") or ""),
                 "uploaded": bool(vista.get("uploaded")),
                 "uploaded_at": int(vista.get("uploaded_at") or 0),
+                # Lo que se pega en TikTok al publicar, sin abrir la carpeta.
+                "caption": str(vista.get("caption") or ""),
+                "emojis": str(vista.get("emojis") or ""),
                 **v,
             })
     salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))
