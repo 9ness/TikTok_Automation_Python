@@ -610,6 +610,19 @@ def sin_texto_en_video(prompt: str) -> str:
     return _FRASE_TEXTO_VIDEO.sub(SIN_TEXTO_VIDEO, prompt)
 
 
+# Remate para TODOS los formatos mudos del multimodo: el rótulo (si lo lleva)
+# lo pone el montaje, así que cualquier letra que meta el generador es basura
+# — Kling se inventó "PIAPIODMIRMA" sobre un bolso. Va al final del prompt de
+# movimiento, que es lo último que lee el generador.
+NOTA_SIN_TEXTO_VIDEO = (
+    "\n\nIMPORTANTE: vídeo limpio, sin ningún texto sobreimpreso. Sin letras, "
+    "palabras, títulos, rótulos, subtítulos, carteles, logotipos, marcas de "
+    "agua ni tipografía de ningún tipo en ningún momento del clip. Si la "
+    "imagen inicial no tiene texto, el vídeo tampoco."
+)
+
+
+
 # El ritmo del Nicho General, que es el que ya funciona en clips de 8s: 136
 # caracteres para 8 segundos (17 car/s).
 CARACTERES_POR_SEGUNDO_CLIP = 17
@@ -1864,6 +1877,8 @@ def prompts_mof10(
         if (TEXTO_MARCA.get(clave) or {}).get("quitar_de_imagen"):
             imagen = sin_texto_en_imagen(imagen)
             guion = sin_texto_en_video(guion)
+        if modo and es_multimodo(modo):
+            guion = guion.rstrip() + NOTA_SIN_TEXTO_VIDEO
         # El tope de caracteres solo se toca en los estilos cuyo guion se
         # escribe fuera; en los de calle no hay marcador que rellenar.
         dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO

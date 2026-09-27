@@ -110,3 +110,9 @@ class TestMovimientoSinTexto:
             video = p.get("guion") or p.get("video") or ""
             assert "se mantiene est" not in video
             assert "No aparece ningún texto" in video
+
+    def test_todos_los_formatos_mudos_prohiben_texto(self):
+        for modo in config.modos_multimodo():
+            ps = config.prompts_mof10(modo=modo)
+            assert ps, modo
+            assert "sin ningún texto sobreimpreso" in ps[0]["guion"], modo
