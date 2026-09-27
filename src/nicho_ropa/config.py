@@ -472,12 +472,28 @@ _VINTAGE_BOLSO = [
     ("Colección de Otoño", "la elegancia de septiembre"),
     ("Autumn Essentials", "cozy season"),
     ("Esencia de Otoño", "nueva temporada"),
+    ("Autumn Mood", "tu bolso de temporada"),
+    ("Otoño en el coche", "café, hojas y tu bolso"),
+    ("Fall Favorites", "must have de otoño"),
+    ("Hojas y café", "el bolso que combina con todo"),
 ]
 _VINTAGE_BOTAS = [
     ("Autumn Edit", "step into style"),
     ("Nueva Colección", "otoño paso a paso"),
     ("Otoño esencial", "paso a paso"),
     ("Autumn Boots", "cozy season"),
+    ("Pasos de Otoño", "botas de temporada"),
+    ("Fall Favorites", "must have de otoño"),
+    ("Otoño a tus pies", "nueva temporada"),
+    ("Boots Season", "cozy vibes"),
+]
+# Frases de Halloween: se suman a las de otoño SOLO en su ventana (del 10 de
+# octubre al 1 de noviembre), con sus propios emojis. Fuera de ella no salen:
+# un 🎃 en septiembre queda raro.
+_VINTAGE_HALLOWEEN = [
+    ("Spooky Season", "look de Halloween", ("🎃", "🎃")),
+    ("Halloween Vibes", "otoño con un toque oscuro", ("🎃", "👻")),
+    ("Noche de Halloween", "el complemento perfecto", ("🦇", "🎃")),
 ]
 for _clave, _frases in (
     ("vintage_bolso_1", _VINTAGE_BOLSO), ("vintage_bolso_2", _VINTAGE_BOLSO),
@@ -487,8 +503,17 @@ for _clave, _frases in (
 ):
     TEXTO_MARCA[_clave] = {
         "variantes": [{"titulo": t, "bajada": b} for t, b in _frases],
+        "halloween": [{"titulo": t, "bajada": b, "emojis": e} for t, b, e in _VINTAGE_HALLOWEEN],
         "segundos": 0.0, "grado": False, "quitar_de_imagen": True,
     }
+
+
+def es_halloween(hoy=None) -> bool:
+    """¿Estamos en la ventana en que tienen sentido las frases de Halloween?"""
+    import datetime as _dt
+
+    hoy = hoy or _dt.date.today()
+    return (hoy.month == 10 and hoy.day >= 10) or (hoy.month == 11 and hoy.day == 1)
 
 _PARRAFO_TEXTO_IMAGEN = re.compile(
     r"Añade directamente sobre la fotografía.*?integrado en la imagen\.\s*", re.S,
@@ -819,6 +844,9 @@ def texto_de_modo(modo: str, semilla: str = "") -> dict:
 
     texto = dict(TEXTO_MARCA.get(estilo_de_modo(modo)) or {})
     variantes = texto.pop("variantes", None)
+    halloween = texto.pop("halloween", None)
+    if variantes and halloween and es_halloween():
+        variantes = variantes + halloween
     if variantes:
         h = hashlib.sha1(("frase:" + str(semilla or "")).encode("utf-8")).digest()
         texto.update(variantes[h[0] % len(variantes)])

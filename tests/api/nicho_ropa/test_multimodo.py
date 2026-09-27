@@ -84,3 +84,9 @@ class TestRotuloVintage:
         assert a == config.texto_de_modo("mm_bolso_1", "c/1")  # remontar no la cambia
         assert not config.lleva_grado("mm_bolso_1")
         assert config.lleva_grado("mm_espejo_escenas")
+
+    def test_halloween_solo_en_su_ventana(self):
+        import datetime as dt
+        assert config.es_halloween(dt.date(2026, 10, 20))
+        assert not config.es_halloween(dt.date(2026, 9, 27))
+        assert not config.es_halloween(dt.date(2026, 11, 5))

@@ -529,6 +529,11 @@ def _quemar_texto(
     tmp = salida.with_name(salida.stem + "__texto" + salida.suffix)
     try:
         ad = adorno_de(semilla)
+        # Las frases de temporada que traen sus emojis (Halloween: 🎃👻)
+        # mandan sobre las hojas y los corazones del adorno.
+        if texto.get("emojis"):
+            e1, e2 = texto["emojis"]
+            ad = {**ad, "titulo": (e1, e2), "bajada": ("", "")}
         png = _png_texto_moda(
             texto["titulo"], texto.get("bajada", ""), work, ad,
         )
