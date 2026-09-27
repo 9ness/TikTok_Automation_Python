@@ -178,8 +178,8 @@ TikTok penaliza el contenido estático. Por eso:
 - En los **bolsos** el prompt de movimiento pide una mano que entra, acaricia
   el bolso y juega con el asa; en **botas 1/2**, que la mano gire el zapato
   que ya sujeta. Si Kling deja el clip quieto igualmente, repítelo.
-- El montaje de los formatos de bodegón (Vintage bolsos/botas y maniquí) le
-  añade un acercamiento lento con vaivén (`config.MODOS_CON_MOVIMIENTO`).
+- Un zoom o vaivén añadido en el montaje NO vale (lo descartó el operador):
+  el movimiento tiene que estar en el clip.
 - En **Zapatillas Espejo** NO pidas que enseñe la zapatilla a cámara: sale el
   pie delante del espejo o el móvil convertido en zapato. El prompt ya la
   deja agachada tocando los cordones.

@@ -323,8 +323,6 @@ def _montar_en(
     # que no cuesta una recodificación extra.
     if modo and config.lleva_grado(modo):
         vf = f"{vf},{FILTRO_MARCA}"
-    if modo and config.lleva_movimiento(modo):
-        vf = f"{vf},{config.filtro_movimiento(pov_config.TARGET_W, pov_config.TARGET_H, pov_config.TARGET_FPS)}"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if voz is None and conservar_audio:

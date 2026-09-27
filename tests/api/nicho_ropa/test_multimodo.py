@@ -131,11 +131,6 @@ class TestMovimientoSinTexto:
             assert "acaricia despacio el bolso" in guion, modo
             assert guion.rstrip().endswith("el vídeo tampoco."), modo
 
-    def test_los_quietos_llevan_movimiento_en_el_montaje(self):
-        assert config.lleva_movimiento("mm_bolso_2")
-        assert not config.lleva_movimiento("mm_espejo")
-        assert "zoompan" in config.filtro_movimiento(1080, 1920, 30)
-
 
 class TestOrdenParaPublicar:
     def _v(self, formato, t, subido=False, t_sub=0):
