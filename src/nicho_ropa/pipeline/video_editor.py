@@ -542,7 +542,7 @@ def _quemar_texto(
         _run([
             "ffmpeg", "-y", "-v", "error", "-i", str(salida), "-i", str(png),
             "-filter_complex",
-            f"[0:v][1:v]overlay=(main_w-overlay_w)/2:main_h*{_TEXTO_Y}{enable}[v]",
+            f"[0:v][1:v]overlay=(main_w-overlay_w)/2:main_h*{float(texto.get('y') or _TEXTO_Y)}{enable}[v]",
             "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "medium", "-crf", "18",
             "-c:a", "copy", "-movflags", "+faststart", str(tmp),

@@ -456,7 +456,9 @@ MODALIDAD_DEFECTO = "aleatorios"
 TEXTO_MARCA: dict[str, dict] = {
     "marca_espejo": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 3.0},
     "marca_zapatos": {"titulo": "AUTUMN BOOTS", "bajada": "step into style", "segundos": 3.0},
-    "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0},
+    # `y`: en la vista POV el zapato va en el CENTRO y el rótulo a la altura de
+    # siempre (42%) le caía encima; arriba queda sobre el suelo o la ventana.
+    "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0, "y": 0.2},
 }
 
 # Los Vintage del multimodo (bolsos y botas). La web pide el rótulo otoñal
