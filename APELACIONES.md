@@ -20,7 +20,9 @@ no se apela: se rehace el vídeo.
    - la foto del producto de la ficha,
    - una comparativa vídeo | ficha lado a lado (ayuda mucho),
    - las capturas completas de la infracción (fecha, motivo, nº de caso).
-2. **Texto** en español, tono profesional, ~600 caracteres, con esta forma:
+2. **Texto** en español, tono profesional, **máximo 500 caracteres** (límite
+   del campo «Motivo» de la apelación; cuéntalos antes de dárselo al
+   operador, apunta a ~480), con esta forma:
    - «Solicito una revisión manual.»
    - El producto del vídeo coincide con el enlazado: diseño, color, forma,
      marca/etiqueta **concretos** (qué se ve igual).
