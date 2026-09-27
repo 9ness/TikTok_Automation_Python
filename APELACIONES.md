@@ -45,7 +45,7 @@ no se apela: se rehace el vídeo.
 | 19/9/2026 | Cheetos Mac'n Cheese «Four Cheesy» | envase en inglés, ficha y vídeo en español («4 Quesos») | ✅ aprobada |
 | (curso) | Esterilizador y secador de biberones | error de detección, producto idéntico | ✅ aprobada |
 | (curso) | Producto con ficha en inglés | contenido en español y ficha en parte en inglés | ✅ aprobada |
-| 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño | ⏳ pendiente |
+| 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ⏳ enviada 27/9 |
 
 Texto y pruebas de cada caso nuevo: en el Drive,
 `TIKTOK_SHOP_AI_PRO/_apelaciones/<fecha>_<producto>/` (`apelacion.txt` +
