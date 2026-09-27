@@ -53,8 +53,16 @@ repetir (hasta el máximo que acordaste con el operador).
 - [ ] **Aparecen o desaparecen objetos** de la escena (un teclado y una
       alfombrilla que no estaban, herramientas nuevas). Que se enciendan
       pantallas o cambie lo que muestra un monitor sí vale.
-- [ ] Mira el clip con una tira de ~10 fotogramas repartidos (o entero):
-      una sola miniatura del principio no enseña estos fallos.
+- [ ] **Al producto le salen detalles que no tenía**: puertos USB, luces
+      LED, botones, costuras, tapas. Pasó con un powerbank: en la imagen
+      no se veía el canto y a mitad de clip Kling le «dibujó» el puerto y
+      los LEDs. El operador lo vio en el móvil; en miniaturas de 120 px no
+      se veía.
+- [ ] Cómo revisarlo: una tira de ~10 fotogramas para el movimiento Y,
+      además, el **primer, el del medio y el último fotograma GRANDES**
+      (≥330 px de ancho, o recortados sobre el producto) para comparar el
+      producto pieza a pieza. Si el canto o la base no se ven en la imagen
+      de partida, mira ahí con más cuidado: es donde el generador inventa.
 - [ ] **Clips hablados** (Moda, UGC):
       - la voz no es español de España (o el idioma que pedía el prompt),
       - se come palabras o se corta a media frase al final,
