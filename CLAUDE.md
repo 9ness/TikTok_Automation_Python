@@ -42,6 +42,7 @@ nichos.
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
+| 🎛️ Moda Mujer · Multimodo | (modos `mm_*` de Ropa) | Formatos MUDOS de 10s (espejo solo música, camisetas, zapatillas, marca, Vintage botas/bolsos) elegidos producto a producto por un agente; catálogos ropa + zapatos + accesorios (`mujer_zapatos_web`/`mujer_accesorios_web`); vista «multimodo» y tandas de 10 (`/multimodo/tandas`) |
 | 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
 | 🎨 Creativos Pro | (sin modo — no edita vídeo) | Módulo 13: un creativo publicitario por producto. Mismo catálogo que POV BOF (fuentes, fotos, textos, hashtags, escaparate, vendidos); solo cambia el prompt y el formato 3:4 |
 | 🖼️ Carruseles | (sin modo — no edita vídeo) | Módulo 14: carrusel de DOS fotos (chica sorprendida + producto) con el texto quemado. Solo productos donde la chica pueda estar EN el sitio |

@@ -57,6 +57,12 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
   (ilimitado, aunque lento). `mm_zapatos_escenas` es la excepción: la imagen
   entra como INGREDIENTE, así que va en Flow.
 - Descarga a 720p/1080p vertical, sin fotos fijas.
+- **Kling 2.5 solo es ilimitado a 720p** (a 1080p gasta créditos). El Video
+  Generator de Magnific deja **una** generación a la vez; para una carpeta
+  entera usa un **Space** propio (duplica «Foto con IA a Video»): «Clear list»
+  en la lista de entrada, «Add media» (máx. 20 por tanda), prompt en el nodo
+  generador y Run. Se encola en el servidor (~5 min por clip). Agrupa por
+  prompt: todos los Vintage comparten movimiento; los de espejo, otro.
 
 ## Revisar antes de subir
 
