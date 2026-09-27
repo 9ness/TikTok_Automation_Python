@@ -101,3 +101,12 @@ class TestMusica:
 
     def test_estable_por_producto(self):
         assert config.musica_de("mm_bolso_1", "c/3") == config.musica_de("mm_bolso_1", "c/3")
+
+
+class TestMovimientoSinTexto:
+    def test_el_prompt_de_video_prohibe_el_texto(self):
+        for modo in ("mm_bolso_1", "mm_botas_largas_2"):
+            p = config.prompts_mof10(modo=modo)[0]
+            video = p.get("guion") or p.get("video") or ""
+            assert "se mantiene est" not in video
+            assert "No aparece ningún texto" in video

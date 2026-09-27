@@ -593,6 +593,23 @@ def sin_texto_en_imagen(prompt: str) -> str:
     return _PARRAFO_TEXTO_IMAGEN.sub("", prompt)
 
 
+# El prompt de MOVIMIENTO de los Vintage pide que "el texto se mantenga
+# estático": con la foto ya sin rótulo, Kling lo tomaba como orden de poner
+# uno y se inventaba letras sin sentido. Se cambia por la prohibición.
+_FRASE_TEXTO_VIDEO = re.compile(
+    r"El [Tt]exto se mantiene est[aá]tico y fijo durante todo el clip\. No desaparece\.\s*",
+)
+SIN_TEXTO_VIDEO = (
+    "No aparece ningún texto, letra ni rótulo en pantalla. "
+    "El producto no se mueve solo ni cambia de forma, color ni tamaño. "
+)
+
+
+def sin_texto_en_video(prompt: str) -> str:
+    """El prompt de movimiento sin pedir texto y prohibiéndolo."""
+    return _FRASE_TEXTO_VIDEO.sub(SIN_TEXTO_VIDEO, prompt)
+
+
 # El ritmo del Nicho General, que es el que ya funciona en clips de 8s: 136
 # caracteres para 8 segundos (17 car/s).
 CARACTERES_POR_SEGUNDO_CLIP = 17
@@ -1846,6 +1863,7 @@ def prompts_mof10(
             imagen = NOTA_PERSONAJE_FIJO + imagen
         if (TEXTO_MARCA.get(clave) or {}).get("quitar_de_imagen"):
             imagen = sin_texto_en_imagen(imagen)
+            guion = sin_texto_en_video(guion)
         # El tope de caracteres solo se toca en los estilos cuyo guion se
         # escribe fuera; en los de calle no hay marcador que rellenar.
         dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO
