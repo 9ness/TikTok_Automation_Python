@@ -678,22 +678,49 @@ NOTA_SIN_TEXTO_VIDEO = (
     "imagen inicial no tiene texto, el vídeo tampoco."
 )
 
-# Lo que Kling se inventa en los formatos de calzado, y el clip ya no vale:
-# en POV el pie descalzo acababa calzado con un tercer zapato; en el espejo
-# entraba una pierna real por delante y la chica terminaba sujetando otro
-# zapato más. Se dice cuántos pies y zapatos hay, porque "no añadas" no basta.
+_MANO_BOLSO = (
+    "Para que el clip tenga movimiento: una mano de mujer con manicura cuidada "
+    "entra en el plano, acaricia despacio el bolso y juega con el asa, y se "
+    "retira. Solo una mano, con cinco dedos. El bolso no cambia de forma, "
+    "color, tamaño ni posición y no se mueve solo."
+)
+_MANO_BOTA = (
+    "Para que el clip tenga movimiento: la mano que sujeta el zapato lo gira "
+    "despacio para enseñarlo por los dos lados y lo acerca un poco a la "
+    "cámara. El zapato no cambia de forma, color ni diseño y no aparece "
+    "ningún zapato nuevo."
+)
+
+# Lo que Kling hace mal o se queda corto en cada formato, dicho al final del
+# prompt de movimiento (antes de la nota sin texto).
 EXTRA_VIDEO_MULTIMODO = {
+    # Los bolsos son un bodegón: con el «movimiento sutil» del curso salía
+    # un temblor y poco más, y TikTok penaliza el contenido estático.
+    "mm_bolso_1": _MANO_BOLSO,
+    "mm_bolso_2": _MANO_BOLSO,
+    "mm_bolso_3": _MANO_BOLSO,
+    # En estos la imagen ya trae la mano sujetando el otro zapato.
+    "mm_botas_1": _MANO_BOTA,
+    "mm_botas_2": _MANO_BOTA,
+    # Lo que Kling se inventa en calzado, y el clip ya no vale: en POV el pie
+    # descalzo acababa calzado con un tercer zapato; en el espejo entraba una
+    # pierna real por delante, la chica acercaba la zapatilla a cámara o el
+    # móvil se volvía zapato. Se dice cuántos pies y zapatos hay y se la deja
+    # QUIETA: "no añadas" no basta, y el «enseña a cámara» del curso lo provoca.
     "mm_zapatos_pov": (
         "Los pies se quedan exactamente como en la imagen inicial: el pie "
         "descalzo sigue descalzo y no aparece ningún zapato nuevo; en todo el "
         "clip hay los mismos zapatos que en la imagen."
     ),
     "mm_zapatillas_espejo": (
-        "Todo ocurre DENTRO del reflejo del espejo: delante del espejo no "
-        "aparece ninguna pierna, pie ni zapato. Ella lleva puestas las dos "
-        "zapatillas todo el clip y solo toca la que tiene en el pie; no coge "
-        "ni sostiene ningún zapato en la mano. Hay exactamente dos zapatillas "
-        "en todo el clip."
+        "Selfie en el espejo casi estático: ella se queda agachada en la misma "
+        "postura, con los dos pies apoyados en el suelo, y con la mano libre "
+        "toca despacio los cordones de la zapatilla que lleva puesta, sin "
+        "quitársela. No levanta el pie ni acerca la zapatilla a la cámara. El "
+        "móvil sigue siendo el mismo móvil en su mano. Todo ocurre DENTRO del "
+        "reflejo del espejo: delante del espejo no aparece ninguna pierna, pie "
+        "ni zapato. Hay exactamente dos zapatillas en todo el clip, las dos en "
+        "sus pies."
     ),
 }
 
