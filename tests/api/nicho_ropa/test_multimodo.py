@@ -90,3 +90,14 @@ class TestRotuloVintage:
         assert config.es_halloween(dt.date(2026, 10, 20))
         assert not config.es_halloween(dt.date(2026, 9, 27))
         assert not config.es_halloween(dt.date(2026, 11, 5))
+
+
+class TestMusica:
+    def test_cada_formato_trae_su_busqueda(self):
+        for modo in config.modos_multimodo():
+            m = config.musica_de(modo, "c/1")
+            assert m["busqueda"] and m["estilo"], modo
+            assert m["busqueda"] not in m["alternativas"]
+
+    def test_estable_por_producto(self):
+        assert config.musica_de("mm_bolso_1", "c/3") == config.musica_de("mm_bolso_1", "c/3")

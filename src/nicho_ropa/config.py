@@ -508,6 +508,74 @@ for _clave, _frases in (
     }
 
 
+# La música la pone el operador en TikTok al publicar (los vídeos salen
+# mudos). Para no pensarla vídeo a vídeo, cada formato trae QUÉ tipo de música
+# le va y varias búsquedas para la biblioteca de sonidos de TikTok; a cada
+# producto le toca una (por semilla), así dos vídeos seguidos no llevan el
+# mismo sonido. En inglés porque así están etiquetados los sonidos en TikTok.
+MUSICA_MULTIMODO: dict[str, dict] = {
+    "espejo_musica": {
+        "estilo": "pop pegadizo de tendencia, alegre, para enseñar el outfit",
+        "busca": ["outfit check", "fit check trend", "get ready with me song", "fashion trending sound"],
+    },
+    "marca_espejo": {
+        "estilo": "indie suave y acogedor, vibra de vlog de otoño",
+        "busca": ["cozy autumn vibes", "aesthetic vlog music", "soft indie autumn", "fall aesthetic"],
+    },
+    "maniqui": {
+        "estilo": "beat minimal de moda, tipo desfile",
+        "busca": ["runway beat", "fashion show music", "minimal house fashion"],
+    },
+    "sarcastica_mujer": {
+        "estilo": "sonido de humor con risas (el formato lo pide)",
+        "busca": ["sitcom laugh", "funny laugh sound", "sarcastic meme sound"],
+    },
+    "zapatillas_espejo": {
+        "estilo": "hip hop chill o lo-fi con ritmo marcado",
+        "busca": ["sneaker check", "lofi hip hop chill", "chill beat fashion"],
+    },
+    "marca_zapatos": {
+        "estilo": "acústica cálida, otoño cinematográfico",
+        "busca": ["autumn acoustic", "cozy fall music", "cinematic autumn"],
+    },
+    "marca_pov": {
+        "estilo": "jazz de cafetería, tranquilo",
+        "busca": ["coffee shop jazz", "cozy autumn jazz", "rainy day jazz"],
+    },
+}
+for _clave in (
+    "vintage_bolso_1", "vintage_bolso_2", "vintage_bolso_3", "vintage_botas_1",
+    "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2",
+):
+    MUSICA_MULTIMODO[_clave] = {
+        "estilo": "jazz o soul vintage, o acústica otoñal tranquila",
+        "busca": ["vintage jazz", "old french song", "autumn lofi", "70s soul aesthetic"],
+    }
+_MUSICA_HALLOWEEN = ["spooky season", "halloween aesthetic"]
+
+
+def musica_de(modo: str, semilla: str = "") -> dict:
+    """`{busqueda, alternativas, estilo}` para ponerle sonido en TikTok.
+
+    `{}` si el formato no tiene sugerencia (los que hablan no la necesitan).
+    """
+    import hashlib
+
+    meta = MUSICA_MULTIMODO.get(estilo_de_modo(modo)) if modo else None
+    if not meta:
+        return {}
+    busca = list(meta["busca"])
+    if es_halloween():
+        busca += _MUSICA_HALLOWEEN
+    h = hashlib.sha1(("musica:" + str(semilla or "")).encode("utf-8")).digest()
+    i = h[0] % len(busca)
+    return {
+        "busqueda": busca[i],
+        "alternativas": busca[:i] + busca[i + 1:],
+        "estilo": meta["estilo"],
+    }
+
+
 def es_halloween(hoy=None) -> bool:
     """¿Estamos en la ventana en que tienen sentido las frases de Halloween?"""
     import datetime as _dt

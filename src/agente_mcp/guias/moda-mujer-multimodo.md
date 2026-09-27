@@ -103,3 +103,8 @@ Arriba de la pantalla, **«📦 Vídeos listos por tandas»** junta todo lo mont
 del multimodo (de cualquier catálogo y carpeta) de diez en diez, por orden de
 montaje: «Bajar» baja la tanda entera y «Subir» marca cada vídeo como
 publicado. No marques Subido/Escaparate/Vendió salvo que te lo pidan.
+
+Cada vídeo trae **🎵 la música que le va** (`musica` en la API): una búsqueda
+para la biblioteca de sonidos de TikTok, otras de repuesto y el estilo. Sale
+de `config.MUSICA_MULTIMODO` por formato y cambia de un producto a otro; en
+Halloween se suman búsquedas de temporada.

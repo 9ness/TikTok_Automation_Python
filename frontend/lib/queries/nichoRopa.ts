@@ -527,6 +527,9 @@ export interface VideoMultimodo {
   video_listo_at: number;
   formato: string;
   formato_label: string;
+  /** Qué música ponerle en TikTok: una búsqueda para la biblioteca de
+   *  sonidos, otras de repuesto y el estilo en una frase. */
+  musica?: { busqueda: string; alternativas: string[]; estilo: string };
 }
 
 export interface TandasMultimodoResponse {

@@ -374,6 +374,7 @@ def multimodo_tandas(
     for v in videos:
         v["carpeta_label"] = config.carpeta_label(v["carpeta"])
         v["formato_label"] = config.MODOS.get(v["formato"], {}).get("label", v["formato"])
+        v["musica"] = config.musica_de(v["formato"], f"{v['carpeta']}/{v['producto']}")
         if indice is not None:
             v["product_url"] = pov_repo.url_de(v, indice) or ""
     tandas = [

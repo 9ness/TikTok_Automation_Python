@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Loader2 } from "lucide-react";
+import { Check, Copy, Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -29,6 +29,17 @@ export function TandasMultimodo() {
     datos?.tandas.find((t) => t.subidos < t.items.length)?.numero ?? null;
   const abiertaReal = abierta ?? primeraPendiente;
 
+  // La búsqueda para la biblioteca de sonidos de TikTok: se pega tal cual
+  // en "Añadir sonido → Buscar".
+  async function copiarMusica(texto: string) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast.success(`Copiado: «${texto}» — pégalo en Sonidos › Buscar de TikTok`);
+    } catch {
+      toast.message(`Busca en TikTok: ${texto}`);
+    }
+  }
+
   async function bajarTanda(numero: number) {
     const t = datos?.tandas.find((x) => x.numero === numero);
     if (!t) return;
@@ -54,7 +65,7 @@ export function TandasMultimodo() {
     <Caja
       icono="📦"
       titulo="Vídeos listos por tandas"
-      hint="Todo lo montado del multimodo, de cualquier carpeta, de diez en diez. Baja la tanda y marca lo que subas."
+      hint="Todo lo montado del multimodo, de cualquier carpeta, de diez en diez. Baja la tanda y marca lo que subas. 🎵 es la música que le va: tócala para copiar la búsqueda y pégala en TikTok › Añadir sonido › Buscar (elige uno con muchos vídeos y bájale el volumen)."
       extra={datos ? `${datos.subidos}/${datos.total} subidos` : undefined}
     >
       {tandas.isLoading ? (
@@ -118,6 +129,17 @@ export function TandasMultimodo() {
                           <p className="truncate text-[10px] text-muted-foreground">
                             {v.formato_label} · {v.carpeta_label} · P{v.producto}
                           </p>
+                          {v.musica?.busqueda ? (
+                            <button
+                              type="button"
+                              onClick={() => void copiarMusica(v.musica!.busqueda)}
+                              title={`${v.musica.estilo}. Otras: ${v.musica.alternativas.join(" · ")}`}
+                              className="mt-0.5 flex max-w-full items-center gap-1 truncate rounded bg-violet-500/10 px-1.5 py-px text-[10px] text-violet-300 hover:bg-violet-500/20"
+                            >
+                              🎵 <span className="truncate">{v.musica.busqueda}</span>
+                              <Copy className="h-2.5 w-2.5 shrink-0" />
+                            </button>
+                          ) : null}
                         </div>
                         <a
                           href={buildVideoRopaUrl(
