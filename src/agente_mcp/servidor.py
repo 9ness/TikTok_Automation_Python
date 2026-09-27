@@ -501,12 +501,12 @@ async def marcar(ctx: Context, menu: str, catalogo: str, carpeta: str, producto:
 @_herramienta(structured_output=False)
 async def marcar_carpeta(ctx: Context, menu: str, catalogo: str, carpeta: str,
                          completada: bool | None = None,
-                         pendiente: bool | None = None) -> str:
+                         pendiente: bool | None = None, modo: str = "") -> str:
     """Botones de la carpeta: «Completada» y «📤 Pendiente» (vídeos hechos, falta
     subirlos). Cuando termines los vídeos de una carpeta, márcala `pendiente=True`
     para que el operador sepa que tiene que subirlos. «Completada» solo si te lo
-    pide. POV BOF y POV BOF Largo (en el Largo, del modo de guion activo)."""
-    c = await _ctx(ctx, menu, catalogo, carpeta)
+    pide. POV BOF, POV BOF Largo (del modo de guion activo) y Ropa (por `modo`)."""
+    c = await _ctx(ctx, menu, catalogo, carpeta, modo)
     return _json({"ok": True, **(await menus.marcar_carpeta(c, completada, pendiente))})
 
 

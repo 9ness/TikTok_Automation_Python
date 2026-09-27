@@ -194,7 +194,7 @@ vídeos).
    `montar`).
 10. `estado()` hasta que acabe → `videos_montados(…, copiar_a_bandeja=True)`
     deja los vídeos editados en `<carpeta>/videos/` de la bandeja.
-11. `marcar_carpeta(menu, catalogo, carpeta, pendiente=True)` al terminar los
+11. `marcar_carpeta(menu, catalogo, carpeta, pendiente=True)` (en Ropa, con `modo`) al terminar los
     vídeos de una carpeta: es el «📤 Pendiente» que le dice al operador que
     tiene que subirlos. `completada=True` solo si él lo pide.
 12. `marcar(…)` solo si el operador lo pide (Subido / Escaparate / Vendió). En

@@ -633,11 +633,17 @@ async def montar(c: Ctx, prod: str) -> dict:
 
 async def marcar_carpeta(c: Ctx, completada: bool | None, pendiente: bool | None) -> dict:
     """«Completada» y «📤 Pendiente» (vídeos hechos, falta subirlos) de una carpeta.
-    En el Largo van por usuario Y por modo de guion, como en la web."""
-    if c.m.tipo not in ("pov", "largo"):
-        raise ErrorApp("Marcar carpetas desde el MCP: solo POV BOF y POV BOF Largo.")
+    En el Largo van por usuario Y por modo de guion, y en Ropa por modo, como en la web."""
+    if c.m.tipo not in ("pov", "largo", "ropa"):
+        raise ErrorApp("Marcar carpetas desde el MCP: solo POV BOF, POV BOF Largo y Ropa.")
     if completada is None and pendiente is None:
         raise ErrorApp("Nada que marcar: pasa `completada` y/o `pendiente`.")
+    if c.m.tipo == "ropa":
+        r = await c.api.post(f"{ROPA}/carpeta/estado", {
+            "carpeta": c.carpeta, "modo": c.modo,
+            "completada": completada, "pendiente": pendiente})
+        return {"carpeta": c.carpeta, "completada": r.get("completada"),
+                "pendiente": r.get("pendiente")}
     base = LARGO if c.m.tipo == "largo" else POV
     hecho: dict = {"carpeta": c.carpeta}
     if completada is not None:
