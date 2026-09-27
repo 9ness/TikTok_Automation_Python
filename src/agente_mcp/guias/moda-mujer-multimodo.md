@@ -61,8 +61,14 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
   Generator de Magnific deja **una** generación a la vez; para una carpeta
   entera usa un **Space** propio (duplica «Foto con IA a Video»): «Clear list»
   en la lista de entrada, «Add media» (máx. 20 por tanda), prompt en el nodo
-  generador y Run. Se encola en el servidor (~5 min por clip). Agrupa por
+  generador y Run. Se encola en el servidor (~5 min por clip con la cola
+  libre; 10-30 si la cuenta tiene más Spaces corriendo). Agrupa por
   prompt: todos los Vintage comparten movimiento; los de espejo, otro.
+- **Un nodo que pasa 60 min sin terminar falla entero** («Node execution
+  timed out after 60 minutes») y se pierden los clips que no salieron. La cola
+  de Kling es de la CUENTA, no del Space: lanza tandas pequeñas (≤5 clips) y
+  no abras varios Spaces a la vez si otra persona u otro agente también
+  está generando.
 
 ## Revisar antes de subir
 
