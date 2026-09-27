@@ -100,8 +100,9 @@ marcar carpetas, no para subir.
 ## Vídeos listos
 
 Arriba de la pantalla, **«📦 Vídeos listos por tandas»** junta todo lo montado
-del multimodo (de cualquier catálogo y carpeta) de diez en diez, por orden de
-montaje: «Bajar» baja la tanda entera y «Subir» marca cada vídeo como
+del multimodo (de cualquier catálogo y carpeta) de diez en diez: primero lo
+ya subido, y lo que falta MEZCLADO por tipo y formato para que la cuenta no
+se ancle (`config.orden_para_publicar`): «Bajar» baja la tanda entera y «Subir» marca cada vídeo como
 publicado. No marques Subido/Escaparate/Vendió salvo que te lo pidan.
 
 Cada vídeo trae **🎵 la música que le va** (`musica` en la API): una búsqueda

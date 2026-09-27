@@ -185,6 +185,7 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
                 "tienda": str(vista.get("tienda") or ""),
                 "product_url": str(vista.get("product_url") or ""),
                 "uploaded": bool(vista.get("uploaded")),
+                "uploaded_at": int(vista.get("uploaded_at") or 0),
                 **v,
             })
     salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))

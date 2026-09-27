@@ -367,6 +367,7 @@ def multimodo_tandas(
         videos = product_repo.videos_multimodo(carpetas, usuario)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+    videos = config.orden_para_publicar(videos)
     try:
         indice = pov_repo.urls_index()
     except Exception:  # noqa: BLE001 — sin índice, vale lo que lleve la ficha

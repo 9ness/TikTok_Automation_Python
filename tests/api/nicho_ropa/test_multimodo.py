@@ -116,3 +116,23 @@ class TestMovimientoSinTexto:
             ps = config.prompts_mof10(modo=modo)
             assert ps, modo
             assert "sin ningún texto sobreimpreso" in ps[0]["guion"], modo
+
+
+class TestOrdenParaPublicar:
+    def _v(self, formato, t, subido=False, t_sub=0):
+        return {"formato": formato, "video_listo_at": t, "uploaded": subido, "uploaded_at": t_sub}
+
+    def test_mezcla_tipos_y_formatos(self):
+        vids = [self._v("mm_bolso_1", 1), self._v("mm_bolso_1", 2), self._v("mm_bolso_2", 3),
+                self._v("mm_botas_2", 4), self._v("mm_botas_2", 5), self._v("mm_espejo", 6)]
+        orden = [v["formato"] for v in config.orden_para_publicar(vids)]
+        assert orden[:3] == ["mm_bolso_1", "mm_botas_2", "mm_espejo"]
+        assert orden[3] == "mm_bolso_2"  # el segundo bolso ya no repite formato
+        for a, b in zip(orden, orden[1:]):
+            assert a != b
+
+    def test_lo_subido_va_primero_y_no_se_mueve(self):
+        vids = [self._v("mm_bolso_1", 1), self._v("mm_botas_2", 2, True, 50),
+                self._v("mm_espejo", 3, True, 40)]
+        orden = config.orden_para_publicar(vids)
+        assert [v["formato"] for v in orden] == ["mm_espejo", "mm_botas_2", "mm_bolso_1"]

@@ -576,6 +576,61 @@ def musica_de(modo: str, semilla: str = "") -> dict:
     }
 
 
+def _turnos(items: list, clave) -> list:
+    """Reparte por turnos: uno de cada grupo, luego el segundo de cada uno…
+
+    Los grupos van en el orden en que aparece su primer elemento y cada grupo
+    conserva su orden interno.
+    """
+    grupos: dict = {}
+    for it in items:
+        grupos.setdefault(clave(it), []).append(it)
+    salida: list = []
+    listas = list(grupos.values())
+    while any(listas):
+        for lista in listas:
+            if lista:
+                salida.append(lista.pop(0))
+    return salida
+
+
+def orden_para_publicar(videos: list[dict]) -> list[dict]:
+    """El orden de las tandas del multimodo: lo subido delante y lo que falta
+    MEZCLADO.
+
+    Se montan por carpetas (diez bolsos seguidos, luego diez botas…) y
+    publicarlos así ancla la cuenta en un formato. Lo pendiente se alterna por
+    tipo (ropa, bolso, botas…) y, dentro de cada tipo, por formato. Lo ya
+    subido va primero y en el orden en que se subió: así las tandas cerradas
+    no cambian cuando entran vídeos nuevos.
+    """
+    subidos = sorted(
+        (v for v in videos if v.get("uploaded")),
+        key=lambda v: (int(v.get("uploaded_at") or 0), int(v.get("video_listo_at") or 0)),
+    )
+    pendientes = sorted(
+        (v for v in videos if not v.get("uploaded")),
+        key=lambda v: int(v.get("video_listo_at") or 0),
+    )
+    por_tipo = _turnos(
+        pendientes, lambda v: MODOS.get(v.get("formato") or "", {}).get("tipo") or "otro",
+    )
+    # Dentro del turno de cada tipo, que tampoco se repita el formato: se
+    # rehace el reparto tipo a tipo con sus formatos alternados.
+    grupos: dict = {}
+    for v in pendientes:
+        tipo = MODOS.get(v.get("formato") or "", {}).get("tipo") or "otro"
+        grupos.setdefault(tipo, []).append(v)
+    alternados = {
+        tipo: _turnos(lista, lambda v: v.get("formato") or "") for tipo, lista in grupos.items()
+    }
+    mezclado = []
+    for v in por_tipo:
+        tipo = MODOS.get(v.get("formato") or "", {}).get("tipo") or "otro"
+        mezclado.append(alternados[tipo].pop(0))
+    return subidos + mezclado
+
+
 def es_halloween(hoy=None) -> bool:
     """¿Estamos en la ventana en que tienen sentido las frases de Halloween?"""
     import datetime as _dt
