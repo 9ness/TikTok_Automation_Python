@@ -62,7 +62,7 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
 - **Kling 2.5 solo es ilimitado a 720p** (a 1080p gasta créditos). El Video
   Generator de Magnific deja **una** generación a la vez; para una carpeta
   entera usa un **Space** propio (duplica «Foto con IA a Video»): «Clear list»
-  en la lista de entrada, «Add media» (máx. 20 por tanda), prompt en el nodo
+  en la lista de entrada, «Add media» (2 por tanda, ver abajo), prompt en el nodo
   generador y Run. Se encola en el servidor (~5 min por clip con la cola
   libre; 10-30 si la cuenta tiene más Spaces corriendo). Agrupa por
   prompt: todos los Vintage comparten movimiento; los de espejo, otro.
@@ -97,13 +97,102 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
 `modo="multimodo"` es solo la vista de todos los vídeos: sirve para listar y
 marcar carpetas, no para subir.
 
+## «Continúa la lista multimodo» — cómo seguir sin perderte
+
+Es lo que te pedirán casi siempre. Qué significa y en qué orden:
+
+1. **Para quién.** Los vídeos del multimodo son de la cuenta de **Ana**. Se
+   hacen y se suben con **SU** MCP (`/api/mcp/ana.<token>`, te lo da el
+   operador; no lo guardes en memoria ni en el repo). **No uses el selector de
+   cuenta de la web**: cierra la sesión y pide PIN. Si no tienes su URL,
+   pídela antes de subir nada.
+2. **Qué queda.** `carpetas(menu="moda_mujer_multimodo", catalogo=…)` en los
+   TRES catálogos de moda (`web`, `zapatos`, `accesorios`), y dentro de cada
+   carpeta `productos(…)`: los que tienen `formato_hecho` vacío están por
+   hacer. Las gafas se saltan siempre.
+3. **Alterna catálogos Y formatos.** No acabes un catálogo entero antes de
+   empezar otro: coge 2-4 productos de ropa, luego 2-4 de zapatos, luego de
+   accesorios, y vuelta. Dentro de cada tipo, rota los formatos (si el último
+   calzado fue POV, el siguiente espejo o escenas; bolsos 1→2→3). Las tandas
+   de la app ya mezclan al publicar, pero si solo hay de un tipo no hay nada
+   que mezclar.
+4. **Por producto:** `plan_producto(…, modo="mm_…")` → imagen en Flow (con
+   Lucía si el formato lleva persona) → clip en Magnific → revisar →
+   `POST <url MCP>/subir` (multipart `file`) → `archivo_id` →
+   `subir_clip(menu="moda_mujer_multimodo", catalogo, carpeta=<slug>,
+   producto, modo, clip=1, archivo_id)` → `estado(id=<job>)` hasta `done`.
+   La carpeta es el **slug** que devuelve `carpetas` (p. ej.
+   `mujer_zapatos_web__Carpeta_2`), no el nombre bonito.
+5. **Informe final:** qué productos quedaron hechos (formato de cada uno),
+   cuáles se saltaron y por qué, y cuántos clips se repitieron.
+
+### Magnific en práctica
+
+- **De 2 en 2.** Lanza tandas de 2 clips por Space y espera a que salgan
+  antes de lanzar más: la cola es de la cuenta y con 4-6 a la vez el nodo
+  pasa de 60 min y falla entero. Si otra sesión (otro agente, Mauro) también
+  genera, túrnate con ella.
+- **Un Space por prompt** (el movimiento es el mismo para todo el formato):
+  uno para espejo, otro para POV de zapatos, otro para Vintage… Cambia solo
+  las imágenes de la lista.
+- Carga: menú «More» de la lista → «Clear list» → «Add media» → sube las 2
+  imágenes → clic en el título del nodo generador y ▶ (Run).
+- **Estado real y descarga:** la lista del Space no siempre se refresca.
+  Pídelo a la API de la propia web, con la sesión abierta:
+  `fetch('/app/api/creations?limit=10')` → cada creación trae su estado y el
+  vídeo en `metadata.url` (el campo `url` va vacío). Chrome bloquea varias
+  descargas seguidas: baja cada vídeo con `curl` desde esa URL.
+- Si la pestaña del Space se queda en blanco o diminuta, ábrelo en otra
+  pestaña: el trabajo sigue en el servidor.
+- Antes de subir, recomprime a H.264 `crf 21` sin audio (`-an`): el clip es
+  mudo y así sube rápido.
+
+### Emparejar clip e imagen
+
+Magnific no nombra los clips por el producto. Cada clip empieza con SU
+imagen (fotograma inicial), así que compara el primer fotograma del clip con
+las imágenes que subiste y quédate con la más parecida. No lo hagas «por
+orden de salida»: se cruzan.
+
+### Textos: nunca en la imagen ni en el clip
+
+- Ningún prompt debe acabar poniendo texto: `plan_producto` ya quita el
+  rótulo del prompt de imagen de los Vintage y termina el de movimiento con
+  «vídeo limpio, sin texto». Si copias el prompt a mano, cópialo ENTERO.
+- El rótulo (otoño, con Halloween en octubre) y sus emojis los **quema el
+  montaje**, una frase distinta por producto. Si la IA pone letras, se
+  rechaza, aunque parezcan buenas: salen deformes o inventadas («POEAOP»,
+  «2024», «PIAPIODMIRMA»).
+- En Zapatos POV el rótulo va arriba para no tapar el zapato.
+
+### Rechazos típicos (repite solo esto)
+
+- Texto o letras de cualquier tipo en la imagen o en el clip.
+- **Zapatos de más**: en POV aparece un tercer zapato o el pie descalzo
+  acaba calzado. El prompt ya lo prohíbe («el pie descalzo sigue
+  descalzo…»); si pasa, repite el clip.
+- El producto cambia de forma, color o estampado, o se mueve solo.
+- Otra chica en vez de Lucía, o la cara se deforma.
+- Tropiezos de movimiento sin inconsistencia se aceptan.
+
 ## Vídeos listos
 
 Arriba de la pantalla, **«📦 Vídeos listos por tandas»** junta todo lo montado
 del multimodo (de cualquier catálogo y carpeta) de diez en diez: primero lo
 ya subido, y lo que falta MEZCLADO por tipo y formato para que la cuenta no
-se ancle (`config.orden_para_publicar`): «Bajar» baja la tanda entera y «Subir» marca cada vídeo como
-publicado. No marques Subido/Escaparate/Vendió salvo que te lo pidan.
+se ancle (`config.orden_para_publicar`). «Bajar» baja la tanda entera.
+
+En cada vídeo:
+
+- **✍️ Caption** copia la descripción lista para TikTok: caption del producto
+  + emojis + hashtags de Moda Mujer.
+- **🎵** copia la búsqueda de música para la biblioteca de TikTok.
+- **«Marcar subido»** marca el PRODUCTO como subido en su carpeta (el mismo
+  «Subido» de su tarjeta, por usuario y con fecha): no hay que ir a la carpeta
+  a marcarlo otra vez. Vuelve a pulsarlo para desmarcar.
+
+No marques Subido/Escaparate/Vendió salvo que te lo pidan: eso es de quien
+publica.
 
 Cada vídeo trae **🎵 la música que le va** (`musica` en la API): una búsqueda
 para la biblioteca de sonidos de TikTok, otras de repuesto y el estilo. Sale
