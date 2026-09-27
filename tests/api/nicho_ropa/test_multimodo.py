@@ -117,6 +117,14 @@ class TestMovimientoSinTexto:
             assert ps, modo
             assert "sin ningún texto sobreimpreso" in ps[0]["guion"], modo
 
+    def test_calzado_fija_los_pies_y_zapatos(self):
+        espejo = config.prompts_mof10(modo="mm_zapatillas_espejo")[0]["guion"]
+        assert "exactamente dos zapatillas" in espejo
+        assert espejo.rstrip().endswith("el vídeo tampoco.")
+        pov = config.prompts_mof10(modo="mm_zapatos_pov")[0]["guion"]
+        assert "el pie descalzo sigue descalzo" in pov
+        assert "exactamente dos" not in config.prompts_mof10(modo="mm_bolso_1")[0]["guion"]
+
 
 class TestOrdenParaPublicar:
     def _v(self, formato, t, subido=False, t_sub=0):

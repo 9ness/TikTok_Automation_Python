@@ -678,6 +678,25 @@ NOTA_SIN_TEXTO_VIDEO = (
     "imagen inicial no tiene texto, el vídeo tampoco."
 )
 
+# Lo que Kling se inventa en los formatos de calzado, y el clip ya no vale:
+# en POV el pie descalzo acababa calzado con un tercer zapato; en el espejo
+# entraba una pierna real por delante y la chica terminaba sujetando otro
+# zapato más. Se dice cuántos pies y zapatos hay, porque "no añadas" no basta.
+EXTRA_VIDEO_MULTIMODO = {
+    "mm_zapatos_pov": (
+        "Los pies se quedan exactamente como en la imagen inicial: el pie "
+        "descalzo sigue descalzo y no aparece ningún zapato nuevo; en todo el "
+        "clip hay los mismos zapatos que en la imagen."
+    ),
+    "mm_zapatillas_espejo": (
+        "Todo ocurre DENTRO del reflejo del espejo: delante del espejo no "
+        "aparece ninguna pierna, pie ni zapato. Ella lleva puestas las dos "
+        "zapatillas todo el clip y solo toca la que tiene en el pie; no coge "
+        "ni sostiene ningún zapato en la mano. Hay exactamente dos zapatillas "
+        "en todo el clip."
+    ),
+}
+
 
 
 # El ritmo del Nicho General, que es el que ya funciona en clips de 8s: 136
@@ -1935,7 +1954,8 @@ def prompts_mof10(
             imagen = sin_texto_en_imagen(imagen)
             guion = sin_texto_en_video(guion)
         if modo and es_multimodo(modo):
-            guion = guion.rstrip() + NOTA_SIN_TEXTO_VIDEO
+            extra = EXTRA_VIDEO_MULTIMODO.get(modo, "")
+            guion = guion.rstrip() + (" " + extra if extra else "") + NOTA_SIN_TEXTO_VIDEO
         # El tope de caracteres solo se toca en los estilos cuyo guion se
         # escribe fuera; en los de calle no hay marcador que rellenar.
         dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO
