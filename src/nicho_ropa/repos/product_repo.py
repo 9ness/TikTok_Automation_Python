@@ -122,7 +122,7 @@ def resumen_por_carpeta(carpetas: list[str], usuario: str = "", modo: str = "") 
     r = get_nicho_ropa_redis()
     if not r.is_available() or not carpetas:
         return {}
-    modo = config.modo_valido(modo)
+    modo = modo if modo == config.MODO_MULTI else config.modo_valido(modo)
     docs = r.mget_json([_key(c) for c in carpetas])
     mios = (
         r.mget_json([_key(_ambito(c, usuario)) for c in carpetas])
@@ -151,6 +151,43 @@ def resumen_por_carpeta(carpetas: list[str], usuario: str = "", modo: str = "") 
             ),
             "con_video": con_video,
         }
+    return salida
+
+
+def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
+    """Los vídeos del multimodo de VARIAS carpetas con una lectura, del más
+    viejo al más nuevo. Es lo que agrupa la pantalla en tandas de diez: el
+    operador los baja y los marca por tandas, sin ir carpeta a carpeta."""
+    from src.nicho_ropa import config
+
+    r = get_nicho_ropa_redis()
+    if not r.is_available() or not carpetas:
+        return []
+    docs = r.mget_json([_key(c) for c in carpetas])
+    mios = (
+        r.mget_json([_key(_ambito(c, usuario)) for c in carpetas])
+        if not _es_historico(usuario) else docs
+    )
+    salida: list[dict] = []
+    for slug, doc, mio in zip(carpetas, docs, mios):
+        productos = (doc or {}).get("productos") or {}
+        personales = (mio or {}).get("productos") or {}
+        for pid in set(productos) | set(personales):
+            vista = {k: v for k, v in (productos.get(pid) or {}).items() if k not in PERSONALES}
+            vista.update(personales.get(pid) or {})
+            v = video_de(vista, config.MODO_MULTI)
+            if not v["video_path"]:
+                continue
+            salida.append({
+                "carpeta": slug,
+                "producto": str(pid),
+                "titulo": str(vista.get("titulo") or ""),
+                "tienda": str(vista.get("tienda") or ""),
+                "product_url": str(vista.get("product_url") or ""),
+                "uploaded": bool(vista.get("uploaded")),
+                **v,
+            })
+    salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))
     return salida
 
 
@@ -219,6 +256,19 @@ def video_de(prod: dict, modo: str) -> dict:
     """
     from src.nicho_ropa import config
 
+    if modo == config.MODO_MULTI:
+        # La vista de todo el multimodo: el vídeo más reciente de cualquiera
+        # de sus formatos, con el formato al lado para saber cuál es.
+        mejor: dict = {}
+        for clave in config.modos_multimodo():
+            v = ((prod or {}).get("modos") or {}).get(clave) or {}
+            if v.get("video_path") and int(v.get("video_listo_at") or 0) >= int(mejor.get("video_listo_at") or 0):
+                mejor = {**v, "formato": clave}
+        return {
+            "video_path": mejor.get("video_path") or "",
+            "video_listo_at": int(mejor.get("video_listo_at") or 0),
+            "formato": mejor.get("formato", ""),
+        }
     modo = config.modo_valido(modo)
     guardado = ((prod or {}).get("modos") or {}).get(modo) or {}
     if not guardado and modo == config.MODO_DEFECTO:

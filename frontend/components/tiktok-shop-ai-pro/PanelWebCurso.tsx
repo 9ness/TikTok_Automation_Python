@@ -43,6 +43,10 @@ const CATALOGOS = [
   // Largo y las gafas al modo del coche—.
   { clave: "hombre_web", label: "👔 Ropa Hombre", donde: "Moda Hombre › Ropa Hombre" },
   { clave: "mujer_web", label: "👗 Ropa Mujer", donde: "Moda Mujer › Ropa Mujer" },
+  // Los zapatos y accesorios de mujer ya tienen productos (sep 2026) y
+  // formatos propios en el Multimodo (botas, bolsos, zapatillas).
+  { clave: "mujer_zapatos_web", label: "👠 Zapatos Mujer", donde: "Moda Mujer › Zapatos Mujer" },
+  { clave: "mujer_accesorios_web", label: "👜 Accesorios Mujer", donde: "Moda Mujer › Accesorios Mujer" },
 ] as const;
 
 type ClaveCatalogo = (typeof CATALOGOS)[number]["clave"];

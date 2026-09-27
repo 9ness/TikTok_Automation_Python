@@ -20,6 +20,15 @@ type Resultado = {
   error?: string;
 };
 
+
+/** Nombre legible de un inventario de la web (`mujer_zapatos_web` → "zapatos de mujer"). */
+function nombreGenero(genero: string, largo = false): string {
+  const sexo = genero.startsWith("hombre") ? "hombre" : "mujer";
+  if (genero.includes("_zapatos_")) return `zapatos de ${sexo}`;
+  if (genero.includes("_accesorios_")) return `accesorios de ${sexo}`;
+  return largo ? `ropa de ${sexo}` : sexo;
+}
+
 /** Sube los ZIP del inventario de ropa (mujer u hombre) de la web del curso.
  *
  *  Vive aparte de la pantalla del nicho porque se usa en los dos sitios: allí
@@ -53,7 +62,7 @@ export function ImportarPrendasWeb({
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         Sube aquí los ZIP del inventario de{" "}
         <strong className="text-foreground">
-          {genero === "mujer_web" ? "mujer" : "hombre"}
+          {nombreGenero(genero)}
         </strong>{" "}
         — puedes elegir varios de golpe. Los del otro sexo van en su pantalla:
         cada uno lleva sus carpetas. Volver a subirlos solo toca lo que haya
@@ -69,7 +78,7 @@ export function ImportarPrendasWeb({
         ) : (
           <>
             <Upload className="h-3.5 w-3.5" /> Subir ZIPs de{" "}
-            {genero === "mujer_web" ? "mujer" : "hombre"}
+            {nombreGenero(genero)}
           </>
         )}
         <input

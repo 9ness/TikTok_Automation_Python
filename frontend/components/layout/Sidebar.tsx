@@ -202,6 +202,7 @@ const ITEMS_PRO = [
   `${BASE_AI_PRO}/pov-bof-largo`,
   `${BASE_AI_PRO}/nicho-ropa-mujer`,
   `${BASE_AI_PRO}/moda-mujer-marca`,
+  `${BASE_AI_PRO}/moda-mujer-multimodo`,
   `${BASE_AI_PRO}/creativos-profesionales`,
   `${BASE_AI_PRO}/carruseles`,
 ];

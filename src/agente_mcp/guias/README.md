@@ -44,6 +44,7 @@ los mismos en los dos casos.
 | Nicho POV BOF | `/tiktok-shop-ai-pro/nicho-pov-bof` | [`pov-bof.md`](pov-bof.md) |
 | Moda Mujer · Aleatorios | `/tiktok-shop-ai-pro/nicho-ropa-mujer` | [`moda-mujer-aleatorios.md`](moda-mujer-aleatorios.md) |
 | Moda Mujer · Marca Personal | `/tiktok-shop-ai-pro/moda-mujer-marca` | [`moda-mujer-marca.md`](moda-mujer-marca.md) |
+| Moda Mujer · Multimodo | `/tiktok-shop-ai-pro/moda-mujer-multimodo` | [`moda-mujer-multimodo.md`](moda-mujer-multimodo.md) |
 | Ropa Hombre | `/tiktok-shop-ai-pro/nicho-ropa-hombre` | [`ropa-hombre.md`](ropa-hombre.md) |
 | Nicho General · UGC | `/tiktok-shop-ai-pro/nicho-general` | [`ugc.md`](ugc.md) |
 | Carruseles | `/tiktok-shop-ai-pro/carruseles` | [`carruseles.md`](carruseles.md) |

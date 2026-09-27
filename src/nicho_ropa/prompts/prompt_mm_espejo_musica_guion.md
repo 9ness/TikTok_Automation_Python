@@ -1,0 +1,4 @@
+<!-- "Frente al Espejo 10s Solo Música (Moda Mujer · aleatorios)", paso 2 de 2: el MOVIMIENTO (mudo). Texto literal de su web
+     (ttshopaiproapp.com, sep 2026). Su nota: Paso 2: Añade el resultado a Onmi junto con la imagen generada previamente de referencia para generar el video con movimiento. Este video solo lleva música. Añade una música comercial de TikTok. -->
+
+Varios micro cortes en la toma pero sin cambiar de encuadre. Uno más cercano, despues vuelve a su posición original. La cámara se mueve de manera realista, con pequeñas vibraciones naturales.  Se graba con el móvil frente a un espejo de cuerpo entero, mostrando cómo le queda desde varios ángulos con movimientos naturales. No se gira. No enseña la prenda por detrás. La cámara presenta pequeñas vibraciones reales de grabación manual, iluminación doméstica natural y calidad propia de un iPhone. Sin sonido, sin efectos de sonido, sin voz ni música. Video Muteado.

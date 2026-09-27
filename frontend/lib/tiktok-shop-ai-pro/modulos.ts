@@ -107,6 +107,16 @@ export const MODULOS: ModuloNicho[] = [
     listo: true,
   },
   {
+    slug: "moda-mujer-multimodo",
+    modulo: 8,
+    label: "Moda Mujer · Multimodo",
+    titulo: "Moda Mujer · Multimodo",
+    icon: Shirt,
+    resumen:
+      "Los formatos mudos de 10s (espejo, camisetas, zapatillas, botas y bolsos) con ropa, zapatos y accesorios: un formato por producto, el que mejor le va.",
+    listo: true,
+  },
+  {
     slug: "nicho-ropa-hombre",
     modulo: 8,
     label: "Ropa Hombre",

@@ -7,6 +7,15 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import { useImportarUrlsRopa } from "@/lib/queries/nichoRopa";
 
+
+/** Nombre legible de un inventario de la web (`mujer_zapatos_web` → "zapatos de mujer"). */
+function nombreGenero(genero: string, largo = false): string {
+  const sexo = genero.startsWith("hombre") ? "hombre" : "mujer";
+  if (genero.includes("_zapatos_")) return `zapatos de ${sexo}`;
+  if (genero.includes("_accesorios_")) return `accesorios de ${sexo}`;
+  return largo ? `ropa de ${sexo}` : sexo;
+}
+
 /** Sube el `fichas.json` que baja el guion de consola, para el inventario de
  *  ropa del sexo que toque. Igual que el importador de ZIP: se usa en la
  *  pantalla del nicho y en Configuración.
@@ -73,7 +82,7 @@ export function PegarFichasRopa({ genero }: { genero: string }) {
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         El mismo guion que en Configuración, pero ejecutado en la página de{" "}
         <strong className="text-foreground">
-          {genero === "hombre_web" ? "ropa de hombre" : "ropa de mujer"}
+          {nombreGenero(genero, true)}
         </strong>{" "}
         de su web. Sube aquí el <code>fichas.json</code> que te descargue.
       </p>

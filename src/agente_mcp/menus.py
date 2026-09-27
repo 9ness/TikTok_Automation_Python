@@ -65,6 +65,23 @@ MENUS: dict[str, Menu] = {
             notas="Personaje FIJO de la cuenta (descárgalo con `personaje_marca`); clips mudos.",
         ),
         Menu(
+            "moda_mujer_multimodo", "Moda Mujer · Multimodo", "moda-mujer-multimodo", "ropa",
+            sexo="mujer", modalidad="multimodo",
+            modos=(
+                "multimodo", "mm_espejo", "mm_espejo_escenas", "mm_maniqui", "mm_sarcastica",
+                "mm_zapatillas_espejo", "mm_zapatos_escenas", "mm_zapatos_pov",
+                "mm_botas_1", "mm_botas_2", "mm_botas_largas_1", "mm_botas_largas_2",
+                "mm_bolso_1", "mm_bolso_2", "mm_bolso_3",
+            ),
+            notas=(
+                "Formatos MUDOS de 10 s; en CADA producto eliges el que le va según su "
+                "`tipo_multimodo` (ropa/camiseta/calzado/botas/bolso; gafas se saltan) y "
+                "alternas para no repetir. Catálogos web (ropa) | zapatos | accesorios. "
+                "`modo=multimodo` es solo la vista de todos (listar carpetas, progreso); "
+                "para plan_producto y subir_clip pasa el formato (mm_*)."
+            ),
+        ),
+        Menu(
             "ropa_hombre", "Ropa Hombre", "ropa-hombre", "ropa",
             sexo="hombre", modalidad="aleatorios",
             modos=("espejo", "camara", "calle_1", "calle_2", "gafas_coche", "sarcastica", "maniqui"),
@@ -87,7 +104,7 @@ MENUS: dict[str, Menu] = {
     ]
 }
 
-CATALOGOS_ROPA = ("web", "muestras", "tareas")
+CATALOGOS_ROPA = ("web", "muestras", "tareas", "zapatos", "accesorios")
 
 
 def menu(clave: str) -> Menu:
@@ -155,11 +172,18 @@ async def carpetas(m: Menu, api: Interno, catalogo: str, modo: str = "") -> list
         if cat not in CATALOGOS_ROPA:
             raise ErrorApp(f"Catálogo de ropa: {', '.join(CATALOGOS_ROPA)}.")
         datos = await api.get(f"{ROPA}/carpetas", sexo=m.sexo, modo=modo, catalogo=cat)
+        from src.nicho_ropa import config as ropa_config
+
         return [
             {"carpeta": c["slug"], "label": c["label"], "productos": c.get("total", 0),
              "con_ficha": c.get("con_url", 0), "con_video": c.get("con_video", 0),
-             "con_colores": c.get("con_colores", 0), "completada": c.get("completada", False)}
+             "con_colores": c.get("con_colores", 0), "completada": c.get("completada", False),
+             "pendiente": c.get("pendiente", False)}
             for c in datos.get("items", [])
+            # El endpoint devuelve las del sexo de TODOS los catálogos (cuenta
+            # solo las del pedido): sin este filtro «web» salían también las
+            # de muestras, tareas, zapatos y accesorios.
+            if ropa_config.catalogo_de_genero(c.get("genero") or c["slug"].split("__")[0]) == cat
         ]
     base = LARGO if m.tipo == "largo" else POV
     cats = [c["clave"] for c in await catalogos(m, api)]
@@ -258,6 +282,8 @@ def resumen(c: Ctx, p: dict) -> dict:
             r["estilo_guion"] = p.get("guion_estilo") or p.get("estilo_guion")
     elif c.m.tipo == "ropa":
         r.update(guion=bool(p.get("guion") or p.get("guiones")), plazos=p.get("plazos", False))
+        if c.m.modalidad == "multimodo":
+            r.update(tipo_multimodo=p.get("tipo_multimodo", ""), formato_hecho=p.get("formato", ""))
         if c.modo == "tienda_colores":
             r["colores"] = p.get("guion_colores") or p.get("variantes_colores") or []
     elif c.m.tipo == "ugc":

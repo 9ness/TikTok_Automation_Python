@@ -512,3 +512,44 @@ export function buildPersonajeMarcaUrl(v: number, descargar = false): string {
     `${ROOT}/personaje-marca?v=${v}` + (descargar ? "&descargar=1" : ""),
   );
 }
+
+/** Un vídeo hecho del Multimodo, con su carpeta y su formato. */
+export interface VideoMultimodo {
+  carpeta: string;
+  carpeta_label: string;
+  producto: string;
+  titulo: string;
+  tienda: string;
+  product_url: string;
+  uploaded: boolean;
+  video_path: string;
+  video_listo_at: number;
+  formato: string;
+  formato_label: string;
+}
+
+export interface TandasMultimodoResponse {
+  total: number;
+  subidos: number;
+  tandas: { numero: number; items: VideoMultimodo[]; subidos: number }[];
+}
+
+/** Los vídeos del Multimodo de TODAS las carpetas, en tandas de diez para
+ *  bajarlos y marcarlos al publicar. */
+export function useTandasMultimodo(activo = true) {
+  return useQuery<TandasMultimodoResponse>({
+    queryKey: [...nichoRopaKeys.all, "multimodo-tandas"],
+    queryFn: () => api.get<TandasMultimodoResponse>(`${ROOT}/multimodo/tandas`),
+    staleTime: 30 * 1000,
+    enabled: activo,
+  });
+}
+
+/** "Subido" de un vídeo de una tanda: la carpeta va en cada fila. */
+export function useMarcarSubidoMultimodo() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { carpeta: string; producto: string; uploaded: boolean }>({
+    mutationFn: (body) => api.post(`${ROOT}/producto/estado`, body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.all }),
+  });
+}

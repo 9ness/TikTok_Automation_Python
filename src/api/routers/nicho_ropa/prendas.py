@@ -218,7 +218,7 @@ def list_carpetas(
             CarpetaRopa(
                 slug=config.slug_web(genero, carpeta),
                 label=config.carpeta_label(config.slug_web(genero, carpeta)),
-                web=True,
+                web=True, genero=genero,
                 sexo=config.sexo_de_carpeta(config.slug_web(genero, carpeta)),
             )
             for genero, carpeta in prendas_web.todas_las_carpetas()
@@ -254,13 +254,12 @@ def list_carpetas(
         limite = time.monotonic() + 6.0
         # Las que de verdad se van a ver. Sin esto se contaban las 29 (27 del
         # inventario más muestras y tareas) para enseñar una.
+        # "web" es la ropa de siempre; zapatos y accesorios (Moda Mujer) van
+        # en su propio catálogo aunque también vengan de la web.
         def _se_ve(c) -> bool:
             if not catalogo:
                 return True
-            propio = (c.genero or "").endswith(("_muestras", "_tareas"))
-            if catalogo == "web":
-                return not propio
-            return (c.genero or "").endswith(f"_{catalogo}")
+            return config.catalogo_de_genero(c.genero or "") == catalogo
 
         # Como en el POV BOF: los tres contadores salen de Redis con UNA
         # lectura (`resumen_por_carpeta`), sin listar el Drive. Contar en
@@ -313,7 +312,7 @@ def list_carpetas(
     try:
         from src.nicho_ropa.repos import progress_repo
 
-        hechas, pendientes = progress_repo.estado(usuario, config.modo_valido(modo))
+        hechas, pendientes = progress_repo.estado(usuario, config.clave_progreso(modo))
         for i in items:
             i.completada = i.slug in hechas
             i.pendiente = i.slug in pendientes
@@ -330,7 +329,7 @@ def set_carpeta_estado(
     """Da una carpeta por hecha, o la deja pendiente de subir (por modo)."""
     from src.nicho_ropa.repos import progress_repo
 
-    modo = config.modo_valido(body.modo)
+    modo = config.clave_progreso(body.modo)
     try:
         hechas, pendientes = progress_repo.marcar(
             usuario, modo, body.carpeta,
@@ -344,6 +343,48 @@ def set_carpeta_estado(
         "completada": body.carpeta in hechas,
         "pendiente": body.carpeta in pendientes,
     }
+
+
+@router.get("/multimodo/tandas")
+def multimodo_tandas(
+    por_tanda: Annotated[int, Query(ge=1, le=50)] = 10,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Los vídeos hechos del Multimodo, de TODOS sus catálogos, en tandas.
+
+    El multimodo recorre ropa, zapatos y accesorios, así que lo hecho queda
+    repartido por decenas de carpetas. Para publicar se trabaja al revés: por
+    orden de montaje y de diez en diez, bajando la tanda y marcando lo subido.
+    """
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    carpetas = [
+        config.slug_web(g, c)
+        for g, c in prendas_web.todas_las_carpetas() + prendas_web.carpetas_del_operador()
+        if config.sexo_de_carpeta(config.slug_web(g, c)) == "mujer"
+    ]
+    try:
+        videos = product_repo.videos_multimodo(carpetas, usuario)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    try:
+        indice = pov_repo.urls_index()
+    except Exception:  # noqa: BLE001 — sin índice, vale lo que lleve la ficha
+        indice = None
+    for v in videos:
+        v["carpeta_label"] = config.carpeta_label(v["carpeta"])
+        v["formato_label"] = config.MODOS.get(v["formato"], {}).get("label", v["formato"])
+        if indice is not None:
+            v["product_url"] = pov_repo.url_de(v, indice) or ""
+    tandas = [
+        {
+            "numero": i // por_tanda + 1,
+            "items": videos[i:i + por_tanda],
+            "subidos": sum(1 for x in videos[i:i + por_tanda] if x["uploaded"]),
+        }
+        for i in range(0, len(videos), por_tanda)
+    ]
+    return {"total": len(videos), "subidos": sum(1 for x in videos if x["uploaded"]), "tandas": tandas}
 
 
 @router.post("/prendas/copiar-de-pov-bof")
@@ -567,7 +608,10 @@ def list_prendas(
     escaparate = pov_repo.escaparate_index(usuario)
 
     items = []
-    guiones = {
+    # La vista de todos del multimodo no tiene guion ni clips propios: solo
+    # enseña el vídeo que haya, del formato que sea.
+    vista_multi = modo == config.MODO_MULTI
+    guiones = {} if vista_multi else {
         pid: product_repo.guion_de(prod, modo)
         for pid, prod in guardados.items()
     }
@@ -610,7 +654,7 @@ def list_prendas(
             # movimiento, así que el del espejo no vale para el del coche.
             guion=guiones.get(pid, {}).get("video", ""),
             guiones=guiones.get(pid, {}).get("videos", []),
-            clips_subidos=sorted(
+            clips_subidos=[] if vista_multi else sorted(
                 int(k) for k in product_repo.clips_de(prod, modo) if str(k).isdigit()
             ),
             guion_colores=guiones.get(pid, {}).get("colores", []),
@@ -624,6 +668,8 @@ def list_prendas(
             # La principal más las del ZIP: los colores en que se vende.
             variantes_producto=1 + len(prendas_web.fotos_color(carpeta, pid)),
             familia=config.familia_de(str(prod.get("titulo") or "")),
+            # Multimodo: qué formatos le valen (bolso, botas, calzado…).
+            tipo_multimodo=config.tipo_multimodo(str(prod.get("titulo") or ""), carpeta),
             miniaturas_variantes=variantes.miniaturas_de(carpeta, pid, variantes.leidos(prod)["colores"]),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
@@ -1251,13 +1297,21 @@ async def upload_video(
         raise APIError("sexo debe ser 'hombre', 'mujer' o vacío.", status_code=400)
 
     slug = carpeta or config.CARPETA_DEFECTO
+    if modo == config.MODO_MULTI:
+        raise APIError(
+            "«Todos los vídeos» es solo para verlos: elige el formato con el que "
+            "se grabó el clip.",
+            status_code=400,
+        )
     pedido = (conservar_audio or "").strip().lower()
     if pedido in ("1", "true", "si", "sí"):
         con_audio = True
     elif pedido in ("0", "false", "no"):
         con_audio = False
     else:
-        con_audio = config.es_carpeta_web(slug)
+        # Los formatos mudos (camisetas, marca, multimodo) no tienen voz que
+        # respetar: el ruido de fondo del generador sobra.
+        con_audio = config.es_carpeta_web(slug) and config.modo_habla(modo)
     # Una voz del banco manda: no se pisa una voz con otra.
     con_audio = con_audio and not sexo_norm
 

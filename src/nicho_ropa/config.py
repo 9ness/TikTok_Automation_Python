@@ -19,6 +19,7 @@ nombres duplicados) y la descarga de fotos por file ID.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -69,7 +70,29 @@ CARPETA_DEFECTO = "camisetas"
 GENEROS_WEB: dict[str, str] = {
     "mujer_web": "👗 Mujer web",
     "hombre_web": "👔 Hombre web",
+    # Las otras dos subcategorías de Moda Mujer en su web (sep 2026). Son de
+    # mujer —el sexo sale del prefijo— pero NO son ropa: van en su propio
+    # catálogo para no colarse entre las carpetas de ropa de siempre, que
+    # numeran igual ("Carpeta 3" hay en las tres).
+    "mujer_zapatos_web": "👠 Mujer zapatos",
+    "mujer_accesorios_web": "👜 Mujer accesorios",
 }
+# Qué catálogo de la pantalla es cada género de la web. "web" es el de ropa de
+# siempre (mujer_web / hombre_web).
+CATALOGO_DE_GENERO: dict[str, str] = {
+    "mujer_zapatos_web": "zapatos",
+    "mujer_accesorios_web": "accesorios",
+}
+
+
+def catalogo_de_genero(genero: str) -> str:
+    """`web` / `zapatos` / `accesorios` / `muestras` / `tareas`."""
+    if genero in CATALOGO_DE_GENERO:
+        return CATALOGO_DE_GENERO[genero]
+    for sufijo in ("muestras", "tareas"):
+        if genero.endswith(f"_{sufijo}"):
+            return sufijo
+    return "web"
 SEPARADOR_WEB = "__"
 PRENDAS_WEB_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/prendas_web"
@@ -225,8 +248,199 @@ MODOS: dict[str, dict] = {
         "modalidad": "marca",
         "categoria": "calzado",
     },
+    # ---- MULTIMODO (sep 2026) --------------------------------------------
+    # NUESTRO, pensado para que lo trabaje un agente: los formatos MUDOS de
+    # 10s de su web (los de "solo música", los de camiseta, los de marca y los
+    # Vintage de bolsos y botas) juntos en un menú, y en cada producto se elige
+    # el que mejor le va. Así la cuenta no se ancla en un formato.
+    #
+    # `tipo` dice para qué producto vale (ver `TIPOS_MULTIMODO`): unas botas no
+    # se graban frente al espejo de la camiseta. Ninguno habla — la música la
+    # pone el operador al publicar, como en todos los mudos.
+    #
+    # Reusan el estilo de los de arriba cuando es el mismo formato (el de
+    # marca_espejo, el maniquí…): así el prompt vive en UN fichero.
+    "mm_espejo": {
+        "desc": "Frente al espejo con el móvil tapando la cara, solo música. Cualquier prenda.",
+        "label": "🪞 Espejo Solo Música",
+        "estilo_mof10": "espejo_musica",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+    },
+    "mm_espejo_escenas": {
+        "desc": "El personaje frente al espejo, varias escenas en un clip y filtro premium.",
+        "label": "🎞️ Espejo Multi Escena",
+        "estilo_mof10": "marca_espejo",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+    },
+    "mm_maniqui": {
+        "desc": "La camiseta en un maniquí sin cabeza y dos manos estirándola. Sin persona.",
+        "label": "🧍 Camiseta Maniquí",
+        "estilo_mof10": "maniqui",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "camiseta",
+    },
+    "mm_sarcastica": {
+        "desc": "Camiseta con frase, comprando sin mirar a cámara. Al publicar se le pone el sonido de risas.",
+        "label": "😏 Camiseta Sarcástica",
+        "estilo_mof10": "sarcastica_mujer",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "camiseta",
+    },
+    "mm_zapatillas_espejo": {
+        "desc": "Agachada frente al espejo enseñando y tocando la zapatilla, solo música.",
+        "label": "👟 Zapatillas Espejo Agachada",
+        "estilo_mof10": "zapatillas_espejo",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "calzado",
+    },
+    "mm_zapatos_escenas": {
+        "desc": "El personaje con los zapatos, varias escenas y filtro premium.",
+        "label": "👢 Zapatos Multi Escena",
+        "estilo_mof10": "marca_zapatos",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "calzado",
+    },
+    "mm_zapatos_pov": {
+        "desc": "Los zapatos vistos desde arriba, en primera persona.",
+        "label": "👀 Zapatos Vista POV",
+        "estilo_mof10": "marca_pov",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "calzado",
+    },
+    "mm_botas_1": {
+        "desc": "Vintage otoño: en el coche enseñando el par, con texto otoñal en la imagen.",
+        "label": "🍂 Vintage Botas 1",
+        "estilo_mof10": "vintage_botas_1",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "botas",
+    },
+    "mm_botas_2": {
+        "desc": "Vintage otoño: segunda escena de botas, con texto otoñal en la imagen.",
+        "label": "🍂 Vintage Botas 2",
+        "estilo_mof10": "vintage_botas_2",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "botas",
+    },
+    "mm_botas_largas_1": {
+        "desc": "Vintage otoño: botas altas en un columpio de porche, de cintura para abajo.",
+        "label": "🍂 Vintage Botas Largas 1",
+        "estilo_mof10": "vintage_botas_largas_1",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "botas",
+    },
+    "mm_botas_largas_2": {
+        "desc": "Vintage otoño: segunda escena de botas altas.",
+        "label": "🍂 Vintage Botas Largas 2",
+        "estilo_mof10": "vintage_botas_largas_2",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "botas",
+    },
+    "mm_bolso_1": {
+        "desc": "Vintage otoño: el bolso en el asiento del copiloto, con café y texto otoñal.",
+        "label": "👜 Vintage Bolso 1",
+        "estilo_mof10": "vintage_bolso_1",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "bolso",
+    },
+    "mm_bolso_2": {
+        "desc": "Vintage otoño: segunda escena del bolso.",
+        "label": "👜 Vintage Bolso 2",
+        "estilo_mof10": "vintage_bolso_2",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "bolso",
+    },
+    "mm_bolso_3": {
+        "desc": "Vintage otoño: tercera escena del bolso.",
+        "label": "👜 Vintage Bolso 3",
+        "estilo_mof10": "vintage_bolso_3",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "bolso",
+    },
 }
 MODO_DEFECTO = "espejo"
+
+# La vista de TODO el multimodo: no es un formato que se grabe, es "el vídeo
+# que tenga hecho este producto, sea del formato que sea". La usan la pantalla
+# (para descargar sin ir formato a formato), los contadores y el progreso de
+# carpeta — una carpeta del multimodo se da por hecha una vez, no por formato.
+MODO_MULTI = "multimodo"
+
+# Qué producto admite cada formato del multimodo. `palabras` lo adivina por el
+# título ya extraído (como `es_calzado`); lo que no case con nada es "ropa".
+# Se mira en orden: "botas" antes que "calzado" porque una bota es las dos.
+TIPOS_MULTIMODO: dict[str, dict] = {
+    "bolso": {
+        "label": "Bolso",
+        "palabras": ("bolso", "bolsa", "cartera", "mochila", "bandolera", "tote", "clutch", "bag", "rinonera", "riñonera"),
+    },
+    "botas": {
+        "label": "Botas",
+        "palabras": ("bota", "botas", "botin", "botín", "botines", "boots", "boot"),
+    },
+    "calzado": {"label": "Zapatos o zapatillas", "palabras": (
+        "zapato", "zapatos", "zapatilla", "zapatillas", "sandalia", "sandalias", "deportiva",
+        "deportivas", "tacon", "tacón", "tacones", "mocasin", "mocasín", "mocasines",
+        "bailarina", "bailarinas", "sneaker", "sneakers", "loafer", "loafers", "heels",
+        "shoes", "calzado", "zueco", "zuecos", "chancla", "chanclas", "slippers",
+    )},
+    "camiseta": {
+        "label": "Camiseta",
+        "palabras": ("camiseta", "camisetas", "t-shirt", "tshirt", "tee"),
+    },
+    "gafas": {
+        "label": "Gafas (sin formato mudo: se saltan)",
+        "palabras": ("gafas", "gafa", "sunglasses", "lentes"),
+    },
+    "ropa": {"label": "Ropa", "palabras": ()},
+}
+
+
+def es_multimodo(modo: str) -> bool:
+    """¿Ese modo es del multimodo (o su vista de todos)?"""
+    return modo == MODO_MULTI or MODOS.get(modo, {}).get("modalidad") == "multimodo"
+
+
+def modos_multimodo() -> list[str]:
+    return [k for k, v in MODOS.items() if v.get("modalidad") == "multimodo"]
+
+
+def clave_progreso(modo: str) -> str:
+    """Bajo qué modo se apunta el progreso de carpeta. Los del multimodo van
+    todos juntos: la carpeta está hecha cuando cada producto tiene SU vídeo,
+    del formato que sea."""
+    return MODO_MULTI if es_multimodo(modo) else modo_valido(modo)
+
+
+def tipo_multimodo(titulo: str, carpeta: str = "") -> str:
+    """Para qué formatos vale un producto, por el título (y el catálogo)."""
+    plano = _sin_acentos(titulo or "")
+    palabras = set(re.sub(r"[^a-z0-9]+", " ", plano).split())
+    for clave in ("bolso", "gafas", "botas", "calzado", "camiseta"):
+        pals = {_sin_acentos(p) for p in TIPOS_MULTIMODO[clave]["palabras"]}
+        if palabras & pals:
+            return clave
+    genero, _ = partes_web(carpeta)
+    if genero.endswith("_zapatos_web"):
+        return "calzado"
+    if genero.endswith("_accesorios_web"):
+        return "bolso"
+    return "ropa"
 # Las dos modalidades de Moda Mujer. Los modos sin `modalidad` son los de
 # siempre (personajes aleatorios); es el defecto para no tocar lo ya guardado.
 MODALIDAD_DEFECTO = "aleatorios"
@@ -535,6 +749,11 @@ def partes_de_modo(modo: str) -> int:
     return int((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("partes") or 1)
 
 
+def modo_habla(modo: str) -> bool:
+    """Si en ese formato la persona habla (el clip trae voz que conservar)."""
+    return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("voz", True))
+
+
 def lleva_flecha(modo: str) -> bool:
     """Si a ese formato se le pone la flecha al carrito al final."""
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("flecha"))
@@ -593,6 +812,7 @@ def categoria_de_modo(modo: str) -> str:
 MODALIDADES: dict[str, str] = {
     "aleatorios": "🎭 Personajes aleatorios",
     "marca": "👤 Marca Personal",
+    "multimodo": "🎛️ Multimodo",
 }
 
 
@@ -620,6 +840,8 @@ def modos_de(sexo: str, modalidad: str = MODALIDAD_DEFECTO) -> list[dict]:
             # sin ello los modos son siete botones con un emoji.
             "desc": meta.get("desc", ""),
             "categoria": meta.get("categoria", ""),
+            # Multimodo: para qué producto vale (ropa, camiseta, calzado…).
+            "tipo": meta.get("tipo", ""),
             "personaje": bool(
                 (ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("personaje")
             ),
@@ -1071,6 +1293,67 @@ ESTILOS_MOF10: dict[str, dict] = {
         "guion": "prompt_mof10_maniqui_guion.md",
         "derivado": (),
     },
+    # ---- MULTIMODO: los mudos de su web que no estaban --------------------
+    # Los tres primeros los publica para chicas ALEATORIAS; en el multimodo va
+    # siempre el personaje de la cuenta, así que llevan `personaje_fijo`: se
+    # antepone una línea que manda sobre el "random woman" del texto, que se
+    # queda literal debajo.
+    "espejo_musica": {
+        "duraciones": False,
+        "label": "Frente al espejo · solo música",
+        "voz": False,
+        "personaje": True,
+        "personaje_fijo": True,
+        "ingrediente": False,
+        "imagen": "prompt_mm_espejo_musica_imagen.md",
+        "guion": "prompt_mm_espejo_musica_guion.md",
+        "derivado": (),
+    },
+    "zapatillas_espejo": {
+        "duraciones": False,
+        "label": "Zapatillas frente al espejo, agachada · solo música",
+        "voz": False,
+        "personaje": True,
+        "personaje_fijo": True,
+        "ingrediente": False,
+        "imagen": "prompt_mm_zapatillas_espejo_imagen.md",
+        "guion": "prompt_mm_zapatillas_espejo_guion.md",
+        "derivado": (),
+    },
+    # La de hombre y la de mujer no cambian solo el género (maquillaje, un
+    # bloque de ropa entero): la de mujer va en su propio fichero.
+    "sarcastica_mujer": {
+        "duraciones": False,
+        "label": "Camiseta sarcástica · en el súper (chica)",
+        "voz": False,
+        "personaje": True,
+        "personaje_fijo": True,
+        "ingrediente": False,
+        "imagen": "prompt_mof10_sarcastica_mujer_imagen.md",
+        "guion": "prompt_mof10_sarcastica_mujer_guion.md",
+        "derivado": (),
+    },
+    # Los "Vintage" de bolsos y botas (Marca Personal en su web): el producto
+    # solo, sin personaje, con exposición baja de otoño y un texto otoñal que
+    # Nano Banana quema YA en la imagen — el montaje no pone nada encima. La
+    # imagen entra como FRAME INICIAL y el clip sale mudo.
+    **{
+        f"vintage_{clave}": {
+            "duraciones": False,
+            "label": f"Vintage otoño · {nombre}",
+            "voz": False,
+            "personaje": False,
+            "ingrediente": False,
+            "imagen": f"prompt_vintage_{clave}_imagen.md",
+            "guion": f"prompt_vintage_{clave}_guion.md",
+            "derivado": (),
+        }
+        for clave, nombre in (
+            ("bolso_1", "bolso 1"), ("bolso_2", "bolso 2"), ("bolso_3", "bolso 3"),
+            ("botas_1", "botas 1"), ("botas_2", "botas 2"),
+            ("botas_largas_1", "botas largas 1"), ("botas_largas_2", "botas largas 2"),
+        )
+    },
     # Este va en los DOS menús de su web, cada uno con su imagen. El guion de
     # mujer sí es NUESTRO: lo que publica en Moda Chica es el de hombre tal
     # cual —el del outfit es un chico— y con la imagen de una chica el vídeo
@@ -1361,6 +1644,18 @@ def nota_temporada_imagen2() -> str:
     )
 
 
+# Lo que se antepone a los formatos que el curso publica con chica ALEATORIA
+# cuando en el multimodo van con el personaje de la cuenta. En inglés como el
+# resto del prompt, y delante para que mande sobre el "random" de debajo.
+NOTA_PERSONAJE_FIJO = (
+    "IMPORTANT — CHARACTER OVERRIDE: the woman in this image must be exactly the "
+    "person shown in the attached character reference image (same face, hair "
+    "colour and style, skin tone, body shape and apparent age). Ignore every "
+    "instruction below that asks for a random, different or new woman; only the "
+    "scene, the pose and the referenced product follow the prompt below.\n\n"
+)
+
+
 def prompts_mof10(
     sexo: str = SEXO_DEFECTO, plazos: bool = False, modo: str = "",
     duracion: str = DURACION_DEFECTO,
@@ -1371,6 +1666,9 @@ def prompts_mof10(
     vez y enseñar los dos era invitar a copiar el prompt equivocado.
     """
     salida = []
+    if modo == MODO_MULTI:
+        # La vista de todos los vídeos del multimodo no se graba: sin prompts.
+        return salida
     for clave, meta in ESTILOS_MOF10.items():
         if modo and clave != estilo_de_modo(modo):
             continue
@@ -1391,6 +1689,8 @@ def prompts_mof10(
         else:
             imagen = _con_sexo(meta["imagen"], sexo, SEXOS_MOF10)
             guion = _con_sexo(meta["guion"], sexo, SEXOS_MOF10)
+        if meta.get("personaje_fijo"):
+            imagen = NOTA_PERSONAJE_FIJO + imagen
         # El tope de caracteres solo se toca en los estilos cuyo guion se
         # escribe fuera; en los de calle no hay marcador que rellenar.
         dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO

@@ -81,6 +81,8 @@ class ModoRopa(BaseModel):
     modalidad: str = "aleatorios"
     # "calzado" cuando el formato solo vale para zapatos.
     categoria: str = ""
+    # Multimodo: para qué producto vale (ropa, camiseta, calzado, botas, bolso).
+    tipo: str = ""
     # Si necesita el personaje de referencia adjunto.
     personaje: bool = False
     # Qué se ve en ese vídeo, en una frase.
@@ -237,6 +239,10 @@ class PrendaInfo(BaseModel):
     sold: bool = False
     video_path: str | None = None
     video_listo_at: int = 0
+    # Multimodo: con qué formato se hizo el vídeo que se enseña (en la vista
+    # de todos) y para qué formatos vale la prenda (bolso, botas, calzado…).
+    formato: str = ""
+    tipo_multimodo: str = ""
     # Hay un montaje de esta prenda en cola o en curso.
     montando: bool = False
 

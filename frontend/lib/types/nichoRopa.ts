@@ -81,6 +81,8 @@ export interface ModoRopa {
   modalidad?: string;
   /** "calzado" cuando el formato solo vale para zapatos. */
   categoria?: string;
+  /** Multimodo: para qué producto vale (ropa, camiseta, calzado, botas, bolso). */
+  tipo?: string;
   /** Si necesita el personaje de referencia adjunto. */
   personaje?: boolean;
   /** Qué se ve en ese vídeo, en una frase. La manda el backend: es lo que
@@ -167,6 +169,9 @@ export interface PrendaItem {
   variantes_producto?: number;
   /** Familia de la prenda, deducida del título (decide gesto y planos). */
   familia?: string;
+  /** Multimodo: formato del vídeo que se enseña y para cuáles vale la prenda. */
+  formato?: string;
+  tipo_multimodo?: string;
   /** Variantes con miniatura recortada de la captura (foto para Flow). */
   miniaturas_variantes?: string[];
   guion_dice?: string;

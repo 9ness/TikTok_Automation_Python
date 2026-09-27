@@ -42,6 +42,7 @@ import { useHashtags } from "@/lib/queries/nichoPovBof";
 import { HerramientasIA } from "@/components/tiktok-shop-ai-pro/HerramientasIA";
 import { PersonajeMarca } from "@/components/tiktok-shop-ai-pro/PersonajeMarca";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
+import { TandasMultimodo } from "@/components/tiktok-shop-ai-pro/TandasMultimodo";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { VideoModal } from "@/components/ui/video-modal";
@@ -292,12 +293,24 @@ const CATALOGOS_ROPA = [
   { clave: "tareas", label: "💼 Tareas" },
 ] as const;
 
+/** En el Multimodo entran además los zapatos y los accesorios de su web:
+ *  son los que tienen formatos propios (botas, bolsos, zapatillas). */
+const CATALOGOS_MULTIMODO = [
+  { clave: "web", label: "👗 Ropa" },
+  { clave: "zapatos", label: "👠 Zapatos" },
+  { clave: "accesorios", label: "👜 Accesorios" },
+  { clave: "muestras", label: "🎁 Muestras" },
+  { clave: "tareas", label: "💼 Tareas" },
+] as const;
+
 /** A qué catálogo pertenece una carpeta, por su prefijo
  *  (`hombre_web__Carpeta_1`, `mujer_tareas__Tareas 1`). */
 function catalogoDe(slug: string): string {
   const genero = slug.split("__")[0] ?? "";
   if (genero.endsWith("_muestras")) return "muestras";
   if (genero.endsWith("_tareas")) return "tareas";
+  if (genero.endsWith("_zapatos_web")) return "zapatos";
+  if (genero.endsWith("_accesorios_web")) return "accesorios";
   return "web";
 }
 
@@ -337,11 +350,16 @@ export function PantallaRopa({
 }) {
   const esWeb = variante === "web";
   const esMarca = modalidad === "marca";
+  // Multimodo: cada producto se graba con el formato mudo que mejor le va (lo
+  // elige el agente). "multimodo" no es un formato: es la vista de todos los
+  // vídeos hechos, sea cual sea el formato, para bajarlos de una vez.
+  const esMulti = modalidad === "multimodo";
   // Dónde está la cámara. Cada modo guarda SU vídeo de la misma prenda, igual
   // que los estilos de guion del POV BOF Largo: se graba la prenda de las dos
   // maneras y son dos publicaciones distintas.
   const [modo, setModo] = useEstadoDeUsuario(`ropa-web:${sexoFijo}:${modalidad}:modo`,
-    esMarca ? "marca_espejo" : "espejo");
+    esMulti ? "multimodo" : esMarca ? "marca_espejo" : "espejo");
+  const esVistaTodos = esMulti && modo === "multimodo";
   // Cuánto va a durar el clip: 10s en Omni, 8s en GenAI Pro (Veo). No es un
   // ajuste de vídeo — baja el tope de caracteres del guion, porque la voz la
   // pone el propio clip y lo que no entra sale cortado a media frase.
@@ -406,7 +424,22 @@ export function PantallaRopa({
   const modoEstilo = (prompts.data?.mof10 ?? [])[0]?.clave ?? "";
   // Los modos son del SEXO, no de la pantalla: en hombre hay cuatro formatos
   // y en mujer dos, y cada uno guarda su propio vídeo de la misma prenda.
-  const modos = prompts.data?.modos?.length ? prompts.data.modos : MODOS_FALLBACK;
+  const modosBackend = prompts.data?.modos?.length ? prompts.data.modos : MODOS_FALLBACK;
+  const modos = esMulti
+    ? [
+        {
+          clave: "multimodo",
+          label: "👀 Todos los vídeos",
+          voz: false,
+          modalidad: "multimodo",
+          categoria: "",
+          tipo: "",
+          personaje: false,
+          desc: "El vídeo que tenga cada producto, sea del formato que sea: para revisarlos y bajarlos de una vez.",
+        },
+        ...modosBackend,
+      ]
+    : modosBackend;
   // Al pasar de hombre a mujer, el modo guardado puede ser de los que solo
   // existen en hombre: sin esto la pantalla se queda en un modo que ya no
   // está en la lista y ningún botón sale marcado.
@@ -539,21 +572,27 @@ export function PantallaRopa({
             <Shirt className="h-5 w-5 shrink-0 text-violet-500" />
             <div className="min-w-0">
               <h1 className="text-base font-bold sm:text-lg">
-                {esMarca
+                {esMulti
+                  ? "Moda Mujer · Multimodo"
+                  : esMarca
                   ? "Moda Mujer · Marca Personal"
                   : sexo === "hombre"
                     ? "Nicho Ropa Hombre"
                     : "Moda Mujer · Aleatorios"}
               </h1>
               <p className="text-[11px] text-muted-foreground">
-                {esMarca
+                {esMulti
+                  ? "Formatos mudos de 10s · uno por producto, el que mejor le va"
+                  : esMarca
                   ? "Tu personaje fijo · un clip de 8-10s por formato"
                   : "La prenda PUESTA, grabada con el móvil · un clip de 8-10s, o dos de 8s en los de 15s"}
               </p>
             </div>
             <GuiaIA
               guia={
-                esMarca
+                esMulti
+                  ? "moda-mujer-multimodo"
+                  : esMarca
                   ? "moda-mujer-marca"
                   : sexo === "hombre"
                     ? "ropa-hombre"
@@ -562,7 +601,15 @@ export function PantallaRopa({
             />
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-            {esMarca ? (
+            {esMulti ? (
+              <>
+                Pensado para que lo trabaje un agente: en cada producto elige el
+                formato mudo que le va (espejo, camiseta, zapatillas, botas o
+                bolso) y así la cuenta no se ancla en uno. Ninguno habla: la
+                música se pone en TikTok al publicar. «Todos los vídeos» junta
+                lo hecho para bajarlo de una vez.
+              </>
+            ) : esMarca ? (
               <>
                 Los tres formatos repiten TU personaje, que es lo que construye
                 la marca — salvo el de vista POV, que va con una chica
@@ -594,6 +641,8 @@ export function PantallaRopa({
           con rótulos, el mismo contador y los mismos chips de carpeta. Quien
           aprende un nicho sabe usar los otros — antes esto eran bloques
           sueltos sin título y botones el doble de altos. */}
+      {esMulti && <TandasMultimodo />}
+
       <Caja
         icono="📁"
         titulo="Dónde trabajas"
@@ -662,7 +711,7 @@ export function PantallaRopa({
             {/* Cuántas carpetas tiene cada uno: sin el número hay que entrar a
                 ver si ahí hay algo, y muestras/tareas suelen estar vacíos. */}
             <div className="grid grid-cols-3 gap-1.5">
-              {CATALOGOS_ROPA.map(({ clave, label }) => {
+              {(esMulti ? CATALOGOS_MULTIMODO : CATALOGOS_ROPA).map(({ clave, label }) => {
                 const cuantas = todasLasCarpetas.filter(
                   (c) => catalogoDe(c.slug) === clave,
                 ).length;
