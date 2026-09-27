@@ -1027,6 +1027,37 @@ def texto_de_modo(modo: str, semilla: str = "") -> dict:
     return texto
 
 
+# Formatos cuyo clip sale casi quieto: el prompt del curso pide «movimiento
+# sutil» sobre un bodegón (bolso en el coche, botas en la alfombra, camiseta en
+# el maniquí) y Kling lo deja en un temblor. TikTok penaliza el contenido
+# estático, así que el montaje le mete un acercamiento lento con un vaivén
+# lateral (`FILTRO_MOVIMIENTO`). El rótulo se quema DESPUÉS y queda fijo.
+MODOS_CON_MOVIMIENTO = frozenset({
+    "mm_bolso_1", "mm_bolso_2", "mm_bolso_3",
+    "mm_botas_1", "mm_botas_2", "mm_botas_largas_1", "mm_botas_largas_2",
+    "mm_maniqui",
+})
+
+
+def lleva_movimiento(modo: str) -> bool:
+    return modo in MODOS_CON_MOVIMIENTO
+
+
+def filtro_movimiento(w: int, h: int, fps: int) -> str:
+    """Acercamiento de ~12 % en 10 s y un vaivén lateral de un ciclo.
+
+    Se escala a 1,5x antes del `zoompan` porque este redondea la ventana a
+    píxeles enteros: sobre el tamaño final el acercamiento sale a saltitos."""
+    gw, gh = w * 3 // 2, h * 3 // 2
+    return (
+        f"scale={gw}:{gh},"
+        r"zoompan=z='min(1+0.0004*on\,1.15)'"
+        ":x='(iw-iw/zoom)/2+(iw-iw/zoom)/2*0.6*sin(on/45)'"
+        ":y='(ih-ih/zoom)/2'"
+        f":d=1:s={w}x{h}:fps={fps}"
+    )
+
+
 def lleva_grado(modo: str) -> bool:
     """¿El montaje le aplica el color de película de marca personal?"""
     texto = texto_de_modo(modo) if modo else {}
