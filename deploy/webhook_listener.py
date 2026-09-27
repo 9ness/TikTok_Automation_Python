@@ -585,12 +585,27 @@ def _smart_status() -> dict:
     lock = "/tmp/tiktok-deploy.lock"
     in_progress = False
     if os.path.exists(lock):
-        # `flock` no escribe PID por defecto, pero podemos buscar procesos
-        # bash ejecutando deploy_safe.sh.
-        rc, ps_out, _ = _run(
-            ["pgrep", "-f", "deploy_safe.sh"], timeout=3,
-        )
-        in_progress = rc == 0 and bool(ps_out.strip())
+        # Se pregunta al CANDADO, no a la lista de procesos: `deploy_safe.sh`
+        # lo tiene cogido con `flock` mientras trabaja, y si `flock -n` lo
+        # consigue es que nadie está desplegando. Antes se buscaba con
+        # `pgrep -f deploy_safe.sh`, y cualquier proceso con ese texto en la
+        # línea de comandos —un bucle de espera de un agente en el VPS, un
+        # `tail` del log— dejaba el aviso "Desplegando…" encendido para siempre.
+        #
+        # En Python y abriéndolo SOLO para leer: el binario `flock` lo abre
+        # con O_CREAT y, con `fs.protected_regular` en /tmp, falla si el
+        # fichero es de otro usuario — y un fallo se leería como "ocupado".
+        import fcntl
+
+        try:
+            with open(lock, "r") as fh:
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(fh, fcntl.LOCK_UN)
+                except BlockingIOError:
+                    in_progress = True
+        except OSError:
+            in_progress = False
     out["deploy_in_progress"] = in_progress
 
     # Último deploy persistido. Puede estar en temp_work o en logs (plan B de
