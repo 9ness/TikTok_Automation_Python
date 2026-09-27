@@ -12,7 +12,9 @@ Un clip **mudo** de 10 s por producto. Nadie habla: la música la pone el
 operador en TikTok al publicar (en Camiseta Sarcástica, además, el sonido de
 risas). La app encuadra a 1080×1920 y limpia metadatos; los dos formatos
 «Multi Escena» llevan además el grado de color y el texto de temporada. Los
-Vintage traen su texto otoñal quemado YA en la imagen (lo pone Nano Banana).
+Vintage NO llevan texto en la imagen: el rótulo otoñal (con sus emojis) lo
+quema el montaje, una frase distinta por producto. Nano Banana lo metía en la
+foto y Kling lo deformaba a mitad de clip.
 
 ## Catálogos
 
@@ -73,8 +75,8 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
 ## Revisar antes de subir
 
 - Imagen: el producto idéntico (forma, color, estampado, piezas); es el
-  personaje en los que lo llevan; los Vintage con su texto otoñal legible y
-  sin tapar el producto.
+  personaje en los que lo llevan; los Vintage SIN ningún texto (si Nano Banana
+  mete alguno, repite la imagen: el rótulo lo pone la app).
 - Clip: el producto no cambia ni se mueve solo, no aparecen manos o piernas
   de más, la cara no se deforma. Compara con el vídeo de ejemplo del formato
   en su web. Repite SOLO por inconsistencias visuales.

@@ -67,3 +67,20 @@ class TestVistaDeTodos:
         assert config.clave_progreso("mm_bolso_2") == config.MODO_MULTI
         assert config.clave_progreso(config.MODO_MULTI) == config.MODO_MULTI
         assert config.clave_progreso("espejo") == "espejo"
+
+
+class TestRotuloVintage:
+    """El rótulo otoñal de los Vintage lo pone el montaje, no la imagen."""
+
+    def test_el_prompt_de_imagen_ya_no_pide_el_texto(self):
+        for modo in ("mm_bolso_1", "mm_bolso_3", "mm_botas_2", "mm_botas_largas_2"):
+            imagen = config.prompts_mof10(modo=modo)[0]["imagen"]
+            assert "Añade directamente sobre la fotografía" not in imagen
+            assert "Sin más texto" in imagen
+
+    def test_frase_por_prenda_y_sin_grado(self):
+        a = config.texto_de_modo("mm_bolso_1", "c/1")
+        assert a["titulo"] and a["segundos"] == 0.0
+        assert a == config.texto_de_modo("mm_bolso_1", "c/1")  # remontar no la cambia
+        assert not config.lleva_grado("mm_bolso_1")
+        assert config.lleva_grado("mm_espejo_escenas")

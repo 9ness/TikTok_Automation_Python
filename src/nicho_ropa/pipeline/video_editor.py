@@ -321,7 +321,7 @@ def _montar_en(
     vf = pov_config.filtro_encuadre()
     # El grado va PEGADO al encuadre: es un filtro más de la misma pasada, así
     # que no cuesta una recodificación extra.
-    if modo and config.texto_de_modo(modo):
+    if modo and config.lleva_grado(modo):
         vf = f"{vf},{FILTRO_MARCA}"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -505,7 +505,7 @@ def _rematar(
         _subtitular(salida, texto_subs, on_log)
     if modo and config.lleva_flecha(modo):
         _flecha(salida, on_log, semilla)
-    texto = config.texto_de_modo(modo) if modo else {}
+    texto = config.texto_de_modo(modo, semilla) if modo else {}
     if texto.get("titulo"):
         _quemar_texto(salida, texto, semilla, on_log)
     _limpiar(salida, on_log)

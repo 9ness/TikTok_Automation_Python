@@ -459,6 +459,46 @@ TEXTO_MARCA: dict[str, dict] = {
     "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0},
 }
 
+# Los Vintage del multimodo (bolsos y botas). La web pide el rótulo otoñal
+# DENTRO de la imagen (Nano Banana), y Kling lo deforma a mitad de clip —salió
+# "ESENCIALES DE OTOÑO" convertido en "POEAOP"—. Se quita del prompt de imagen
+# (`sin_texto_en_imagen`) y lo pone el montaje, como en los de marca: siempre
+# legible y con sus emojis. Varias frases, elegidas por prenda para que dos
+# vídeos seguidos no digan lo mismo. Sin `grado`: la foto ya trae su filtro de
+# otoño y oscurecerla otra vez la apagaba. Se ve el vídeo entero (0), como el
+# rótulo de las imágenes de referencia.
+_VINTAGE_BOLSO = [
+    ("Otoño esencial", "colección de temporada"),
+    ("Colección de Otoño", "la elegancia de septiembre"),
+    ("Autumn Essentials", "cozy season"),
+    ("Esencia de Otoño", "nueva temporada"),
+]
+_VINTAGE_BOTAS = [
+    ("Autumn Edit", "step into style"),
+    ("Nueva Colección", "otoño paso a paso"),
+    ("Otoño esencial", "paso a paso"),
+    ("Autumn Boots", "cozy season"),
+]
+for _clave, _frases in (
+    ("vintage_bolso_1", _VINTAGE_BOLSO), ("vintage_bolso_2", _VINTAGE_BOLSO),
+    ("vintage_bolso_3", _VINTAGE_BOLSO), ("vintage_botas_1", _VINTAGE_BOTAS),
+    ("vintage_botas_2", _VINTAGE_BOTAS), ("vintage_botas_largas_1", _VINTAGE_BOTAS),
+    ("vintage_botas_largas_2", _VINTAGE_BOTAS),
+):
+    TEXTO_MARCA[_clave] = {
+        "variantes": [{"titulo": t, "bajada": b} for t, b in _frases],
+        "segundos": 0.0, "grado": False, "quitar_de_imagen": True,
+    }
+
+_PARRAFO_TEXTO_IMAGEN = re.compile(
+    r"Añade directamente sobre la fotografía.*?integrado en la imagen\.\s*", re.S,
+)
+
+
+def sin_texto_en_imagen(prompt: str) -> str:
+    """El prompt de imagen sin el párrafo que pide el rótulo otoñal."""
+    return _PARRAFO_TEXTO_IMAGEN.sub("", prompt)
+
 
 # El ritmo del Nicho General, que es el que ya funciona en clips de 8s: 136
 # caracteres para 8 segundos (17 car/s).
@@ -769,9 +809,26 @@ def lleva_subtitulos(modo: str) -> bool:
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("subtitulos"))
 
 
-def texto_de_modo(modo: str) -> dict:
-    """El texto quemado que le toca a ese modo. `{}` si no lleva ninguno."""
-    return dict(TEXTO_MARCA.get(estilo_de_modo(modo)) or {})
+def texto_de_modo(modo: str, semilla: str = "") -> dict:
+    """El texto quemado que le toca a ese modo. `{}` si no lleva ninguno.
+
+    Los que traen `variantes` eligen una por prenda (`semilla`), determinista:
+    remontar el mismo vídeo no le cambia la frase.
+    """
+    import hashlib
+
+    texto = dict(TEXTO_MARCA.get(estilo_de_modo(modo)) or {})
+    variantes = texto.pop("variantes", None)
+    if variantes:
+        h = hashlib.sha1(("frase:" + str(semilla or "")).encode("utf-8")).digest()
+        texto.update(variantes[h[0] % len(variantes)])
+    return texto
+
+
+def lleva_grado(modo: str) -> bool:
+    """¿El montaje le aplica el color de película de marca personal?"""
+    texto = texto_de_modo(modo) if modo else {}
+    return bool(texto) and texto.get("grado", True)
 # Palabras que delatan un calzado en el título ya extraído. Se filtra por
 # palabra y no con una llamada a la IA porque la pregunta es fácil: en
 # Carruseles hizo falta Gemini porque allí se preguntaba "¿este producto
@@ -1691,6 +1748,8 @@ def prompts_mof10(
             guion = _con_sexo(meta["guion"], sexo, SEXOS_MOF10)
         if meta.get("personaje_fijo"):
             imagen = NOTA_PERSONAJE_FIJO + imagen
+        if (TEXTO_MARCA.get(clave) or {}).get("quitar_de_imagen"):
+            imagen = sin_texto_en_imagen(imagen)
         # El tope de caracteres solo se toca en los estilos cuyo guion se
         # escribe fuera; en los de calle no hay marcador que rellenar.
         dur = duracion_valida(duracion) if meta.get("duraciones") else DURACION_DEFECTO
