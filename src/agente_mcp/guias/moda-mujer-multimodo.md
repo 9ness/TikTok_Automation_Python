@@ -137,6 +137,12 @@ Es lo que te pedirán casi siempre. Qué significa y en qué orden:
   las imágenes de la lista.
 - Carga: menú «More» de la lista → «Clear list» → «Add media» → sube las 2
   imágenes → clic en el título del nodo generador y ▶ (Run).
+- Si el menú no abre (a veces no se despliega), no hace falta vaciar: pulsa
+  el ◎ junto a «N images» y deja marcadas SOLO las imágenes de esta tanda
+  (sale «2/6 images»); el Run genera solo esas. «Replace items» NO sustituye
+  al añadir, y la tecla **Supr borra el nodo entero** (Ctrl+Z lo recupera).
+  Comprueba en `/app/api/creations` que entraron tantos `queued` como
+  imágenes marcaste.
 - **Estado real y descarga:** la lista del Space no siempre se refresca.
   Pídelo a la API de la propia web, con la sesión abierta:
   `fetch('/app/api/creations?limit=10')` → cada creación trae su estado y el
