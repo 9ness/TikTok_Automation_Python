@@ -10,6 +10,7 @@ import {
   buildVideoRopaUrl,
   useMarcarSubidoMultimodo,
   useTandasMultimodo,
+  type VideoMultimodo,
 } from "@/lib/queries/nichoRopa";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -29,6 +30,7 @@ export function TandasMultimodo() {
     v.caption ? [v.caption, v.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : "";
   const marcar = useMarcarSubidoMultimodo();
   const [bajando, setBajando] = useState<number | null>(null);
+  const [bajandoUno, setBajandoUno] = useState<string | null>(null);
   // "3/10" mientras baja, como al bajar los vídeos de una carpeta.
   const [progreso, setProgreso] = useState("");
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -48,6 +50,25 @@ export function TandasMultimodo() {
     } catch {
       toast.message(`Busca en TikTok: ${texto}`);
     }
+  }
+
+  /** Un vídeo suelto, con el MISMO nombre que al bajar la tanda entera. */
+  async function bajarUno(numero: number, i: number, v: VideoMultimodo) {
+    setBajandoUno(`${v.carpeta}-${v.producto}`);
+    const r = await bajarEnOrden([
+      {
+        href: buildVideoRopaUrl(v.producto, v.carpeta, v.video_listo_at, true, v.formato),
+        nombre:
+          nombreDescarga(
+            "multimodo",
+            `tanda${String(numero).padStart(2, "0")}`,
+            String(i + 1).padStart(2, "0"),
+            v.formato,
+          ) + ".mp4",
+      },
+    ]);
+    setBajandoUno(null);
+    if (r.fallidas) toast.error("No se pudo descargar el vídeo");
   }
 
   async function bajarTanda(numero: number) {
@@ -129,91 +150,105 @@ export function TandasMultimodo() {
                     {t.items.map((v, i) => (
                       <li
                         key={`${v.carpeta}-${v.producto}`}
-                        className="flex items-center gap-2 px-2 py-1.5"
+                        className="flex flex-col gap-1 px-2 py-1.5"
                       >
-                        <span className="w-5 shrink-0 text-[10px] text-muted-foreground">
-                          {i + 1}
-                        </span>
-                        {v.foto_id ? (
-                          <a
-                            href={buildFotoRopaUrl(v.foto_id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Ver la foto del producto"
-                            className="shrink-0"
+                        {/* Arriba la ficha y las acciones; los chips van en su
+                            propia línea a lo ancho: en un móvil estrecho no
+                            caben al lado y se aplastaban. */}
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 shrink-0 text-[10px] text-muted-foreground">
+                            {i + 1}
+                          </span>
+                          {v.foto_id ? (
+                            <a
+                              href={buildFotoRopaUrl(v.foto_id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Ver la foto del producto"
+                              className="shrink-0"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={buildFotoRopaUrl(v.foto_id, 96)}
+                                alt=""
+                                loading="lazy"
+                                className="h-10 w-10 rounded-md border border-border/40 bg-white object-contain sm:h-12 sm:w-12"
+                              />
+                            </a>
+                          ) : (
+                            <div className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border/40 sm:h-12 sm:w-12" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-medium sm:text-xs">
+                              {v.titulo || `Producto ${v.producto}`}
+                            </p>
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              {v.formato_label} · {v.carpeta_label} · P{v.producto}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={bajandoUno !== null}
+                            onClick={() => void bajarUno(t.numero, i, v)}
+                            title="Descargar este vídeo"
+                            className="flex shrink-0 items-center rounded-md border border-border/60 px-1.5 py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={buildFotoRopaUrl(v.foto_id, 96)}
-                              alt=""
-                              loading="lazy"
-                              className="h-10 w-10 rounded-md border border-border/40 bg-white object-contain sm:h-12 sm:w-12"
-                            />
-                          </a>
-                        ) : (
-                          <div className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border/40 sm:h-12 sm:w-12" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[11px] font-medium sm:text-xs">
-                            {v.titulo || `Producto ${v.producto}`}
-                          </p>
-                          <p className="truncate text-[10px] text-muted-foreground">
-                            {v.formato_label} · {v.carpeta_label} · P{v.producto}
-                          </p>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                            {bajandoUno === `${v.carpeta}-${v.producto}` ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Download className="h-3 w-3" />
+                            )}
+                          </button>
+                          {v.product_url ? (
+                            <a
+                              href={v.product_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="shrink-0 rounded-md border border-border/60 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              🛍️
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={marcar.isPending}
+                            onClick={() =>
+                              marcar.mutate({
+                                carpeta: v.carpeta,
+                                producto: v.producto,
+                                uploaded: !v.uploaded,
+                              })
+                            }
+                            className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] ${
+                              v.uploaded
+                                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
+                                : "border-border/60 text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <Check className="h-3 w-3" />
+                            {v.uploaded ? "Subido" : (
+                              <>
+                                <span className="hidden sm:inline">Marcar subido</span>
+                                <span className="sm:hidden">Subir</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex min-w-0 flex-wrap items-center gap-1 pl-6">
                           <CopyChip label="✍️ Caption" text={captionDe(v)} siempre />
                           {v.musica?.busqueda ? (
                             <button
                               type="button"
                               onClick={() => void copiarMusica(v.musica!.busqueda)}
                               title={`${v.musica.estilo}. Otras: ${v.musica.alternativas.join(" · ")}`}
-                              className="flex max-w-full items-center gap-1 truncate rounded bg-violet-500/10 px-1.5 py-px text-[10px] text-violet-300 hover:bg-violet-500/20"
+                              className="flex min-w-0 max-w-full items-center gap-1 rounded bg-violet-500/10 px-1.5 py-1 text-left text-[10px] text-violet-300 hover:bg-violet-500/20"
                             >
-                              🎵 <span className="truncate">{v.musica.busqueda}</span>
+                              <span className="shrink-0">🎵</span>
+                              <span className="min-w-0 break-words leading-tight">{v.musica.busqueda}</span>
                               <Copy className="h-2.5 w-2.5 shrink-0" />
                             </button>
                           ) : null}
-                          </div>
                         </div>
-                        <a
-                          href={buildVideoRopaUrl(
-                            v.producto, v.carpeta, v.video_listo_at, false, v.formato,
-                          )}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="shrink-0 rounded-md border border-border/60 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground"
-                        >
-                          ▶
-                        </a>
-                        {v.product_url ? (
-                          <a
-                            href={v.product_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="shrink-0 rounded-md border border-border/60 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground"
-                          >
-                            🛍️
-                          </a>
-                        ) : null}
-                        <button
-                          type="button"
-                          disabled={marcar.isPending}
-                          onClick={() =>
-                            marcar.mutate({
-                              carpeta: v.carpeta,
-                              producto: v.producto,
-                              uploaded: !v.uploaded,
-                            })
-                          }
-                          className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] ${
-                            v.uploaded
-                              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
-                              : "border-border/60 text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          <Check className="h-3 w-3" />
-                          {v.uploaded ? "Subido" : "Marcar subido"}
-                        </button>
                       </li>
                     ))}
                   </ul>
