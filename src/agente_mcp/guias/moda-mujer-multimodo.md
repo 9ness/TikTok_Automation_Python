@@ -66,7 +66,7 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
   prompt: todos los Vintage comparten movimiento; los de espejo, otro.
 - **Un nodo que pasa 60 min sin terminar falla entero** («Node execution
   timed out after 60 minutes») y se pierden los clips que no salieron. La cola
-  de Kling es de la CUENTA, no del Space: lanza tandas pequeñas (≤5 clips) y
+  de Kling es de la CUENTA, no del Space: lanza tandas de **2 clips** y
   no abras varios Spaces a la vez si otra persona u otro agente también
   está generando.
 
