@@ -266,6 +266,32 @@ def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
 def montar(
     video_in: Path,
     out_path: Path,
+    **kwargs,
+) -> Path:
+    """Monta en una carpeta LOCAL y copia al destino solo el resultado.
+
+    El destino es el Drive montado, y ahí cada paso (encuadre, subtítulos,
+    flecha, texto, metadatos) reescribía y renombraba el fichero: con la cuota
+    de la API de Drive apurada, ffmpeg no podía reabrir la salida para el
+    `+faststart` ("Unable to re-open ... output file for shifting data") y el
+    montaje fallaba. Aquí solo se escribe una vez.
+    """
+    import shutil
+    import tempfile
+
+    work = Path(tempfile.mkdtemp(prefix="moda_montar_"))
+    try:
+        local = _montar_en(video_in, work / out_path.name, **kwargs)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(local, out_path)
+        return out_path
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _montar_en(
+    video_in: Path,
+    out_path: Path,
     *,
     voz: Path | None = None,
     conservar_audio: bool = False,
