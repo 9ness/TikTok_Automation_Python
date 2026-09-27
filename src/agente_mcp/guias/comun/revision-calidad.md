@@ -7,6 +7,9 @@ producto retirado del vídeo). Ya ha pasado: un clip de un **inflador** de
 ruedas publicado con el enlace de un **ventilador** de mano de la misma
 carcasa blanca.
 
+(Si aun así llega una sanción y el vídeo está bien, se apela: método y
+casos aprobados en `APELACIONES.md`, en la raíz del repo.)
+
 Por eso **cada imagen y cada clip se revisan contra la foto limpia y la ficha
 del producto** (las dos se ven en la app al pulsar la miniatura de la
 tarjeta). Si algo falla: **rechazar**, moverlo a `RECHAZADAS/` con el motivo y

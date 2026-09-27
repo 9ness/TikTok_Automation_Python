@@ -733,6 +733,7 @@ herramientas del mismo grupo en el futuro.
 | [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura completa, esquemas Redis, prompts, Pilot Program |
 | [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + OpenAI GPT-4o |
 | [`TTSHOP_AI_PRO_WEB.md`](TTSHOP_AI_PRO_WEB.md) | **La web del curso** — cómo funciona `ttshopaiproapp.com`, de donde salen prompts, ZIP y fichas. Está tras login del operador: ningún agente puede mirarla, así que lo que se sepa se escribe ahí |
+| [`APELACIONES.md`](APELACIONES.md) | Cómo apelar sanciones de TikTok Shop («promoción incoherente»): pruebas, forma del texto, qué no decir, casos aprobados |
 | [`UI_NICHOS.md`](UI_NICHOS.md) | **Estándar visual de las pantallas de nicho** (Programa 4) — anatomía de pantalla y de tarjeta, colores con significado, piezas que se reutilizan. Obligatorio antes de crear o retocar una |
 | [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Programa 4 — banco de candidatos sin repetir, 3 estilos de subtítulo, jitter anti-fingerprint, numeración de rondas |
 | [`src/agente_mcp/guias/`](src/agente_mcp/guias/README.md) | **Guías para agentes de IA** (una por menú del Programa 4): las lee el MCP con `guia`, se sirven en `/api/v1/agente/guias/…` y cada pantalla las enlaza con «Guía IA». Si cambias el flujo de una pantalla, actualiza su guía. Skill: `.claude/skills/operar-tiktok-ai-pro` |
