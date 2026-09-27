@@ -444,9 +444,13 @@ export function PantallaRopa({
   // existen en hombre: sin esto la pantalla se queda en un modo que ya no
   // está en la lista y ningún botón sale marcado.
   useEffect(() => {
+    // Solo con la lista REAL: mientras se piden los prompts del modo nuevo
+    // `modos` es el de reserva (solo espejo) y esto devolvía cualquier modo
+    // recién elegido al primero — en Multimodo, a "Todos los vídeos".
+    if (!prompts.data?.modos?.length) return;
     if (!modos.length || modos.some((m) => m.clave === modo)) return;
     setModo(modos[0]!.clave);
-  }, [modos, modo, setModo]);
+  }, [modos, modo, setModo, prompts.data?.modos?.length]);
   // Solo se pide si ese formato tiene de verdad versión con plazos: en el
   // resto copiaba exactamente el mismo texto y era una llamada de más.
   const promptsPlazos = usePromptsRopa(
