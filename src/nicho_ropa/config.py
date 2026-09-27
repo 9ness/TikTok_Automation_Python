@@ -691,6 +691,13 @@ _MANO_BOTA = (
     "ningún zapato nuevo."
 )
 
+_PIERNAS_BOTA = (
+    "Para que el clip tenga movimiento: ella balancea despacio el pie de la "
+    "pierna cruzada, descruza y vuelve a cruzar las piernas con calma y pasa "
+    "una mano por la caña de la bota. Solo dos botas, las dos puestas; no "
+    "cambian de forma, color, altura ni diseño."
+)
+
 # Lo que Kling hace mal o se queda corto en cada formato, dicho al final del
 # prompt de movimiento (antes de la nota sin texto).
 EXTRA_VIDEO_MULTIMODO = {
@@ -702,6 +709,10 @@ EXTRA_VIDEO_MULTIMODO = {
     # En estos la imagen ya trae la mano sujetando el otro zapato.
     "mm_botas_1": _MANO_BOTA,
     "mm_botas_2": _MANO_BOTA,
+    # Medido sobre lo montado (sep 2026): las botas altas eran lo más quieto
+    # después de los bolsos — una chica de cintura para abajo sin moverse.
+    "mm_botas_largas_1": _PIERNAS_BOTA + " Se mece suavemente en el columpio.",
+    "mm_botas_largas_2": _PIERNAS_BOTA,
     # Lo que Kling se inventa en calzado, y el clip ya no vale: en POV el pie
     # descalzo acababa calzado con un tercer zapato; en el espejo entraba una
     # pierna real por delante, la chica acercaba la zapatilla a cámara o el
