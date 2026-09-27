@@ -128,7 +128,7 @@ class TestMovimientoSinTexto:
     def test_los_bolsos_llevan_una_mano_que_da_movimiento(self):
         for modo in ("mm_bolso_1", "mm_bolso_2", "mm_bolso_3"):
             guion = config.prompts_mof10(modo=modo)[0]["guion"]
-            assert "acaricia despacio el bolso" in guion, modo
+            assert "nunca pasa por delante de la cámara" in guion, modo
             assert guion.rstrip().endswith("el vídeo tampoco."), modo
 
 
