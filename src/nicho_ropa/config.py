@@ -610,9 +610,10 @@ def orden_para_publicar(videos: list[dict]) -> list[dict]:
         (v for v in videos if v.get("uploaded")),
         key=lambda v: (int(v.get("uploaded_at") or 0), int(v.get("video_listo_at") or 0)),
     )
+    # Por la PRIMERA vez que se montó: un vídeo rehecho no pierde su puesto.
     pendientes = sorted(
         (v for v in videos if not v.get("uploaded")),
-        key=lambda v: int(v.get("video_listo_at") or 0),
+        key=lambda v: int(v.get("primer_listo_at") or v.get("video_listo_at") or 0),
     )
     por_tipo = _turnos(
         pendientes, lambda v: MODOS.get(v.get("formato") or "", {}).get("tipo") or "otro",

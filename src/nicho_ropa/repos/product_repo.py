@@ -272,6 +272,7 @@ def video_de(prod: dict, modo: str) -> dict:
             "video_path": mejor.get("video_path") or "",
             "video_listo_at": int(mejor.get("video_listo_at") or 0),
             "formato": mejor.get("formato", ""),
+            "primer_listo_at": int(mejor.get("primer_listo_at") or mejor.get("video_listo_at") or 0),
         }
     modo = config.modo_valido(modo)
     guardado = ((prod or {}).get("modos") or {}).get(modo) or {}
@@ -425,9 +426,14 @@ def guardar_video(
         prod = productos.setdefault(str(producto), {})
         # `update` y no asignación: en ese hueco vive también el guion de
         # este modo, y sustituirlo entero lo borraba al montar el vídeo.
-        prod.setdefault("modos", {}).setdefault(modo, {}).update({
-            "video_path": ruta, "video_listo_at": listo_at,
-        })
+        hueco = prod.setdefault("modos", {}).setdefault(modo, {})
+        # La PRIMERA vez que ese formato tuvo vídeo: es lo que ordena las
+        # tandas del multimodo. Si se rehace un clip (un bolso que salía
+        # estático), el vídeo nuevo conserva su puesto en vez de irse al final
+        # y dejar su hueco a otro sin rehacer.
+        if "primer_listo_at" not in hueco:
+            hueco["primer_listo_at"] = int(hueco.get("video_listo_at") or listo_at)
+        hueco.update({"video_path": ruta, "video_listo_at": listo_at})
         # El de siempre se sigue escribiendo para el modo por defecto: hay
         # código (y datos) que lo lee de la raíz.
         if modo == config.MODO_DEFECTO:

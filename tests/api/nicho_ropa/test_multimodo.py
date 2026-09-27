@@ -145,6 +145,11 @@ class TestOrdenParaPublicar:
         for a, b in zip(orden, orden[1:]):
             assert a != b
 
+    def test_un_video_rehecho_conserva_su_puesto(self):
+        viejo = {**self._v("mm_bolso_1", 999), "primer_listo_at": 1}
+        otro = self._v("mm_bolso_1", 2)
+        assert config.orden_para_publicar([otro, viejo])[0] is viejo
+
     def test_lo_subido_va_primero_y_no_se_mueve(self):
         vids = [self._v("mm_bolso_1", 1), self._v("mm_botas_2", 2, True, 50),
                 self._v("mm_espejo", 3, True, 40)]
