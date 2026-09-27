@@ -29,6 +29,8 @@ export function TandasMultimodo() {
     v.caption ? [v.caption, v.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : "";
   const marcar = useMarcarSubidoMultimodo();
   const [bajando, setBajando] = useState<number | null>(null);
+  // "3/10" mientras baja, como al bajar los vídeos de una carpeta.
+  const [progreso, setProgreso] = useState("");
   const [abierta, setAbierta] = useState<number | null>(null);
 
   const datos = tandas.data;
@@ -63,8 +65,10 @@ export function TandasMultimodo() {
             v.formato,
           ) + ".mp4",
       })),
+      (hechos, total) => setProgreso(`${hechos}/${total}`),
     );
     setBajando(null);
+    setProgreso("");
     if (r.fallidas) toast.error(`${r.bajadas} bajados · ${r.fallidas} fallaron`);
     else toast.success(`Tanda ${numero}: ${r.bajadas} vídeo(s) descargados`);
   }
@@ -117,7 +121,7 @@ export function TandasMultimodo() {
                     ) : (
                       <Download className="h-3 w-3" />
                     )}
-                    Bajar
+                    {bajando === t.numero && progreso ? progreso : "Bajar"}
                   </button>
                 </div>
                 {abiertaEsta && (
