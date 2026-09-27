@@ -111,6 +111,37 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
   clips. La marca se quita sola al montarse el vídeo nuevo. Sin ficha («URL» en gris) → se puede hacer, pero
   no se podrá publicar con carrito: pregunta.
 
+## Lo que aprendimos haciendo carpetas enteras (sep 2026)
+
+Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
+«precio»). Seguirlo ahorra la mitad de las repeticiones:
+
+- **Una imagen por clip, cada una en un sitio distinto** (cocina / salón,
+  taller / suelo junto a un enchufe…), no dos clips de la misma imagen: el
+  vídeo parece otro plano en vez de repetirse.
+- **Lee título y ficha antes de escribir la escena**: tamaño real (un mini
+  móvil de 8,9 cm junto a una taza para que se vea diminuto; una carpa 3×3 o
+  una bici enteras en el plano, señaladas desde lejos), para quién es
+  (infantil ≠ adulto) y si es un pack (salen TODAS las piezas). Quita de la
+  foto medidas, flechas y sellos tipo «TOP PICKS».
+- **La mano**: «la mano lo señala con el dedo índice desde unos 15 cm, SIN
+  tocarlo». Con productos pequeños (multímetro, powerbank) Nano Banana pone
+  el dedo encima aunque se pida lo contrario → repite la imagen; un dedo
+  apoyado acaba en el clip agarrando o girando el producto. Pide el dedo
+  índice explícitamente (una vez salió un gesto ofensivo).
+- **Postura estable**: los aparatos pequeños mejor **tumbados** sobre la mesa
+  que de pie; de pie, Kling tiende a moverlos o girarlos.
+- **Aparatos con luz**: pídelos ENCENDIDOS (lámparas, LED, luces de
+  crecimiento). Que en el clip se enciendan pantallas no es un fallo.
+- **Revisa sobre todo el último segundo del clip**: es donde Kling gira la
+  bici, hace aparecer un teclado o la mano coge el bote. Ver los rechazos
+  típicos en [`revision-calidad.md`](comun/revision-calidad.md).
+- Productos con 3 clips (guion largo): súbelos con `subir_clip(clip=3)`; con
+  el último hueco se monta solo.
+- Al terminar la carpeta (todos «▶ Ver vídeo»), márcala «Pendiente» si el
+  operador lo pide (`marcar_carpeta(pendiente=true)`); no marques Subido ni
+  Escaparate.
+
 ## API útil (solo lectura, con la sesión del navegador)
 
 - `GET /api/v1/nicho-pov-bof-largo/productos?source=<catálogo>&folder=<carpeta>`

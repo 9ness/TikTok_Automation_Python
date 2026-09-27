@@ -30,7 +30,15 @@ Qué menú admite qué:
 
 Trabaja dentro de un **proyecto** por carpeta de productos (ej. «Moda Mujer ·
 Carpeta 24»): así las imágenes quedan juntas y puedes reutilizarlas como
-frame o ingrediente sin volver a subirlas.
+frame o ingrediente sin volver a subirlas. No metas cientos de imágenes en un
+mismo proyecto: se satura y se congela.
+
+> ⚠️ **Flow necesita la ventana del navegador VISIBLE.** Con Chrome
+> minimizado u oculto (PC bloqueado, operador fuera) el selector de
+> ingredientes no pinta, el envío no sale y al recargar vuelve a modo vídeo
+> (se llegaron a gastar 6 vídeos Omni por error). Compruébalo antes
+> (`document.visibilityState` debe ser `visible`); si no lo es, haz las
+> imágenes en Magnific (abajo) y avísalo en el informe.
 
 ### Imagen (Nano Banana 2)
 
@@ -92,6 +100,28 @@ space, se sube la imagen y se lanza. Mudo, 8 s o 10 s.
 | Foto con IA → vídeo | cuando ya tienes la imagen generada en Flow | https://www.magnific.com/app/spaces/a271e815-cff4-46b6-8597-16153024b453 |
 | Foto con IA → vídeo (2) | el mismo, otro space para repartir la carga | https://www.magnific.com/app/spaces/a285a2e7-03d4-426c-9053-4ef927673519?page=1 |
 | Carrusel de 1 foto | una sola foto de partida | https://www.magnific.com/app/spaces/a279e062-6d19-44bf-bb6c-2775ab35d74c |
+
+Cómo se usa el space «Foto con IA → vídeo» en lote (Kling 2.5 · 9:16 · 10 s ·
+**720p**, que es lo ilimitado; 1080p gasta créditos):
+
+- El nodo de lista de entrada: **«⋯ › Clear list»** y luego **«Add media»**
+  con las imágenes; después **Run** en el nodo Video Generator. El prompt
+  anti-movimiento ya está dentro: no lo cambies.
+- **Tandas de ≤5 imágenes.** Kling va a ~8 min por clip, uno detrás de otro,
+  y un nodo que pasa de **60 min falla entero** («Node execution timed
+  out») — con 24 imágenes se perdió la tanda.
+- La cola de Kling es **de la cuenta**: si otra sesión o persona está
+  generando, alternad tandas y avisaos. No vacíes la lista mientras el nodo
+  diga «Generating video N of M».
+- Los resultados salen en la lista de salida y en el historial de la cuenta;
+  recorta cada clip a ~7,3 s (el final trae fundido) antes de subirlo.
+
+**Imágenes en Magnific** (Image Generator, modelo **Nano Banana 2
+«Unlimited»**, 9:16): solo si Flow no se puede usar (p. ej. el navegador del
+PC está minimizado u oculto: Flow deja de responder, Magnific no). Va lento
+(~5-6 min por imagen, cola de 8 por cuenta). Recarga la página entre
+productos: las referencias adjuntas se acumulan y mezclan productos. Tras
+recargar, comprueba otra vez 9:16 y el modelo.
 
 > ⚠️ Estos enlaces son de septiembre de 2026, de antes de dejar Magnific y
 > volver a él. Si un space no abre o no hace lo que dice la tabla, **para y

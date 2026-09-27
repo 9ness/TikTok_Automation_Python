@@ -47,6 +47,14 @@ repetir (hasta el máximo que acordaste con el operador).
 - [ ] El producto hace algo que **no hace de verdad** o que la ficha no dice
       (un ventilador que echa vapor, una crema que borra una cicatriz).
 - [ ] Manos o cuerpos que se deforman, objetos que atraviesan otros.
+- [ ] **El producto se mueve solo** (gira, se desplaza, se cae, flota) o la
+      mano lo **coge, lo empuja o lo gira**. Motivo de rechazo más frecuente
+      en los clips mudos de Kling; casi siempre en el último segundo.
+- [ ] **Aparecen o desaparecen objetos** de la escena (un teclado y una
+      alfombrilla que no estaban, herramientas nuevas). Que se enciendan
+      pantallas o cambie lo que muestra un monitor sí vale.
+- [ ] Mira el clip con una tira de ~10 fotogramas repartidos (o entero):
+      una sola miniatura del principio no enseña estos fallos.
 - [ ] **Clips hablados** (Moda, UGC):
       - la voz no es español de España (o el idioma que pedía el prompt),
       - se come palabras o se corta a media frase al final,
