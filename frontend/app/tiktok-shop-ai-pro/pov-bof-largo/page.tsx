@@ -121,6 +121,13 @@ import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
+/** Nombre para enseñar: las carpetas virtuales tienen un nombre interno. */
+function nombreCarpeta(folder: string): string {
+  if (folder === "__rehechos__") return "🔁 Rehechos";
+  if (folder === "__esperando_stock__") return "⏳ Esperando stock";
+  return folder;
+}
+
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
 }
@@ -894,8 +901,8 @@ export default function PovBofLargoPage() {
           trabajo, que es lo que viene justo debajo. */}
       {data && folder && (
         <Caja
-          icono="📂"
-          titulo={folder}
+          icono={folder === "__rehechos__" ? "🔁" : folder === "__esperando_stock__" ? "⏳" : "📂"}
+          titulo={nombreCarpeta(folder)}
           hint={`Carpeta ${idx + 1} de ${total}${currentItem?.completed ? " · ya completada" : ""}`}
         >
           <div className="flex items-center gap-2">
@@ -1019,7 +1026,7 @@ export default function PovBofLargoPage() {
           <div className="flex items-center gap-2 px-1">
             <Sparkles className="h-4 w-4 shrink-0 text-violet-500" />
             <p className="text-sm font-semibold">Cómo se hace un vídeo</p>
-            <span className="ml-auto text-[10px] text-muted-foreground">{folder}</span>
+            <span className="ml-auto text-[10px] text-muted-foreground">{nombreCarpeta(folder)}</span>
           </div>
 
           {/* EL MODO, antes que los pasos: decide qué escribe la IA y por
@@ -1513,7 +1520,7 @@ export default function PovBofLargoPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>
               Reescribir {conGuion} guion{conGuion === 1 ? "" : "es"}
-              {folder ? ` de ${folder}` : ""}
+              {folder ? ` de ${nombreCarpeta(folder)}` : ""}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
