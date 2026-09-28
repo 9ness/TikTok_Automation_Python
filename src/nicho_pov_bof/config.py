@@ -180,6 +180,13 @@ def es_carpeta_virtual(folder: str) -> bool:
     return folder == CARPETA_ESPERANDO_STOCK
 
 
+# Solo del POV BOF Largo: los vídeos rehechos (marcados «rehacer» y ya
+# montados de nuevo) que faltan por subir. No entra en `es_carpeta_virtual`
+# porque el POV BOF corto no la tiene y la mandaría a «Esperando stock».
+CARPETA_REHECHOS = "__rehechos__"
+ETIQUETA_REHECHOS = "🔁 Rehechos"
+
+
 def es_fuente_propia(source: str) -> bool:
     """True si la fuente son productos subidos por el operador (no del curso)."""
     return bool((SOURCES.get(source) or {}).get("propia"))

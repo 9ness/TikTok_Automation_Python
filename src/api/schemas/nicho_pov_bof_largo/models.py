@@ -27,6 +27,10 @@ class ProductoLargo(BaseModel):
     # cuando se monta uno nuevo.
     rehacer: bool = False
     rehacer_nota: str = ""
+    # Vídeo REHECHO (se montó estando marcado «rehacer»): sale en la carpeta
+    # virtual «🔁 Rehechos» hasta que se sube. La nota es lo que se arregló.
+    rehecho: bool = False
+    rehecho_nota: str = ""
     # De qué carpeta es. Solo se rellena en el listado de TODAS las carpetas
     # (Top vendidos ordenado por ventas): ahí cada producto viene de una.
     folder: str = ""
@@ -165,6 +169,8 @@ class FolderLargo(BaseModel):
     virtual: bool = False
     # Cuántos hay dentro (solo en la virtual, para pintarlo en el chip).
     esperando: int = 0
+    # Qué virtual es: "esperando_stock" o "rehechos" (vacío en las reales).
+    tipo_virtual: str = ""
     # Cuántos productos de la carpeta están marcados "rehacer".
     rehacer: int = 0
 

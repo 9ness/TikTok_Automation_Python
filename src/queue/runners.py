@@ -2500,12 +2500,21 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         on_log(f"[pov_bof_largo] ⚠️ no pude guardar la copia local: {e}")
 
     on_progress(0.95, "💾 Guardando estado…")
+    # Si estaba marcado para rehacer, este es el vídeo REHECHO: queda anotado
+    # (con la nota de qué se arregló) para que salga en la carpeta virtual
+    # «🔁 Rehechos» hasta que el operador lo suba.
+    antes = product_repo.get_product(source, folder, producto, operator, estilo) or {}
+    rehecho = (
+        {"rehecho": True, "rehecho_at": int(time.time()),
+         "rehecho_nota": str(antes.get("rehacer_nota") or "")}
+        if antes.get("rehacer") else {}
+    )
     product_repo.update_product(
         source, folder, producto, usuario=operator, estilo=estilo,
         video_path=str(salida), video_listo_at=int(time.time()),
         voz_label=info["voz_label"], voz_sexo=sexo,
         # Vídeo nuevo: lo que el operador marcó para rehacer queda atendido.
-        rehacer=False, rehacer_nota="",
+        rehacer=False, rehacer_nota="", **rehecho,
     )
     on_progress(1.0, "✅ Listo")
     return str(salida)

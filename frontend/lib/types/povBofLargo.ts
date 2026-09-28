@@ -21,6 +21,9 @@ export interface ProductoLargo {
    *  nicho y usuario; se apaga solo al montar uno nuevo. */
   rehacer?: boolean;
   rehacer_nota?: string;
+  /** Vídeo rehecho (se montó estando marcado «rehacer»); sale en «🔁 Rehechos» hasta subirlo. */
+  rehecho?: boolean;
+  rehecho_nota?: string;
   /** De qué carpeta es. Solo en el listado de TODAS las carpetas (Top
    *  vendidos por ventas). */
   folder?: string;
@@ -117,6 +120,8 @@ export interface FolderLargo {
   /** No está en el Drive: la compone la app con los que esperan stock. */
   virtual?: boolean;
   esperando?: number;
+  /** Qué virtual es: "esperando_stock" o "rehechos". */
+  tipo_virtual?: string;
   /** Cuántos productos de la carpeta están marcados para rehacer. */
   rehacer?: number;
   name: string;

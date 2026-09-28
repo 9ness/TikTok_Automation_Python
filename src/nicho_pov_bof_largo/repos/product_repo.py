@@ -259,6 +259,32 @@ def rehacer_por_carpeta(
     return salida
 
 
+def rehechos(
+    source: str, folders: list[str], usuario: str = "", estilo: str = "",
+) -> dict[str, list[str]]:
+    """`{carpeta: [números]}` con el vídeo REHECHO y todavía sin subir.
+
+    Son los que el operador marcó «🔁 Rehacer» y ya tienen el vídeo nuevo
+    montado: van juntos a la carpeta virtual «🔁 Rehechos» para revisarlos y
+    subirlos de una pasada, sin buscarlos carpeta a carpeta. Al marcarlos
+    «Subido» salen solos (el filtro es `not uploaded`). Una sola lectura.
+    """
+    r = get_nicho_pov_bof_largo_redis()
+    if not r.is_available() or not folders:
+        return {}
+    docs = r.mget_json([_key(source, n, usuario, estilo) for n in folders])
+    salida: dict[str, list[str]] = {}
+    for carpeta, doc in zip(folders, docs):
+        numeros = [
+            pid for pid, prod in ((doc or {}).get("productos") or {}).items()
+            if (prod or {}).get("rehecho") and (prod or {}).get("video_path")
+            and not (prod or {}).get("uploaded") and not (prod or {}).get("rehacer")
+        ]
+        if numeros:
+            salida[carpeta] = sorted(numeros, key=lambda x: (len(x), x))
+    return salida
+
+
 def esperando_stock(
     source: str, folders: list[str], usuario: str = "", estilo: str = "",
 ) -> dict[str, list[str]]:

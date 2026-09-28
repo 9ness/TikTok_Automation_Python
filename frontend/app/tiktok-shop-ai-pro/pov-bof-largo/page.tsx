@@ -804,7 +804,11 @@ export default function PovBofLargoPage() {
               {f.desde_copia && "🗄️ "}
               {/* La virtual no es del Drive: son los vídeos terminados que
                   esperan a que vuelva el stock, juntados de varias carpetas. */}
-              {f.virtual ? `⏳ Esperando stock (${f.esperando ?? 0})` : f.name}
+              {f.virtual
+                ? f.tipo_virtual === "rehechos"
+                  ? `🔁 Rehechos (${f.esperando ?? 0})`
+                  : `⏳ Esperando stock (${f.esperando ?? 0})`
+                : f.name}
               {/* Cuántos productos de esta carpeta tienen ya la ficha
                   enlazada: es el trabajo que hay dentro. Sin esto había que
                   entrar carpeta por carpeta para descubrir que estaba a cero.
@@ -2065,6 +2069,16 @@ function ProductoCard({
             quien rehace los clips (él o un agente por el MCP) lo ve de un
             vistazo, con la nota de qué está mal. Se apaga solo al montar el
             vídeo nuevo. */}
+        {/* Vídeo ya rehecho y sin subir: dice qué se arregló, para revisarlo
+            antes de publicarlo. Sale en la carpeta virtual «🔁 Rehechos». */}
+        {p.rehecho && !p.uploaded && !p.rehacer && (
+          <span
+            title="Vídeo rehecho: revísalo y súbelo"
+            className="inline-flex max-w-full items-center gap-1 break-words leading-tight rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-500"
+          >
+            ✅ Rehecho{p.rehecho_nota ? `: ${p.rehecho_nota}` : ""}
+          </span>
+        )}
         {!p.rehacer ? (
           <button
             type="button"

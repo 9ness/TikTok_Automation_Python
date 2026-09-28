@@ -108,7 +108,7 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
   carpeta cuenta cuántos hay; el MCP los lista todos con `para_rehacer(menu)` y los da en `avisos` y en `rehacer` con su
   nota): rehaz ese producto —fotos nuevas en Flow si hace falta, otro
   escenario para cada clip, y la nota dice qué falló— y vuelve a subir los
-  clips. La marca se quita sola al montarse el vídeo nuevo. Sin ficha («URL» en gris) → se puede hacer, pero
+  clips. La marca se quita sola al montarse el vídeo nuevo, y el producto pasa a la carpeta virtual **«🔁 Rehechos»** (arriba del todo en la lista de carpetas, con la nota de qué se arregló) hasta que el operador lo marca «📤 Subido». Sin ficha («URL» en gris) → se puede hacer, pero
   no se podrá publicar con carrito: pregunta.
 
 ## Lo que aprendimos haciendo carpetas enteras (sep 2026)

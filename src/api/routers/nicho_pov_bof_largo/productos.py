@@ -343,9 +343,26 @@ def list_folders(
         if cuantos:
             items.insert(0, FolderLargo(
                 name=pov_config.CARPETA_ESPERANDO_STOCK,
-                virtual=True, esperando=cuantos,
+                virtual=True, esperando=cuantos, tipo_virtual="esperando_stock",
             ))
     except Exception:  # noqa: BLE001 — sin esto el listado sigue valiendo
+        pass
+    # Y delante de todo, los REHECHOS sin subir: son vídeos corregidos que el
+    # operador quiere revisar y publicar juntos, sin buscarlos por carpetas.
+    try:
+        from src.nicho_pov_bof import config as pov_config
+        from src.nicho_pov_bof_largo.repos import product_repo as largo_repo
+
+        hechos = largo_repo.rehechos(
+            source, [c.get("name", "") for c in carpetas], usuario,
+        )
+        cuantos = sum(len(v) for v in hechos.values())
+        if cuantos:
+            items.insert(0, FolderLargo(
+                name=pov_config.CARPETA_REHECHOS,
+                virtual=True, esperando=cuantos, tipo_virtual="rehechos",
+            ))
+    except Exception:  # noqa: BLE001
         pass
 
     current = next(
@@ -527,6 +544,8 @@ def _listar(
             sin_stock=bool(textos.get("sin_stock")),
             rehacer=bool(mio.get("rehacer")),
             rehacer_nota=str(mio.get("rehacer_nota") or ""),
+            rehecho=bool(mio.get("rehecho")),
+            rehecho_nota=str(mio.get("rehecho_nota") or ""),
             desde_copia=desde_copia,
             clean_photo_id=(par.get("clean") or {}).get("id"),
             titled_photo_id=(par.get("titled") or {}).get("id"),
@@ -629,13 +648,19 @@ def list_productos(
 
     if pov_config.es_carpeta_virtual(folder):
         return _listar_esperando_stock(source, queue, usuario, refresh=refresh)
+    if folder == pov_config.CARPETA_REHECHOS:
+        return _listar_esperando_stock(
+            source, queue, usuario, refresh=refresh, virtual=folder,
+        )
     return _listar(source, folder, queue, usuario, refresh=refresh)
 
 
 def _listar_esperando_stock(
-    source: str, queue, usuario: str, *, refresh: bool = False,
+    source: str, queue, usuario: str, *, refresh: bool = False, virtual: str = "",
 ) -> ProductosLargoResponse:
-    """Los productos con el vídeo hecho que esperan a que vuelva el stock.
+    """Una carpeta virtual: por defecto, los productos con el vídeo hecho que
+    esperan a que vuelva el stock; con `virtual=CARPETA_REHECHOS`, los vídeos
+    rehechos que faltan por subir.
 
     Solo se leen las carpetas que Redis dice que tienen alguno —normalmente dos
     o tres—, porque listar las fotos de una carpeta cuesta una llamada al Drive
@@ -647,16 +672,18 @@ def _listar_esperando_stock(
     from src.nicho_pov_bof.services import drive_client
     from src.nicho_pov_bof_largo.repos import product_repo as largo_repo
 
+    virtual = virtual or pov_config.CARPETA_ESPERANDO_STOCK
     try:
         nombres = [f["name"] for f in drive_client.list_product_folders(source)]
     except Exception as e:  # noqa: BLE001
         raise APIError(f"No se pudo leer el catálogo: {e}", status_code=502) from e
 
-    esperando = largo_repo.esperando_stock(source, nombres, usuario)
+    if virtual == pov_config.CARPETA_REHECHOS:
+        esperando = largo_repo.rehechos(source, nombres, usuario)
+    else:
+        esperando = largo_repo.esperando_stock(source, nombres, usuario)
     if not esperando:
-        return ProductosLargoResponse(
-            source=source, folder=pov_config.CARPETA_ESPERANDO_STOCK, items=[],
-        )
+        return ProductosLargoResponse(source=source, folder=virtual, items=[])
 
     def _una(carpeta: str) -> list:
         try:
@@ -672,9 +699,7 @@ def _listar_esperando_stock(
         listas = list(pool.map(_una, esperando.keys()))
 
     items = [i for lista in listas for i in lista]
-    return ProductosLargoResponse(
-        source=source, folder=pov_config.CARPETA_ESPERANDO_STOCK, items=items,
-    )
+    return ProductosLargoResponse(source=source, folder=virtual, items=items)
 
 
 @router.get("/productos-todos", response_model=ProductosLargoResponse)
@@ -994,6 +1019,8 @@ def set_producto_estado(
             sin_stock=bool(textos.get("sin_stock")),
             rehacer=bool(mio.get("rehacer")),
             rehacer_nota=str(mio.get("rehacer_nota") or ""),
+            rehecho=bool(mio.get("rehecho")),
+            rehecho_nota=str(mio.get("rehecho_nota") or ""),
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             clip_s=int(mio.get("clip_s") or config.CLIP_TARGET_S),

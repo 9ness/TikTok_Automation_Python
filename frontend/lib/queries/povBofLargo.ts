@@ -371,9 +371,10 @@ export function useSetEstadoLargo() {
       if (vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: ["cuotas", "hoy"] });
       }
-      // El chip de la carpeta cuenta los "rehacer" y la carpeta virtual los
-      // "sin stock": sin esto se quedaban con el número viejo hasta recargar.
-      if (vars.rehacer !== undefined || vars.sin_stock !== undefined) {
+      // El chip de la carpeta cuenta los "rehacer", la virtual de stock los
+      // "sin stock" y la de rehechos los que faltan por subir: sin esto se
+      // quedaban con el número viejo hasta recargar.
+      if (vars.rehacer !== undefined || vars.sin_stock !== undefined || vars.uploaded !== undefined) {
         void qc.invalidateQueries({ queryKey: largoKeys.folders(vars.source) });
       }
     },

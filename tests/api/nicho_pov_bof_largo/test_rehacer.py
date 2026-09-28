@@ -98,3 +98,26 @@ def test_para_rehacer_recorre_todos_los_catalogos_y_solo_abre_las_marcadas(monke
     assert abiertas == ["Carpeta_26"]
     assert filas == [{"catalogo": "inventario_general", "carpeta": "Carpeta_26",
                       "producto": "6", "titulo": "Caja Shorkey", "nota": "es para niños"}]
+
+
+def test_rehechos_sin_subir_van_a_la_carpeta_virtual(monkeypatch):
+    """Rehecho y sin subir → sale; subido, o vuelto a marcar «rehacer» → no."""
+    monkeypatch.setattr(
+        product_repo, "_key",
+        lambda source, folder, usuario="", estilo="": f"{folder}",
+    )
+    docs = {
+        "Carpeta_26": {"productos": {
+            "6": {"rehecho": True, "video_path": "v.mp4"},
+            "7": {"rehecho": True, "video_path": "v.mp4", "uploaded": True},
+            "8": {"rehecho": True, "video_path": "v.mp4", "rehacer": True},
+            "9": {"video_path": "v.mp4"},
+        }},
+        "Carpeta_27": {"productos": {"1": {"rehacer": True}}},
+    }
+    monkeypatch.setattr(
+        product_repo, "get_nicho_pov_bof_largo_redis", lambda: _RedisFalso(docs),
+    )
+    assert product_repo.rehechos(
+        "inventario_general", ["Carpeta_26", "Carpeta_27"], "ness",
+    ) == {"Carpeta_26": ["6"]}
