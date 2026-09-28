@@ -7,7 +7,13 @@
   (zc1p2, zc1p4, zc1p9, zc1p10, zc2p1, zc2p4, zc2p5, zc3p2, zc3p7, zc3p9…).
   zc1p2 y zc1p10 ya los subió el operador. Rehacer con imagen sin texto si se
   quiere el rótulo en la edición.
-- Sin hacer: Zapatillas Espejo zc2p10 (imagen lista), Vintage zc2p8.
+- Hechos y subidos (28 sep): zc2p10, zc4p5 (Zapatillas Espejo), wc1p1, wc1p4 (Espejo), wc1p7 (Multi Escena); wc1p3 en curso.
+- PENDIENTES con imagen ya hecha y revisada (sin texto) en `tmp/multimodo_pendientes/`
+  + `plan.json` (catálogo, carpeta, producto, modo y prompt de movimiento): bolsos
+  accesorios C3 p1/p2/p3 (Bolso 1/2/3, mano), zapatos C4 p2 (Zapatos POV) y p1
+  (Botas 1). Solo falta el clip en Magnific → revisar → `subir_clip` con el MCP de Ana.
+- Sin empezar: Vintage zc2p8; resto de accesorios C3, zapatos C4+ y ropa C1/C2/C4+.
+
 
 ## 🎛️ Multimodo — dos rarezas vistas el 27 sep 2026
 
