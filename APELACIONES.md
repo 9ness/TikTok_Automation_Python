@@ -6,6 +6,15 @@ visibilidad reducida y producto retirado del vídeo), detectada por
 **un solo intento**, 180 días de plazo y el vídeo tiene que seguir
 **público** mientras se revisa (no borrarlo: tampoco quita la sanción).
 
+**Mejor que apelar: la «Comprobación previa» de TikTok Shop** (al añadir el
+producto al vídeo › «Haz una comprobación previa de tu vídeo»). Revisa el vídeo
+con las normas de contenido ANTES de publicarlo; con «Publicar» activado lo
+sube solo si pasa. **10 comprobaciones al día**. TikTok avisa de que el
+resultado «solo es una referencia y no garantiza el resultado final», así que
+no sustituye revisar el vídeo contra la ficha. Con la cuenta al límite de
+puntos, pasa por ahí todo lo que se publique (o, si hay más de 10, los de más
+riesgo: aparatos con pantalla o botones, packs, marcas y letra pequeña).
+
 Antes de apelar, comprueba de verdad que el vídeo no tiene fallo
 ([`revision-calidad.md`](src/agente_mcp/guias/comun/revision-calidad.md)):
 producto idéntico a la ficha pieza a pieza, voz y textos sin promesas que la
