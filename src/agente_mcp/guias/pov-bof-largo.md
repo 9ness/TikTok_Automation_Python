@@ -144,6 +144,7 @@ Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
 - **Productos con pantalla** (móviles, relojes, multímetros): pide la
   pantalla apagada o con la MISMA imagen que la foto limpia, y rechaza el
   clip si el generador la enciende con iconos o menús inventados.
+- **Que el dedo roce el producto en la imagen NO es motivo de repetirla** (lo dijo el operador): lo que se rechaza es el CLIP en que el producto se mueve, se deforma o la mano lo coge/gira.
 - **La mano**: «la mano lo señala con el dedo índice desde unos 15 cm, SIN
   tocarlo». Con productos pequeños (multímetro, powerbank) Nano Banana pone
   el dedo encima aunque se pida lo contrario → repite la imagen; un dedo
