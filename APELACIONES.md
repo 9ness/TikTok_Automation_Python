@@ -45,13 +45,34 @@ no se apela: se rehace el vídeo.
 | 19/9/2026 | Cheetos Mac'n Cheese «Four Cheesy» | envase en inglés, ficha y vídeo en español («4 Quesos») | ✅ aprobada |
 | (curso) | Esterilizador y secador de biberones | error de detección, producto idéntico | ✅ aprobada |
 | (curso) | Producto con ficha en inglés | contenido en español y ficha en parte en inglés | ✅ aprobada |
-| 28/9/2026 | MIKOMIKA espejo maquillaje LED (Inventario · Carpeta_28 · p7) | es un espejo: refleja la habitación y la mano (6 pruebas, sin fotogramas del clip 1) | ⏳ por enviar |
+| 28/9/2026 | MIKOMIKA espejo maquillaje LED (Inventario · Carpeta_28 · p7) | es un espejo: refleja la habitación y la mano (6 pruebas, sin fotogramas del clip 1) | ❌ rechazada 28/9 |
 | 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ❌ rechazada 28/9 (respuesta genérica) |
 
 Texto y pruebas de cada caso nuevo: en el Drive,
 `TIKTOK_SHOP_AI_PRO/_apelaciones/<fecha>_<producto>/` (`apelacion.txt` +
 imágenes numeradas en el orden en que se adjuntan). Cuando TikTok responda,
 actualiza la tabla con el resultado.
+
+### Qué nos dicen las dos rechazadas (FUFFI y MIKOMIKA, sep 2026)
+
+Las dos eran vídeos generados con IA donde el producto **no se veía igual en
+los dos clips** (otro móvil al lado y pantallas inventadas; espejo muy de lado,
+luces apagadas y sin los botones táctiles en un clip). La revisión humana mira
+el vídeo ENTERO, no nuestras capturas: si en algún plano el producto no es
+idéntico a la ficha, la apelación se pierde aunque las pruebas enseñen el plano
+bueno. La aprobada (Cheetos) era un vídeo sin inconsistencias y un fallo de la
+máquina explicable (idioma del envase).
+
+Por tanto:
+- **Antes de apelar, mira el vídeo PUBLICADO fotograma a fotograma.** Si algún
+  plano no coincide con la ficha, no gastes el intento: la sanción no se quita
+  borrando, así que lo que toca es no repetir el fallo.
+- Apela solo cuando el vídeo sea coherente de principio a fin y haya una causa
+  de la máquina clara (idioma, marca que no se lee, producto de aspecto raro
+  pero idéntico a la ficha).
+- La prevención vale más que la apelación: revisar con
+  [`revision-calidad.md`](src/agente_mcp/guias/comun/revision-calidad.md)
+  antes de publicar.
 
 ### Rechazada — FUFFI mini teléfono (27/9/2026)
 
