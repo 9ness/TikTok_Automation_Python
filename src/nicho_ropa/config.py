@@ -694,6 +694,10 @@ _MANO_BOTA = (
     "ningún zapato nuevo."
 )
 
+_DE_FRENTE_AL_ESPEJO = (
+    "Está SIEMPRE de frente al espejo con el móvil en la mano tapándole parte "
+    "de la cara; nunca se la ve de espaldas ni sin el móvil."
+)
 _PIERNAS_BOTA = (
     "Para que el clip tenga movimiento: ella balancea despacio el pie de la "
     "pierna cruzada, descruza y vuelve a cruzar las piernas con calma y pasa "
@@ -726,6 +730,10 @@ EXTRA_VIDEO_MULTIMODO = {
         "descalzo sigue descalzo y no aparece ningún zapato nuevo; en todo el "
         "clip hay los mismos zapatos que en la imagen."
     ),
+    # Kling giraba a la chica y la enseñaba de espaldas «haciéndose» el selfie
+    # (imposible frente a un espejo): dos de cuatro clips de ropa rechazados.
+    "mm_espejo": _DE_FRENTE_AL_ESPEJO,
+    "mm_espejo_escenas": _DE_FRENTE_AL_ESPEJO,
     "mm_zapatillas_espejo": (
         "Selfie en el espejo casi estático: ella se queda agachada en la misma "
         "postura, con los dos pies apoyados en el suelo, y con la mano libre "
