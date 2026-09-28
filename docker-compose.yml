@@ -63,7 +63,10 @@ services:
       # del host (no se sube a git — está en .gitignore).
       GOOGLE_SA_KEY_PATH: "/app/secrets/google-sa.json"
     volumes:
-      - api_temp:/app/temp_work
+      # Aquí vive la COLA (queue_state.json). En el VPS apunta al disco extra
+      # (`API_TEMP_PATH` en .env, ver deploy/SERVER_ACCESS.md › "Disco
+      # extra"); sin la variable es el volumen de siempre.
+      - ${API_TEMP_PATH:-api_temp}:/app/temp_work
       # Drive sincronizado (rclone mount en el host) → necesario para los
       # pipelines que leen TIKTOK_CR/TIKTOK_SHOP. `rshared` es CRÍTICO para
       # que las subrutas del FUSE mount de rclone se vean dentro del

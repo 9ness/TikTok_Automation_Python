@@ -20,6 +20,30 @@ revisar logs, reiniciar servicios). Para el setup inicial completo ver
 
 ---
 
+## Disco extra (Hetzner Volume, 40 GB)
+
+El disco del sistema (80 GB) se quedaba corto. Desde el 28-sep-2026 hay un
+**Volume** de 40 GB (`volume-hel1-1`, id 106974679, ext4) montado en
+`/mnt/HC_Volume_106974679` (fstab con `nofail`: si no está, el server arranca
+igual). Se amplía en caliente desde la consola de Hetzner (pestaña Volumes);
+NO se puede reducir.
+
+| Carpeta del volumen | Qué es | Quién la usa |
+|---|---|---|
+| `api_temp/` | `/app/temp_work` del container `api`: **la cola** (`queue_state.json`), subidas, vídeos intermedios | `docker-compose.yml` vía `API_TEMP_PATH` en `.env` |
+| `rclone-cache/` | caché VFS del mount del Drive (tope 15 GB / 72 h) — incluye las subidas a Drive PENDIENTES | `gdrive-mount.service` (`--cache-dir`) |
+
+Reglas:
+- Lo que crece (temporales, cachés, salidas) va al volumen; el sistema, Docker
+  (imágenes) y los repos se quedan en el disco principal.
+- Cambiar `API_TEMP_PATH` o `--cache-dir` es mover datos VIVOS: con la cola
+  parada (0 jobs `running`), parar el servicio, copiar con `rsync -aHAX`,
+  arrancar. Con una carpeta vacía se pierde la cola o las subidas pendientes.
+- Sigue valiendo lo de siempre: NUNCA `docker compose down -v`.
+- Espacio: `df -h / /mnt/HC_Volume_106974679`.
+
+---
+
 ## Conectar por SSH (PowerShell / Terminal)
 
 ```powershell

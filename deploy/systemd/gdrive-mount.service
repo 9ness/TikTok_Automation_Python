@@ -10,16 +10,21 @@ User=nebulabsai
 Group=nebulabsai
 
 # Mount RW. Estrategia:
-# - Lectura de assets: caché VFS full (30GB) acelera reusos
+# - Lectura de assets: caché VFS full (15GB) acelera reusos
 # - Escritura de outputs: rclone escribe a caché local primero y sube async
 #   a Drive en background, MoviePy no se bloquea esperando la subida
+# - La caché vive en el Volume de Hetzner (disco extra, ver
+#   deploy/SERVER_ACCESS.md › "Disco extra"), no en el disco del sistema.
+#   Para moverla: parar el mount, mover la carpeta ENTERA (lleva las subidas
+#   pendientes) y arrancar. Con una carpeta vacía esas subidas se pierden.
 # - Polling rápido (15s): cualquier asset nuevo subido desde el móvil/PC
 #   aparece en <30s en el VPS sin reiniciar nada
 ExecStart=/usr/bin/rclone mount gdrive: /home/nebulabsai/gdrive \
     --allow-other \
     --vfs-cache-mode full \
-    --vfs-cache-max-size 30G \
-    --vfs-cache-max-age 168h \
+    --cache-dir /mnt/HC_Volume_106974679/rclone-cache \
+    --vfs-cache-max-size 15G \
+    --vfs-cache-max-age 72h \
     --vfs-cache-poll-interval 15s \
     --vfs-read-chunk-size 64M \
     --vfs-read-chunk-size-limit 512M \
