@@ -87,6 +87,8 @@ export function TandasMultimodo() {
           ) + ".mp4",
       })),
       (hechos, total) => setProgreso(`${hechos}/${total}`),
+      // Son vídeos de ~10 MB: de uno en uno, la tanda tardaba minutos.
+      3,
     );
     setBajando(null);
     setProgreso("");
@@ -211,7 +213,6 @@ export function TandasMultimodo() {
                           ) : null}
                           <button
                             type="button"
-                            disabled={marcar.isPending}
                             onClick={() =>
                               marcar.mutate({
                                 carpeta: v.carpeta,

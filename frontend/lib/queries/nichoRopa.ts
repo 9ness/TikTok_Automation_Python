@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import type {
@@ -553,11 +554,39 @@ export function useTandasMultimodo(activo = true) {
   });
 }
 
-/** "Subido" de un vídeo de una tanda: la carpeta va en cada fila. */
+/** "Subido" de un vídeo de una tanda: la carpeta va en cada fila.
+ *
+ *  Se pinta AL MOMENTO (sin esperar al servidor) y no se recarga la lista: el
+ *  orden de las tandas es fijo y el dato que cambia ya está puesto. Si falla,
+ *  la fila vuelve a como estaba. */
 export function useMarcarSubidoMultimodo() {
   const qc = useQueryClient();
-  return useMutation<unknown, Error, { carpeta: string; producto: string; uploaded: boolean }>({
-    mutationFn: (body) => api.post(`${ROOT}/producto/estado`, body),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: nichoRopaKeys.all }),
+  const key = [...nichoRopaKeys.all, "multimodo-tandas"];
+  type Body = { carpeta: string; producto: string; uploaded: boolean };
+  const aplicar = (b: Body) =>
+    qc.setQueryData<TandasMultimodoResponse>(key, (d) => {
+      if (!d) return d;
+      const tandas = d.tandas.map((t) => {
+        const items = t.items.map((v) =>
+          v.carpeta === b.carpeta && v.producto === b.producto ? { ...v, uploaded: b.uploaded } : v,
+        );
+        return { ...t, items, subidos: items.filter((v) => v.uploaded).length };
+      });
+      return { ...d, tandas, subidos: tandas.reduce((n, t) => n + t.subidos, 0) };
+    });
+  return useMutation<unknown, Error, Body>({
+    mutationFn: (body) => api.post(`${ROOT}/multimodo/subido`, body),
+    onMutate: async (b) => {
+      await qc.cancelQueries({ queryKey: key });
+      aplicar(b);
+    },
+    onError: (_e, b) => {
+      aplicar({ ...b, uploaded: !b.uploaded });
+      toast.error("No se pudo guardar el «subido». Vuelve a pulsarlo.");
+    },
+    // Las carpetas de Moda Mujer enseñan el mismo «subido»: se quedan
+    // marcadas como viejas para la próxima vez, sin recargarlas ahora.
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.all, refetchType: "none" }),
   });
 }

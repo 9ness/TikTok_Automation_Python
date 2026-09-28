@@ -367,7 +367,15 @@ def multimodo_tandas(
         videos = product_repo.videos_multimodo(carpetas, usuario)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
-    videos = config.orden_para_publicar(videos)
+    try:
+        videos = product_repo.fijar_orden_multimodo(videos, usuario, config.orden_para_publicar)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    tandas_pendientes = [
+        videos[i:i + por_tanda] for i in range(0, len(videos), por_tanda)
+        if not all(x["uploaded"] for x in videos[i:i + por_tanda])
+    ]
+    _precalentar([v["video_path"] for t in tandas_pendientes[:2] for v in t])
     try:
         indice = pov_repo.urls_index()
     except Exception:  # noqa: BLE001 — sin índice, vale lo que lleve la ficha
@@ -396,6 +404,60 @@ def multimodo_tandas(
         for i in range(0, len(videos), por_tanda)
     ]
     return {"total": len(videos), "subidos": sum(1 for x in videos if x["uploaded"]), "tandas": tandas}
+
+
+_calentando: set[str] = set()
+
+
+def _precalentar(rutas: list[str]) -> None:
+    """Lee en segundo plano los vídeos de las tandas por subir.
+
+    Están en el Drive montado y el primero que se pide sin estar en la caché
+    de rclone tarda ~35 s en llegar (medido): bajar una tanda de diez se iba a
+    minutos. Leídos al abrir la pantalla, al pulsar «Bajar» ya salen del disco.
+    """
+    import threading
+
+    faltan = [r for r in rutas if r and r not in _calentando]
+    if not faltan:
+        return
+    _calentando.update(faltan)
+
+    def _leer() -> None:
+        for ruta in faltan:
+            try:
+                with open(ruta, "rb") as f:
+                    while f.read(1 << 20):
+                        pass
+            except OSError:
+                _calentando.discard(ruta)
+
+    threading.Thread(target=_leer, daemon=True).start()
+
+
+@router.post("/multimodo/subido")
+def multimodo_subido(
+    body: PrendaEstadoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """«Subido» de una fila de las tandas, sin rehacer la carpeta.
+
+    `/producto/estado` contesta con la prenda recalculada, y eso es listar la
+    carpeta entera: en frío llegó a 49 s y el botón se quedaba colgado (o el
+    móvil cortaba antes). Aquí solo se apunta lo que cambia.
+    """
+    if body.uploaded is None or not config.es_carpeta_conocida(body.carpeta):
+        raise APIError("Falta la carpeta o el estado.", status_code=400)
+    uploaded_at = int(time.time()) if body.uploaded else 0
+    try:
+        product_repo.update_personal(
+            body.carpeta, body.producto, usuario,
+            uploaded=bool(body.uploaded), uploaded_at=uploaded_at,
+        )
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    _contar_subida(f"ropa:{body.carpeta}:{body.producto}", bool(body.uploaded), usuario)
+    return {"ok": True, "uploaded": bool(body.uploaded), "uploaded_at": uploaded_at}
 
 
 @router.post("/prendas/copiar-de-pov-bof")

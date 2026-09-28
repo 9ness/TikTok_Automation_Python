@@ -170,3 +170,50 @@ class TestRotuloEnZonaSegura:
         w, h = Image.open(png).size
         assert x >= int(1080 * pov.SAFE_X[0]) and x + w <= int(1080 * pov.SAFE_X[1])
         assert y >= int(1920 * pov.SAFE_Y[0]) and y + h <= int(1920 * pov.SAFE_Y[1])
+
+
+class _RedisFalso:
+    def __init__(self):
+        self.datos = {}
+
+    def is_available(self):
+        return True
+
+    def get_json(self, key):
+        return self.datos.get(key)
+
+    def set_json(self, key, value):
+        self.datos[key] = value
+        return True
+
+
+class TestOrdenFijo:
+    """Marcar un vídeo como subido no puede mover las tandas ya bajadas."""
+
+    def _v(self, carpeta, producto, formato, t, subido=False, t_sub=0):
+        return {"carpeta": carpeta, "producto": producto, "formato": formato,
+                "video_listo_at": t, "uploaded": subido, "uploaded_at": t_sub}
+
+    def test_marcar_subido_no_reordena_y_lo_nuevo_va_al_final(self, monkeypatch):
+        falso = _RedisFalso()
+        monkeypatch.setattr(product_repo, "get_nicho_ropa_redis", lambda: falso)
+        vids = [self._v("a", str(i), f, i) for i, f in
+                enumerate(["mm_bolso_1", "mm_botas_2", "mm_espejo", "mm_bolso_2"])]
+        antes = [product_repo.clave_multimodo(v) for v in
+                 product_repo.fijar_orden_multimodo(vids, "ana", config.orden_para_publicar)]
+
+        vids[3]["uploaded"], vids[3]["uploaded_at"] = True, 99
+        vids.append(self._v("b", "1", "mm_espejo", 50))
+        despues = [product_repo.clave_multimodo(v) for v in
+                   product_repo.fijar_orden_multimodo(vids, "ana", config.orden_para_publicar)]
+        assert despues[:4] == antes
+        assert despues[4] == "b|1"
+
+    def test_un_video_que_desaparece_no_ocupa_sitio(self, monkeypatch):
+        falso = _RedisFalso()
+        monkeypatch.setattr(product_repo, "get_nicho_ropa_redis", lambda: falso)
+        vids = [self._v("a", str(i), "mm_espejo", i) for i in range(3)]
+        product_repo.fijar_orden_multimodo(vids, "ana", config.orden_para_publicar)
+        quedan = product_repo.fijar_orden_multimodo(
+            [vids[0], vids[2]], "ana", config.orden_para_publicar)
+        assert [v["producto"] for v in quedan] == ["0", "2"]

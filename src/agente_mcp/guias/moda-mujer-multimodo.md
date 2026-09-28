@@ -205,6 +205,15 @@ del multimodo (de cualquier catálogo y carpeta) de diez en diez: primero lo
 ya subido, y lo que falta MEZCLADO por tipo y formato para que la cuenta no
 se ancle (`config.orden_para_publicar`). «Bajar» baja la tanda entera.
 
+**El orden es FIJO** (`product_repo.fijar_orden_multimodo`, Redis
+`multimodo:orden:<usuario>`): se calcula una vez y lo nuevo se añade al
+final. Marcar subido NO mueve nada — antes el vídeo saltaba al bloque de
+arriba y la tanda ya bajada dejaba de coincidir con lo descargado. Para
+reordenar a propósito hay que borrar esa clave. El «subido» de las filas va
+por `POST /multimodo/subido` (ligero; `/producto/estado` rehace la carpeta
+entera y en frío tardaba ~50 s). Los vídeos de las dos primeras tandas por
+subir se leen del Drive en segundo plano al abrir la pantalla.
+
 En cada vídeo:
 
 - **✍️ Caption** copia la descripción lista para TikTok: caption del producto

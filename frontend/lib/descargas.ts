@@ -38,15 +38,31 @@ export function nombreDescarga(...partes: (string | number)[]): string {
 export async function bajarEnOrden(
   archivos: { href: string; nombre: string }[],
   onProgreso?: (hechos: number, total: number) => void,
+  /** Cuántos se piden a la vez. Se GUARDAN igual en orden: solo se adelanta
+   *  la bajada de los siguientes mientras se espera al actual. */
+  simultaneas = 1,
 ): Promise<{ bajadas: number; fallidas: number }> {
   let bajadas = 0;
   let fallidas = 0;
+  const pedir = (f: { href: string }) =>
+    fetch(f.href, { credentials: "include" }).then((res) => {
+      if (!res.ok) throw new Error(String(res.status));
+      return res.blob();
+    });
+  const enCurso: Promise<Blob>[] = [];
+  const lanzar = (j: number) => {
+    if (j < archivos.length && !enCurso[j]) {
+      enCurso[j] = pedir(archivos[j]!);
+      // Que un fallo no quede como promesa rechazada sin atender antes de
+      // llegarle el turno.
+      enCurso[j].catch(() => undefined);
+    }
+  };
   for (const [i, f] of archivos.entries()) {
     onProgreso?.(i + 1, archivos.length);
+    for (let j = i; j < i + Math.max(1, simultaneas); j++) lanzar(j);
     try {
-      const res = await fetch(f.href, { credentials: "include" });
-      if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
+      const blob = (await enCurso[i])!;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

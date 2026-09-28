@@ -195,6 +195,38 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
     return salida
 
 
+def _key_orden_multimodo(usuario: str) -> str:
+    return f"multimodo:orden:{usuario or USUARIO_HISTORICO}"
+
+
+def clave_multimodo(v: dict) -> str:
+    return f"{v['carpeta']}|{v['producto']}"
+
+
+def fijar_orden_multimodo(videos: list[dict], usuario: str, ordenar) -> list[dict]:
+    """Las tandas en el orden en que se dieron la PRIMERA vez.
+
+    Recalcularlo en cada lectura movía todo: marcar un vídeo como subido lo
+    sacaba de su tanda, y la tanda que el operador ya había bajado dejaba de
+    coincidir con lo descargado. El orden se guarda por usuario y solo se le
+    AÑADE al final lo nuevo (ordenado con `ordenar`); lo que ya tenía puesto
+    no se mueve nunca. Un vídeo que desaparece deja su hueco guardado por si
+    vuelve (rehecho), pero no ocupa sitio en las tandas.
+    """
+    r = get_nicho_ropa_redis()
+    if not r.is_available():
+        return ordenar(videos)
+    key = _key_orden_multimodo(usuario)
+    guardado = list((r.get_json(key) or {}).get("claves") or [])
+    por_clave = {clave_multimodo(v): v for v in videos}
+    vistos = set(guardado)
+    nuevos = [v for k, v in por_clave.items() if k not in vistos]
+    if nuevos:
+        guardado += [clave_multimodo(v) for v in ordenar(nuevos)]
+        r.set_json(key, {"claves": guardado})
+    return [por_clave[k] for k in guardado if k in por_clave]
+
+
 def get_product(carpeta: str, producto: str, usuario: str = "") -> dict:
     return (load(carpeta, usuario).get("productos") or {}).get(str(producto)) or {}
 
