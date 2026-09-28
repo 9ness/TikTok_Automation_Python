@@ -205,6 +205,8 @@ vídeos).
 12. `marcar(…)` solo si el operador lo pide (Subido / Escaparate / Vendió). En
     POV BOF Largo, `rehacer` + `nota_rehacer` es la marca «🔁 Rehacer»; la pone
     él al revisar y los productos marcados te salen en `avisos`.
+    **`para_rehacer(menu)`** los lista todos de una vez (todos los catálogos,
+    con catálogo, carpeta, producto y la nota de qué falló).
 13. `borrar_productos(catalogo, carpeta, productos?, confirmar=True)`: solo en
     los catálogos propios (Muestras / Tareas) y solo si el operador lo pide.
     Sin `productos` vacía la carpeta entera. No se deshace.

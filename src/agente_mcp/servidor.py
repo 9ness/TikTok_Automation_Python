@@ -49,6 +49,7 @@ montado → `videos_montados`.
 Las imágenes y los vídeos se generan SIEMPRE en la web (Flow, GenAI Pro,
 Magnific) controlando el navegador, NUNCA por API. Nunca generes nada sin
 decir antes cuánto vas a lanzar y esperar el «sí». No uses `marcar` salvo que te lo pidan.
+Si te piden rehacer lo marcado, `para_rehacer(menu)` lo lista todo con la nota.
 """
 
 mcp = MCPServer(name="tiktok-shop-ai-pro", instructions=INSTRUCCIONES)
@@ -149,6 +150,17 @@ async def carpetas(ctx: Context, menu: str, catalogo: str = "", modo: str = "") 
     if not catalogo and m.tipo != "ropa":
         return _json({"catalogos": await menus.catalogos(m, api)})
     return _json(await menus.carpetas(m, api, catalogo, modo))
+
+
+@_herramienta(structured_output=False)
+async def para_rehacer(ctx: Context, menu: str = "pov_bof_largo") -> str:
+    """Lo que el operador ha marcado «🔁 Rehacer» en TODOS los catálogos del
+    menú, con su nota (qué falló). Es de ESTE usuario (el del token) y del
+    modo de guion activo de cada catálogo, lo mismo que ve él en la web.
+    Empieza por aquí si te dice «rehaz lo marcado»: cada fila trae catalogo,
+    carpeta y producto para `plan_producto`."""
+    filas = await menus.para_rehacer(menus.menu(menu), Interno(_usuario(ctx)))
+    return _json(filas or {"nada": "No hay nada marcado para rehacer."})
 
 
 @_herramienta(structured_output=False)

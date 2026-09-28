@@ -51,6 +51,7 @@ import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { EscaparateModal } from "@/components/tiktok-shop-ai-pro/EscaparateModal";
 import { VendidosModal } from "@/components/tiktok-shop-ai-pro/VendidosModal";
 import { FotoModal } from "@/components/tiktok-shop-ai-pro/FotoModal";
+import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
 import { BotonUrl } from "@/components/tiktok-shop-ai-pro/BotonUrl";
 import { PrecioAMano } from "@/components/tiktok-shop-ai-pro/PrecioAMano";
 import { TextosDelAdmin } from "@/components/tiktok-shop-ai-pro/TextosDelAdmin";
@@ -1649,6 +1650,7 @@ function ProductoCard({
   };
 
   const [verFoto, setVerFoto] = useState(false);
+  const [verRehacer, setVerRehacer] = useState(false);
   const [verTools, setVerTools] = useState(false);
   const [verGuion, setVerGuion] = useState(false);
   const [verVoz, setVerVoz] = useState(false);
@@ -2067,11 +2069,7 @@ function ProductoCard({
           <button
             type="button"
             title="Algo está mal en el vídeo: marcarlo para rehacerlo"
-            onClick={() => {
-              const nota = window.prompt("¿Qué hay que rehacer? (opcional)", "");
-              if (nota === null) return;
-              push({ rehacer: true, rehacer_nota: nota });
-            }}
+            onClick={() => setVerRehacer(true)}
             className="inline-flex items-center gap-1 break-words leading-tight rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:border-orange-500/50 hover:text-orange-500"
           >
             🔁 Rehacer
@@ -2086,6 +2084,12 @@ function ProductoCard({
             🔁 Rehacer{p.rehacer_nota ? `: ${p.rehacer_nota}` : ""} · quitar
           </button>
         )}
+        <RehacerDialog
+          abierto={verRehacer}
+          onCerrar={() => setVerRehacer(false)}
+          titulo={`${p.producto} · ${(p.titulo || "").replace(/\s+/g, " ")}`}
+          onMarcar={(nota) => push({ rehacer: true, rehacer_nota: nota })}
+        />
         {/* Copiar el producto a un catálogo de Moda. Solo en los tuyos: las
             carpetas del curso no se copian a ningún sitio. */}
         {CATALOGOS_PROPIOS.includes(source) && (

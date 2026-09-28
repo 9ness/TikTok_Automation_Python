@@ -68,3 +68,33 @@ def test_el_resumen_del_mcp_avisa_con_la_nota():
     })
     assert r["rehacer"] == "el mando cambia"
     assert any("REHACER" in a and "el mando cambia" in a for a in r["avisos"])
+
+
+def test_para_rehacer_recorre_todos_los_catalogos_y_solo_abre_las_marcadas(monkeypatch):
+    import asyncio
+
+    from src.agente_mcp import menus
+
+    abiertas = []
+
+    async def catalogos(m, api):
+        return [{"clave": "inventario_general"}, {"clave": "tareas_productos"}]
+
+    async def carpetas(m, api, cat, modo=""):
+        if cat == "inventario_general":
+            return [{"carpeta": "Carpeta_25"}, {"carpeta": "Carpeta_26", "rehacer": 1}]
+        return [{"carpeta": "Tareas Productos 8"}]
+
+    async def productos_crudos(c):
+        abiertas.append(c.carpeta)
+        return [{"producto": "5", "titulo": "Otra"},
+                {"producto": "6", "titulo": "Caja  Shorkey", "rehacer": True,
+                 "rehacer_nota": " es para niños "}]
+
+    monkeypatch.setattr(menus, "catalogos", catalogos)
+    monkeypatch.setattr(menus, "carpetas", carpetas)
+    monkeypatch.setattr(menus, "productos_crudos", productos_crudos)
+    filas = asyncio.run(menus.para_rehacer(menus.menu("pov_bof_largo"), object()))
+    assert abiertas == ["Carpeta_26"]
+    assert filas == [{"catalogo": "inventario_general", "carpeta": "Carpeta_26",
+                      "producto": "6", "titulo": "Caja Shorkey", "nota": "es para niños"}]

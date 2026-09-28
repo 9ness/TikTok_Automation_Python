@@ -197,6 +197,26 @@ async def carpetas(m: Menu, api: Interno, catalogo: str, modo: str = "") -> list
     ]
 
 
+async def para_rehacer(m: Menu, api: Interno) -> list[dict]:
+    """Todo lo marcado «🔁 Rehacer» del menú, en TODOS sus catálogos, con la
+    nota del operador. Solo recorre las carpetas cuyo contador lo dice."""
+    if m.tipo not in ("pov", "largo"):
+        return []
+    out = []
+    for cat in [c["clave"] for c in await catalogos(m, api)]:
+        for f in await carpetas(m, api, cat):
+            if not f.get("rehacer"):
+                continue
+            c = Ctx(m, api, cat, f["carpeta"])
+            for p in await productos_crudos(c):
+                if p.get("rehacer"):
+                    out.append({"catalogo": cat, "carpeta": f["carpeta"],
+                                "producto": p.get("producto"),
+                                "titulo": " ".join(str(p.get("titulo") or "").split()),
+                                "nota": str(p.get("rehacer_nota") or "").strip()})
+    return out
+
+
 def _modo_ropa(m: Menu, modo: str) -> str:
     modo = (modo or "").strip()
     if not modo:

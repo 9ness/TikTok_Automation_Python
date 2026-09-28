@@ -105,7 +105,7 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
   falla, vuelve a subir los clips.
 - «🚫 Sin stock» → sáltalo.
 - «🔁 Rehacer» (lo marca el operador al revisar un vídeo; el chip de la
-  carpeta cuenta cuántos hay y el MCP lo da en `avisos` y en `rehacer` con su
+  carpeta cuenta cuántos hay; el MCP los lista todos con `para_rehacer(menu)` y los da en `avisos` y en `rehacer` con su
   nota): rehaz ese producto —fotos nuevas en Flow si hace falta, otro
   escenario para cada clip, y la nota dice qué falló— y vuelve a subir los
   clips. La marca se quita sola al montarse el vídeo nuevo. Sin ficha («URL» en gris) → se puede hacer, pero
