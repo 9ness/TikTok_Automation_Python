@@ -696,7 +696,9 @@ _MANO_BOTA = (
 
 _DE_FRENTE_AL_ESPEJO = (
     "Está SIEMPRE de frente al espejo con el móvil en la mano tapándole parte "
-    "de la cara; nunca se la ve de espaldas ni sin el móvil."
+    "de la cara; nunca se la ve de espaldas ni sin el móvil. El móvil va "
+    "siempre sujeto en su mano: nunca se queda flotando ni suspendido en el "
+    "aire."
 )
 _PIERNAS_BOTA = (
     "Para que el clip tenga movimiento: ella balancea despacio el pie de la "
@@ -742,7 +744,8 @@ EXTRA_VIDEO_MULTIMODO = {
         "móvil sigue siendo el mismo móvil en su mano. Todo ocurre DENTRO del "
         "reflejo del espejo: delante del espejo no aparece ninguna pierna, pie "
         "ni zapato. Hay exactamente dos zapatillas en todo el clip, las dos en "
-        "sus pies."
+        "sus pies. La mano no agarra el talón ni tira de ninguna zapatilla: "
+        "las dos conservan su forma y su color en todo el clip."
     ),
 }
 
