@@ -54,8 +54,12 @@ repetir (hasta el máximo que acordaste con el operador).
       mano lo **coge, lo empuja o lo gira**. Motivo de rechazo más frecuente
       en los clips mudos de Kling; casi siempre en el último segundo.
 - [ ] **Aparecen o desaparecen objetos** de la escena (un teclado y una
-      alfombrilla que no estaban, herramientas nuevas). Que se enciendan
-      pantallas o cambie lo que muestra un monitor sí vale.
+      alfombrilla que no estaban, herramientas nuevas). Un monitor del
+      fondo que cambia de imagen vale; pero si el PRODUCTO tiene pantalla y
+      el generador se la enciende con iconos o menús inventados, rechazar
+      (vídeo del mini móvil sancionado, apelación rechazada).
+- [ ] En la escena hay **otro objeto de la misma categoría** que el producto
+      (otro móvil, otra botella, otra crema): rechazar la imagen.
 - [ ] **Al producto le salen detalles que no tenía**: puertos USB, luces
       LED, botones, costuras, tapas. Pasó con un powerbank: en la imagen
       no se veía el canto y a mitad de clip Kling le «dibujó» el puerto y

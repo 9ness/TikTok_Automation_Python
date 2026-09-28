@@ -124,6 +124,14 @@ Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
   una bici enteras en el plano, señaladas desde lejos), para quién es
   (infantil ≠ adulto) y si es un pack (salen TODAS las piezas). Quita de la
   foto medidas, flechas y sellos tipo «TOP PICKS».
+- **Para dar escala, nunca un objeto de la MISMA categoría** que el producto:
+  nada de otro móvil junto al mini móvil, otra botella junto al termo, otra
+  crema junto a la crema. Usa objetos neutros (taza, llaves, un libro). El
+  vídeo del mini móvil con un móvil normal al lado se sancionó (-24) y la
+  apelación se rechazó (ver `APELACIONES.md`).
+- **Productos con pantalla** (móviles, relojes, multímetros): pide la
+  pantalla apagada o con la MISMA imagen que la foto limpia, y rechaza el
+  clip si el generador la enciende con iconos o menús inventados.
 - **La mano**: «la mano lo señala con el dedo índice desde unos 15 cm, SIN
   tocarlo». Con productos pequeños (multímetro, powerbank) Nano Banana pone
   el dedo encima aunque se pida lo contrario → repite la imagen; un dedo

@@ -45,12 +45,29 @@ no se apela: se rehace el vídeo.
 | 19/9/2026 | Cheetos Mac'n Cheese «Four Cheesy» | envase en inglés, ficha y vídeo en español («4 Quesos») | ✅ aprobada |
 | (curso) | Esterilizador y secador de biberones | error de detección, producto idéntico | ✅ aprobada |
 | (curso) | Producto con ficha en inglés | contenido en español y ficha en parte en inglés | ✅ aprobada |
-| 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ⏳ enviada 27/9 |
+| 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ❌ rechazada 28/9 (respuesta genérica) |
 
 Texto y pruebas de cada caso nuevo: en el Drive,
 `TIKTOK_SHOP_AI_PRO/_apelaciones/<fecha>_<producto>/` (`apelacion.txt` +
 imágenes numeradas en el orden en que se adjuntan). Cuando TikTok responda,
 actualiza la tabla con el resultado.
+
+### Rechazada — FUFFI mini teléfono (27/9/2026)
+
+Respuesta genérica («infracción válida de nuestras pautas»), sin decir qué
+vio. Lo más probable, y es de NUESTRO vídeo, no de la apelación:
+
+- En una escena pusimos **otro teléfono** (uno normal) al lado para que se
+  viera lo pequeño que es. En un vídeo que vende un teléfono, un segundo
+  teléfono es «otro producto» para el revisor.
+- En esa misma escena el generador **encendió las pantallas con iconos de
+  apps inventados**, y la ficha enseña otro fondo de pantalla y la trasera
+  con doble cámara.
+
+Lección: si el vídeo lleva un objeto de la MISMA categoría que el producto,
+la apelación no se sostiene; alegarlo como «causa probable» es admitir que
+está. Esos vídeos no se apelan: se rehacen sin ese objeto (ver
+[`pov-bof-largo.md`](src/agente_mcp/guias/pov-bof-largo.md)).
 
 ### Texto aprobado — Cheetos (19/9/2026)
 
