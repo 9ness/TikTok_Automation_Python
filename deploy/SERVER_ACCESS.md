@@ -39,6 +39,14 @@ Reglas:
 - Cambiar `API_TEMP_PATH` o `--cache-dir` es mover datos VIVOS: con la cola
   parada (0 jobs `running`), parar el servicio, copiar con `rsync -aHAX`,
   arrancar. Con una carpeta vacía se pierde la cola o las subidas pendientes.
+- Parar `gdrive-mount` con la API arrancada deja el mount COLGADO
+  ("Transport endpoint is not connected": el container lo tiene en uso y
+  `fusermount3 -u` falla con "busy"; el `start` siguiente falla el
+  `AssertPathIsDirectory`). Salida: `fusermount3 -uz ~/gdrive`, `systemctl
+  reset-failed gdrive-mount && systemctl start gdrive-mount` y RECREAR el
+  container api (`docker compose up -d --no-deps --force-recreate api`, con 0
+  jobs running): el suyo se queda con el mount muerto aunque el host ya vea
+  el Drive. Pasó el 28-sep-2026 al mover la caché.
 - Sigue valiendo lo de siempre: NUNCA `docker compose down -v`.
 - Espacio: `df -h / /mnt/HC_Volume_106974679`.
 
