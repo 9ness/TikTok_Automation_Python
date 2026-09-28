@@ -535,6 +535,11 @@ export interface VideoMultimodo {
   emojis?: string;
   /** Id para `/foto` de la foto limpia: la miniatura de la fila. */
   foto_id?: string;
+  /** Marcado «🔁 Rehacer» (con la nota de qué falla) y, cuando llega el
+   *  vídeo nuevo, «rehecho» para revisarlo antes de subirlo. */
+  rehacer?: boolean;
+  rehacer_nota?: string;
+  rehecho?: boolean;
 }
 
 export interface TandasMultimodoResponse {
@@ -551,6 +556,41 @@ export function useTandasMultimodo(activo = true) {
     queryFn: () => api.get<TandasMultimodoResponse>(`${ROOT}/multimodo/tandas`),
     staleTime: 30 * 1000,
     enabled: activo,
+  });
+}
+
+/** «🔁 Rehacer» de un vídeo de las tandas, con la nota de qué falla. Se
+ *  pinta al momento, como el «subido». */
+export function useRehacerMultimodo() {
+  const qc = useQueryClient();
+  const key = [...nichoRopaKeys.all, "multimodo-tandas"];
+  type Body = { carpeta: string; producto: string; rehacer: boolean; rehacer_nota?: string };
+  const aplicar = (b: Body) =>
+    qc.setQueryData<TandasMultimodoResponse>(key, (d) =>
+      d && {
+        ...d,
+        tandas: d.tandas.map((t) => ({
+          ...t,
+          items: t.items.map((v) =>
+            v.carpeta === b.carpeta && v.producto === b.producto
+              ? { ...v, rehacer: b.rehacer, rehacer_nota: b.rehacer ? (b.rehacer_nota ?? "") : "" }
+              : v,
+          ),
+        })),
+      },
+    );
+  return useMutation<unknown, Error, Body, TandasMultimodoResponse | undefined>({
+    mutationFn: (body) => api.post(`${ROOT}/multimodo/rehacer`, body),
+    onMutate: async (b) => {
+      await qc.cancelQueries({ queryKey: key });
+      const antes = qc.getQueryData<TandasMultimodoResponse>(key);
+      aplicar(b);
+      return antes;
+    },
+    onError: (_e, _b, antes) => {
+      if (antes) qc.setQueryData(key, antes);
+      toast.error("No se pudo guardar el «rehacer». Vuelve a intentarlo.");
+    },
   });
 }
 

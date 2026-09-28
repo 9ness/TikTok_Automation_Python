@@ -158,7 +158,8 @@ async def para_rehacer(ctx: Context, menu: str = "pov_bof_largo") -> str:
     menú, con su nota (qué falló). Es de ESTE usuario (el del token) y del
     modo de guion activo de cada catálogo, lo mismo que ve él en la web.
     Empieza por aquí si te dice «rehaz lo marcado»: cada fila trae catalogo,
-    carpeta y producto para `plan_producto`."""
+    carpeta y producto para `plan_producto`. En `moda_mujer_multimodo` sale de
+    las tandas y trae además `modo` (el formato a repetir) y `tanda`."""
     filas = await menus.para_rehacer(menus.menu(menu), Interno(_usuario(ctx)))
     return _json(filas or {"nada": "No hay nada marcado para rehacer."})
 

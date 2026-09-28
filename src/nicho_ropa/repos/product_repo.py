@@ -69,7 +69,11 @@ def _cerrojo(carpeta: str, espera_s: float = 10.0):
 #
 # El histórico (lo de antes de separar) se queda en el documento común y es
 # de `ness`, igual que en el POV BOF: así no hay que migrar lo suyo.
-PERSONALES = ("modos", "uploaded", "uploaded_at", "video_path", "video_listo_at", "sold")
+PERSONALES = (
+    "modos", "uploaded", "uploaded_at", "video_path", "video_listo_at", "sold",
+    # «🔁 Rehacer» de las tandas del multimodo: es del vídeo de cada uno.
+    "rehacer", "rehacer_nota", "rehacer_at", "rehecho",
+)
 USUARIO_HISTORICO = "ness"
 
 
@@ -189,6 +193,9 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
                 # Lo que se pega en TikTok al publicar, sin abrir la carpeta.
                 "caption": str(vista.get("caption") or ""),
                 "emojis": str(vista.get("emojis") or ""),
+                "rehacer": bool(vista.get("rehacer")),
+                "rehacer_nota": str(vista.get("rehacer_nota") or ""),
+                "rehecho": bool(vista.get("rehecho")),
                 **v,
             })
     salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))
@@ -466,6 +473,11 @@ def guardar_video(
         if "primer_listo_at" not in hueco:
             hueco["primer_listo_at"] = int(hueco.get("video_listo_at") or listo_at)
         hueco.update({"video_path": ruta, "video_listo_at": listo_at})
+        # Estaba marcado «🔁 Rehacer» y llega el vídeo nuevo: deja de estar
+        # pendiente y queda como rehecho (para revisarlo antes de subirlo).
+        if prod.pop("rehacer", None):
+            prod.pop("rehacer_at", None)
+            prod["rehecho"] = True
         # El de siempre se sigue escribiendo para el modo por defecto: hay
         # código (y datos) que lo lee de la raíz.
         if modo == config.MODO_DEFECTO:

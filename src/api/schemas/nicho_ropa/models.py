@@ -289,6 +289,10 @@ class PrendaEstadoRequest(BaseModel):
     uploaded: bool | None = None
     # Vendió. Va al ranking común por usuario, igual que en el POV BOF Largo.
     sold: bool | None = None
+    # «🔁 Rehacer» un vídeo de las tandas del multimodo, con la nota de qué
+    # falla (la lee quien rehace el clip, persona o agente por el MCP).
+    rehacer: bool | None = None
+    rehacer_nota: str | None = None
 
 
 class VideoRopaUploadResponse(BaseModel):

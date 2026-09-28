@@ -460,6 +460,31 @@ def multimodo_subido(
     return {"ok": True, "uploaded": bool(body.uploaded), "uploaded_at": uploaded_at}
 
 
+@router.post("/multimodo/rehacer")
+def multimodo_rehacer(
+    body: PrendaEstadoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """«🔁 Rehacer» un vídeo de las tandas, con la nota de qué falla.
+
+    Es del vídeo de ESE usuario. Se quita solo cuando se monta el vídeo
+    nuevo (`product_repo.guardar_video`), que además lo deja como «rehecho»;
+    el vídeo nuevo conserva su puesto en la tanda.
+    """
+    if body.rehacer is None or not config.es_carpeta_conocida(body.carpeta):
+        raise APIError("Falta la carpeta o el estado.", status_code=400)
+    nota = (body.rehacer_nota or "").strip()[:400]
+    campos = {"rehacer": bool(body.rehacer), "rehacer_at": int(time.time()) if body.rehacer else 0,
+              "rehacer_nota": nota if body.rehacer else ""}
+    if body.rehacer:
+        campos["rehecho"] = False
+    try:
+        product_repo.update_personal(body.carpeta, body.producto, usuario, **campos)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, **campos}
+
+
 @router.post("/prendas/copiar-de-pov-bof")
 def copiar_de_pov_bof(
     genero: Annotated[str, Query()],

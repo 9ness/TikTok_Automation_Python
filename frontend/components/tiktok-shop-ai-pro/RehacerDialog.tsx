@@ -36,12 +36,15 @@ export function RehacerDialog({
   onCerrar,
   titulo,
   onMarcar,
+  motivos = MOTIVOS,
 }: {
   abierto: boolean;
   onCerrar: () => void;
   /** Título del producto, para saber cuál se está marcando. */
   titulo: string;
   onMarcar: (nota: string) => void;
+  /** Los motivos rápidos; por defecto, los de los clips de producto. */
+  motivos?: string[];
 }) {
   const [nota, setNota] = useState("");
   const area = useRef<HTMLTextAreaElement>(null);
@@ -80,7 +83,7 @@ export function RehacerDialog({
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">¿Qué falla? Toca para añadirlo</p>
           <div className="flex flex-wrap gap-1.5">
-            {MOTIVOS.map((m) => {
+            {motivos.map((m) => {
               const puesto = nota.toLowerCase().includes(m.toLowerCase());
               return (
                 <button

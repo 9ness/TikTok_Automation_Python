@@ -200,6 +200,18 @@ async def carpetas(m: Menu, api: Interno, catalogo: str, modo: str = "") -> list
 async def para_rehacer(m: Menu, api: Interno) -> list[dict]:
     """Todo lo marcado «🔁 Rehacer» del menú, en TODOS sus catálogos, con la
     nota del operador. Solo recorre las carpetas cuyo contador lo dice."""
+    if m.modalidad == "multimodo":
+        # En el multimodo se marca desde las tandas, vídeo a vídeo.
+        from src.nicho_ropa import config as ropa_config
+
+        datos = await api.get(f"{ROPA}/multimodo/tandas")
+        return [
+            {"catalogo": ropa_config.catalogo_de_genero(v["carpeta"].split("__")[0]),
+             "carpeta": v["carpeta"], "producto": v["producto"], "modo": v["formato"],
+             "tanda": t["numero"], "titulo": " ".join(str(v.get("titulo") or "").split()),
+             "nota": str(v.get("rehacer_nota") or "").strip()}
+            for t in datos.get("tandas", []) for v in t["items"] if v.get("rehacer")
+        ]
     if m.tipo not in ("pov", "largo"):
         return []
     out = []

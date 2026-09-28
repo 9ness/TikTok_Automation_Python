@@ -222,6 +222,14 @@ En cada vídeo:
 - **«Marcar subido»** marca el PRODUCTO como subido en su carpeta (el mismo
   «Subido» de su tarjeta, por usuario y con fecha): no hay que ir a la carpeta
   a marcarlo otra vez. Vuelve a pulsarlo para desmarcar.
+- **🔁** marca el vídeo para rehacerlo, con la nota de qué falla (móvil
+  flotando, piernas de más…). `para_rehacer(menu="moda_mujer_multimodo")`
+  lo lista con `modo` y `tanda`. Al subir el clip nuevo por `subir_clip` y
+  montarse, el «rehacer» se quita solo, la fila sale «✨ Rehecho» y el vídeo
+  CONSERVA su puesto en la tanda. Lo normal es que no haga falta: revisa
+  cada clip entero (ver «Revisión» arriba) antes de subirlo — un objeto
+  suspendido en el aire, algo que aparece de golpe o una chica de espaldas
+  al espejo son sanción.
 
 No marques Subido/Escaparate/Vendió salvo que te lo pidan: eso es de quien
 publica.

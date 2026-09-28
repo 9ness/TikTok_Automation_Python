@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, Loader2 } from "lucide-react";
+import { Check, Copy, Download, Loader2, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -9,12 +9,27 @@ import {
   buildFotoRopaUrl,
   buildVideoRopaUrl,
   useMarcarSubidoMultimodo,
+  useRehacerMultimodo,
   useTandasMultimodo,
   type VideoMultimodo,
 } from "@/lib/queries/nichoRopa";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
+
+/** Los fallos que más se repiten en los clips del multimodo (con chica o
+ *  con mano): se revisan antes de subir, porque cada uno es una sanción. */
+const MOTIVOS_MULTIMODO = [
+  "Objeto flotando o suspendido en el aire (móvil, bolso…)",
+  "Aparece o desaparece algo de golpe",
+  "Manos, piernas o pies de más o deformes",
+  "Se ve de espaldas o sin el móvil en el espejo",
+  "La prenda o el producto cambia de color o forma",
+  "Zapato o pieza de más",
+  "Texto o letras en el vídeo",
+  "Demasiado estático",
+];
 
 /** Los vídeos hechos del Multimodo en tandas de diez.
  *
@@ -29,6 +44,8 @@ export function TandasMultimodo() {
   const captionDe = (v: { caption?: string; emojis?: string }) =>
     v.caption ? [v.caption, v.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : "";
   const marcar = useMarcarSubidoMultimodo();
+  const rehacer = useRehacerMultimodo();
+  const [aRehacer, setARehacer] = useState<VideoMultimodo | null>(null);
   const [bajando, setBajando] = useState<number | null>(null);
   const [bajandoUno, setBajandoUno] = useState<string | null>(null);
   // "3/10" mientras baja, como al bajar los vídeos de una carpeta.
@@ -132,6 +149,11 @@ export function TandasMultimodo() {
                     >
                       {t.subidos}/{t.items.length} subidos
                     </span>
+                    {t.items.some((x) => x.rehacer) ? (
+                      <span className="ml-1 rounded-full bg-orange-500/15 px-1.5 py-px text-[10px] text-orange-500">
+                        🔁 {t.items.filter((x) => x.rehacer).length}
+                      </span>
+                    ) : null}
                   </button>
                   <button
                     type="button"
@@ -214,6 +236,22 @@ export function TandasMultimodo() {
                           <button
                             type="button"
                             onClick={() =>
+                              v.rehacer
+                                ? rehacer.mutate({ carpeta: v.carpeta, producto: v.producto, rehacer: false })
+                                : setARehacer(v)
+                            }
+                            title={v.rehacer ? "Quitar «rehacer»" : "Marcar para rehacer"}
+                            className={`flex shrink-0 items-center rounded-md border px-1.5 py-1 ${
+                              v.rehacer
+                                ? "border-orange-500/60 bg-orange-500/15 text-orange-500"
+                                : "border-border/60 text-muted-foreground hover:text-orange-500"
+                            }`}
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
                               marcar.mutate({
                                 carpeta: v.carpeta,
                                 producto: v.producto,
@@ -235,6 +273,15 @@ export function TandasMultimodo() {
                             )}
                           </button>
                         </div>
+                        {v.rehacer ? (
+                          <p className="break-words pl-6 text-[10px] text-orange-500">
+                            🔁 Rehacer{v.rehacer_nota ? `: ${v.rehacer_nota}` : ""}
+                          </p>
+                        ) : v.rehecho && !v.uploaded ? (
+                          <p className="pl-6 text-[10px] text-sky-400">
+                            ✨ Rehecho — revísalo antes de subirlo
+                          </p>
+                        ) : null}
                         <div className="flex min-w-0 flex-wrap items-center gap-1 pl-6">
                           <CopyChip label="✍️ Caption" text={captionDe(v)} siempre />
                           {v.musica?.busqueda ? (
@@ -259,6 +306,21 @@ export function TandasMultimodo() {
           })}
         </div>
       )}
+      <RehacerDialog
+        abierto={aRehacer !== null}
+        onCerrar={() => setARehacer(null)}
+        titulo={aRehacer ? `${aRehacer.titulo || `Producto ${aRehacer.producto}`} · ${aRehacer.formato_label}` : ""}
+        motivos={MOTIVOS_MULTIMODO}
+        onMarcar={(nota) =>
+          aRehacer &&
+          rehacer.mutate({
+            carpeta: aRehacer.carpeta,
+            producto: aRehacer.producto,
+            rehacer: true,
+            rehacer_nota: nota,
+          })
+        }
+      />
     </Caja>
   );
 }

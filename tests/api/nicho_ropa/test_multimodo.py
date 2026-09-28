@@ -217,3 +217,30 @@ class TestOrdenFijo:
         quedan = product_repo.fijar_orden_multimodo(
             [vids[0], vids[2]], "ana", config.orden_para_publicar)
         assert [v["producto"] for v in quedan] == ["0", "2"]
+
+
+class _RedisDocs(_RedisFalso):
+    def set_nx(self, key, value, ttl_s):
+        return True
+
+    def delete(self, key):
+        return True
+
+    def mget_json(self, keys):
+        return [self.datos.get(k) for k in keys]
+
+
+class TestRehacer:
+    def test_el_video_nuevo_quita_el_rehacer_y_queda_rehecho(self, monkeypatch):
+        falso = _RedisDocs()
+        monkeypatch.setattr(product_repo, "get_nicho_ropa_redis", lambda: falso)
+        c = "mujer_web__Carpeta_3"
+        product_repo.guardar_video(c, "3", "mm_espejo", "/v1.mp4", 1, "ana")
+        product_repo.update_personal(c, "3", "ana", rehacer=True, rehacer_nota="móvil en el aire")
+        v = product_repo.videos_multimodo([c], "ana")[0]
+        assert v["rehacer"] and v["rehacer_nota"] == "móvil en el aire" and not v["rehecho"]
+
+        product_repo.guardar_video(c, "3", "mm_espejo", "/v2.mp4", 2, "ana")
+        v = product_repo.videos_multimodo([c], "ana")[0]
+        assert not v["rehacer"] and v["rehecho"]
+        assert v["video_path"] == "/v2.mp4" and v["primer_listo_at"] == 1
