@@ -23,6 +23,10 @@ repetir (hasta el máximo que acordaste con el operador).
       boquilla, tapa, cable, estuche…).
 - [ ] El logo, la marca o la etiqueta cambian, desaparecen o salen
       deformados.
+- [ ] Falta un **detalle pequeño de la ficha** que en otra escena sí sale
+      (los botones táctiles de un espejo LED, un logo, un piloto): las dos
+      imágenes de un mismo vídeo tienen que enseñar el producto igual. Suele
+      pasar cuando se ve muy de lado; pídelo de frente.
 - [ ] La **letra pequeña del envase está inventada** o mal escrita (pasa
       mucho: «FOIL'N CHEESY» en vez de «FOUR CHEESY»). Para TikTok eso es
       «alterar el aspecto del producto».
