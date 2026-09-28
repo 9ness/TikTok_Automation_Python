@@ -37,6 +37,10 @@ repetir (hasta el máximo que acordaste con el operador).
 - [ ] Texto, precios, pegatinas de oferta, marcas de agua o logos que no
       están en el producto.
 - [ ] No es vertical 9:16 (3:4 en Creativos Pro).
+- [ ] **Sale un niño o un bebé** (aunque sea al fondo, de espaldas o en una
+      foto realista de la pared): rechazar SIEMPRE, también en productos
+      infantiles. TikTok lo sanciona fuerte; la escena infantil va sin
+      personas.
 - [ ] Persona que parece **menor de edad**, desnudez o poses sexualizadas
       (bikinis y lencería: solo si el prompt del curso lo contempla, y sin
       poses provocativas).

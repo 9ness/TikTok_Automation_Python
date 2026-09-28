@@ -124,6 +124,12 @@ Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
   una bici enteras en el plano, señaladas desde lejos), para quién es
   (infantil ≠ adulto) y si es un pack (salen TODAS las piezas). Quita de la
   foto medidas, flechas y sellos tipo «TOP PICKS».
+- **NUNCA niños ni bebés** en imágenes ni clips, tampoco en productos
+  infantiles (juguetes, organizadores de LEGO, cosas de bebé): TikTok lo
+  sanciona fuerte. La escena infantil va SIN personas (un cuarto de niño,
+  una sala de juegos) y la única persona es la mano adulta del POV. Escríbelo
+  en la pista («sin ningún niño ni persona aparte de la mano») y revisa que
+  no se cuele ninguno, ni al fondo, ni en fotos o dibujos realistas.
 - **Para dar escala, nunca un objeto de la MISMA categoría** que el producto:
   nada de otro móvil junto al mini móvil, otra botella junto al termo, otra
   crema junto a la crema. Usa objetos neutros (taza, llaves, un libro). El
