@@ -135,6 +135,13 @@ Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
   crema junto a la crema. Usa objetos neutros (taza, llaves, un libro). El
   vídeo del mini móvil con un móvil normal al lado se sancionó (-24) y la
   apelación se rechazó (ver `APELACIONES.md`).
+- **Productos con luz** (espejos LED, lámparas, tiras LED): las luces
+  ENCENDIDAS de principio a fin, como en la ficha. Kling apagó las bombillas
+  a mitad del clip de un espejo LED y además le cambió el grosor del marco;
+  el vídeo se sancionó (-24). Rechaza el clip si la luz se apaga o cambia.
+- **Espejos**: el reflejo confunde al generador (dobles marcos, manos
+  duplicadas). Ponlo de frente o ligeramente girado, nunca muy de lado, y
+  revisa que el marco no cambie de forma.
 - **Productos con pantalla** (móviles, relojes, multímetros): pide la
   pantalla apagada o con la MISMA imagen que la foto limpia, y rechaza el
   clip si el generador la enciende con iconos o menús inventados.
