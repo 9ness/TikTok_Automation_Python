@@ -1,3 +1,14 @@
+## 🎛️ Multimodo (Ana) — pendiente a 28 sep 2026
+
+- Rehechos con movimiento real: los 18 bolsos (mano que acaricia el bolso) y
+  las 6 botas altas más quietas (piernas + mano). Todos subidos a Ana.
+- Quedan con la imagen VIEJA (rótulo pegado en la foto, puede caer fuera de la
+  zona segura): Vintage Botas 1/2 y Botas Largas 1 de antes del 27 sep
+  (zc1p2, zc1p4, zc1p9, zc1p10, zc2p1, zc2p4, zc2p5, zc3p2, zc3p7, zc3p9…).
+  zc1p2 y zc1p10 ya los subió el operador. Rehacer con imagen sin texto si se
+  quiere el rótulo en la edición.
+- Sin hacer: Zapatillas Espejo zc2p10 (imagen lista), Vintage zc2p8.
+
 ## 🎛️ Multimodo — dos rarezas vistas el 27 sep 2026
 
 - **`/multimodo/tandas` devolvió datos atrasados** dos veces (6 en vez de 11, y 11
