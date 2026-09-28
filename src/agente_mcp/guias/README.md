@@ -36,6 +36,10 @@ los mismos en los dos casos.
    una foto o un clip generado vale o se repite.
 5. La guía del **menú** que te han pedido (tabla de abajo).
 
+Si el operador trae una **sanción de TikTok Shop** de un vídeo ya publicado,
+el método para apelar (y cuándo no merece la pena) está en `APELACIONES.md`,
+en la raíz del repo.
+
 ## 2. Una guía por menú
 
 | Menú de la app (sidebar «Tiktok Shop AI Pro») | Ruta | Guía |
