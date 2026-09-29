@@ -1,10 +1,19 @@
 # Navegador en el VPS — para que un agente genere en Flow / Magnific sin el PC
 
-> **Estado (sep 2026): NO está montado.** Aquí está cómo montarlo y cómo lo usa
-> un agente. Si un agente del VPS (Claude Code, Codex) necesita generar
-> imágenes o clips y no hay navegador, que se lo proponga al operador con este
-> documento. **No lo montes sin su «sí»**: hace falta que él entre en sus
-> cuentas.
+> **Estado (29-sep-2026): MONTADO, a demanda.** Instalado en el VPS actual
+> (CX33, 8 GB) como PRUEBA de si Google y Magnific dejan entrar desde la IP del
+> servidor. No arranca solo: `navegador on` / `navegador off` / `navegador estado`
+> (script `/usr/local/bin/navegador`). Encendido gasta ~0,7-1 GB reales de RAM
+> (cgroup; sumar RSS engaña) y tiene tope de 2,2 GB (`MemoryHigh`) / 2,8 GB
+> (`MemoryMax`) y `OOMScoreAdjust=900`: si falta memoria muere Chrome, no la API.
+> No lo dejes encendido con la cola de vídeos llena.
+>
+> **Cómo entra el operador:** `deploy/navegador_vps.ps1` (túnel SSH a
+> `localhost:6080`, nada abierto a internet). Contraseña de la pantalla:
+> `ssh root@62.238.19.31 "cat /root/navegador_vnc_password.txt"` (aleatoria, solo
+> root; no la pegues en chats). Perfil, caché y descargas viven en el disco extra
+> (`/mnt/HC_Volume_106974679/navegador/{perfil,cache,descargas}`).
+> **Sin Tailscale**: noVNC y CDP escuchan solo en 127.0.0.1.
 
 ## Para qué
 
