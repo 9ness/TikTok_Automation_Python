@@ -533,6 +533,8 @@ export interface VideoMultimodo {
   musica?: { busqueda: string; alternativas: string[]; estilo: string };
   caption?: string;
   emojis?: string;
+  /** Título literal del producto en TikTok, para buscarlo a mano. */
+  titulo_tiktok_completo?: string;
   /** Id para `/foto` de la foto limpia: la miniatura de la fila. */
   foto_id?: string;
   /** Marcado «🔁 Rehacer» (con la nota de qué falla) y, cuando llega el

@@ -284,6 +284,15 @@ export function TandasMultimodo() {
                         ) : null}
                         <div className="flex min-w-0 flex-wrap items-center gap-1 pl-6">
                           <CopyChip label="✍️ Caption" text={captionDe(v)} siempre />
+                          {/* Si el enlace del producto no corresponde (la web del curso
+                              se equivoca a veces), se busca a mano en TikTok con el
+                              título y la tienda, igual que en POV BOF Largo. */}
+                          <CopyChip
+                            label="🔎 Título"
+                            text={v.titulo_tiktok_completo || v.titulo || ""}
+                            siempre
+                          />
+                          <CopyChip label="🏪 Tienda" text={v.tienda || ""} siempre />
                           {v.musica?.busqueda ? (
                             <button
                               type="button"

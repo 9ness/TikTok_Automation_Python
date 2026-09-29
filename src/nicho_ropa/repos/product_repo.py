@@ -187,6 +187,9 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
                 "producto": str(pid),
                 "titulo": str(vista.get("titulo") or ""),
                 "tienda": str(vista.get("tienda") or ""),
+                # Para BUSCAR el producto en TikTok cuando el enlace de la web del
+                # curso no corresponde (pasa): el título literal, copiable.
+                "titulo_tiktok_completo": str(vista.get("titulo_tiktok_completo") or ""),
                 "product_url": str(vista.get("product_url") or ""),
                 "uploaded": bool(vista.get("uploaded")),
                 "uploaded_at": int(vista.get("uploaded_at") or 0),

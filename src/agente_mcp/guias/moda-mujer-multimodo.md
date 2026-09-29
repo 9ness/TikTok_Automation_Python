@@ -218,6 +218,9 @@ En cada vídeo:
 
 - **✍️ Caption** copia la descripción lista para TikTok: caption del producto
   + emojis + hashtags de Moda Mujer.
+- **🔎 Título** y **🏪 Tienda** copian el título literal del producto en TikTok y su tienda,
+  para BUSCARLO a mano cuando el enlace 🛍️ de la web del curso no corresponde al producto
+  (pasa). Es lo mismo que en POV BOF Largo.
 - **🎵** copia la búsqueda de música para la biblioteca de TikTok.
 - **«Marcar subido»** marca el PRODUCTO como subido en su carpeta (el mismo
   «Subido» de su tarjeta, por usuario y con fecha): no hay que ir a la carpeta
