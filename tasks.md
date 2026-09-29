@@ -1,19 +1,56 @@
-## 🎛️ Multimodo (Ana) — pendiente a 28 sep 2026
+## 🎛️ Multimodo (Ana) — RELEVO para la siguiente sesión (29 sep 2026)
 
-- Rehechos con movimiento real: los 18 bolsos (mano que acaricia el bolso) y
-  las 6 botas altas más quietas (piernas + mano). Todos subidos a Ana.
-- Quedan con la imagen VIEJA (rótulo pegado en la foto, puede caer fuera de la
-  zona segura): Vintage Botas 1/2 y Botas Largas 1 de antes del 27 sep
-  (zc1p2, zc1p4, zc1p9, zc1p10, zc2p1, zc2p4, zc2p5, zc3p2, zc3p7, zc3p9…).
-  zc1p2 y zc1p10 ya los subió el operador. Rehacer con imagen sin texto si se
-  quiere el rótulo en la edición.
-- Hechos y subidos (28 sep): zc2p10, zc4p5 (Zapatillas Espejo), wc1p1, wc1p4 (Espejo), wc1p7 y wc1p3 (Multi Escena).
-- PENDIENTES con imagen ya hecha y revisada (sin texto) en `tmp/multimodo_pendientes/`
-  + `plan.json` (catálogo, carpeta, producto, modo y prompt de movimiento): bolsos
-  accesorios C3 p1/p2/p3 (Bolso 1/2/3, mano), zapatos C4 p2 (Zapatos POV) y p1
-  (Botas 1). Solo falta el clip en Magnific → revisar → `subir_clip` con el MCP de Ana.
-- Sin empezar: Vintage zc2p8; resto de accesorios C3, zapatos C4+ y ropa C1/C2/C4+.
+> **Empieza por aquí.** Contexto completo: `src/agente_mcp/guias/moda-mujer-multimodo.md`
+> (sobre todo «Continúa la lista multimodo»), `src/agente_mcp/guias/comun/navegador-vps.md`
+> (el Chrome del VPS, ya con Magnific/Flow/GenAI Pro logueados) y
+> `src/agente_mcp/guias/comun/revision-calidad.md`.
 
+**Qué hay que hacer:** seguir generando vídeos multimodo para la cuenta de **Ana**, en
+tandas cortas, **alternando catálogos (ropa / zapatos / accesorios) y formatos**, desde el
+navegador del VPS. Imagen en **Flow** → clip en **Magnific** (Space «Copy of Copy of Foto con
+IA a Video», Kling 2.5·9:16·10 s·720p) → revisar fotograma a fotograma → `subir_clip` por el
+MCP de Ana → borrar lo descargado.
+
+**Antes de nada:**
+1. Pide al operador la **URL del MCP de Ana** (`/api/mcp/ana.<token>`). NO está guardada en
+   ningún sitio a propósito: no la apuntes en memoria ni en el repo. Sin ella no subas nada.
+2. `para_rehacer(menu="moda_mujer_multimodo")`: lo que el operador haya marcado con 🔁 en las
+   tandas va PRIMERO (trae `modo`, `tanda` y la nota de qué falla).
+3. `navegador estado` y mira que la cola de montaje esté libre (`estado` de la app, sin jobs
+   `running`) y haya ≥2,5 GB de RAM disponible.
+
+**Estado a 29-sep (vídeos hechos / productos, según `carpetas` de Ana):**
+- Ropa (`web`): C1 4/10 · C2 0 · **C3 10/10** · C4…C28 0/10 · C29 0/7.
+- Zapatos: C1 10/10 · C2 9/10 (falta zc2p8, Vintage: el operador ya subió el antiguo, saltar) ·
+  C3 10/10 · **C4 3/10** (p1, p2, p5 hechos) · C5…C16 0/10 · C17 0/3.
+- Accesorios: C1 8/10 (los que faltan son gafas: se saltan) · C2 10/10 · **C3 3/10** (p1-p3 hechos).
+- Siguiente tanda razonable: accesorios C3 p4-p10 (bolsos), zapatos C4 p3,p4,p6-p10,
+  ropa C2 y C4, mezclando formatos. Cada carpeta tiene 10 productos.
+
+**Lo aprendido (para no repetirlo):**
+- **Revisa también la IMAGEN de origen, no solo el clip:** Nano Banana a veces pinta texto
+  (rótulos tipo «A HARVEST OF ELEGANCE»); Kling lo deforma y además duplica el rótulo del
+  montaje. Imagen sin texto siempre (el rótulo lo pone la app dentro de la zona segura).
+- Rechazos típicos ya vistos: objeto suspendido en el aire (móvil al girarse en el espejo),
+  zapatilla de atrás agarrada por el talón, chica de espaldas en el espejo, pies/piernas de
+  más, la mano que tapa el bolso. Los prompts de `config.EXTRA_VIDEO_MULTIMODO` ya llevan
+  refuerzos; si sale mal, se REPITE (no se sube). No repitas un vídeo que el operador ya
+  subió (lo dice el botón «Subido» de su fila).
+- **La cola de Kling es de la cuenta y otras sesiones la usan a la vez** (clips de 12-25 min):
+  no lances más de 1-2 clips a la vez, y localiza TU clip por su prompt en
+  `/app/api/creations` (no cojas «el último»: puede ser de otro).
+- **Flow desde el VPS aún NO está probado** (Magnific sí, con 5 clips hechos). Prueba con UNA
+  imagen antes de lanzar tandas. Las imágenes cuestan 0 créditos (Nano Banana 2).
+- Cerrar la última pestaña cierra Chrome; una pestaña a la vez; `navegador off` al acabar.
+- No marques Subido/Escaparate/Vendió (es del operador); no uses el selector de cuenta de la web.
+- Límites de publicación: el operador sube ~8-10 vídeos al día por cuenta; no hace falta ir más
+  rápido que eso, importa que salgan bien.
+
+**Pendientes técnicos de esta zona (menores):**
+- `tmp/multimodo_pendientes/` (untracked) ya está HECHO: se puede borrar.
+- Botón 🔁 y `para_rehacer` estrenados el 29-sep; falta ver cómo los usa el operador.
+- Las carpetas C4+ de ropa/zapatos tienen textos pero pueden faltar fotos limpias en alguna:
+  si `plan_producto` no da `foto_limpia`, salta el producto y avísalo en el informe.
 
 ## 🎛️ Multimodo — dos rarezas vistas el 27 sep 2026
 

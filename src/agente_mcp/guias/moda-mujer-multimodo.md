@@ -99,6 +99,9 @@ marcar carpetas, no para subir.
 
 ## «Continúa la lista multimodo» — cómo seguir sin perderte
 
+> **Estado y relevo a día de hoy:** `tasks.md` › «Multimodo (Ana) — RELEVO» (qué carpetas
+> están hechas, qué sigue, lo aprendido y cómo trabajar desde el VPS).
+
 Es lo que te pedirán casi siempre. Qué significa y en qué orden:
 
 1. **Para quién.** Los vídeos del multimodo son de la cuenta de **Ana**. Se
