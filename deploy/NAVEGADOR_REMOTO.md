@@ -139,28 +139,26 @@ pidan. El perfil `~/.navegador-agente` guarda las sesiones. **No borrarlo.**
 
 ## Cómo lo usa un agente del VPS
 
-Por CDP con el MCP de Playwright, enganchado al Chrome que ya está abierto (NO
-uno nuevo: ese no tendría la sesión):
+**Guía operativa completa para agentes:
+[`src/agente_mcp/guias/comun/navegador-vps.md`](../src/agente_mcp/guias/comun/navegador-vps.md)**
+(encender/apagar, controlarlo, cuidar CPU y RAM, limpieza de disco y el Space de
+Magnific ya montado). Resumen:
 
-```bash
-# Claude Code
-claude mcp add navegador -- npx -y @playwright/mcp@latest --cdp-endpoint http://127.0.0.1:9222
-# Codex (~/.codex/config.toml)
-# [mcp_servers.navegador]
-# command = "npx"
-# args = ["-y", "@playwright/mcp@latest", "--cdp-endpoint", "http://127.0.0.1:9222"]
-```
+- El agente **lo abre él solo** (`navegador on`) y lo controla por CDP con
+  `/home/nebulabsai/cdp.py` (fuente `deploy/navegador/cdp.py`; venv
+  `/home/nebulabsai/nav-venv` con `playwright`, sin descargar otro navegador). El
+  operador no tiene que abrir nada; solo entra por **Accesos** si aparece un login.
+- Se conecta al Chrome que YA está abierto (`connect_over_cdp`): un Chrome nuevo no
+  tendría la sesión. El MCP de Playwright (`@playwright/mcp --cdp-endpoint
+  http://127.0.0.1:9222`) también vale si el agente lo prefiere.
+- Cuidado de recursos: una pestaña a la vez, cerrar el Space de Magnific entre
+  tandas (1,5-2 GB), `navegador off` al acabar, y borrar fotos/clips descargados
+  en cuanto el vídeo está subido (carpeta de trabajo en el disco extra).
 
-Con eso el agente abre pestañas, sube ficheros, escribe prompts, descarga y
-hace capturas en Flow/Magnific igual que con Claude in Chrome. Los trucos de
-Flow (subir por el selector de ingredientes, pegar con `insertText`, botón
-«Descargar contenido multimedia»…) están en
-`src/agente_mcp/guias/moda-mujer-aleatorios.md` › «Trucos de automatización».
-
-Reglas que siguen valiendo igual: decir cuántas imágenes y clips se van a
-lanzar y esperar el «sí» (cuestan créditos), revisar cada uno antes de
-subirlo, y no tocar ajustes de las cuentas. Si aparece un login, una
-verificación o un CAPTCHA, parar y pedir al operador que entre por noVNC.
+Reglas que siguen valiendo igual: decir cuántas imágenes y clips se van a lanzar y
+esperar el «sí» (cuestan créditos), revisar cada uno antes de subirlo, y no tocar
+ajustes de las cuentas. Si aparece un login, una verificación o un CAPTCHA, parar y
+pedir al operador que entre desde Accesos.
 
 ## Quitarlo
 

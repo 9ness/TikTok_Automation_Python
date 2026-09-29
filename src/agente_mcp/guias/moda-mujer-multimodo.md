@@ -128,6 +128,10 @@ Es lo que te pedirán casi siempre. Qué significa y en qué orden:
 
 ### Magnific en práctica
 
+- **Desde el VPS**: el Space de clips se abre y se maneja con el Chrome remoto
+  (sin el PC del operador); cómo, y cómo no saturar CPU/RAM/disco, en
+  [`comun/navegador-vps.md`](comun/navegador-vps.md).
+
 - **De 2 en 2.** Lanza tandas de 2 clips por Space y espera a que salgan
   antes de lanzar más: la cola es de la cuenta y con 4-6 a la vez el nodo
   pasa de 60 min y falla entero. Si otra sesión (otro agente, Mauro) también

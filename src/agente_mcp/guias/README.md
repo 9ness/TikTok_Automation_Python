@@ -101,11 +101,12 @@ decide la app.
   GenAI Pro, Magnific), con la cuenta del operador abierta en el navegador,
   igual que los hace él. **Nunca por API** (Gemini, Veo, Seedance…): cuesta
   mucho más. Si no puedes controlar el navegador, prepara todo y para.
-  Si eres un agente del **VPS** (Claude Code, Codex) sin navegador: existe la
-  opción de un Chrome remoto en el propio VPS con la sesión del operador
-  (`deploy/NAVEGADOR_REMOTO.md`). Mira si está montado
-  (`systemctl is-active navegador-chrome`). Si no lo está, propónselo al
-  operador con ese documento y NO lo montes sin su «sí».
+  Si eres un agente del **VPS** (Claude Code, Codex): hay un **Chrome remoto en
+  el propio VPS con las sesiones del operador ya abiertas** (Magnific, Flow y
+  GenAI Pro). Lo enciendes y lo controlas tú solo — sin pedirle nada al
+  operador —: lee [`comun/navegador-vps.md`](comun/navegador-vps.md) (cómo
+  manejarlo, cuidar CPU y RAM con pocas pestañas, y borrar lo descargado al
+  terminar cada vídeo o tanda).
 - **Nunca gastes sin permiso.** Cada imagen y cada clip cuesta créditos. Antes
   de generar, di cuántas imágenes y clips vas a lanzar y espera el «sí».
 - **Máximo 10 vídeos al día por cuenta nueva** (Moda Mujer, Ropa Hombre);
