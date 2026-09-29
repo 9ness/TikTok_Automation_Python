@@ -30,6 +30,26 @@ export function NavegadorRemoto() {
   const e = estado.data;
   const cambiando = accion.isPending;
 
+  /** Abre la pantalla ya con la contraseña puesta: en el móvil el cuadro de
+   *  contraseña de noVNC no se veía y la pantalla se quedaba gris. Va tras el
+   *  `#` (fragmento): el navegador no lo manda al servidor, así que no queda en
+   *  ningún registro. La ventana se abre ANTES de pedir la clave para que el
+   *  móvil no bloquee la pestaña como emergente. */
+  async function abrir() {
+    const ventana = window.open("about:blank", "_blank");
+    try {
+      const clave = await pedirClaveNavegador();
+      const url =
+        "/navegador/vnc.html?path=navegador/websockify&autoconnect=1&resize=scale" +
+        `#password=${encodeURIComponent(clave)}`;
+      if (ventana) ventana.location.href = url;
+      else window.location.href = url;
+    } catch {
+      ventana?.close();
+      toast.error("No se pudo abrir el navegador");
+    }
+  }
+
   async function copiarClave() {
     try {
       await navigator.clipboard.writeText(await pedirClaveNavegador());
@@ -85,14 +105,8 @@ export function NavegadorRemoto() {
         <div className="flex flex-wrap gap-2">
           {e?.encendido ? (
             <>
-              <Button asChild size="sm">
-                <a
-                  href="/navegador/vnc.html?path=navegador/websockify&autoconnect=1&resize=scale"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Abrir navegador
-                </a>
+              <Button size="sm" onClick={() => void abrir()}>
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Abrir navegador
               </Button>
               <Button size="sm" variant="outline" onClick={() => void copiarClave()}>
                 <KeyRound className="mr-1.5 h-3.5 w-3.5" /> Copiar contraseña
