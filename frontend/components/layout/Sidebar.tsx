@@ -18,6 +18,7 @@ import {
   History,
   Image as ImageIcon,
   LayoutDashboard,
+  Link2,
   LineChart,
   Loader2,
   Menu,
@@ -159,6 +160,10 @@ const NAV: NavGroup[] = [
   {
     kind: "single",
     item: { href: "/claude", label: "Claude", icon: Bot },
+  },
+  {
+    kind: "single",
+    item: { href: "/accesos", label: "Accesos", icon: Link2 },
   },
   {
     kind: "single",
