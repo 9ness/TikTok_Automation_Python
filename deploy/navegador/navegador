@@ -7,7 +7,7 @@ activo() { systemctl is-active --quiet navegador-chrome; }
 mb_chrome() { local b; b=$(systemctl show navegador-chrome -p MemoryCurrent --value 2>/dev/null); [[ "$b" =~ ^[0-9]+$ ]] && echo $((b/1024/1024)) || echo 0; }
 clientes() { { ss -Htn state established '( sport = :5900 or sport = :9222 )' 2>/dev/null; } | wc -l; }
 case "$1" in
-  on)  systemctl start navegador.target; touch $ULTIMO; sleep 6
+  on)  systemctl start navegador.target; touch $ULTIMO; chmod 666 $ULTIMO 2>/dev/null; sleep 6
        # Que la ventana de Chrome esté delante y pintando (si no, el visor sale gris).
        w=$(sudo -u nebulabsai env DISPLAY=:99 xdotool search --onlyvisible --class chrome 2>/dev/null | tail -1)
        [ -n "$w" ] && sudo -u nebulabsai env DISPLAY=:99 xdotool windowactivate "$w" 2>/dev/null

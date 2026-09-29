@@ -80,6 +80,11 @@ memoria, muere él antes que la API.
   pestañas, y si sigue, `navegador off` y vuelve a `on`.
 - **No hagas bucles de capturas** ni sondees cada segundo: cada captura cuesta
   CPU. Espera con calma (un clip de Kling tarda 5-30 min) y mira cada 30-60 s.
+- **El apagado automático cuenta tu actividad por CDP** (cada orden de `cdp.py` renueva
+  el reloj de 45 min). Si esperas un clip sin ejecutar nada, el reloj corre: consulta el
+  estado con `cdp.py evalf` cada 30-60 s (lo renueva). El 29-sep se apagó solo mientras
+  esperaba un clip; el clip NO se pierde (sigue en Magnific): `navegador on` y lee
+  `/app/api/creations?limit=3`.
 - **Al terminar todo: `navegador off`.** Si dejas trabajo a medias, dilo; se
   apaga solo a los 45 min sin uso, pero no cuentes con eso.
 

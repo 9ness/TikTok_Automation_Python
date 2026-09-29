@@ -16,6 +16,7 @@ Uso (sub = trozo de la URL de la pestaña):
   cdp.py close <sub>                 # cerrar pestaña
 Siempre trae la pestaña al frente (una pestaña en segundo plano no pinta y se cuelga).
 """
+import os
 import sys
 from playwright.sync_api import sync_playwright
 
@@ -30,6 +31,12 @@ def pagina(ctx, sub):
 
 
 def main():
+    # Cada acción del agente cuenta como actividad: `navegador auto` apaga Chrome tras 45 min
+    # sin clientes, y las consultas cortas de un agente que espera un clip no lo evitaban.
+    try:
+        os.utime("/run/navegador.ultimo")
+    except OSError:
+        pass
     cmd = sys.argv[1]
     with sync_playwright() as p:
         b = p.chromium.connect_over_cdp(CDP)
