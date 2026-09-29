@@ -1,6 +1,9 @@
 # POV BOF Largo — `/tiktok-shop-ai-pro/pov-bof-largo`
 
 Lee antes [`README.md`](README.md) y las tres guías de [`comun/`](comun/).
+**Recetas exactas de punta a punta (Flow, GenAI Pro, Kling, revisión, subida, errores):
+[`pov-bof-largo-recetas.md`](pov-bof-largo-recetas.md)** — imprescindible si continúas
+el trabajo desde el VPS.
 
 ## Qué sale
 
