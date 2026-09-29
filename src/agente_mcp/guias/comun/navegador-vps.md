@@ -66,6 +66,9 @@ Medido el 29-sep: **Chrome con el Space de Magnific abierto gasta 1,5-2 GB**;
 Flow o GenAI Pro, ~0,5 GB cada uno. Chrome tiene tope de 2,2 GB y, si falta
 memoria, muere él antes que la API.
 
+- **Cerrar la ÚLTIMA pestaña cierra Chrome entero** (y el servicio queda apagado):
+  si vas a seguir, abre la siguiente ANTES de cerrar la anterior, o termina con
+  `navegador off`. `navegador on` lo reabre en Magnific.
 - **UNA pestaña a la vez.** Abre la que necesitas, haz el trabajo y `close`
   antes de pasar a otra. No dejes Flow y el Space abiertos a la vez. Cerrar la
   pestaña no pierde la sesión (va en el perfil).
@@ -79,6 +82,11 @@ memoria, muere él antes que la API.
   CPU. Espera con calma (un clip de Kling tarda 5-30 min) y mira cada 30-60 s.
 - **Al terminar todo: `navegador off`.** Si dejas trabajo a medias, dilo; se
   apaga solo a los 45 min sin uso, pero no cuentes con eso.
+
+**Medido en la primera prueba real (29-sep, un clip de bolso):** encender + Space
+abierto ≈ 1,6-2,0 GB de Chrome; con solo el Space y sin las otras pestañas ≈ 0,8-1,6 GB;
+un clip de Kling tardó ~12 min (5 en cola + procesado); el mp4 en bruto pesa ~17 MB;
+tras borrar y `navegador off` la RAM libre vuelve a ~4 GB.
 
 ## 5. Descargas y limpieza de disco
 
