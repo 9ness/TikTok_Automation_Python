@@ -126,8 +126,10 @@ Pasos (coordenadas en ventana 1568×726): clic nodo lista (600,92) → «⋯» (
 → «Clear list» (797,436) → pasa el ratón por «Add media» (646,208) y clic (647,243)
 → **repite el gesto** hasta que aparezca el `input[type=file]` → `upload` de las
 imágenes → «Add N» (1413,652) → Run (888,132). **Tandas de ≤5.**
-- La cola es **de la cuenta** (compartida con Mauro y otras sesiones): los clips
-  que salen pueden no ser tuyos. Kling ~8 min/clip en serie, ~35 min para 4.
+- La cola es **de la cuenta**: si hay OTRO agente o sesión generando a la vez (el
+  29/9 lo había, y se colaron clips ajenos y esperas largas), los clips que salen
+  pueden no ser tuyos. Con la cuenta solo para ti no pasa: el operador confirmó
+  que la cola es suya. Kling ~8 min/clip en serie, ~35 min para 4.
 - Resultados sin descargar: `fetch('/app/api/creations?limit=8')` desde la
   pestaña de Magnific → cada `creation` trae en su JSON
   `https://pikaso.cdnpk.net/private/production/<id>/video.mp4?token=…` (regex
@@ -209,5 +211,6 @@ id=$(curl -s -F file=@clip.mp4 "$MCP/subir" | python -c "import sys,json;print(j
 - Sustituir el gesto de la mano del prompt (temblor).
 - Aprobar un clip mirando solo la mano: **mira el producto** en todos los planos.
 - Dejar la pestaña de Flow en segundo plano.
-- Confiar en que un clip que llega por la cola de Magnific es tuyo: empareja.
+- Dar por tuyo un clip de la cola de Magnific sin emparejarlo (si hay otro agente
+  generando, se cuelan clips ajenos).
 - Escenas con dos vistas del producto o con textos de la ficha.
