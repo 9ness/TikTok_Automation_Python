@@ -414,7 +414,22 @@ if [[ "$NEEDS_CADDY_RESTART" == "true" ]]; then
     # semanas con la config vieja y el deploy decía "✅ caddy reiniciado".
     #
     # `caddy reload` sí la relee, y sin cortar ninguna conexión.
-    if dc exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null; then
+    #
+    # PERO solo si el contenedor VE el fichero nuevo: un `git pull` cambia el
+    # inodo del Caddyfile y un bind-mount de UN fichero se queda mirando al
+    # viejo, así que el reload releía la config antigua y decía "recargado"
+    # (29-sep-2026: la ruta /navegador dio 404 hasta reiniciar Caddy a mano).
+    # Si el contenido que ve el contenedor no coincide con el del host, se
+    # reinicia (2 s de corte) en vez de recargar.
+    if [[ "$(dc exec -T caddy md5sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1)" \
+          != "$(md5sum "${APP_DIR}/Caddyfile" | cut -d' ' -f1)" ]]; then
+        echo "[deploy_safe] ♻️ el contenedor ve un Caddyfile viejo (bind-mount) — reiniciando caddy"
+        if dc restart caddy; then
+            echo "[deploy_safe] ✅ caddy reiniciado con la config nueva"
+        else
+            echo "[deploy_safe] ⚠️ caddy no reinició — mira `docker compose logs caddy`"
+        fi
+    elif dc exec -T caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null; then
         echo "[deploy_safe] ✅ caddy recargado (sin corte)"
     elif ! dc up -d caddy; then
         echo "[deploy_safe] ⚠️ caddy no arrancó — mira `docker compose logs caddy`"
