@@ -1,0 +1,33 @@
+#!/bin/bash
+# navegador on|off|estado|json|auto|clave — el Chrome del VPS solo gasta memoria mientras está encendido.
+# `auto` lo apaga tras IDLE_MIN minutos sin cliente VNC ni agente conectado por CDP.
+IDLE_MIN=${IDLE_MIN:-45}
+ULTIMO=/run/navegador.ultimo
+activo() { systemctl is-active --quiet navegador-chrome; }
+mb_chrome() { local b; b=$(systemctl show navegador-chrome -p MemoryCurrent --value 2>/dev/null); [[ "$b" =~ ^[0-9]+$ ]] && echo $((b/1024/1024)) || echo 0; }
+clientes() { { ss -Htn state established '( sport = :5900 or sport = :9222 )' 2>/dev/null; } | wc -l; }
+case "$1" in
+  on)  systemctl start navegador.target; touch $ULTIMO; sleep 4; systemctl is-active navegador-pantalla navegador-chrome navegador-vnc ;;
+  off) systemctl stop navegador-chrome navegador-vnc navegador-pantalla; rm -f $ULTIMO; echo apagado ;;
+  auto)
+    activo || exit 0
+    if [ "$(clientes)" -gt 0 ]; then touch $ULTIMO; exit 0; fi
+    [ -f $ULTIMO ] || touch $ULTIMO
+    if [ $(( $(date +%s) - $(stat -c %Y $ULTIMO) )) -gt $((IDLE_MIN*60)) ]; then
+      logger -t navegador "sin uso desde hace ${IDLE_MIN} min: apagando"; "$0" off
+    fi ;;
+  json)
+    on=false; activo && on=true
+    disp=$(free -m | awk '/Mem:/{print $7}')
+    tabs=$(curl -s --max-time 2 http://127.0.0.1:9222/json 2>/dev/null | python3 -c 'import sys,json,urllib.parse
+try:
+  d=json.load(sys.stdin); print(json.dumps([{"titulo":t.get("title","")[:60],"host":urllib.parse.urlparse(t.get("url","")).netloc} for t in d if t.get("type")=="page"]))
+except Exception: print("[]")')
+    idle=0; [ -f $ULTIMO ] && idle=$(( $(date +%s) - $(stat -c %Y $ULTIMO) ))
+    printf '{"encendido":%s,"chrome_mb":%s,"disponible_mb":%s,"inactivo_s":%s,"autoapagado_min":%s,"pestanas":%s}\n' "$on" "$(mb_chrome)" "$disp" "$idle" "$IDLE_MIN" "${tabs:-[]}" ;;
+  clave) cat /root/navegador_vnc_password.txt ;;
+  estado|"")
+    systemctl is-active navegador-pantalla navegador-chrome navegador-vnc
+    echo "Chrome: $(mb_chrome) MB"; free -m | head -2 ;;
+  *) echo "uso: navegador on|off|estado|json|auto|clave" ;;
+esac

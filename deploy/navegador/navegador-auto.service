@@ -1,0 +1,6 @@
+[Unit]
+Description=Apaga el navegador remoto si lleva un rato sin nadie usándolo
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/navegador auto

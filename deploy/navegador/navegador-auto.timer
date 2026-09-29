@@ -1,0 +1,9 @@
+[Unit]
+Description=Comprobar cada 5 minutos si el navegador remoto sigue en uso
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

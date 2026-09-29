@@ -48,6 +48,7 @@ from src.api.routers import (
     cuotas_router,
     construccion_pov_router,
     deploy_router,
+    navegador_router,
     copyright_router,
     dashboard_router,
     diagnostics_router,
@@ -360,6 +361,7 @@ def create_app() -> FastAPI:
     app.include_router(cuotas_router)
     app.include_router(auth_router)
     app.include_router(deploy_router)
+    app.include_router(navegador_router)
     app.include_router(diagnostics_router)
     app.include_router(queue_ws_router)
     # MCP para agentes (Claude, ChatGPT…): rutas de ficheros/guías y el

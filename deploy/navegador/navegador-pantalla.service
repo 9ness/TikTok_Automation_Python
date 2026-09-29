@@ -1,0 +1,10 @@
+[Unit]
+Description=Pantalla virtual :99 para el navegador remoto
+PartOf=navegador.target
+
+[Service]
+User=nebulabsai
+ExecStart=/bin/sh -c 'Xvfb :99 -screen 0 1440x900x24 -nolisten tcp & sleep 2; DISPLAY=:99 exec fluxbox'
+Restart=on-failure
+Nice=10
+OOMScoreAdjust=700

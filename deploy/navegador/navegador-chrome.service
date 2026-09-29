@@ -1,0 +1,29 @@
+[Unit]
+Description=Chrome del agente (perfil en el disco extra, CDP solo local)
+After=navegador-pantalla.service
+Requires=navegador-pantalla.service
+PartOf=navegador.target
+
+[Service]
+User=nebulabsai
+Environment=DISPLAY=:99
+Environment=XDG_CONFIG_HOME=/home/nebulabsai/.config
+# Chrome es lo primero que se sacrifica si falta memoria: nunca la API.
+OOMScoreAdjust=900
+Nice=10
+CPUWeight=50
+MemoryHigh=2200M
+MemoryMax=2800M
+ExecStart=/usr/bin/google-chrome \
+  --user-data-dir=/mnt/HC_Volume_106974679/navegador/perfil \
+  --disk-cache-dir=/mnt/HC_Volume_106974679/navegador/cache --disk-cache-size=209715200 \
+  --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
+  --no-first-run --no-default-browser-check --disable-dev-shm-usage \
+  --disable-gpu --disable-extensions --disable-sync --disable-translate \
+  --disable-background-networking --disable-component-update --disable-default-apps \
+  --disable-features=MediaRouter,OptimizationHints,Translate,AutofillServerCommunication,InterestFeedContentSuggestions \
+  --renderer-process-limit=2 --js-flags=--max-old-space-size=1024 \
+  --window-position=0,0 --window-size=1440,900 \
+  https://www.magnific.com/app/spaces
+Restart=on-failure
+RestartSec=5

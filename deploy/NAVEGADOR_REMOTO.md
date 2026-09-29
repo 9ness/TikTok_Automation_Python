@@ -1,19 +1,29 @@
 # Navegador en el VPS — para que un agente genere en Flow / Magnific sin el PC
 
-> **Estado (29-sep-2026): MONTADO, a demanda.** Instalado en el VPS actual
-> (CX33, 8 GB) como PRUEBA de si Google y Magnific dejan entrar desde la IP del
-> servidor. No arranca solo: `navegador on` / `navegador off` / `navegador estado`
-> (script `/usr/local/bin/navegador`). Encendido gasta ~0,7-1 GB reales de RAM
-> (cgroup; sumar RSS engaña) y tiene tope de 2,2 GB (`MemoryHigh`) / 2,8 GB
-> (`MemoryMax`) y `OOMScoreAdjust=900`: si falta memoria muere Chrome, no la API.
-> No lo dejes encendido con la cola de vídeos llena.
+> **Estado (29-sep-2026): MONTADO, a demanda** en el VPS actual (CX33, 8 GB) como
+> PRUEBA de si Google y Magnific dejan entrar desde la IP del servidor.
 >
-> **Cómo entra el operador:** `deploy/navegador_vps.ps1` (túnel SSH a
-> `localhost:6080`, nada abierto a internet). Contraseña de la pantalla:
-> `ssh root@62.238.19.31 "cat /root/navegador_vnc_password.txt"` (aleatoria, solo
-> root; no la pegues en chats). Perfil, caché y descargas viven en el disco extra
-> (`/mnt/HC_Volume_106974679/navegador/{perfil,cache,descargas}`).
-> **Sin Tailscale**: noVNC y CDP escuchan solo en 127.0.0.1.
+> **Sin terminal:** Ajustes › «🖥️ Navegador remoto» (solo admin) → Encender /
+> Abrir navegador / Copiar contraseña / Apagar. «Abrir» va a `/navegador/`
+> (Caddy `forward_auth` → `/api/v1/navegador/auth`, 200 solo si eres admin) y
+> pide además la contraseña de la pantalla (segunda puerta). Se apaga solo tras
+> 45 min sin cliente VNC ni agente por CDP (`navegador-auto.timer`).
+>
+> **Cómo funciona por dentro:**
+> - Servicios systemd en `deploy/navegador/` (`navegador-{pantalla,chrome,vnc}`,
+>   `navegador.target`, `navegador-auto.{service,timer}`) y el script
+>   `/usr/local/bin/navegador on|off|estado|json|auto|clave`. NO arrancan al boot.
+> - Chrome con tope de RAM (`MemoryHigh=2200M`, `MemoryMax=2800M`,
+>   `OOMScoreAdjust=900`: si falta memoria muere Chrome, no la API). ~0,6-1 GB reales.
+> - Perfil, caché y descargas en el disco extra:
+>   `/mnt/HC_Volume_106974679/navegador/{perfil,cache,descargas}`. **No borrar `perfil`.**
+> - x11vnc solo en 127.0.0.1:5900; websockify en `172.18.0.1:6080` (bridge docker;
+>   ufw solo abre 172.18.0.0/16); CDP en 127.0.0.1:9222. Nada escucha en internet.
+> - La API llama al `webhook_listener` del host (`/admin/navegador/*`, igual que el
+>   panel Deploy) y este hace `sudo navegador …`.
+> - Contraseña de la pantalla: `/root/navegador_vnc_password.txt` (aleatoria, solo
+>   root; el botón «Copiar contraseña» la pone en el portapapeles, no se muestra).
+> - Alternativa con terminal: `deploy/navegador_vps.ps1` (túnel SSH a `localhost:6080`).
 
 ## Para qué
 

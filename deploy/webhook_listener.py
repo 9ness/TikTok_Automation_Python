@@ -33,6 +33,9 @@ Endpoints:
     GET  /admin/docker/ps         — docker compose ps (parseado)
     GET  /admin/deploy/log?n=200  — tail de logs/deploy.log
     GET  /admin/system            — uptime + disk + mem
+    GET  /admin/navegador/estado  — Chrome remoto (Flow/Magnific): encendido, RAM, pestañas
+    GET  /admin/navegador/clave   — contraseña de la pantalla (solo admin)
+    POST /admin/navegador/on|off  — encender / apagar ese Chrome (`/usr/local/bin/navegador`)
 """
 
 import hashlib
@@ -263,6 +266,20 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_claude_sdk("status")
             return
 
+        if path == "/admin/navegador/estado":
+            self._handle_navegador("json")
+            return
+
+        if path == "/admin/navegador/clave":
+            if not self._check_admin_auth():
+                return
+            rc, out, _e = _run(["sudo", "-n", "/usr/local/bin/navegador", "clave"], timeout=10)
+            if rc == 0:
+                self._json_response(200, {"clave": out.strip()})
+            else:
+                self._json_response(500, {"error": "sin clave"})
+            return
+
         self.send_error(404)
 
     # ------------------------------------------------------------------
@@ -297,11 +314,31 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_claude_sdk("free")
             return
 
+        if path in ("/admin/navegador/on", "/admin/navegador/off"):
+            self._handle_navegador(path.rsplit("/", 1)[1])
+            return
+
         self.send_error(404)
 
     # ------------------------------------------------------------------
     # Handlers
     # ------------------------------------------------------------------
+    def _handle_navegador(self, accion: str) -> None:
+        """Enciende/apaga el Chrome remoto y devuelve su estado (JSON)."""
+        if not self._check_admin_auth():
+            return
+        if accion in ("on", "off"):
+            _run(["sudo", "-n", "/usr/local/bin/navegador", accion], timeout=60)
+        rc, out, err = _run(["sudo", "-n", "/usr/local/bin/navegador", "json"], timeout=20)
+        try:
+            data = json.loads(out.strip().splitlines()[-1]) if rc == 0 and out.strip() else None
+        except (json.JSONDecodeError, IndexError):
+            data = None
+        if data is None:
+            self._json_response(500, {"error": err or out or "sin respuesta de navegador"})
+            return
+        self._json_response(200, data)
+
     def _handle_github_webhook(self) -> None:
         try:
             content_length = int(self.headers.get("Content-Length", "0"))

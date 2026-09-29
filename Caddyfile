@@ -58,6 +58,19 @@
 		}
 	}
 
+	# Navegador remoto del VPS (Chrome con pantalla virtual, noVNC). SOLO el
+	# administrador de la app: `forward_auth` pregunta a la API con el cookie de
+	# sesión y deja pasar solo si responde 200. noVNC vive en el bridge docker
+	# del host (172.18.0.1:6080, ufw solo abre 172.18.0.0/16), nunca en internet.
+	@navegador path /navegador /navegador/*
+	handle @navegador {
+		forward_auth api:8000 {
+			uri /api/v1/navegador/auth
+		}
+		uri strip_prefix /navegador
+		reverse_proxy 172.18.0.1:6080
+	}
+
 	# Frontend Next.js (cualquier otra ruta).
 	handle {
 		reverse_proxy web:3000

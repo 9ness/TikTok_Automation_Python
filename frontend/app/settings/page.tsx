@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { DeployPanel } from "@/components/settings/DeployPanel";
 import { MenuPersonalizado } from "@/components/settings/MenuPersonalizado";
+import { NavegadorRemoto } from "@/components/settings/NavegadorRemoto";
 import { ConectarIA } from "@/components/settings/ConectarIA";
 import { ApiError, api } from "@/lib/api";
 import { checkApiHealth, type HealthResponse } from "@/lib/queries/queue";
@@ -56,6 +57,9 @@ export default function SettingsPage() {
 
       {/* Deploy arriba — lo que más usas para diagnosticar prod */}
       <DeployPanel />
+
+      {/* Chrome del servidor para Flow/Magnific sin el PC (solo admin) */}
+      <NavegadorRemoto />
 
       {/* El menú, justo debajo: es lo único de aquí que se toca a diario. */}
       <MenuPersonalizado />

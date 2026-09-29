@@ -1,0 +1,14 @@
+[Unit]
+Description=noVNC de la pantalla :99 (solo el bridge docker; lo publica Caddy con login de admin)
+After=navegador-pantalla.service docker.service
+Requires=navegador-pantalla.service
+PartOf=navegador.target
+
+[Service]
+User=nebulabsai
+# x11vnc solo en localhost; websockify en el bridge de docker (172.18.0.1), que es
+# alcanzable desde el contenedor de Caddy y NO desde internet (ufw solo deja 172.18.0.0/16).
+ExecStart=/bin/sh -c 'until [ -S /tmp/.X11-unix/X99 ]; do sleep 1; done; sleep 1; x11vnc -display :99 -rfbauth /home/nebulabsai/.vnc/passwd -localhost -forever -shared -noxdamage -rfbport 5900 & exec websockify --web /usr/share/novnc 172.18.0.1:6080 127.0.0.1:5900'
+Restart=on-failure
+RestartSec=5
+Nice=10
