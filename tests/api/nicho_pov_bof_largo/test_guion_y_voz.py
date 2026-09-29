@@ -91,6 +91,50 @@ class TestVoz:
         with pytest.raises(RuntimeError, match="FISH_API_KEY"):
             voz.sintetizar("hola", tmp_path / "v.mp3", sexo="hombre")
 
+    def test_una_voz_retirada_por_fish_se_cambia_por_otra(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ):
+        """29/9/2026: Fish retiró «Joven Relajado» y devolvía 400 «Reference
+        not found»; tumbó tres montajes porque solo se cambiaba de voz con 5xx."""
+        import io
+        import urllib.error
+        import urllib.request
+
+        monkeypatch.setattr(config, "fish_api_key", lambda: "k")
+        usadas: list[str] = []
+
+        class _Resp:
+            def __init__(self, datos: bytes):
+                self._d = datos
+
+            def read(self):
+                return self._d
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def _falso(peticion, timeout=0):
+            import json as _json
+            rid = _json.loads(peticion.data)["reference_id"]
+            usadas.append(rid)
+            if len(usadas) == 1:
+                raise urllib.error.HTTPError(
+                    peticion.full_url, 400, "Bad Request", {},
+                    io.BytesIO(b'{"message":"Reference not found","status":400}'),
+                )
+            return _Resp(b"ID3")
+
+        monkeypatch.setattr(urllib.request, "urlopen", _falso)
+        elegida = config.VOCES["hombre"][0]
+        try:
+            voz.sintetizar("hola", tmp_path / "v.mp3", sexo="hombre", voz=elegida)
+        except Exception:
+            pass  # después de locutar se procesa el audio; aquí solo importa el cambio
+        assert len(usadas) >= 2 and usadas[0] != usadas[1]
+
 
 class TestMinimoDePlazos:
     """Ningún guion puede decir "en pedidos de más de 30 euros".

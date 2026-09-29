@@ -385,7 +385,11 @@ def sintetizar(
             # igual de bien, así que se cambia antes de rendirse.
             descartadas.add(elegida["id"])
             otras = [v for v in config.VOCES.get(sexo, []) if v["id"] not in descartadas]
-            if e.code >= 500 and otras:
+            # Un 400/404 «Reference not found» es que Fish ha retirado ESA voz
+            # (29/9/2026: «Joven Relajado» ya no existe y tumbó tres montajes
+            # seguidos): también se cambia de voz, no es culpa del guion.
+            voz_retirada = e.code in (400, 404) and "reference" in detalle.lower()
+            if (e.code >= 500 or voz_retirada) and otras:
                 nueva = (rng or random).choice(otras)
                 on_log(
                     f"[voz] Fish no puede con «{elegida['label']}» ({e.code}: "
