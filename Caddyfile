@@ -66,6 +66,11 @@
 	handle @navegador {
 		forward_auth api:8000 {
 			uri /api/v1/navegador/auth
+			# La comprobación de login es una petición normal: sin estas dos
+			# cabeceras la API la toma por un intento de WebSocket (noVNC abre
+			# uno) y contesta 403, así que noVNC daba «Failed to connect».
+			header_up -Upgrade
+			header_up -Connection
 		}
 		uri strip_prefix /navegador
 		reverse_proxy 172.18.0.1:6080

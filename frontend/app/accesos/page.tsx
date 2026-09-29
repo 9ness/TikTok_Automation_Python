@@ -20,7 +20,7 @@ const ENLACES: { titulo: string; descripcion: string; href: string; icono: strin
   {
     titulo: "Panel de gestión IPTV",
     descripcion: "Panel de administración de iptv-nestor (Mora).",
-    href: "https://tiktok-factory.tailbff00e.ts.net:10000",
+    href: "https://tiktok-factory.tailbff00e.ts.net:10000/p-66adff1685eabac5",
     icono: "📺",
   },
 ];
