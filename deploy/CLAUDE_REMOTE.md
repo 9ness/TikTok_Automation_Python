@@ -97,3 +97,18 @@ Como usuario `nebulabsai` salvo donde pone `sudo`.
 Si tras un re-login algo sigue diciendo «Not logged in», hay que reiniciar
 `claude-chat` y todos los `claude-remote@*`, porque guardan el token en memoria.
 Más gotchas en `learnings.md` (buscar «Remote Control»).
+
+## Estado actual (29-sep-2026): solo `bet-ai-master` encendido
+
+Cada `claude-remote@<proyecto>` gasta 75-220 MB aunque no se use y el VPS tiene 8 GB, así que
+se apagaron y DESACTIVARON todas menos `bet-ai-master` (Master Picks), la que usa el operador.
+No se borró nada: para volver a usar otra,
+
+```bash
+systemctl enable --now claude-remote@<proyecto>    # p. ej. TikTok_Automation_Python, iptv-nestor
+systemctl disable --now claude-remote@<proyecto>   # y al terminar, para liberar la RAM
+```
+
+Apagadas: BetCalculator, Curriculum-nestor_rodriguez, fitness-life, gestion-taller, iptv-nestor,
+lilcup, MamaXaChejei, moment, nebulabs-media, planificador-viajes, scanner-ia-pisada,
+TikTok_Automation_Python, tiktokShop-generator, veo-video-generador.
