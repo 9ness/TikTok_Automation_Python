@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Navegador remoto</title>
+<!--
+  Visor propio del navegador remoto (sobre el `RFB` de noVNC que ya sirve websockify).
+
+  Por qué existe: `vnc.html` conectaba en el móvil pero dejaba la pantalla gris
+  (29-sep-2026, Android/Chrome). Este es más simple: solo `scaleViewport`, una barra
+  con lo imprescindible (teclado, pegar, recargar) y una línea de diagnóstico para
+  ver qué pasa si vuelve a fallar. Se sirve desde la raíz web de websockify
+  (/usr/share/novnc/visor.html) → https://<dominio>/navegador/visor.html#password=…
+  La contraseña va tras el `#`: el navegador no la manda al servidor.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #ddd; font: 13px system-ui, sans-serif; overflow: hidden; touch-action: none; }
+  #barra { position: fixed; top: 0; left: 0; right: 0; height: 40px; z-index: 5; display: flex; gap: 6px; align-items: center;
+           padding: 0 8px; background: #000c; padding-top: env(safe-area-inset-top); }
+  #barra button { background: #2d3748; color: #fff; border: 1px solid #4a5568; border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+  #estado { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #a0aec0; }
+  #pantalla { position: fixed; top: 40px; left: 0; right: 0; bottom: 0; background: #111; }
+  #teclado { position: fixed; left: -1000px; top: 0; width: 10px; height: 10px; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="barra">
+  <button id="btn-teclado" title="Teclado">⌨️</button>
+  <button id="btn-pegar" title="Pegar el portapapeles del móvil">📋 Pegar</button>
+  <button id="btn-recargar" title="Volver a conectar">↻</button>
+  <span id="estado">iniciando…</span>
+</div>
+<div id="pantalla"></div>
+<input id="teclado" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+
+<script type="module">
+import RFB from "./core/rfb.js";
+
+const $ = (id) => document.getElementById(id);
+const estado = $("estado");
+const clave = decodeURIComponent((location.hash.match(/password=([^&]*)/) || [, ""])[1]);
+const base = location.pathname.replace(/[^/]*$/, "");          // "/navegador/" o "/"
+const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + base + "websockify";
+
+let rfb = null;
+let info = "";
+
+function pintarEstado(txt) {
+  const fb = rfb && rfb._fbWidth ? `${rfb._fbWidth}x${rfb._fbHeight}` : "—";
+  const c = document.querySelector("#pantalla canvas");
+  estado.textContent = `${txt} · pantalla ${fb} · ventana ${innerWidth}x${innerHeight}` + (c ? ` · canvas ${c.clientWidth}x${c.clientHeight}` : "");
+}
+
+function conectar() {
+  if (rfb) { try { rfb.disconnect(); } catch (e) {} }
+  $("pantalla").innerHTML = "";
+  pintarEstado("conectando…");
+  try {
+    rfb = new RFB($("pantalla"), url, { credentials: { password: clave } });
+  } catch (e) {
+    pintarEstado("error: " + e.message);
+    return;
+  }
+  rfb.scaleViewport = true;     // ajustar al ancho/alto de la ventana
+  rfb.resizeSession = false;    // el servidor no cambia de tamaño (Xvfb fijo)
+  rfb.clipViewport = false;
+  rfb.background = "#111";
+  rfb.addEventListener("connect", () => { info = "conectado"; pintarEstado(info); setTimeout(() => pintarEstado(info), 1500); });
+  rfb.addEventListener("disconnect", (e) => { info = e.detail.clean ? "desconectado" : "conexión perdida"; pintarEstado(info + " (pulsa ↻)"); });
+  rfb.addEventListener("credentialsrequired", () => pintarEstado("contraseña incorrecta o ausente"));
+  rfb.addEventListener("securityfailure", (e) => pintarEstado("fallo de seguridad: " + (e.detail.reason || "")));
+}
+
+addEventListener("resize", () => pintarEstado(info));
+$("btn-recargar").onclick = conectar;
+
+// Teclado del móvil: un <input> oculto que recibe el foco y reenvía las teclas.
+const tec = $("teclado");
+$("btn-teclado").onclick = () => { tec.value = ""; tec.focus(); };
+const ESPECIALES = { Enter: 0xff0d, Backspace: 0xff08, Tab: 0xff09, Escape: 0xff1b, ArrowLeft: 0xff51, ArrowUp: 0xff52,
+                     ArrowRight: 0xff53, ArrowDown: 0xff54, Delete: 0xffff, Home: 0xff50, End: 0xff57 };
+function pulsar(keysym) { if (!rfb) return; rfb.sendKey(keysym, null, true); rfb.sendKey(keysym, null, false); }
+tec.addEventListener("keydown", (e) => {
+  if (e.key in ESPECIALES) { e.preventDefault(); pulsar(ESPECIALES[e.key]); }
+});
+tec.addEventListener("input", () => {          // texto normal (incluye tildes y emojis)
+  for (const ch of tec.value) { const cp = ch.codePointAt(0); pulsar(cp < 0x100 ? cp : 0x01000000 + cp); }
+  tec.value = "";
+});
+
+// Pegar: manda el portapapeles del móvil al del servidor y pulsa Ctrl+V.
+$("btn-pegar").onclick = async () => {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (!t) { pintarEstado("el portapapeles está vacío"); return; }
+    rfb.clipboardPasteFrom(t);
+    rfb.sendKey(0xffe3, null, true); pulsar(0x76); rfb.sendKey(0xffe3, null, false);
+    pintarEstado("pegado (" + t.length + " caracteres)");
+  } catch (e) { pintarEstado("no se pudo leer el portapapeles: " + e.message); }
+};
+
+conectar();
+</script>
+</body>
+</html>

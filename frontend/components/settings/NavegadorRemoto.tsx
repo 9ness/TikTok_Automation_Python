@@ -30,22 +30,18 @@ export function NavegadorRemoto() {
   const e = estado.data;
   const cambiando = accion.isPending;
 
-  /** Abre la pantalla ya con la contraseña puesta: en el móvil el cuadro de
-   *  contraseña de noVNC no se veía y la pantalla se quedaba gris. Va tras el
-   *  `#` (fragmento): el navegador no lo manda al servidor, así que no queda en
-   *  ningún registro. La ventana se abre ANTES de pedir la clave para que el
-   *  móvil no bloquee la pestaña como emergente. */
+  /** Abre el visor ya con la contraseña puesta. La contraseña va tras el `#`
+   *  (fragmento): el navegador no la manda al servidor, así que no queda en
+   *  ningún registro. Se navega en la MISMA pestaña —sin `window.open`—: en la
+   *  app del móvil una pestaña nueva salía en blanco («about:blank») y ofrecía
+   *  abrirla con otra aplicación. El visor (`deploy/navegador/visor.html`) es
+   *  propio porque el `vnc.html` de noVNC conectaba pero dejaba la pantalla gris
+   *  en Android. */
   async function abrir() {
-    const ventana = window.open("about:blank", "_blank");
     try {
       const clave = await pedirClaveNavegador();
-      const url =
-        "/navegador/vnc.html?path=navegador/websockify&autoconnect=1&resize=scale" +
-        `#password=${encodeURIComponent(clave)}`;
-      if (ventana) ventana.location.href = url;
-      else window.location.href = url;
+      window.location.href = `/navegador/visor.html#password=${encodeURIComponent(clave)}`;
     } catch {
-      ventana?.close();
       toast.error("No se pudo abrir el navegador");
     }
   }

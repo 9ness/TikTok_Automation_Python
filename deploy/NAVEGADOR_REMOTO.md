@@ -23,6 +23,9 @@
 >   panel Deploy) y este hace `sudo navegador …`.
 > - Contraseña de la pantalla: `/root/navegador_vnc_password.txt` (aleatoria, solo
 >   root; el botón «Copiar contraseña» la pone en el portapapeles, no se muestra).
+> - Visor propio `deploy/navegador/visor.html` (sobre el `RFB` de noVNC): hay que copiarlo a
+>   `/usr/share/novnc/visor.html` en el VPS (`scp` + `chmod 644`); `vnc.html` dejaba la pantalla
+>   gris en Android. Se abre en `/navegador/visor.html#password=…` (barra: ⌨️ teclado, 📋 pegar, ↻).
 > - Alternativa con terminal: `deploy/navegador_vps.ps1` (túnel SSH a `localhost:6080`).
 
 ## Para qué
