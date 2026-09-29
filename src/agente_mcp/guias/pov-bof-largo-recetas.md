@@ -201,7 +201,7 @@ id=$(curl -s -F file=@clip.mp4 "$MCP/subir" | python -c "import sys,json;print(j
 |---|---|
 | Flow imagen | ~40 s; 2×15 productos ≈ 1 h con saturaciones |
 | GenAI Pro clip | 3-6 min; falla a menudo con >3 a la vez |
-| Kling clip | ~8 min en serie, cola compartida |
+| Kling clip | ~8 min en serie (más si otro agente usa la cola) |
 | Montaje (voz+subs+flecha) | 2-4 min por producto, 4 en paralelo OK |
 | Repeticiones típicas | 1 de cada 3 clips; mochilas, kits de piezas, aparatos con luz y productos con manos cerca son los peores |
 
