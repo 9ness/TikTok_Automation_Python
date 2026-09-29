@@ -87,7 +87,7 @@ export function NavegadorRemoto() {
             <>
               <Button asChild size="sm">
                 <a
-                  href="/navegador/vnc.html?path=navegador/websockify&autoconnect=1&resize=remote"
+                  href="/navegador/vnc.html?path=navegador/websockify&autoconnect=1&resize=scale"
                   target="_blank"
                   rel="noreferrer"
                 >
