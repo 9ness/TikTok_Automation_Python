@@ -85,6 +85,7 @@ en VPS Hetzner con Tailscale Funnel.
 | [`learnings.md`](learnings.md) | Historial técnico (1 línea por fix/aprendizaje) |
 | [`tasks.md`](tasks.md) | TODO pendientes (incluye tareas humanas: claves, planes de pago) |
 | [`src/agente_mcp/guias/README.md`](src/agente_mcp/guias/README.md) | **Si te piden HACER el trabajo de un menú de Tiktok Shop AI Pro** (bajar fotos, generar en Flow, subir clips…): el proceso paso a paso de cada pantalla, y el MCP (`src/agente_mcp/`) que lo automatiza. Si cambias el flujo de una pantalla, actualiza su guía |
+| `MCP_URLS.local.md` (NO está en git) | **URLs del MCP de la app con su token** (p. ej. la de Ana, para subir los vídeos del multimodo). Solo existe en el PC del operador y en el VPS; nunca las copies a memoria, commits ni chats. Si no lo encuentras, pídele la URL al operador |
 | [`APELACIONES.md`](APELACIONES.md) | **Si hay una sanción de TikTok Shop** («promoción de productos incoherente»): cuándo apelar y cuándo no, pruebas, forma del texto (máx. 500 caracteres), qué no escribir y casos aprobados/rechazados |
 | [`SESSION_STATE.md`](SESSION_STATE.md) | Handoff del refactor TikTok Shop (mayo 2026) |
 

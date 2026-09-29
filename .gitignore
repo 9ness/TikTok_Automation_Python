@@ -66,3 +66,6 @@ tsconfig.tsbuildinfo
 # Lo único que se versiona de `android/` es twa-manifest.json.
 /android/*
 !/android/twa-manifest.json
+
+# URLs del MCP con token (acceso como un usuario): SOLO en local y en el VPS
+*.local.md
