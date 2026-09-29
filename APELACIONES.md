@@ -56,6 +56,7 @@ no se apela: se rehace el vídeo.
 | (curso) | Producto con ficha en inglés | contenido en español y ficha en parte en inglés | ✅ aprobada |
 | 28/9/2026 | MIKOMIKA espejo maquillaje LED (Inventario · Carpeta_28 · p7) | es un espejo: refleja la habitación y la mano (6 pruebas, sin fotogramas del clip 1) | ❌ rechazada 28/9 |
 | 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ❌ rechazada 28/9 (respuesta genérica) |
+| 29/9/2026 | Botas de fútbol SAIBI (Tareas Productos 9 · p10) — sanción -4 «contenido estático / slideshow» | vídeo real con movimiento de mano, voz y subtítulos; el detector lo confundió con imagen fija (escena parecida a las fotos de la ficha) | ✅ aprobada (4 puntos devueltos) |
 
 Texto y pruebas de cada caso nuevo: en el Drive,
 `TIKTOK_SHOP_AI_PRO/_apelaciones/<fecha>_<producto>/` (`apelacion.txt` +
@@ -109,3 +110,32 @@ está. Esos vídeos no se apelan: se rehacen sin ese objeto (ver
 > causa del error: el envase está en inglés («Four Cheesy») y la ficha y el
 > vídeo en español («4 Quesos»). Adjunto ficha y capturas. Pido retirar la
 > sanción, reactivar el producto y devolver los 24 puntos.
+
+### Otro tipo de sanción: «contenido estático» (-4 puntos, 29/9/2026)
+
+Motivo automático: «slideshow or scrolling images… still-frame content: no se
+permiten imágenes estáticas… usa contenido dinámico con movimiento o
+interacción». Fue el vídeo de las botas de fútbol (Tareas Productos 9 · p10):
+producto y cámara **inmóviles**, solo se mueve el dedo, y encima rótulos fijos
+a pantalla completa. Medido (diferencia media entre fotogramas): 1,63 en todo
+el vídeo y **1,15 en el segundo clip**; los que no dan problema andan en 2-3.
+Es una sanción de 4 puntos (no 24), pero cuenta.
+
+**Resultado: apelación APROBADA (29/9/2026), sin confirmar la causa real.** Todos nuestros vídeos tienen la misma
+estructura (mano señalando + rótulos + voz + subtítulos) y la mayoría pasa sin
+problema; el detector automático es inconsistente. La poca cámara en movimiento
+es solo una hipótesis (los clips se parecían mucho a las fotos de la ficha).
+Como no era un fallo claro del vídeo se apeló (vídeo público, capturas de
+fotogramas sin etiquetas de «clip» —para ellos es un vídeo entero— y texto de
+478 caracteres) y **se aprobó**. Pruebas y texto en el Drive:
+`_apelaciones/2026-09-29_botas_futbol_estatico/`. Lección: cuando el vídeo es
+coherente y la sanción es de la máquina, apelar funciona; no hace falta
+rehacerlo.
+
+Prevención (por si ayuda): al generar los clips pide **movimiento real** — cámara con paseo o
+acercamiento suave, la mano moviéndose de forma natural, no solo «quieto y
+quieto» — y comprueba con la «Comprobación previa» antes de publicar. El
+prompt «One continuous shot with the same framing… completely motionless»
+deja el clip casi como una foto: mantén el producto quieto pero deja mover la
+cámara y la mano. Vídeos ya hechos con poco movimiento (diferencia < ~1,5,
+sobre todo en el 2.º clip) son los de más riesgo.

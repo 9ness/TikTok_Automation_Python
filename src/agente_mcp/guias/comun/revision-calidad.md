@@ -107,3 +107,22 @@ clip 2) · motivo corto · intento n. Si un mismo producto falla dos veces por
 lo mismo (siempre inventa el texto del envase, siempre cambia la pieza),
 **no insistas**: apártalo y díselo al operador — puede ser que la foto limpia
 no sirva.
+
+- **Realismo de la imagen**: rechaza la que parezca un **recorte pegado** o una
+  foto de catálogo (producto plano, sin sombra propia, sin relieve ni
+  profundidad, con la misma disposición que la foto de referencia). Pasa sobre
+  todo con kits de muchas piezas colocadas en fila (lo advirtió el operador con
+  el kit de uñas, sep 2026): pide en la pista «fotografía real con relieve,
+  cada pieza con su sombra, ángulo de 45°, colocadas de forma natural, no vista
+  cenital ni collage».
+- **Imágenes con dos vistas del mismo producto** (dos chalecos, dos estuches…):
+  el generador copia las dos vistas de la foto limpia. Pide «UN SOLO …, ningún
+  otro» y rechaza si sale duplicado; y rechaza **texto inventado** sobre el
+  producto (rótulos en la mochila o en la bolsa) que no esté en la foto.
+
+- **Vídeo demasiado estático** (hipótesis, no confirmada; el detector es
+  inconsistente): TikTok sancionó (-4) «contenido estático / slideshow» un
+  vídeo con el clip casi como una foto (cámara fija, producto quieto, solo
+  un dedo que se mueve). Rechaza el clip sin movimiento de cámara ni de mano
+  y pide en la pista «la cámara se mueve suavemente / se acerca despacio, la
+  mano se mueve con naturalidad». Ver `APELACIONES.md`.

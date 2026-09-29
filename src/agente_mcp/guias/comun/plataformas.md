@@ -85,6 +85,27 @@ Solo vídeo, **mudo**. Ajustes, siempre los mismos:
   los productos).
 - Si la tarjeta pide 2 clips, genera **dos clips** de la misma imagen (cada
   generación sale distinta; eso es lo que se busca).
+- **Calidad SIEMPRE «Original» (720×1280).** Con «1080p» el vídeo sale
+  **1920×1080 horizontal** aunque esté en Portrait — bug reconfirmado el
+  29/9/2026, no lo vuelvas a probar. Los ~0,5 s finales de cada clip hacen un
+  fundido de vuelta al primer fotograma: recorta a **7,3 s** antes de subir.
+- Al prompt base añade **una frase del producto** («la máquina está apagada y
+  quieta, la puerta no se abre…») y, si hace falta, prohibiciones concretas:
+  «exactly ONE hand, never a second hand» (salían dos manos), «NO steam, NO
+  smoke» (salió humo de una taza), «the workbench stays EMPTY» (apareció un
+  metro). Un producto ENCENDIDO (lámpara) se dice «stays lit, constant light».
+- **No cambies el gesto de la mano del «Prompt vídeo» de la app.** El original
+  dice «The person gestures with the visible hand as if explaining the product…
+  Only the hand moves». Si lo sustituyes por «la mano se queda quieta
+  señalando / pointing calmly», el dedo queda casi fijo y el vídeo tiembla. Deja
+  ese texto tal cual y solo AÑADE al final, por producto: «Exactly one hand,
+  never a second one», la pantalla apagada o «nothing lights up», y lo que no
+  debe moverse. (29/9/2026: los clips hechos con «stays at the bottom… pointing
+  calmly» salieron con la mano temblando.)
+- «Generation failed, please try again» = fallo genérico, **se reembolsa**:
+  reintenta con el mismo botón. Van varios en paralelo, ~3-5 min cada uno.
+- Las URL de los resultados están en el DOM (`video.currentSrc`,
+  `files.genaipro.io/video_<uuid>.mp4`): se bajan con curl sin tocar el botón.
 
 ---
 
