@@ -16,6 +16,16 @@ Vintage NO llevan texto en la imagen: el rótulo otoñal (con sus emojis) lo
 quema el montaje, una frase distinta por producto. Nano Banana lo metía en la
 foto y Kling lo deformaba a mitad de clip.
 
+**Excepción: los dos formatos de 20 s con voz** (`mm_zapatillas_pov20` y
+`mm_zapatillas_sentado20`, «Zapatillas Vista POV/Sentado 20s» de su web). Son
+**DOS clips de 10 s**, cada uno de SU imagen (el curso pide dos imágenes con el
+mismo prompt: sale otra chica y otro sitio), y los dos **mudos**. La voz la pone
+la app al montar: un guion de **punto de dolor** escrito para ese producto
+(el mismo prompt que el POV BOF Largo) y locutado con una voz de mujer de
+**Fish**. Lleva los textos del POV BOF Largo (gancho, título, CTA, flecha y
+subtítulos). Sin música: habla. Si Omni/Kling mete voz en el clip, da igual:
+se descarta.
+
 ## Catálogos
 
 | Catálogo (`catalogo`) | Qué hay |
@@ -35,8 +45,12 @@ dentro de la carpeta (no pongas el mismo a todos).
 |---|---|---|---|
 | ropa (vestidos, pantalones, jerséis, chaquetas…) | `mm_espejo` (Espejo Solo Música) · `mm_espejo_escenas` (Espejo Multi Escena) | **sí** | FRAME INICIAL |
 | camiseta | `mm_maniqui` (sin persona) · `mm_sarcastica` (solo si la camiseta lleva FRASE) · o los de ropa | maniquí no / sarcástica sí | FRAME INICIAL |
-| calzado (zapatillas, zapatos, tacones) | `mm_zapatillas_espejo` · `mm_zapatos_escenas` · `mm_zapatos_pov` | espejo y escenas sí; POV no | escenas = **INGREDIENTE**; resto FRAME INICIAL |
-| botas | `mm_botas_1` · `mm_botas_2` · `mm_botas_largas_1` · `mm_botas_largas_2` (las «largas», solo botas altas) · o los de calzado | no | FRAME INICIAL |
+| calzado (zapatillas, zapatos, tacones) | `mm_zapatillas_espejo` · `mm_zapatos_escenas` · `mm_zapatos_pov` · 🎙️ `mm_zapatillas_pov20` · 🎙️ `mm_zapatillas_sentado20` | espejo y escenas sí; POV y los de 20 s no | escenas = **INGREDIENTE**; resto FRAME INICIAL |
+| botas | `mm_botas_1` · `mm_botas_2` · `mm_botas_largas_1` · `mm_botas_largas_2` (las «largas», solo botas altas) · o los de calzado (también los 🎙️ de 20 s) | no | FRAME INICIAL |
+
+Los 🎙️ de 20 s son los únicos con voz: úsalos para **mezclar largos con
+cortos** (lo pide el curso para evitar sanciones), p. ej. uno de cada tres o
+cuatro calzados. Son dos clips, así que cuestan el doble de generación.
 | bolso | `mm_bolso_1` · `mm_bolso_2` · `mm_bolso_3` | no | FRAME INICIAL |
 | gafas | — **se saltan** (no hay formato mudo) | | |
 
@@ -91,7 +105,10 @@ quites. Con el MCP, el personaje sale de `personaje_marca`.
 3. `plan_producto(…, modo="mm_…")` → prompts de imagen y de movimiento de ESE
    formato.
 4. Imagen en Flow → clip en Magnific → revisa.
-5. `subir_clip(…, modo="mm_…", clip=1)` → se monta solo.
+5. `subir_clip(…, modo="mm_…", clip=1)` → se monta solo. En los 🎙️ de 20 s
+   sube `clip=1` y `clip=2` (uno de cada imagen): al llegar el segundo, la app
+   escribe el guion si no lo tenía, locuta con Fish y monta. Si quieres ver el
+   guion antes, `preparar_carpeta(…, modo="mm_zapatillas_pov20")` lo escribe.
 6. Al terminar la carpeta: `marcar_carpeta(…, modo="multimodo", pendiente=True)`.
 
 `modo="multimodo"` es solo la vista de todos los vídeos: sirve para listar y
@@ -194,6 +211,10 @@ TikTok penaliza el contenido estático. Por eso:
 - En **Zapatillas Espejo** NO pidas que enseñe la zapatilla a cámara: sale el
   pie delante del espejo o el móvil convertido en zapato. El prompt ya la
   deja agachada tocando los cordones.
+- En los 🎙️ de 20 s el movimiento del curso es genérico («gesticula con la
+  mano»); `plan_producto` le añade lo que tiene que moverse: en POV las manos
+  giran el calzado sin soltarlo, y sentada mueve los pies (gira uno, golpecitos
+  con la punta, cruza los tobillos). Si sale quieto, repítelo.
 
 ### Rechazos típicos (repite solo esto)
 

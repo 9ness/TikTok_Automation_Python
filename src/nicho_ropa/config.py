@@ -316,6 +316,27 @@ MODOS: dict[str, dict] = {
         "modalidad": "multimodo",
         "tipo": "calzado",
     },
+    # Los dos de 20s de su web (Moda Mujer · aleatorios). Son los ÚNICOS del
+    # multimodo que HABLAN, pero la voz no la pone el clip: los dos clips de
+    # 10s salen mudos y encima va un guion de punto de dolor escrito para ese
+    # producto y locutado con Fish — la misma receta del POV BOF Largo, con
+    # sus mismos textos quemados. Valen para zapatillas, zapatos y botas.
+    "mm_zapatillas_pov20": {
+        "desc": "Dos manos con manicura sujetando y enseñando el calzado, 20s: DOS clips de 10s mudos y voz de mujer (Fish) con guion de punto de dolor. Zapatillas, zapatos o botas.",
+        "label": "🎙️ Zapatillas Vista POV 20s",
+        "estilo_mof10": "zapatillas_pov20",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "calzado",
+    },
+    "mm_zapatillas_sentado20": {
+        "desc": "Sentada, de rodillas abajo, con el calzado puesto, 20s: DOS clips de 10s mudos y voz de mujer (Fish) con guion de punto de dolor. Zapatillas, zapatos o botas.",
+        "label": "🎙️ Zapatillas Vista Sentado 20s",
+        "estilo_mof10": "zapatillas_sentado20",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "calzado",
+    },
     "mm_botas_1": {
         "desc": "Vintage otoño: en el coche enseñando el par, con texto otoñal en la imagen.",
         "label": "🍂 Vintage Botas 1",
@@ -709,7 +730,33 @@ _PIERNAS_BOTA = (
 
 # Lo que Kling hace mal o se queda corto en cada formato, dicho al final del
 # prompt de movimiento (antes de la nota sin texto).
+_SIN_VOZ_CLIP = (
+    "Nadie habla ni se oye ninguna voz: el clip va sin diálogo (la voz se "
+    "pone después)."
+)
+
 EXTRA_VIDEO_MULTIMODO = {
+    # Los de 20s con voz de Fish. El «gesticula con la mano» del curso, con
+    # dos manos sujetando un zapato, es lo que hace que Kling/Omni lo suelten,
+    # lo deformen o saquen un tercer zapato; y un clip quieto es sanción
+    # (-4 puntos por casi-foto). Se dice qué se mueve y qué no.
+    "mm_zapatillas_pov20": (
+        "Las manos sujetan el calzado y lo giran despacio para enseñarlo por "
+        "los dos lados, acercándolo un poco a la cámara, con la cámara "
+        "moviéndose un poco como un móvil en mano. Solo dos manos, con cinco "
+        "dedos cada una, y nunca sueltan el calzado. El calzado no cambia de "
+        "forma, color, tamaño ni diseño y no aparece ningún zapato nuevo. "
+        + _SIN_VOZ_CLIP
+    ),
+    "mm_zapatillas_sentado20": (
+        "Ella sigue sentada y mueve los pies con naturalidad: gira un poco un "
+        "pie para enseñar el lateral del calzado, da un par de golpecitos con "
+        "la punta en el suelo y cruza y descruza los tobillos, mientras la "
+        "cámara se mueve un poco como un móvil en mano. Solo dos piernas y dos "
+        "pies, con el calzado puesto en los dos; no cambia de forma, color ni "
+        "diseño y no aparece ningún zapato nuevo. No se le ve la cara ni el "
+        "cuerpo de las rodillas para arriba. " + _SIN_VOZ_CLIP
+    ),
     # Los bolsos son un bodegón: con el «movimiento sutil» del curso salía
     # un temblor y poco más, y TikTok penaliza el contenido estático.
     "mm_bolso_1": _MANO_BOLSO,
@@ -1048,6 +1095,18 @@ def modo_habla(modo: str) -> bool:
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("voz", True))
 
 
+def lleva_fish(modo: str) -> bool:
+    """Si ese formato se locuta con Fish (guion de punto de dolor del POV BOF
+    Largo) y se monta con su editor. Los clips van mudos."""
+    if not modo or modo == MODO_MULTI:
+        return False
+    return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("fish"))
+
+
+# Los de Fish son de DOS clips de 10s: el guion se escribe para esos 20s.
+SEGUNDOS_FISH = 20
+
+
 def lleva_flecha(modo: str) -> bool:
     """Si a ese formato se le pone la flecha al carrito al final."""
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("flecha"))
@@ -1165,6 +1224,8 @@ def modos_de(sexo: str, modalidad: str = MODALIDAD_DEFECTO) -> list[dict]:
             "voz": bool(
                 (ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("voz", True)
             ),
+            # Clip mudo pero vídeo HABLADO: la voz la pone Fish al montar.
+            "fish": bool((ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("fish")),
         }
         for clave, meta in MODOS.items()
         if sexo in meta["sexos"]
@@ -1636,6 +1697,43 @@ ESTILOS_MOF10: dict[str, dict] = {
     },
     # La de hombre y la de mujer no cambian solo el género (maquillaje, un
     # bloque de ropa entero): la de mujer va en su propio fichero.
+    # Los de 20s con voz de Fish. Tres cosas que no tiene ningún otro:
+    #   `fish`     el guion lo escribe Gemini con el prompt de punto de dolor
+    #              del POV BOF Largo (es EL MISMO texto en su web) y se locuta
+    #              con Fish; el montaje es el del Largo (voz repartida entre los
+    #              dos clips, gancho, título, CTA, flecha y subtítulos).
+    #   `voz`      False: el clip sale MUDO. Omni habla, pero su voz se tira
+    #              (lo dice el propio curso), así que no se le pide.
+    #   `partes`   dos clips de 10s, cada uno de SU imagen: el curso pide dos
+    #              imágenes con el mismo prompt (sale otra chica y otro sitio).
+    # Sin `personaje`: solo se ven manos o piernas, y el prompt pide una mujer
+    # aleatoria.
+    "zapatillas_pov20": {
+        "duraciones": False,
+        "label": "Zapatillas vista POV · 20s con voz Fish",
+        "voz": False,
+        "fish": True,
+        "partes": 2,
+        "segundos_clip": 10,
+        "personaje": False,
+        "ingrediente": False,
+        "imagen": "prompt_mm_zapatillas_pov20_imagen.md",
+        "guion": "prompt_mm_zapatillas_20_movimiento.md",
+        "derivado": (),
+    },
+    "zapatillas_sentado20": {
+        "duraciones": False,
+        "label": "Zapatillas vista sentado · 20s con voz Fish",
+        "voz": False,
+        "fish": True,
+        "partes": 2,
+        "segundos_clip": 10,
+        "personaje": False,
+        "ingrediente": False,
+        "imagen": "prompt_mm_zapatillas_sentado20_imagen.md",
+        "guion": "prompt_mm_zapatillas_20_movimiento.md",
+        "derivado": (),
+    },
     "sarcastica_mujer": {
         "duraciones": False,
         "label": "Camiseta sarcástica · en el súper (chica)",
@@ -2063,6 +2161,9 @@ def prompts_mof10(
             "personaje": bool(meta.get("personaje")),
             "ingrediente": bool(meta.get("ingrediente")),
             "voz": bool(meta.get("voz", True)),
+            # El guion lo escribe la app (punto de dolor) y lo locuta Fish: el
+            # botón de guiones vale aunque aquí no haya tope de caracteres.
+            "fish": bool(meta.get("fish")),
             # Si ESTE formato tiene de verdad versión con plazos. La frase va
             # dentro de lo que dice la persona, y el curso solo la publicó en
             # el del espejo: en los demás el botón copiaba el MISMO texto y

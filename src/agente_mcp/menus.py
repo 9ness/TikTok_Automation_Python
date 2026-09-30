@@ -72,9 +72,12 @@ MENUS: dict[str, Menu] = {
                 "mm_zapatillas_espejo", "mm_zapatos_escenas", "mm_zapatos_pov",
                 "mm_botas_1", "mm_botas_2", "mm_botas_largas_1", "mm_botas_largas_2",
                 "mm_bolso_1", "mm_bolso_2", "mm_bolso_3",
+                "mm_zapatillas_pov20", "mm_zapatillas_sentado20",
             ),
             notas=(
-                "Formatos MUDOS de 10 s; en CADA producto eliges el que le va según su "
+                "Formatos MUDOS de 10 s y dos de 20 s con voz (mm_zapatillas_pov20 / "
+                "mm_zapatillas_sentado20: DOS clips mudos de 10 s y la app pone la voz de "
+                "Fish con guion de punto de dolor); en CADA producto eliges el que le va según su "
                 "`tipo_multimodo` (ropa/camiseta/calzado/botas/bolso; gafas se saltan) y "
                 "alternas para no repetir. Catálogos web (ropa) | zapatos | accesorios. "
                 "`modo=multimodo` es solo la vista de todos (listar carpetas, progreso); "
@@ -423,14 +426,18 @@ async def preparar(c: Ctx, clip_s: int = 0, estilo_guion: str = "", rehacer: boo
         est = await estilo_ropa(c)
         if solo:
             items = [p for p in items if str(p.get("producto")) in solo]
-        if est.get("escrito_fuera") and (
-            rehacer or any(not (p.get("guion") or p.get("guiones")) for p in items)
-        ):
+        # Los de voz de Fish también escriben guion (el que locuta la app).
+        escribe = est.get("escrito_fuera") or est.get("fish")
+        falta = (
+            (lambda p: not p.get("guion_dice")) if est.get("fish")
+            else (lambda p: not (p.get("guion") or p.get("guiones")))
+        )
+        if escribe and (rehacer or any(falta(p) for p in items)):
             await c.api.post(f"{ROPA}/guiones", {"carpeta": c.carpeta, "modo": c.modo,
                                                 "duracion": c.duracion, "rehacer": rehacer,
                                                 "productos": solo})
             hecho.append("guiones" + (f" de {', '.join(solo)}" if solo else "") + " → en la cola")
-        elif not est.get("escrito_fuera"):
+        elif not escribe:
             hecho.append("este modo no lleva guion por prenda (diálogo fijo o movimiento)")
     return {"hecho": hecho or ["nada que hacer: todo estaba listo"]}
 
@@ -605,6 +612,34 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
             })
         return
 
+    if est.get("fish"):
+        # Zapatillas Vista POV/Sentado 20s: DOS imágenes con el MISMO prompt
+        # (cada una sale con otra chica y otro sitio, así lo pide el curso) y
+        # un clip mudo de 10 s de cada una. La voz la pone la app al montar.
+        seg_f = int(est.get("segundos_clip") or 10)
+        out["imagenes"] = [{
+            "archivo": f"imagen_{i}.png", "prompt": est.get("imagen", ""),
+            "adjuntar": ["foto_limpia"], "donde": f"{FLOW} · Nano Banana 2", "formato": "9:16",
+            "revisar": "El calzado idéntico a la foto limpia (forma, color, suela, cordones); "
+                       "solo manos o piernas de mujer, sin texto." +
+                       (" Otra generación distinta de imagen_1." if i > 1 else ""),
+        } for i in range(1, partes + 1)]
+        for i in range(1, partes + 1):
+            out["clips"].append({
+                "clip": i, "archivo": f"clip_{i}.mp4", "prompt": est.get("guion", ""),
+                "imagen": f"imagen_{i}.png", "como_entra_la_imagen": "FRAME INICIAL",
+                "segundos": seg_f, "habla": False, "plataformas": _plataformas(False, False, seg_f),
+            })
+        out["voz"] = (
+            "La pone la app al montar: guion de punto de dolor escrito para este producto y "
+            "locutado con una voz de mujer de Fish, con los textos del POV BOF Largo. El audio "
+            "de los clips se descarta.")
+        if not p.get("guion_dice"):
+            out["avisos"].append(
+                "Aún no tiene guion: se escribe solo al montar, o llama a `preparar_carpeta` "
+                "para verlo antes.")
+        return
+
     if partes > 1 and est.get("imagen2"):
         out["imagenes"].append({
             "archivo": "imagen_2.png", "prompt": _con_familia(est["imagen2"], familia, fam),
@@ -621,7 +656,7 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
                 "clip": i + 1, "archivo": f"clip_{i + 1}.mp4",
                 "prompt": guiones[i] if i < len(guiones) else "",
                 "imagen": f"imagen_{i + 1}.png", "como_entra_la_imagen": "FRAME INICIAL",
-                "segundos": 8, "habla": habla, "plataformas": _plataformas(habla, ingrediente, 8),
+                "segundos": seg, "habla": habla, "plataformas": _plataformas(habla, ingrediente, seg),
             })
         return
 

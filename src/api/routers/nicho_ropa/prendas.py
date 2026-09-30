@@ -770,6 +770,7 @@ def list_prendas(
             tipo_multimodo=config.tipo_multimodo(str(prod.get("titulo") or ""), carpeta),
             miniaturas_variantes=variantes.miniaturas_de(carpeta, pid, variantes.leidos(prod)["colores"]),
             guion_dice=guiones.get(pid, {}).get("dice", ""),
+            guion_subliminal=guiones.get(pid, {}).get("subliminal", ""),
             guion_at=guiones.get(pid, {}).get("guion_at", 0),
             uploaded=bool(prod.get("uploaded")),
             uploaded_at=int(prod.get("uploaded_at") or 0),
@@ -986,7 +987,9 @@ def escribir_guiones(
     estilos = config.prompts_mof10(sexo, False, modo, body.duracion)
     if not estilos:
         raise APIError(f"El modo {modo} no tiene prompt.", status_code=400)
-    if not estilos[0].get("escrito_fuera"):
+    # Los de voz de Fish no llevan tope en el prompt, pero su guion sí se
+    # escribe aquí (punto de dolor del POV BOF Largo).
+    if not estilos[0].get("escrito_fuera") and not estilos[0].get("fish"):
         raise APIError(
             "Este formato trae el guion cerrado del curso: se pega tal cual, "
             "no hay nada que escribir.",

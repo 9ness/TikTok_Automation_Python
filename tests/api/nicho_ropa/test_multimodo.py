@@ -95,6 +95,10 @@ class TestRotuloVintage:
 class TestMusica:
     def test_cada_formato_trae_su_busqueda(self):
         for modo in config.modos_multimodo():
+            if config.lleva_fish(modo):
+                # Los de 20s hablan (voz de Fish): sin música que buscar.
+                assert config.musica_de(modo, "c/1") == {}, modo
+                continue
             m = config.musica_de(modo, "c/1")
             assert m["busqueda"] and m["estilo"], modo
             assert m["busqueda"] not in m["alternativas"]

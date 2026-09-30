@@ -1867,6 +1867,20 @@ def run_nicho_ropa_guiones(job: Job, on_log: OnLog, on_progress: OnProgress) -> 
                         f"[nicho_ropa] {pid}: sin fotos de otros colores — el guion "
                         "saldrá con un solo color"
                     )
+        # Los de 20s con voz de Fish: el guion de punto de dolor del POV BOF
+        # Largo, que no pasa por el guionista de este nicho.
+        if estilo.get("fish"):
+            try:
+                escrito = _guion_fish_ropa(
+                    carpeta, pid, prod, modo, estilo["guion"], usuario,
+                    (limpia or fotos or [None])[0], on_log,
+                )
+            except Exception as e:  # noqa: BLE001 — una prenda no tumba la tanda
+                fallos.append(f"{pid}: {str(e)[:120]}")
+                continue
+            hechos += 1
+            on_log(f"[nicho_ropa] {pid}: guion para Fish de {len(escrito['dice'])} caracteres")
+            continue
         # El formato de la tienda vale para cualquier prenda, pero el gesto y
         # las zonas cambian: un pantalón se sube, a un jersey se le tira del
         # bajo y un cárdigan se abre. Se rellena con la familia del título.
@@ -1945,6 +1959,207 @@ def run_nicho_ropa_textos(job: Job, on_log: OnLog, on_progress: OnProgress) -> s
     return f"{len(textos)} prenda(s) con textos"
 
 
+def _fotos_prenda_ropa(
+    carpeta: str, pid: str, prod: dict, on_log: OnLog, pares: dict | None = None,
+) -> dict[str, Path]:
+    """`{"clean": Path, "titled": Path}` de una prenda: lo que se pueda bajar.
+
+    Las prendas de la web (ZIP) no guardan el id de sus fotos en la ficha:
+    salen del emparejado de la carpeta. `pares` es la caché de ese emparejado
+    cuando se recorre una carpeta entera (se rellena la primera vez).
+    """
+    from src.nicho_pov_bof.services import drive_client
+    from src.nicho_ropa.services import text_extractor
+
+    ids = {"titled": prod.get("titled_photo_id"), "clean": prod.get("clean_photo_id")}
+    if not any(ids.values()):
+        if pares is None:
+            pares = {}
+        if not pares:
+            try:
+                pares.update({x["producto"]: x for x in text_extractor.pares(carpeta)})
+            except Exception as e:  # noqa: BLE001 — sin fotos antes que sin guion
+                on_log(f"[nicho_ropa] no se pudieron emparejar las fotos ({str(e)[:100]})")
+        par = pares.get(pid) or {}
+        ids = {
+            "titled": (par.get("titled") or {}).get("id"),
+            "clean": (par.get("clean") or {}).get("id"),
+        }
+    fotos: dict[str, Path] = {}
+    for clave, fid in ids.items():
+        if fid:
+            try:
+                fotos[clave] = drive_client.fetch_photo(str(fid))
+            except (RuntimeError, ValueError) as e:  # noqa: PERF203
+                on_log(f"[nicho_ropa] {pid}: sin foto {clave} ({e})")
+    return fotos
+
+
+def _textos_ropa(prod: dict) -> dict:
+    """Lo que leen las reglas de plazos y envío gratis del POV BOF."""
+    return {
+        k: str(prod.get(k) or "")
+        for k in ("titulo", "tienda", "caption", "precio", "plazos", "envio")
+    }
+
+
+def _guion_fish_ropa(
+    carpeta: str, pid: str, prod: dict, modo: str, movimiento: str,
+    usuario: str, foto: Path | None, on_log: OnLog,
+) -> dict:
+    """Escribe y guarda el guion de un formato con voz de Fish.
+
+    Es el prompt de punto de dolor del POV BOF Largo tal cual (en su web es el
+    mismo texto para los dos formatos de 20s de Moda Mujer), escrito para los
+    20s de dos clips de 10. El bloque de vídeo de cada clip es el movimiento
+    fijo del formato: los clips van mudos, así que no dependen del guion.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.services import guionista as largo_guionista
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.repos import product_repo
+
+    textos = _textos_ropa(prod)
+    plazos = pov_config.hay_plazos(textos)
+    envio = largo_config.hay_envio_gratis(textos)
+    segundos = ropa_config.SEGUNDOS_FISH
+    escrito = largo_guionista.escribir(
+        titulo=textos["titulo"], tienda=textos["tienda"], caption=textos["caption"],
+        foto=foto, plazos=plazos,
+        prompt=largo_config.prompt_guion(plazos, "dolor", envio, segundos),
+        max_caracteres=largo_config.caracteres_guion(segundos),
+        etiqueta="nicho_ropa_fish", on_log=on_log,
+    )
+    partes = ropa_config.partes_de_modo(modo)
+    product_repo.guardar_guion(
+        carpeta, pid, modo, escrito["guion"], movimiento, [movimiento] * partes,
+        usuario=usuario, subliminal=escrito.get("subliminal") or "",
+        nombre=escrito.get("nombre") or "", plazos=plazos,
+    )
+    return {"dice": escrito["guion"], "subliminal": escrito.get("subliminal") or "",
+            "nombre": escrito.get("nombre") or "", "plazos": plazos}
+
+
+def _salida_ropa(carpeta: str, producto: str, titulo: str, modo: str, quien: str) -> Path:
+    """Dónde se deja el vídeo montado de una prenda en ese modo."""
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.repos import product_repo
+
+    nombre = pov_config.nombre_video(producto, titulo, folder=carpeta)
+    # El modo va en el nombre: sin él, el vídeo de "dejando la cámara" se
+    # escribía encima del del espejo (misma prenda, misma carpeta).
+    if modo != ropa_config.MODO_DEFECTO:
+        nombre = f"{Path(nombre).stem}__{modo}{Path(nombre).suffix}"
+    # Cada usuario en su subcarpeta, como en el POV BOF: montan la MISMA
+    # prenda por separado y el nombre del fichero es idéntico, así que sin
+    # esto el vídeo de uno sobrescribía el del otro. `ness` se queda en la
+    # raíz de siempre para no mover su histórico.
+    raiz_videos = Path(ropa_config.video_dir())
+    if quien and quien != product_repo.USUARIO_HISTORICO:
+        raiz_videos = raiz_videos / quien
+    return raiz_videos / carpeta / nombre
+
+
+def _montar_ropa_fish(
+    job: Job, rutas: list[Path], carpeta: str, producto: str, prod: dict,
+    modo: str, quien: str, on_log: OnLog, on_progress: OnProgress,
+) -> str:
+    """Montaje de los formatos de 20s con voz de Fish (Moda Mujer multimodo).
+
+    La receta del POV BOF Largo en modo punto de dolor: guion para ESE
+    producto, locutado con una voz de mujer de Fish, repartido entre los dos
+    clips (se corta en una pausa del habla) y con sus mismos textos quemados
+    — gancho, título, CTA, flecha y subtítulos, en el acabado blanco del
+    gancho de dolor. Los clips llegan mudos; su audio no se usa.
+    """
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.pipeline import video_editor as largo_editor
+    from src.nicho_pov_bof_largo.services import velocidad_voz, voz as voz_svc
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.repos import product_repo
+
+    if len(rutas) < 2:
+        raise ValueError(f"Este formato son dos clips y llegaron {len(rutas)}.")
+    titulo = str(prod.get("titulo") or "")
+    if not titulo:
+        on_log("[nicho_ropa] esta prenda no tiene textos extraídos: el guion saldrá genérico")
+
+    on_progress(0.05, "🖼️ Bajando la foto de la prenda…")
+    fotos = _fotos_prenda_ropa(carpeta, producto, prod, on_log)
+    foto = fotos.get("clean") or fotos.get("titled")
+
+    textos = _textos_ropa(prod)
+    plazos = pov_config.hay_plazos(textos)
+    guion = product_repo.guion_de(prod, modo)
+    # Sin guion, o escrito cuando el producto era de otro modo de plazos (se
+    # corrigió el precio): se escribe ahora. Si ya estaba, se reutiliza — otra
+    # llamada costaría dinero y el vídeo saldría distinto al remontarlo.
+    if not guion["dice"] or bool(guion.get("plazos")) != plazos:
+        on_progress(0.10, "✍️ Escribiendo el guion (punto de dolor)…")
+        movimiento = next(
+            (e["guion"] for e in ropa_config.prompts_mof10("mujer", False, modo)), "",
+        )
+        guion = _guion_fish_ropa(carpeta, producto, prod, modo, movimiento, quien, foto, on_log)
+    else:
+        on_log("[nicho_ropa] reutilizando el guion ya escrito")
+    texto = largo_config.sin_minimo_plazos(guion["dice"])
+    on_log(f"[nicho_ropa] guion ({len(texto)} car.): {texto}")
+
+    envio = largo_config.hay_envio_gratis(textos)
+    segundos = ropa_config.SEGUNDOS_FISH
+    salida = _salida_ropa(carpeta, producto, titulo, modo, quien)
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix=f"ropa_fish_{producto}_"))
+    try:
+        on_progress(0.22, "🔊 Locutando con Fish (mujer)…")
+        audio = work / "voz.mp3"
+        metraje = _segundos_de_video(rutas, estirado=False)
+        info = voz_svc.sintetizar(
+            texto, audio, sexo="mujer", on_log=on_log,
+            segundos_max=round(metraje * largo_config.ESTIRADO_CLIP, 1),
+            segundos_ideal=metraje,
+            segundos_min=segundos,
+            ctas=largo_config.ctas_posibles(plazos, envio),
+            ventana=largo_config.ventana_video(segundos, metraje),
+        )
+        texto = str(info.get("texto") or texto)
+        velocidad_voz.apuntar(
+            str(info.get("voz_id") or ""), len(texto),
+            float(info.get("duracion") or 0), float(info.get("tempo") or 1.0),
+        )
+
+        def _progreso(pct: float, label: str) -> None:
+            on_progress(0.30 + pct * 0.62, label)
+
+        largo_editor.montar(
+            clips=rutas,
+            audio_path=audio,
+            textos={**textos, "subliminal": guion.get("subliminal") or ""},
+            output_path=salida,
+            work_dir=work,
+            producto=producto,
+            semilla=f"{carpeta}/{producto}",
+            con_gancho=True, con_titulo=True, con_cta=True, con_flecha=True,
+            con_subliminal=False, con_subtitulos=True,
+            texto_voz=texto,
+            estilo_texto=largo_config.estilo_texto_valido("", "dolor"),
+            foto_producto=foto,
+            on_log=on_log,
+            on_progress=_progreso,
+        )
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    on_progress(0.95, "💾 Guardando estado…")
+    product_repo.guardar_video(carpeta, producto, modo, str(salida), int(time.time()), usuario=quien)
+    product_repo.olvidar_clips(carpeta, producto, modo, quien)
+    on_progress(1.0, "✅ Listo")
+    return str(salida)
+
+
 def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Monta el vídeo de UNA prenda: encuadre 9:16 y sin audio.
 
@@ -1954,7 +2169,6 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
 
     Params: producto, raw_path, y opcionalmente sexo ("hombre"|"mujer").
     """
-    from src.nicho_pov_bof import config as pov_config
     from src.nicho_ropa import config as ropa_config
     from src.nicho_ropa.pipeline import video_editor
     from src.nicho_ropa.repos import product_repo
@@ -1994,6 +2208,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     prod = product_repo.get_product(carpeta, producto, quien) or {}
     titulo = str(prod.get("titulo") or "")
     modo = ropa_config.modo_valido(str(p.get("modo") or ""))
+
+    # Los de 20s con voz de Fish se montan con el editor del POV BOF Largo.
+    if ropa_config.lleva_fish(modo):
+        return _montar_ropa_fish(job, rutas, carpeta, producto, prod, modo, quien, on_log, on_progress)
 
     if len(rutas) > 1:
         # En el orden de lo que DICEN, no en el que se subieron: si se sube el
@@ -2074,19 +2292,7 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
             on_log("[nicho_ropa] sin guion guardado: el vídeo sale sin subtítulos")
 
     on_progress(0.4, "🎬 Encuadrando a 9:16…")
-    nombre = pov_config.nombre_video(producto, titulo, folder=carpeta)
-    # El modo va en el nombre: sin él, el vídeo de "dejando la cámara" se
-    # escribía encima del del espejo (misma prenda, misma carpeta).
-    if modo != ropa_config.MODO_DEFECTO:
-        nombre = f"{Path(nombre).stem}__{modo}{Path(nombre).suffix}"
-    # Cada usuario en su subcarpeta, como en el POV BOF: montan la MISMA
-    # prenda por separado y el nombre del fichero es idéntico, así que sin
-    # esto el vídeo de uno sobrescribía el del otro. `ness` se queda en la
-    # raíz de siempre para no mover su histórico.
-    raiz_videos = Path(ropa_config.video_dir())
-    if quien and quien != product_repo.USUARIO_HISTORICO:
-        raiz_videos = raiz_videos / quien
-    salida = raiz_videos / carpeta / nombre
+    salida = _salida_ropa(carpeta, producto, titulo, modo, quien)
     video_editor.montar(
         raw_path, salida, voz=voz, conservar_audio=conservar_audio,
         texto_subs=texto_subs,

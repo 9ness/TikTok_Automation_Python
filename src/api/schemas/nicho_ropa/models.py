@@ -229,6 +229,9 @@ class PrendaInfo(BaseModel):
     # del producto en ese color, para adjuntar en Flow.
     miniaturas_variantes: list[str] = Field(default_factory=list)
     guion_dice: str = ""
+    # Formatos con voz de Fish: el mensaje de urgencia de precio que escribe
+    # el mismo prompt (columna «Han ajustado el precio de…»).
+    guion_subliminal: str = ""
     guion_at: int = 0
     uploaded: bool = False
     # Cuándo se marcó, para pintar "subido hoy" o la fecha. 0 = no consta.

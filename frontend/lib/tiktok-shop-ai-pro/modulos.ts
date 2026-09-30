@@ -113,7 +113,7 @@ export const MODULOS: ModuloNicho[] = [
     titulo: "Moda Mujer · Multimodo",
     icon: Shirt,
     resumen:
-      "Los formatos mudos de 10s (espejo, camisetas, zapatillas, botas y bolsos) con ropa, zapatos y accesorios: un formato por producto, el que mejor le va.",
+      "Los formatos mudos de 10s (espejo, camisetas, zapatillas, botas y bolsos) y dos de zapatillas de 20s con voz de Fish, con ropa, zapatos y accesorios: un formato por producto, el que mejor le va.",
     listo: true,
   },
   {

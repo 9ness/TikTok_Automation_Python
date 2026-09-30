@@ -357,6 +357,12 @@ def guion_de(prod: dict, modo: str) -> dict:
         # Los primeros se guardaron con fecha en ISO: si no es un número, se
         # sirve 0 en vez de reventar la lista entera de la carpeta.
         "guion_at": int(guion.get("at") or 0) if str(guion.get("at") or "").isdigit() else 0,
+        # Formatos con voz de Fish (guion del POV BOF Largo): el mensaje que
+        # se quema con la urgencia de precio, el nombre corto del producto y
+        # si se escribió con la frase de los plazos.
+        "subliminal": str(guion.get("subliminal") or ""),
+        "nombre": str(guion.get("nombre") or ""),
+        "plazos": bool(guion.get("plazos")),
     }
 
 
@@ -365,6 +371,9 @@ def guardar_guion(
     videos: "list[str] | None" = None, usuario: str = "",
     colores: "list[str] | None" = None,
     colores_hex: "dict[str, str] | None" = None,
+    subliminal: str = "",
+    nombre: str = "",
+    plazos: bool = False,
 ) -> dict:
     """Apunta el guion de un modo sin tocar el de los demás ni su vídeo."""
     from src.nicho_ropa import config
@@ -385,6 +394,9 @@ def guardar_guion(
             # montaje para los cortes de color. Vacío en los demás.
             "colores": [str(c) for c in (colores or []) if str(c).strip()],
             "colores_hex": dict(colores_hex or {}),
+            "subliminal": subliminal,
+            "nombre": nombre,
+            "plazos": bool(plazos),
             "at": int(time.time()),
         }
         prod["updated_at"] = _now()

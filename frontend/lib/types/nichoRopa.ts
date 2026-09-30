@@ -51,6 +51,11 @@ export interface EstiloMof10 {
   /** El guion se escribe fuera: se pega en ChatGPT con la foto de la ficha y
    *  lo que va a Flow es lo que ese devuelva. */
   escrito_fuera?: boolean;
+  /** Clips MUDOS y la voz la pone la app con Fish (guion de punto de dolor
+   *  del POV BOF Largo). Zapatillas Vista POV/Sentado 20s del multimodo. */
+  fish?: boolean;
+  /** Segundos de cada clip en los formatos partidos (8 o 10). */
+  segundos_clip?: number;
 }
 
 export interface PromptsRopaResponse {
@@ -77,6 +82,8 @@ export interface ModoRopa {
   label: string;
   /** Si el clip sale hablado. Los mudos no gastan la voz del generador. */
   voz?: boolean;
+  /** Clip mudo pero vídeo hablado: la voz la pone la app con Fish. */
+  fish?: boolean;
   /** "aleatorios" o "marca": son cuentas distintas, no un ajuste. */
   modalidad?: string;
   /** "calzado" cuando el formato solo vale para zapatos. */
@@ -175,6 +182,8 @@ export interface PrendaItem {
   /** Variantes con miniatura recortada de la captura (foto para Flow). */
   miniaturas_variantes?: string[];
   guion_dice?: string;
+  /** Formatos con voz de Fish: el mensaje de urgencia de precio. */
+  guion_subliminal?: string;
   guion_at?: number;
   uploaded: boolean;
   /** Cuándo se marcó como subido (epoch). 0 = no consta. */

@@ -676,7 +676,7 @@ export function PantallaRopa({
 
             <Sub>Modo de grabación</Sub>
             <div className="grid grid-cols-2 gap-1.5">
-              {modos.map(({ clave, label, voz }) => (
+              {modos.map(({ clave, label, voz, fish }: ModoRopa) => (
                 <button
                   key={clave}
                   type="button"
@@ -690,7 +690,9 @@ export function PantallaRopa({
                   {/* 🔇 = el clip sale MUDO: su paso 2 solo dice el
                       movimiento. Importa para el bolsillo, no para el
                       montaje — la voz del generador es lo que se paga. */}
-                  {voz === false ? "🔇 " : "🗣️ "}
+                  {/* Los de Fish ya traen 🎙️ en su etiqueta: clip mudo, pero
+                      el vídeo habla. */}
+                  {fish ? "" : voz === false ? "🔇 " : "🗣️ "}
                   {label}
                 </button>
               ))}
@@ -1169,7 +1171,15 @@ export function PantallaRopa({
                     roto: ese texto NO es para Flow, es el encargo para
                     ChatGPT, que devuelve el prompt de vídeo ya escrito para
                     esta prenda. Los de diálogo cerrado se saltan este paso. */}
-                {e.escrito_fuera ? (
+                {e.fish ? (
+                  <li>
+                    2️⃣ Pega el{" "}
+                    <strong className="text-foreground">prompt de movimiento</strong>{" "}
+                    en Flow/Omni o Magnific con cada imagen como FRAME INICIAL ·
+                    9:16 · {e.segundos_clip ?? 10} s. El guion NO se pega en el
+                    generador: lo escribe y lo locuta la app.
+                  </li>
+                ) : e.escrito_fuera ? (
                   <>
                     <li>
                       2️⃣ Pulsa{" "}
@@ -1203,11 +1213,21 @@ export function PantallaRopa({
                   </li>
                 )}
                 <li>
-                  {e.voz === false
+                  {e.fish
+                    ? "🎙️ Clips mudos: al montar, la app escribe un guion de punto de dolor para la prenda, lo locuta con una voz de mujer de Fish y pone los textos del POV BOF Largo"
+                    : e.voz === false
                     ? "🔇 Sale mudo: la música se pone en TikTok al publicar"
                     : "🗣️ El clip sale ya hablado: se publica con su voz, sin texto quemado"}
                 </li>
-                {(e.partes ?? 1) > 1 && !e.colores && (
+                {e.fish && (
+                  <li className="text-fuchsia-300">
+                    ✂️ Son {e.partes ?? 2} clips de {e.segundos_clip ?? 10} s: genera{" "}
+                    <strong className="text-foreground">{e.partes ?? 2} imágenes</strong>{" "}
+                    con el mismo prompt (otra chica y otro sitio en cada una) y un
+                    clip de cada imagen.
+                  </li>
+                )}
+                {(e.partes ?? 1) > 1 && !e.colores && !e.fish && (
                   <li className="text-fuchsia-300">
                     ✂️ Este formato va PARTIDO en {e.partes} clips: copia
                     también la <strong className="text-foreground">imagen 2</strong>{" "}
@@ -1254,7 +1274,7 @@ export function PantallaRopa({
                   prenda con ESTE prompt y sus fotos, y lo deja en su tarjeta.
                   Solo en los formatos cuyo guion se escribe fuera — los de
                   diálogo cerrado ya vienen con el texto puesto. */}
-              {e.escrito_fuera && (
+              {(e.escrito_fuera || e.fish) && (
                 <button
                   type="button"
                   disabled={guiones.isPending || !conTexto}
@@ -1520,7 +1540,10 @@ export function PantallaRopa({
               conPlazos={hayPlazos}
               // El guion de este formato lo escribe la IA por prenda: la
               // tarjeta enseña el botón de copiarlo (y el de rehacerlo).
-              conGuion={!!estiloActivo?.escrito_fuera}
+              conGuion={!!estiloActivo?.escrito_fuera || !!estiloActivo?.fish}
+              // Clips mudos y la voz la pone la app (Fish): el guion de la
+              // tarjeta es lo que se LOCUTA, no un bloque para el generador.
+              fish={!!estiloActivo?.fish}
               nichoCaption={nichoDeLaPantalla(variante, sexoFijo, modalidad)}
               // En cuántos clips se graba el formato: con dos, la tarjeta
               // pide los dos y el montaje los pega.
@@ -1551,6 +1574,7 @@ function PrendaCard({
   modo,
   conPlazos = false,
   conGuion = false,
+  fish = false,
   nichoCaption = "",
   partes = 1,
   conColores = false,
@@ -1573,6 +1597,8 @@ function PrendaCard({
   conPlazos?: boolean;
   /** El guion de este formato lo escribe la IA por prenda. */
   conGuion?: boolean;
+  /** Clips mudos + voz de Fish al montar (Zapatillas 20s del multimodo). */
+  fish?: boolean;
   /** Cuántos clips se suben para este formato. 1 = como siempre. */
   partes?: number;
   /** Formato con cortes de color: la tarjeta pide la captura del selector
@@ -2073,7 +2099,33 @@ function PrendaCard({
           {/* Un botón por clip: en el formato de calle dividido cada mitad
               del guion va a SU vídeo, y pegar el entero en los dos hace que
               los dos digan lo mismo. */}
-          {(prenda.guiones ?? []).length > 1 ? (
+          {fish ? (
+            /* Lo que se locuta (Fish) y el movimiento de los dos clips, que
+               es el mismo: el guion no va al generador, los clips son mudos. */
+            <>
+              <button
+                type="button"
+                disabled={!prenda.guion_dice}
+                onClick={() => onCopiar("Voz (Fish)", prenda.guion_dice)}
+                className={`flex-1 rounded-md border px-2 py-1.5 text-[11px] transition disabled:opacity-40 ${
+                  prenda.guion_dice
+                    ? "border-amber-500/60 text-amber-500 hover:bg-amber-500/10"
+                    : "border-border/60 text-muted-foreground"
+                }`}
+                title={prenda.guion_dice || "Se escribe solo al montar, o pulsa ✨ para verlo antes"}
+              >
+                🎙️ {prenda.guion_dice ? `Voz · ${prenda.guion_dice.length} car` : "Sin guion"}
+              </button>
+              <button
+                type="button"
+                disabled={!prenda.guion}
+                onClick={() => onCopiar("Movimiento (los 2 clips)", prenda.guion)}
+                className="flex-1 rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-amber-500/50 disabled:opacity-40"
+              >
+                🎬 Movimiento
+              </button>
+            </>
+          ) : (prenda.guiones ?? []).length > 1 ? (
             (prenda.guiones ?? []).map((texto, i) => {
               // Lo que se DICE en ese clip (lo que va entre comillas): el
               // bloque entero lleva también la voz y el movimiento, que no
