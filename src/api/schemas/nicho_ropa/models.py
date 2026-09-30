@@ -296,6 +296,9 @@ class PrendaEstadoRequest(BaseModel):
     # falla (la lee quien rehace el clip, persona o agente por el MCP).
     rehacer: bool | None = None
     rehacer_nota: str | None = None
+    # Retirado de TikTok Shop (su enlace ya no abre). Es del producto, no de
+    # cada usuario: el catálogo es el mismo para todos.
+    sin_stock: bool | None = None
 
 
 class VideoRopaUploadResponse(BaseModel):

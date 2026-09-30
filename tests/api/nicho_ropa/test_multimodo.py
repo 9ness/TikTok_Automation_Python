@@ -248,3 +248,20 @@ class TestRehacer:
         v = product_repo.videos_multimodo([c], "ana")[0]
         assert not v["rehacer"] and v["rehecho"]
         assert v["video_path"] == "/v2.mp4" and v["primer_listo_at"] == 1
+
+
+class TestSinStock:
+    def test_es_del_producto_y_se_ve_en_las_tandas_de_todos(self, monkeypatch):
+        """Como en el POV BOF: va al documento común, así que lo ve cualquier
+        usuario, y el vídeo sigue en la lista (no se borra ni se mueve)."""
+        falso = _RedisDocs()
+        monkeypatch.setattr(product_repo, "get_nicho_ropa_redis", lambda: falso)
+        c = "mujer_web__Carpeta_3"
+        product_repo.guardar_video(c, "3", "mm_espejo", "/v1.mp4", 1, "ana")
+        product_repo.guardar_video(c, "4", "mm_espejo", "/v2.mp4", 2, "ana")
+        product_repo.update_product(c, "3", sin_stock=True)
+        vs = {v["producto"]: v for v in product_repo.videos_multimodo([c], "ana")}
+        assert vs["3"]["sin_stock"] and not vs["4"]["sin_stock"]
+        assert vs["3"]["video_path"] == "/v1.mp4"
+        product_repo.update_product(c, "3", sin_stock=False)
+        assert not product_repo.videos_multimodo([c], "ana")[0]["sin_stock"]

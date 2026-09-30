@@ -10,6 +10,7 @@ import {
   buildVideoRopaUrl,
   useMarcarSubidoMultimodo,
   useRehacerMultimodo,
+  useSinStockMultimodo,
   useTandasMultimodo,
   type VideoMultimodo,
 } from "@/lib/queries/nichoRopa";
@@ -45,6 +46,7 @@ export function TandasMultimodo() {
     v.caption ? [v.caption, v.emojis, hashtags.join(" ")].filter(Boolean).join(" ") : "";
   const marcar = useMarcarSubidoMultimodo();
   const rehacer = useRehacerMultimodo();
+  const sinStock = useSinStockMultimodo();
   const [aRehacer, setARehacer] = useState<VideoMultimodo | null>(null);
   const [bajando, setBajando] = useState<number | null>(null);
   const [bajandoUno, setBajandoUno] = useState<string | null>(null);
@@ -53,9 +55,10 @@ export function TandasMultimodo() {
   const [abierta, setAbierta] = useState<number | null>(null);
 
   const datos = tandas.data;
-  // Por defecto se abre la primera tanda que aún tenga algo por subir.
+  // Por defecto se abre la primera tanda que aún tenga algo por subir. Lo
+  // que está sin stock no cuenta: no se puede publicar.
   const primeraPendiente =
-    datos?.tandas.find((t) => t.subidos < t.items.length)?.numero ?? null;
+    datos?.tandas.find((t) => t.subidos + (t.sin_stock ?? 0) < t.items.length)?.numero ?? null;
   const abiertaReal = abierta ?? primeraPendiente;
 
   // La búsqueda para la biblioteca de sonidos de TikTok: se pega tal cual
@@ -92,8 +95,11 @@ export function TandasMultimodo() {
     const t = datos?.tandas.find((x) => x.numero === numero);
     if (!t) return;
     setBajando(numero);
+    // Sin stock no se baja (no se puede publicar), pero el resto conserva su
+    // número de puesto en el nombre: la tanda descargada sigue cuadrando.
+    const saltados = t.items.filter((v) => v.sin_stock && !v.uploaded).length;
     const r = await bajarEnOrden(
-      t.items.map((v, i) => ({
+      t.items.map((v, i) => ({ v, i })).filter(({ v }) => !(v.sin_stock && !v.uploaded)).map(({ v, i }) => ({
         href: buildVideoRopaUrl(v.producto, v.carpeta, v.video_listo_at, true, v.formato),
         nombre:
           nombreDescarga(
@@ -110,7 +116,11 @@ export function TandasMultimodo() {
     setBajando(null);
     setProgreso("");
     if (r.fallidas) toast.error(`${r.bajadas} bajados · ${r.fallidas} fallaron`);
-    else toast.success(`Tanda ${numero}: ${r.bajadas} vídeo(s) descargados`);
+    else
+      toast.success(
+        `Tanda ${numero}: ${r.bajadas} vídeo(s) descargados` +
+          (saltados ? ` · ${saltados} sin stock no bajado(s)` : ""),
+      );
   }
 
   return (
@@ -118,7 +128,12 @@ export function TandasMultimodo() {
       icono="📦"
       titulo="Vídeos listos por tandas"
       hint="Todo lo montado del multimodo, de cualquier carpeta, de diez en diez. Baja la tanda, copia el caption y la música de cada vídeo y pulsa «Marcar subido» al publicarlo. 🎵 es la música que le va: tócala para copiar la búsqueda y pégala en TikTok › Añadir sonido › Buscar (elige uno con muchos vídeos y bájale el volumen)."
-      extra={datos ? `${datos.subidos}/${datos.total} subidos` : undefined}
+      extra={
+        datos
+          ? `${datos.subidos}/${datos.total} subidos` +
+            (datos.sin_stock ? ` · 🚫 ${datos.sin_stock}` : "")
+          : undefined
+      }
     >
       {tandas.isLoading ? (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -129,7 +144,8 @@ export function TandasMultimodo() {
       ) : (
         <div className="space-y-1.5">
           {datos.tandas.map((t) => {
-            const completa = t.subidos >= t.items.length;
+            // Sin stock cuenta como cerrado: no hay nada más que hacer con él.
+            const completa = t.subidos + (t.sin_stock ?? 0) >= t.items.length;
             const abiertaEsta = abiertaReal === t.numero;
             return (
               <div key={t.numero} className="rounded-lg border border-border/60">
@@ -149,6 +165,11 @@ export function TandasMultimodo() {
                     >
                       {t.subidos}/{t.items.length} subidos
                     </span>
+                    {t.sin_stock ? (
+                      <span className="ml-1 rounded-full bg-rose-500/15 px-1.5 py-px text-[10px] text-rose-500">
+                        🚫 {t.sin_stock}
+                      </span>
+                    ) : null}
                     {t.items.some((x) => x.rehacer) ? (
                       <span className="ml-1 rounded-full bg-orange-500/15 px-1.5 py-px text-[10px] text-orange-500">
                         🔁 {t.items.filter((x) => x.rehacer).length}
@@ -174,7 +195,9 @@ export function TandasMultimodo() {
                     {t.items.map((v, i) => (
                       <li
                         key={`${v.carpeta}-${v.producto}`}
-                        className="flex flex-col gap-1 px-2 py-1.5"
+                        className={`flex flex-col gap-1 px-2 py-1.5 ${
+                          v.sin_stock && !v.uploaded ? "bg-rose-500/5" : ""
+                        }`}
                       >
                         {/* Arriba la ficha y las acciones; los chips van en su
                             propia línea a lo ancho: en un móvil estrecho no
@@ -203,7 +226,11 @@ export function TandasMultimodo() {
                             <div className="h-10 w-10 shrink-0 rounded-md border border-dashed border-border/40 sm:h-12 sm:w-12" />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[11px] font-medium sm:text-xs">
+                            <p
+                              className={`truncate text-[11px] font-medium sm:text-xs ${
+                                v.sin_stock && !v.uploaded ? "text-muted-foreground line-through" : ""
+                              }`}
+                            >
                               {v.titulo || `Producto ${v.producto}`}
                             </p>
                             <p className="truncate text-[10px] text-muted-foreground">
@@ -233,6 +260,33 @@ export function TandasMultimodo() {
                               🛍️
                             </a>
                           ) : null}
+                          {/* Sin stock: como en POV BOF, el producto ya no está en
+                              TikTok Shop. Solo en lo que falta por subir; se
+                              quita de un toque si el producto vuelve. */}
+                          {(!v.uploaded || v.sin_stock) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                sinStock.mutate({
+                                  carpeta: v.carpeta,
+                                  producto: v.producto,
+                                  sin_stock: !v.sin_stock,
+                                })
+                              }
+                              title={
+                                v.sin_stock
+                                  ? "Quitar «sin stock» (el producto ha vuelto)"
+                                  : "Marcar sin stock: el producto ya no está en TikTok Shop"
+                              }
+                              className={`flex shrink-0 items-center rounded-md border px-1.5 py-1 text-[10px] ${
+                                v.sin_stock
+                                  ? "border-rose-500/60 bg-rose-500/15 text-rose-500"
+                                  : "border-border/60 text-muted-foreground hover:text-rose-500"
+                              }`}
+                            >
+                              🚫
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() =>
@@ -273,6 +327,12 @@ export function TandasMultimodo() {
                             )}
                           </button>
                         </div>
+                        {v.sin_stock && !v.uploaded ? (
+                          <p className="break-words pl-6 text-[10px] text-rose-500">
+                            🚫 Sin stock: no se sube ni se baja con la tanda. Si el producto
+                            vuelve, pulsa 🚫 otra vez y queda en su puesto.
+                          </p>
+                        ) : null}
                         {v.rehacer ? (
                           <p className="break-words pl-6 text-[10px] text-orange-500">
                             🔁 Rehacer{v.rehacer_nota ? `: ${v.rehacer_nota}` : ""}

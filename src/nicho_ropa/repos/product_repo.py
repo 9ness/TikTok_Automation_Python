@@ -199,6 +199,10 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
                 "rehacer": bool(vista.get("rehacer")),
                 "rehacer_nota": str(vista.get("rehacer_nota") or ""),
                 "rehecho": bool(vista.get("rehecho")),
+                # El producto ya no está en TikTok Shop: el vídeo está hecho
+                # pero no se puede publicar. Es del PRODUCTO (documento común),
+                # como en el POV BOF: si vuelve, se quita y se sube.
+                "sin_stock": bool(vista.get("sin_stock")),
                 **v,
             })
     salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))

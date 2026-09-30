@@ -280,8 +280,15 @@ En cada vídeo:
   suspendido en el aire, algo que aparece de golpe o una chica de espaldas
   al espejo son sanción.
 
-No marques Subido/Escaparate/Vendió salvo que te lo pidan: eso es de quien
-publica.
+- **🚫** marca el producto **sin stock** (ya no está en TikTok Shop), como en
+  POV BOF. Es del PRODUCTO, no del usuario (`sin_stock` en el documento común,
+  `POST /multimodo/sin-stock`). El vídeo se queda en su puesto, tachado. Cuenta
+  como cerrado para dar la tanda por terminada y «Bajar» se lo salta,
+  conservando el número de puesto de los demás. Si el producto vuelve, se pulsa
+  otra vez. **No rehagas ni generes nada de un producto sin stock.**
+
+No marques Subido/Escaparate/Vendió/Sin stock salvo que te lo pidan: eso es de
+quien publica.
 
 Cada vídeo trae **🎵 la música que le va** (`musica` en la API): una búsqueda
 para la biblioteca de sonidos de TikTok, otras de repuesto y el estilo. Sale

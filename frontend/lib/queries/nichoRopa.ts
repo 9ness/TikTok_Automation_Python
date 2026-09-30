@@ -542,12 +542,50 @@ export interface VideoMultimodo {
   rehacer?: boolean;
   rehacer_nota?: string;
   rehecho?: boolean;
+  /** El producto ya no está en TikTok Shop: el vídeo no se sube ni se baja,
+   *  pero se queda en su puesto por si vuelve. Es del producto, no del usuario. */
+  sin_stock?: boolean;
 }
 
 export interface TandasMultimodoResponse {
   total: number;
   subidos: number;
-  tandas: { numero: number; items: VideoMultimodo[]; subidos: number }[];
+  /** Vídeos sin subir cuyo producto está sin stock. */
+  sin_stock?: number;
+  tandas: { numero: number; items: VideoMultimodo[]; subidos: number; sin_stock?: number }[];
+}
+
+/** «🚫 Sin stock» de una fila de las tandas. Se pinta al momento, como el
+ *  «subido»: la fila se queda en su sitio, tachada. */
+export function useSinStockMultimodo() {
+  const qc = useQueryClient();
+  const key = [...nichoRopaKeys.all, "multimodo-tandas"];
+  type Body = { carpeta: string; producto: string; sin_stock: boolean };
+  const pendienteSinStock = (v: VideoMultimodo) => !!v.sin_stock && !v.uploaded;
+  const aplicar = (b: Body) =>
+    qc.setQueryData<TandasMultimodoResponse>(key, (d) => {
+      if (!d) return d;
+      const tandas = d.tandas.map((t) => {
+        const items = t.items.map((v) =>
+          v.carpeta === b.carpeta && v.producto === b.producto ? { ...v, sin_stock: b.sin_stock } : v,
+        );
+        return { ...t, items, sin_stock: items.filter(pendienteSinStock).length };
+      });
+      return { ...d, tandas, sin_stock: tandas.reduce((n, t) => n + (t.sin_stock ?? 0), 0) };
+    });
+  return useMutation<unknown, Error, Body>({
+    mutationFn: (body) => api.post(`${ROOT}/multimodo/sin-stock`, body),
+    onMutate: async (b) => {
+      await qc.cancelQueries({ queryKey: key });
+      aplicar(b);
+    },
+    onError: (_e, b) => {
+      aplicar({ ...b, sin_stock: !b.sin_stock });
+      toast.error("No se pudo guardar «sin stock». Vuelve a pulsarlo.");
+    },
+    onSettled: () =>
+      void qc.invalidateQueries({ queryKey: nichoRopaKeys.all, refetchType: "none" }),
+  });
 }
 
 /** Los vídeos del Multimodo de TODAS las carpetas, en tandas de diez para
@@ -612,9 +650,19 @@ export function useMarcarSubidoMultimodo() {
         const items = t.items.map((v) =>
           v.carpeta === b.carpeta && v.producto === b.producto ? { ...v, uploaded: b.uploaded } : v,
         );
-        return { ...t, items, subidos: items.filter((v) => v.uploaded).length };
+        return {
+          ...t,
+          items,
+          subidos: items.filter((v) => v.uploaded).length,
+          sin_stock: items.filter((v) => v.sin_stock && !v.uploaded).length,
+        };
       });
-      return { ...d, tandas, subidos: tandas.reduce((n, t) => n + t.subidos, 0) };
+      return {
+        ...d,
+        tandas,
+        subidos: tandas.reduce((n, t) => n + t.subidos, 0),
+        sin_stock: tandas.reduce((n, t) => n + (t.sin_stock ?? 0), 0),
+      };
     });
   return useMutation<unknown, Error, Body>({
     mutationFn: (body) => api.post(`${ROOT}/multimodo/subido`, body),

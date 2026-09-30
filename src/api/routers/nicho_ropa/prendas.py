@@ -371,11 +371,18 @@ def multimodo_tandas(
         videos = product_repo.fijar_orden_multimodo(videos, usuario, config.orden_para_publicar)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+    # Un vídeo sin stock no se puede publicar: cuenta como CERRADO para dar la
+    # tanda por terminada, pero se queda en su puesto (el orden no se mueve).
+    def _cerrado(x: dict) -> bool:
+        return bool(x["uploaded"] or x.get("sin_stock"))
+
     tandas_pendientes = [
         videos[i:i + por_tanda] for i in range(0, len(videos), por_tanda)
-        if not all(x["uploaded"] for x in videos[i:i + por_tanda])
+        if not all(_cerrado(x) for x in videos[i:i + por_tanda])
     ]
-    _precalentar([v["video_path"] for t in tandas_pendientes[:2] for v in t])
+    _precalentar([
+        v["video_path"] for t in tandas_pendientes[:2] for v in t if not v.get("sin_stock")
+    ])
     try:
         indice = pov_repo.urls_index()
     except Exception:  # noqa: BLE001 — sin índice, vale lo que lleve la ficha
@@ -400,10 +407,18 @@ def multimodo_tandas(
             "numero": i // por_tanda + 1,
             "items": videos[i:i + por_tanda],
             "subidos": sum(1 for x in videos[i:i + por_tanda] if x["uploaded"]),
+            "sin_stock": sum(
+                1 for x in videos[i:i + por_tanda] if x.get("sin_stock") and not x["uploaded"]
+            ),
         }
         for i in range(0, len(videos), por_tanda)
     ]
-    return {"total": len(videos), "subidos": sum(1 for x in videos if x["uploaded"]), "tandas": tandas}
+    return {
+        "total": len(videos),
+        "subidos": sum(1 for x in videos if x["uploaded"]),
+        "sin_stock": sum(1 for x in videos if x.get("sin_stock") and not x["uploaded"]),
+        "tandas": tandas,
+    }
 
 
 _calentando: set[str] = set()
@@ -458,6 +473,27 @@ def multimodo_subido(
         raise APIError(str(e), status_code=503) from e
     _contar_subida(f"ropa:{body.carpeta}:{body.producto}", bool(body.uploaded), usuario)
     return {"ok": True, "uploaded": bool(body.uploaded), "uploaded_at": uploaded_at}
+
+
+@router.post("/multimodo/sin-stock")
+def multimodo_sin_stock(
+    body: PrendaEstadoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """«🚫 Sin stock» de una fila de las tandas (y quitarlo si vuelve).
+
+    Igual que en el POV BOF: es del PRODUCTO, no del usuario — si ya no está
+    en TikTok Shop no está para nadie —, así que va al documento común. El
+    vídeo no se borra ni se mueve de su tanda: se da por cerrado y no se baja
+    hasta que el producto vuelva. Ligero como `/multimodo/subido`.
+    """
+    if body.sin_stock is None or not config.es_carpeta_conocida(body.carpeta):
+        raise APIError("Falta la carpeta o el estado.", status_code=400)
+    try:
+        product_repo.update_product(body.carpeta, body.producto, sin_stock=bool(body.sin_stock))
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    return {"ok": True, "sin_stock": bool(body.sin_stock)}
 
 
 @router.post("/multimodo/rehacer")
@@ -877,6 +913,12 @@ def set_producto_estado(
     # venta es de la cuenta de quien la hizo, no del catálogo de donde saliera
     # la prenda. Se guarda además en el documento para poder pintarlo sin leer
     # el índice entero.
+    if body.sin_stock is not None:
+        # Del producto (documento común), igual que en las tandas.
+        try:
+            product_repo.update_product(carpeta, body.producto, sin_stock=bool(body.sin_stock))
+        except RuntimeError as e:
+            raise APIError(str(e), status_code=503) from e
     if body.sold is not None:
         try:
             product_repo.update_personal(
