@@ -1210,7 +1210,10 @@ def escribir_guion(
             foto=foto,
             fotos=imagenes or None,
             plazos=plazos,
-            prompt=config.prompt_guion(plazos, estilo, envio_gratis, segundos),
+            prompt=config.prompt_guion(
+                plazos, estilo, envio_gratis, segundos,
+                temporada=body.folder == pov_config.CARPETA_Q4,
+            ),
             max_caracteres=config.caracteres_guion(segundos),
         )
     except ValueError as e:

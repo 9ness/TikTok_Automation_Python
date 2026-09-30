@@ -100,3 +100,15 @@ def test_refs_mal_formadas_y_sin_foto(tmp_path, monkeypatch):
 def test_solo_ness_ve_la_carpeta():
     assert config.ve_carpeta_q4("ness")
     assert not config.ve_carpeta_q4("ana")
+
+
+def test_el_guion_de_temporada_lleva_el_angulo_regalo_sin_promesas():
+    from src.nicho_pov_bof_largo import config as largo
+
+    normal = largo.prompt_guion(False, "dolor", False, 24)
+    q4 = largo.prompt_guion(False, "dolor", False, 24, temporada=True)
+    assert "TEMPORADA" not in normal
+    assert "TEMPORADA" in q4 and "REGALO" in q4
+    assert "Black Friday" in q4 and "fechas de entrega" in q4
+    # La cabecera del fichero es para el repo, no para Gemini.
+    assert "Bloque que se AÑADE" not in q4

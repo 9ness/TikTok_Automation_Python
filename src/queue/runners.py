@@ -2462,6 +2462,13 @@ def _es_plazos(textos: dict) -> bool:
     return pov_config.hay_plazos(textos)
 
 
+def _carpeta_q4() -> str:
+    """La carpeta de temporada, cuyos guiones llevan el ángulo de campaña."""
+    from src.nicho_pov_bof import config as pov_config
+
+    return pov_config.CARPETA_Q4
+
+
 def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Monta el vídeo de UN producto: guion escrito por IA, locutado y sobre
     los clips que haga falta pegados (8s cada uno).
@@ -2583,7 +2590,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             caption=textos.get("caption", ""),
             foto=foto,
             plazos=plazos,
-            prompt=largo_config.prompt_guion(plazos, modo, envio, segundos),
+            prompt=largo_config.prompt_guion(
+                plazos, modo, envio, segundos,
+                temporada=folder == _carpeta_q4(),
+            ),
             max_caracteres=largo_config.caracteres_guion(segundos),
             on_log=on_log,
         )
@@ -3570,7 +3580,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
                 caption=t.get("caption", ""),
                 foto=_foto_limpia(source, carpeta, pid),
                 plazos=plazos,
-                prompt=largo_config.prompt_guion(plazos, estilo, envio, segundos),
+                prompt=largo_config.prompt_guion(
+                    plazos, estilo, envio, segundos,
+                    temporada=carpeta == _carpeta_q4(),
+                ),
                 max_caracteres=largo_config.caracteres_guion(segundos),
             )
         except Exception as e:  # noqa: BLE001 — uno malo no para el resto

@@ -507,8 +507,12 @@ def prompt_guion(
     estilo: str = ESTILO_GUION_DEFECTO,
     envio_gratis: bool = True,
     segundos: float = 0,
+    temporada: bool = False,
 ) -> str:
     """El prompt del curso, con el bloque de plazos pegado si toca.
+
+    `temporada` (carpeta «Productos Q4») pega además `guion_temporada.md`: el
+    ángulo regalo de Black Friday/Navidad sin prometer nada de la ficha.
 
     Va LITERAL y nunca se toca. Lo de plazos es un añadido al final
     (`guion_plazos.md`), no una versión aparte: así el guion de un producto
@@ -530,6 +534,10 @@ def prompt_guion(
         extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
         # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini
         # solo se le manda lo que va después del separador.
+        _, _, cuerpo = extra.partition("\n---\n")
+        base = f"{base}\n\n{cuerpo.strip()}"
+    if temporada:
+        extra = (prompts_dir() / "guion_temporada.md").read_text(encoding="utf-8")
         _, _, cuerpo = extra.partition("\n---\n")
         base = f"{base}\n\n{cuerpo.strip()}"
     return _alargar(base, segundos) + _caracteristicas(segundos) + _epoca()
