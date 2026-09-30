@@ -15,6 +15,7 @@ from .models import (
     ProductoEstadoLargoRequest,
     ProductoLargo,
     ProductosLargoResponse,
+    Q4AnadirRequest,
     VocesLargoResponse,
     VozLargo,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "ProductoEstadoLargoRequest",
     "ProductoLargo",
     "ProductosLargoResponse",
+    "Q4AnadirRequest",
     "VocesLargoResponse",
     "VozLargo",
 ]

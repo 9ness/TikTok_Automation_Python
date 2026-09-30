@@ -197,6 +197,15 @@ class MarkPendienteLargoRequest(BaseModel):
     pendiente: bool = True
 
 
+class Q4AnadirRequest(BaseModel):
+    """Copia productos a la carpeta de temporada «Productos Q4»."""
+
+    # "<catálogo>|<carpeta>|<producto>", p. ej. "inventario_general|Carpeta_22|3".
+    refs: list[str]
+    # Duración que se le pide al guion de los nuevos: 24 = tres clips de 8s.
+    segundos_guion: float = 24
+
+
 class MarkCompletedLargoResponse(BaseModel):
     source: str
     folder: str

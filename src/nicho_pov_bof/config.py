@@ -186,6 +186,22 @@ def es_carpeta_virtual(folder: str) -> bool:
 CARPETA_REHECHOS = "__rehechos__"
 ETIQUETA_REHECHOS = "🔁 Rehechos"
 
+# Carpeta de temporada (Black Friday + Navidad): productos del Inventario
+# General COPIADOS aquí para volver a grabarlos con el ángulo de campaña. A
+# diferencia de las de arriba es una carpeta REAL (fotos en el Drive montado):
+# así guion, clips, vídeo y marcas son suyos y no pisan los del original, que
+# puede estar ya publicado. Ver `services/productos_q4.py`.
+CARPETA_Q4 = "Productos Q4"
+CATALOGO_Q4 = "inventario_general"
+# Quién la ve en la lista de carpetas. Es trabajo de la cuenta de ness; a los
+# demás solo les saldría una carpeta que no han pedido.
+USUARIOS_Q4 = frozenset({"ness"})
+
+
+def ve_carpeta_q4(usuario: str) -> bool:
+    # Sin usuario es la API directa (tests, scripts): la ve.
+    return not usuario or usuario in USUARIOS_Q4
+
 
 def es_fuente_propia(source: str) -> bool:
     """True si la fuente son productos subidos por el operador (no del curso)."""

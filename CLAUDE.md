@@ -427,6 +427,12 @@ Tres cosas del guion que no son del curso y hay que saber:
   escuchándolas decir un guion nuestro. El car/s de cada una está MEDIDO con
   nuestro texto: el que anuncia el catálogo de Fish se desvía hasta 3 car/s.
 
+**🎄 Productos Q4** (`nicho_pov_bof/services/productos_q4.py`): carpeta real
+«Productos Q4» dentro del Inventario General, primera de la lista y solo para
+`ness`, con COPIAS de productos (fotos + textos + `segundos_guion`) para grabar
+vídeos de Black Friday/Navidad sin pisar el original. Manifiesto
+`q4:manifiesto`; se llena con `POST /q4/anadir` o el MCP `anadir_a_q4`.
+
 Si el producto pasa de `PRECIO_MIN_PLAZOS`, al guion se le añade el bloque de
 `prompts/guion_plazos.md` (una frase de financiación, sin nombrar la pasarela):
 misma estructura del curso, un párrafo más en el prompt. `guion_plazos` guarda

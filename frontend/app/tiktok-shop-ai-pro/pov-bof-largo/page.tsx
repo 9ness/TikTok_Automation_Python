@@ -121,10 +121,15 @@ import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 
+/** La de temporada: productos del Inventario copiados para la campaña (ver `productos_q4.py`). */
+const CARPETA_Q4 = "Productos Q4";
+
 /** Nombre para enseñar: las carpetas virtuales tienen un nombre interno. */
 function nombreCarpeta(folder: string): string {
   if (folder === "__rehechos__") return "🔁 Rehechos";
   if (folder === "__esperando_stock__") return "⏳ Esperando stock";
+  // Carpeta REAL del Inventario, pero de temporada (Black Friday + Navidad).
+  if (folder === CARPETA_Q4) return "Productos Q4 · Black Friday y Navidad";
   return folder;
 }
 
@@ -815,7 +820,7 @@ export default function PovBofLargoPage() {
                 ? f.tipo_virtual === "rehechos"
                   ? `🔁 Rehechos (${f.esperando ?? 0})`
                   : `⏳ Esperando stock (${f.esperando ?? 0})`
-                : f.name}
+                : f.name === CARPETA_Q4 ? "🎄 Productos Q4" : f.name}
               {/* Cuántos productos de esta carpeta tienen ya la ficha
                   enlazada: es el trabajo que hay dentro. Sin esto había que
                   entrar carpeta por carpeta para descubrir que estaba a cero.
@@ -901,7 +906,7 @@ export default function PovBofLargoPage() {
           trabajo, que es lo que viene justo debajo. */}
       {data && folder && (
         <Caja
-          icono={folder === "__rehechos__" ? "🔁" : folder === "__esperando_stock__" ? "⏳" : "📂"}
+          icono={folder === "__rehechos__" ? "🔁" : folder === "__esperando_stock__" ? "⏳" : folder === CARPETA_Q4 ? "🎄" : "📂"}
           titulo={nombreCarpeta(folder)}
           hint={`Carpeta ${idx + 1} de ${total}${currentItem?.completed ? " · ya completada" : ""}`}
         >

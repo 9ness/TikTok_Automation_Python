@@ -49,6 +49,7 @@ from src.api.schemas.nicho_pov_bof_largo import (
     ProductoEstadoLargoRequest,
     ProductoLargo,
     ProductosLargoResponse,
+    Q4AnadirRequest,
     VocesLargoResponse,
     VozLargo,
 )
@@ -330,6 +331,15 @@ def list_folders(
         )
         for c in carpetas
     ]
+    # «Productos Q4» es una carpeta real del Inventario, pero de temporada: va
+    # delante de las numeradas (y detrás de las virtuales) y solo para quien la
+    # trabaja.
+    from src.nicho_pov_bof import config as pov_config
+
+    q4 = [i for i in items if i.name == pov_config.CARPETA_Q4]
+    items = [i for i in items if i.name != pov_config.CARPETA_Q4]
+    if q4 and pov_config.ve_carpeta_q4(usuario):
+        items.insert(0, q4[0])
     # La virtual va la PRIMERA y solo si tiene algo: son vídeos terminados que
     # no se pueden publicar, y mezclados con el resto se perdían de vista.
     try:
@@ -365,8 +375,13 @@ def list_folders(
     except Exception:  # noqa: BLE001
         pass
 
+    # La de temporada no es "la siguiente por hacer" del catálogo.
     current = next(
-        (i.name for i in items if not i.completed and not i.virtual), None,
+        (
+            i.name for i in items
+            if not i.completed and not i.virtual and i.name != pov_config.CARPETA_Q4
+        ),
+        None,
     )
     return FoldersLargoResponse(
         source=source,
@@ -437,6 +452,40 @@ def mark_completed(
         total=len(names),
         next_folder=next_folder,
     )
+
+
+@router.get("/q4")
+def q4_manifiesto(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Qué productos hay en «Productos Q4» y de dónde salió cada uno."""
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.services import productos_q4
+
+    if not pov_config.ve_carpeta_q4(usuario):
+        raise APIError("La carpeta Productos Q4 es de la cuenta de ness.", status_code=403)
+    doc = productos_q4.manifiesto()
+    return {
+        "source": pov_config.CATALOGO_Q4, "carpeta": pov_config.CARPETA_Q4,
+        "productos": [{"ref": ref, "producto": n} for ref, n in doc.items()],
+    }
+
+
+@router.post("/q4/anadir")
+def q4_anadir(
+    body: Q4AnadirRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Copia productos a «Productos Q4» (fotos + textos, sin tocar el original)."""
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.services import productos_q4
+
+    if not pov_config.ve_carpeta_q4(usuario):
+        raise APIError("La carpeta Productos Q4 es de la cuenta de ness.", status_code=403)
+    if not body.refs:
+        raise _bad("Dime qué productos: refs = ['<catálogo>|<carpeta>|<producto>', …]")
+    try:
+        return productos_q4.anadir(body.refs, segundos_guion=body.segundos_guion)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
 
 
 def _montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:

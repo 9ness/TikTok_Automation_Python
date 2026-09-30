@@ -114,6 +114,24 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
   clips. La marca se quita sola al montarse el vídeo nuevo, y el producto pasa a la carpeta virtual **«🔁 Rehechos»** (arriba del todo en la lista de carpetas, con la nota de qué se arregló) hasta que el operador lo marca «📤 Subido». Sin ficha («URL» en gris) → se puede hacer, pero
   no se podrá publicar con carrito: pregunta.
 
+## 🎄 Productos Q4 (Black Friday y Navidad)
+
+Carpeta de temporada dentro de **📦 Inventario General**, la primera de la lista
+(solo la ve `ness`). Son COPIAS de productos del inventario (fotos + textos):
+el original no se toca y en la copia el guion, los clips, el vídeo y las marcas
+son nuevos, así que se puede repetir un producto ya publicado.
+
+- Añadir: MCP `anadir_a_q4(productos=["inventario_general|Carpeta_22|3", …], clips=3)`
+  (API: `POST /api/v1/nicho-pov-bof-largo/q4/anadir`). Idempotente.
+- `clips=3` deja el guion en 24 s (tres clips de 8 s): una imagen por clip, tres
+  sitios distintos.
+- Después, como cualquier carpeta: `preparar_carpeta(catalogo="inventario_general",
+  carpeta="Productos Q4", clip_s=8, estilo_guion=…)`. El modo es del catálogo
+  entero: si se hace media carpeta en «precio» y media en «dolor», cada mitad se
+  ve con su modo activo.
+- Ángulo de campaña: `campanas` y [`comun/campanas.md`](comun/campanas.md). Nada
+  de prometer ofertas que la ficha no tenga.
+
 ## Lo que aprendimos haciendo carpetas enteras (sep 2026)
 
 Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en

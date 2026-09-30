@@ -183,6 +183,22 @@ async def para_rehacer(ctx: Context, menu: str = "pov_bof_largo") -> str:
 
 
 @_herramienta(structured_output=False)
+async def anadir_a_q4(ctx: Context, productos: list[str], clips: int = 3) -> str:
+    """Copia productos a la carpeta de temporada «Productos Q4» (Black Friday /
+    Navidad) del Inventario General de POV BOF Largo. Cada uno como
+    "<catálogo>|<carpeta>|<producto>" (p. ej. "inventario_general|Carpeta_22|3").
+    Se copian fotos y textos: el original no se toca y en la copia todo (guion,
+    clips, vídeo, subido) es nuevo. `clips` fija la duración del guion (3 = 24s
+    con clips de 8s). Idempotente: lo ya copiado sale en `ya_estaban`. Solo la
+    cuenta de ness. Después, `preparar_carpeta(menu="pov_bof_largo",
+    catalogo="inventario_general", carpeta="Productos Q4", clip_s=8, ...)`."""
+    api = Interno(_usuario(ctx))
+    return _json(await api.post("/api/v1/nicho-pov-bof-largo/q4/anadir",
+                                {"refs": [str(p) for p in productos],
+                                 "segundos_guion": 8 * max(2, int(clips or 3))}))
+
+
+@_herramienta(structured_output=False)
 async def productos(ctx: Context, menu: str, catalogo: str, carpeta: str, modo: str = "",
                     gancho: str = "", duracion: str = "") -> str:
     """Los productos de una carpeta con su estado: textos, guion, clips que
