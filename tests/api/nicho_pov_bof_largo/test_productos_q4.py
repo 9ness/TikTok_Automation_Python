@@ -54,6 +54,7 @@ def _prepara(tmp_path, monkeypatch):
     monkeypatch.setattr(drive_client, "fetch_photo", lambda i, suffix="": __import__("pathlib").Path(i))
     monkeypatch.setattr(product_repo, "get_product", lambda s, f, p, u="": {
         "titulo": f"Producto {p}", "tienda": "Tienda", "precio": 9.9, "vacio": "",
+        "envio": "condicionado", "plazos": "no",
     })
     monkeypatch.setattr(
         product_repo, "save_extracted_texts",
@@ -75,6 +76,8 @@ def test_copia_fotos_y_textos_con_duracion_y_origen(tmp_path, monkeypatch):
     assert textos["1"]["segundos_guion"] == 24.0
     assert textos["2"]["origen"] == "inventario_general|Carpeta_22|4"
     assert "vacio" not in textos["1"]
+    # Lo que la ficha deja prometer viaja con la copia.
+    assert textos["1"]["envio"] == "condicionado" and textos["1"]["plazos"] == "no"
 
 
 def test_no_duplica_y_no_recicla_numeros(tmp_path, monkeypatch):

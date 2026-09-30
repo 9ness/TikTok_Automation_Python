@@ -40,10 +40,13 @@ _EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 _MANIFIESTO = "q4:manifiesto"
 SOURCE = config.CATALOGO_Q4
 CARPETA = config.CARPETA_Q4
-# Campos de texto que viajan con el producto (los mismos que Top vendidos).
+# Campos de texto que viajan con el producto. `envio` y `plazos` son lo que
+# la ficha deja PROMETER: sin ellos la copia cae al precio y el guion puede
+# ofrecer envío gratis o plazos que el producto no tiene (promoción
+# incoherente).
 _CAMPOS = (
     "titulo", "titulo_tiktok_completo", "tienda", "caption",
-    "emojis", "precio", "precio_lista", "product_url",
+    "emojis", "precio", "precio_lista", "product_url", "envio", "plazos",
 )
 
 
@@ -158,6 +161,8 @@ def anadir(
 
         origen = product_repo.get_product(source, folder, producto)
         textos = {k: origen.get(k, "") for k in _CAMPOS if origen.get(k)}
+        if origen.get("sin_stock"):
+            textos["sin_stock"] = True
         textos["origen"] = ref
         if segundos_guion and segundos_guion > 0:
             textos["segundos_guion"] = float(segundos_guion)
@@ -185,3 +190,24 @@ def _invalidar() -> None:
         drive_client.list_photos(SOURCE, CARPETA, refresh=True)
     except Exception:  # noqa: BLE001
         pass
+
+
+def recopiar_promesas() -> dict[str, dict]:
+    """Vuelve a traer `envio`, `plazos` y `sin_stock` del original a cada copia.
+
+    Para las copias hechas antes de que esos campos viajaran con el producto.
+    """
+    from src.nicho_pov_bof.repos import product_repo
+
+    salida: dict[str, dict] = {}
+    for ref, numero in manifiesto().items():
+        partes = ref.split("|")
+        if len(partes) != 3:
+            continue
+        origen = product_repo.get_product(*partes)
+        campos = {k: origen[k] for k in ("envio", "plazos") if origen.get(k)}
+        campos["sin_stock"] = bool(origen.get("sin_stock"))
+        salida[str(numero)] = campos
+    if salida:
+        product_repo.save_extracted_texts(SOURCE, CARPETA, salida)
+    return salida
