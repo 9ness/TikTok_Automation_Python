@@ -1,0 +1,67 @@
+#!/bin/bash
+# claude-login estado|iniciar|codigo|cancelar — iniciar sesión de Claude Code en el VPS desde la web.
+#
+# La sesión de claude.ai del VPS caduca (≈ cada mes, o se cierra) y entonces Remote Control
+# y el chat de la app dan «failed to fetch». Esto la renueva SIN terminal: la app (Accesos ›
+# «Sesión de Claude en el VPS») llama aquí vía webhook_listener:
+#   iniciar → lanza `claude auth login` en tmux y devuelve el enlace de claude.com
+#   codigo  → (código por STDIN, nunca en argv) lo teclea en ese tmux y comprueba el login;
+#             si entra, reinicia las sesiones remotas activadas y el chat.
+# El operador inicia sesión en SU navegador; el código solo pasa por aquí.
+set -u
+U=nebulabsai
+CLAUDE=/home/$U/.local/bin/claude
+SES=claude-login
+as_u() { sudo -u "$U" env HOME=/home/$U DISABLE_AUTOUPDATER=1 "$@"; }
+
+json_estado() {
+  as_u "$CLAUDE" auth status 2>/dev/null | python3 -c '
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d={}
+print(json.dumps({"logueado": bool(d.get("loggedIn")), "cuenta": d.get("email") or d.get("account",{}).get("email") or "", "metodo": d.get("authMethod","")}))'
+}
+
+case "${1:-estado}" in
+  estado) json_estado ;;
+
+  iniciar)
+    as_u tmux kill-session -t "$SES" 2>/dev/null
+    as_u tmux new-session -d -s "$SES" -x 400 -y 60 "$CLAUDE auth login"
+    url=""
+    for _ in $(seq 1 20); do
+      sleep 1
+      url=$(as_u tmux capture-pane -t "$SES" -p -J -S -60 2>/dev/null | grep -o 'https://claude\.com/cai/oauth/authorize[^ ]*' | tail -1)
+      [ -n "$url" ] && break
+    done
+    python3 -c 'import json,sys; print(json.dumps({"url": sys.argv[1]}))' "$url" ;;
+
+  codigo)
+    read -r code
+    code=$(printf '%s' "$code" | tr -d '[:space:]')
+    if [ -z "$code" ] || ! as_u tmux has-session -t "$SES" 2>/dev/null; then
+      echo '{"ok": false, "error": "No hay un inicio de sesión en marcha: pulsa «Iniciar sesión» otra vez."}'; exit 0
+    fi
+    as_u tmux send-keys -t "$SES" -l "$code"
+    as_u tmux send-keys -t "$SES" Enter
+    for _ in $(seq 1 20); do
+      sleep 1
+      if [ "$(json_estado | python3 -c 'import json,sys; print(json.load(sys.stdin)["logueado"])')" = "True" ]; then
+        as_u tmux kill-session -t "$SES" 2>/dev/null
+        # Lo que dependía de la sesión: las Remote Control ACTIVADAS y el chat de la app.
+        for s in $(systemctl list-unit-files --no-legend 'claude-remote@*' | awk '$2=="enabled"{print $1}') \
+                 $(systemctl list-units --no-legend --plain 'claude-remote@*' | awk '{print $1}'); do
+          systemctl restart "$s" 2>/dev/null
+        done
+        systemctl restart claude-chat 2>/dev/null
+        est=$(json_estado)
+        python3 -c 'import json,sys; d=json.loads(sys.argv[1]); d["ok"]=True; print(json.dumps(d))' "$est"
+        exit 0
+      fi
+    done
+    pant=$(as_u tmux capture-pane -t "$SES" -p -J -S -15 2>/dev/null | grep -v '^\s*$' | tail -3 | tr '\n' ' ')
+    python3 -c 'import json,sys; print(json.dumps({"ok": False, "error": "Claude no aceptó el código (¿caducado o mal copiado?). " + sys.argv[1][:200]}))' "$pant" ;;
+
+  cancelar) as_u tmux kill-session -t "$SES" 2>/dev/null; echo '{"ok": true}' ;;
+  *) echo "uso: claude-login estado|iniciar|codigo|cancelar" ;;
+esac

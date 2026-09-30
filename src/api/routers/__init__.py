@@ -64,6 +64,7 @@ from .auth import router as auth_router
 from .ui_menu import router as ui_menu_router
 from .deploy import router as deploy_router
 from .navegador import router as navegador_router
+from .claude_vps import router as claude_vps_router
 from .cuotas import cuotas_router
 from .diagnostics import router as diagnostics_router
 from .fonts import file_router as fonts_file_router, router as fonts_router
@@ -94,6 +95,7 @@ __all__ = [
     "ui_menu_router",
     "deploy_router",
     "navegador_router",
+    "claude_vps_router",
     "cuotas_router",
     "diagnostics_router",
     "editor_auto_enqueue_router",

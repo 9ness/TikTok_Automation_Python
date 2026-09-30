@@ -34,6 +34,8 @@ Endpoints:
     GET  /admin/deploy/log?n=200  — tail de logs/deploy.log
     GET  /admin/system            — uptime + disk + mem
     GET  /admin/navegador/estado  — Chrome remoto (Flow/Magnific): encendido, RAM, pestañas
+    GET  /admin/claude-login/estado   — ¿está Claude Code logueado en el VPS?
+    POST /admin/claude-login/iniciar|codigo|cancelar — renovar esa sesión desde la web
     GET  /admin/navegador/clave   — contraseña de la pantalla (solo admin)
     POST /admin/navegador/on|off  — encender / apagar ese Chrome (`/usr/local/bin/navegador`)
 """
@@ -270,6 +272,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_navegador("json")
             return
 
+        if path == "/admin/claude-login/estado":
+            self._handle_claude_login("estado")
+            return
+
         if path == "/admin/navegador/clave":
             if not self._check_admin_auth():
                 return
@@ -314,6 +320,11 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_claude_sdk("free")
             return
 
+        if path in ("/admin/claude-login/iniciar", "/admin/claude-login/codigo",
+                    "/admin/claude-login/cancelar"):
+            self._handle_claude_login(path.rsplit("/", 1)[1])
+            return
+
         if path in ("/admin/navegador/on", "/admin/navegador/off"):
             self._handle_navegador(path.rsplit("/", 1)[1])
             return
@@ -323,6 +334,34 @@ class WebhookHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
     # Handlers
     # ------------------------------------------------------------------
+    def _handle_claude_login(self, accion: str) -> None:
+        """Renovar la sesión de claude.ai del VPS (`/usr/local/bin/claude-login`).
+
+        El código de autorización llega en el cuerpo JSON (`{"codigo": …}`) y se
+        pasa al script por STDIN: nunca en argv (se vería en `ps`) ni en logs.
+        """
+        if not self._check_admin_auth():
+            return
+        entrada = None
+        if accion == "codigo":
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                cuerpo = json.loads(self.rfile.read(min(n, 4096)) or b"{}")
+                entrada = str(cuerpo.get("codigo", "")).strip()[:400] + "\n"
+            except (ValueError, json.JSONDecodeError):
+                self._json_response(400, {"error": "cuerpo no válido"})
+                return
+        try:
+            p = subprocess.run(
+                ["sudo", "-n", "/usr/local/bin/claude-login", accion],
+                input=entrada, capture_output=True, text=True, timeout=90,
+            )
+            data = json.loads(p.stdout.strip().splitlines()[-1])
+        except (subprocess.TimeoutExpired, IndexError, json.JSONDecodeError) as e:
+            self._json_response(500, {"error": f"claude-login {accion}: {e}"})
+            return
+        self._json_response(200, data)
+
     def _handle_navegador(self, accion: str) -> None:
         """Enciende/apaga el Chrome remoto y devuelve su estado (JSON)."""
         if not self._check_admin_auth():

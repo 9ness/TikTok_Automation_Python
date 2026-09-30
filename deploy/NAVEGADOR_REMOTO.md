@@ -168,3 +168,19 @@ rm /etc/systemd/system/navegador-*.service && systemctl daemon-reload
 ufw delete allow in on tailscale0 to any port 6080 proto tcp
 rm -rf /home/nebulabsai/.navegador-agente   # borra las sesiones guardadas
 ```
+
+## Sesión de Claude Code del VPS (renovarla sin terminal)
+
+La sesión de claude.ai del servidor caduca (≈ cada mes) o se cierra, y entonces Claude
+remoto y el chat de la app dan **«failed to fetch»** (`claude auth status` → `loggedIn: false`;
+el servicio `claude-remote@…` sale con «You must be logged in to use Remote Control»).
+
+**Arreglo:** app › **Accesos › «Sesión de Claude en el VPS»** → «Iniciar sesión» → «Abrir
+claude.com» (entra el operador con SU cuenta) → pega el código que da → «Conectar». El
+servidor teclea el código en `claude auth login` (tmux `claude-login`) y reinicia las
+`claude-remote@*` activadas y `claude-chat`. Script: `deploy/claude-login/claude-login`
+(instalado en `/usr/local/bin/claude-login`); el código va por STDIN, nunca en argv ni logs.
+Por terminal: `sudo -u nebulabsai -i claude auth login`.
+
+**opencode y el bot de Telegram NO dependen de esto**: usan su propia clave de OpenCode Go
+(`/home/nebulabsai/telegram-agent/.env`), que no caduca.
