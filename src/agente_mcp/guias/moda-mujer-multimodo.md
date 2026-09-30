@@ -49,8 +49,26 @@ dentro de la carpeta (no pongas el mismo a todos).
 | botas | `mm_botas_1` · `mm_botas_2` · `mm_botas_largas_1` · `mm_botas_largas_2` (las «largas», solo botas altas) · o los de calzado (también los 🎙️ de 20 s) | no | FRAME INICIAL |
 
 Los 🎙️ de 20 s son los únicos con voz: úsalos para **mezclar largos con
-cortos** (lo pide el curso para evitar sanciones), p. ej. uno de cada tres o
-cuatro calzados. Son dos clips, así que cuestan el doble de generación.
+cortos** (lo pide el curso para evitar sanciones). Son dos clips, así que
+cuestan el doble de generación.
+
+### Cuándo elegir un 🎙️ de 20 s (y cuál)
+
+- **Solo** productos con `tipo_multimodo` = `calzado` o `botas`.
+- **Ritmo:** más o menos **1 de cada 3-4 calzados** de la tanda. Nunca dos
+  seguidos del mismo modo de 20 s: alterna POV ↔ Sentado.
+- **`mm_zapatillas_pov20`** (dos manos sujetando el calzado): zapatillas,
+  zapatos planos, mocasines y botines, es decir, lo que se enseña bien en la mano. **No**
+  para botas altas: no caben enteras en el plano.
+- **`mm_zapatillas_sentado20`** (sentada, de rodillas abajo, puesto):
+  cualquier calzado que luzca PUESTO: tacones, sandalias, botas altas,
+  zapatillas.
+- **Mejor si la ficha da para hablar:** el guion sale de los textos
+  extraídos (título, caption, características). Si el producto no tiene textos, o
+  el título es pobre («Zapatillas mujer»), elige un formato mudo: el guion saldría
+  genérico.
+- Los plazos y el envío gratis los decide la app por la ficha y el precio: no
+  hace falta hacer nada.
 | bolso | `mm_bolso_1` · `mm_bolso_2` · `mm_bolso_3` | no | FRAME INICIAL |
 | gafas | — **se saltan** (no hay formato mudo) | | |
 

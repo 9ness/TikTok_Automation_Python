@@ -26,6 +26,11 @@ MCP de Ana → borrar lo descargado.
 - Accesorios: C1 8/10 (los que faltan son gafas: se saltan) · C2 10/10 · **C3 3/10** (p1-p3 hechos).
 - Siguiente tanda razonable: accesorios C3 p4-p10 (bolsos), zapatos C4 p3,p4,p6-p10,
   ropa C2 y C4, mezclando formatos. Cada carpeta tiene 10 productos.
+- **Formatos NUEVOS (30-sep): 🎙️ `mm_zapatillas_pov20` y `mm_zapatillas_sentado20`**, los
+  únicos con voz. Son DOS clips mudos de 10 s (dos imágenes con el mismo prompt); la app escribe
+  un guion de punto de dolor, lo locuta con Fish y lo monta al subir el clip 2. Úsalos en ~1 de
+  cada 3-4 calzados de la tanda (criterio de cuál elegir en la guía, «Cuándo elegir un 🎙️ de 20
+  s»). El primero que se monte, enséñaselo al operador antes de seguir con más.
 
 **Lo aprendido (para no repetirlo):**
 - **Revisa también la IMAGEN de origen, no solo el clip:** Nano Banana a veces pinta texto
