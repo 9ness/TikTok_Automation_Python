@@ -2154,7 +2154,10 @@ def _montar_ropa_fish(
         shutil.rmtree(work, ignore_errors=True)
 
     on_progress(0.95, "💾 Guardando estado…")
-    product_repo.guardar_video(carpeta, producto, modo, str(salida), int(time.time()), usuario=quien)
+    # Los de Fish llevan SIEMPRE la flecha del montaje del Largo.
+    product_repo.guardar_video(
+        carpeta, producto, modo, str(salida), int(time.time()), usuario=quien, flecha=True,
+    )
     product_repo.olvidar_clips(carpeta, producto, modo, quien)
     on_progress(1.0, "✅ Listo")
     return str(salida)
@@ -2186,6 +2189,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     # El catálogo de la web sale de VEO ya hablado: ahí el audio del clip es el
     # vídeo, no un ambiente que sobre.
     conservar_audio = bool(p.get("conservar_audio"))
+    # Flecha CTA al final: la decide quien sube (web o agente) en el
+    # multimodo; sin decir nada, la que traiga el formato.
+    con_flecha = p.get("con_flecha")
+    con_flecha = None if con_flecha is None else bool(con_flecha)
 
     for ruta in rutas:
         if not ruta.is_file():
@@ -2299,6 +2306,8 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
         # De él dependen el grado de color y el texto de temporada.
         modo=str(p.get("modo") or ""),
         semilla=f"{p.get('carpeta')}/{p.get('producto')}", on_log=on_log,
+        # Flecha CTA elegida al subir (None = la que traiga el formato).
+        flecha=con_flecha,
     )
 
     on_progress(0.95, "💾 Guardando estado…")
@@ -2307,6 +2316,7 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     product_repo.guardar_video(
         carpeta, producto, str(p.get("modo") or ""), str(salida), int(time.time()),
         usuario=quien,
+        flecha=video_editor.pone_flecha(modo, con_flecha),
     )
     # Los clips guardados a la espera de su pareja ya se han usado: si se
     # quedan, la siguiente subida creería que ya están los dos.

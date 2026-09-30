@@ -1643,6 +1643,11 @@ function PrendaCard({
   // Qué audio lleva el vídeo. Vacío es el defecto de cada pantalla: mudo en
   // las del curso, y la voz que ya trae el clip en las de la web.
   const [audio, setAudio] = useState("");
+  // Flecha CTA los últimos segundos: en el multimodo no se suele poner, así
+  // que se decide vídeo a vídeo (es una prueba de si da más visitas). Los de
+  // voz de Fish la llevan siempre (montaje del POV BOF Largo).
+  const flechaOpcional = modo.startsWith("mm_") && !fish;
+  const [flecha, setFlecha] = useState(false);
   const [verVideo, setVerVideo] = useState(false);
   const [verFoto, setVerFoto] = useState(false);
   // Se pintan al pulsar y se revierten si la API falla (ver UI_NICHOS.md): el
@@ -1675,6 +1680,7 @@ function PrendaCard({
     if (esWeb && (mudo || audio === "mudo")) fd.append("conservar_audio", "0");
     fd.append("modo", modo);
     if (parte) fd.append("parte", String(parte));
+    if (flechaOpcional) fd.append("flecha", flecha ? "1" : "0");
     fd.append("file", file);
 
     const base = api.baseUrl;
@@ -1933,6 +1939,20 @@ function PrendaCard({
       {/* En los formatos mudos no hay nada que elegir: el clip sale sin voz
           por diseño y la música se pone en TikTok. Enseñar "Su voz" ahí era
           ofrecer un ajuste que no hace nada. */}
+      {flechaOpcional && (
+        <button
+          type="button"
+          onClick={() => setFlecha((v) => !v)}
+          title="Flecha al carrito los 3 últimos segundos, con el color que mejor case con el vídeo. Se aplica al subir el clip."
+          className={`w-full rounded-md border px-2 py-1 text-left text-[11px] transition ${
+            flecha
+              ? "border-violet-500 bg-violet-500/10 font-semibold text-violet-500"
+              : "border-border/60 text-muted-foreground hover:border-foreground/30"
+          }`}
+        >
+          {flecha ? "☑" : "☐"} ➡️ Flecha CTA al final (prueba)
+        </button>
+      )}
       {!mudo && (
       <div className="flex gap-1">
         <ChipAjuste

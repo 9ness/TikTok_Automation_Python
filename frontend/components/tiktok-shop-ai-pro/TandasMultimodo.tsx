@@ -234,6 +234,7 @@ export function TandasMultimodo() {
                               {v.titulo || `Producto ${v.producto}`}
                             </p>
                             <p className="truncate text-[10px] text-muted-foreground">
+                              {v.flecha ? "➡️ " : ""}
                               {v.formato_label} · {v.carpeta_label} · P{v.producto}
                             </p>
                           </div>

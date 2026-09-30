@@ -434,26 +434,29 @@ async def ver(ctx: Context, ruta_bandeja: str = "", archivo_id: str = "", url: s
 async def subir_clip(ctx: Context, menu: str, catalogo: str, carpeta: str, producto: str,
                      clip: int = 1, ruta_bandeja: str = "", archivo_id: str = "", url: str = "",
                      modo: str = "", gancho: str = "", duracion: str = "",
-                     voz: str = "auto") -> str:
+                     voz: str = "auto", flecha: bool | None = None) -> str:
     """Sube UN clip al hueco `clip` (1, 2…) de un producto. Fuente (una):
     `ruta_bandeja` (lo guardaste en la bandeja del Drive), `archivo_id` (lo
     subiste a `<url del MCP>/subir`) o `url` pública. Al llenar el último hueco
     la app monta sola (salvo UGC: llama a `montar`). POV BOF/Largo: `voz`
-    auto|hombre|mujer."""
+    auto|hombre|mujer. Moda (multimodo): `flecha=True/False` pone o quita la
+    flecha CTA de los últimos segundos (color según el vídeo); sin pasarlo,
+    la del formato (el multimodo no la lleva)."""
     u = _usuario(ctx)
     c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion)
     datos, nombre = await archivos.leer_origen(u, url=url, archivo_id=archivo_id,
                                                ruta_bandeja=ruta_bandeja)
     if not archivos.es_video(nombre, datos):
         raise ErrorApp(f"{nombre!r} no parece un vídeo.")
-    r = await menus.subir_clip(c, producto, int(clip), datos, nombre, voz)
+    r = await menus.subir_clip(c, producto, int(clip), datos, nombre, voz, flecha)
     return _json(r)
 
 
 @_herramienta(structured_output=False)
 async def subir_clips_de_bandeja(ctx: Context, menu: str, catalogo: str, carpeta: str,
                                  modo: str = "", gancho: str = "", duracion: str = "",
-                                 productos: list[str] | None = None, voz: str = "auto") -> str:
+                                 productos: list[str] | None = None, voz: str = "auto",
+                                 flecha: bool | None = None) -> str:
     """Sube de golpe los `clip_N.mp4` que haya en la bandeja de cada producto
     de la carpeta (los que aún no estén subidos), en orden. UGC: además monta."""
     u = _usuario(ctx)
@@ -478,7 +481,7 @@ async def subir_clips_de_bandeja(ctx: Context, menu: str, catalogo: str, carpeta
             if n in ya or n < 1:
                 continue
             try:
-                r = await menus.subir_clip(c, pid, n, f.read_bytes(), f.name, voz)
+                r = await menus.subir_clip(c, pid, n, f.read_bytes(), f.name, voz, flecha)
                 subidos.append({"clip": n, "ok": True, "msg": r.get("message", "")})
             except ErrorApp as e:
                 subidos.append({"clip": n, "ok": False, "msg": str(e)})

@@ -555,6 +555,12 @@ async def plan(c: Ctx, prod: str) -> dict:
 
 async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
     est = await estilo_ropa(c)
+    if c.m.modalidad == "multimodo" and not est.get("fish"):
+        out["flecha_cta"] = (
+            "OPCIONAL: pasa `flecha=True` en `subir_clip` (en TODOS los clips del producto) "
+            "para que el montaje ponga la flecha al carrito los 3 últimos segundos, con el "
+            "color que case con el fondo del vídeo. Es una PRUEBA: actívala en ~1 de cada 3 "
+            "vídeos, mejor en los que acaban con el producto bien visible y quieto.")
     fam = est.pop("_familias", {})
     familia = p.get("familia", "")
     pid = str(p["producto"])
@@ -677,7 +683,7 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
 # Subir un clip y montar
 # ---------------------------------------------------------------------------
 async def subir_clip(c: Ctx, prod: str, clip: int, datos: bytes, nombre: str,
-                     voz: str = "auto") -> dict:
+                     voz: str = "auto", flecha: bool | None = None) -> dict:
     p = await producto(c, prod)
     pid = str(p["producto"])
     fichero = (nombre or f"clip_{clip}.mp4", datos, "video/mp4")
@@ -707,6 +713,9 @@ async def subir_clip(c: Ctx, prod: str, clip: int, datos: bytes, nombre: str,
             form["parte"] = clip
         if not est.get("voz", True):
             form["conservar_audio"] = "0"
+        # Flecha CTA al final (multimodo): la decide el agente por vídeo.
+        if flecha is not None:
+            form["flecha"] = "1" if flecha else "0"
         return await c.api.post_form(f"{ROPA}/video/upload", form, fichero)
     raise ErrorApp(f"{c.m.label} no lleva clips.")
 

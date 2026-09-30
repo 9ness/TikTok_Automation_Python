@@ -304,6 +304,9 @@ def _montar_en(
     # Identifica la prenda: de ella sale QUÉ variante de rótulo le toca, para
     # que dos vídeos seguidos no lleven el mismo adorno.
     semilla: str = "",
+    # Flecha CTA al final: None = lo que diga el formato (`lleva_flecha`);
+    # True/False lo decide quien sube el clip (prueba en el multimodo).
+    flecha: bool | None = None,
     on_log: OnLog = _noop,
 ) -> Path:
     """Encuadra a 9:16 y deja el vídeo mudo (o con la voz que se le pase).
@@ -336,7 +339,7 @@ def _montar_en(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo con SU audio (la voz que trae el clip)")
-        _rematar(out_path, modo, semilla, on_log, texto_subs)
+        _rematar(out_path, modo, semilla, on_log, texto_subs, flecha)
         return out_path
 
     if voz is None:
@@ -347,7 +350,7 @@ def _montar_en(
             "-movflags", "+faststart", str(out_path),
         ], on_log)
         on_log("[nicho_ropa] vídeo mudo (sin voz ni música, a propósito)")
-        _rematar(out_path, modo, semilla, on_log, texto_subs)
+        _rematar(out_path, modo, semilla, on_log, texto_subs, flecha)
         return out_path
 
     # Con voz: el vídeo dura lo que dure la voz. `-shortest` corta por el más
@@ -362,7 +365,7 @@ def _montar_en(
         "-movflags", "+faststart", str(out_path),
     ], on_log)
     on_log(f"[nicho_ropa] vídeo con voz: {voz.name}")
-    _rematar(out_path, modo, semilla, on_log, texto_subs)
+    _rematar(out_path, modo, semilla, on_log, texto_subs, flecha)
     return out_path
 
 
@@ -370,6 +373,14 @@ def _montar_en(
 # carrito como en el POV BOF: el guion de moda no lleva CTA hablada (el del
 # curso no la tiene y no se toca), así que no hay palabra que la dispare.
 FLECHA_SEGUNDOS = 4.0
+# La que se ACTIVA a mano en un formato que no la lleva (multimodo, vídeos de
+# 10 s mudos): los tres últimos segundos, que en 10 s ya es casi un tercio.
+FLECHA_OPCIONAL_SEGUNDOS = 3.0
+
+
+def pone_flecha(modo: str, flecha: bool | None) -> bool:
+    """Si el vídeo acaba llevando flecha: lo pedido, y si no, el formato."""
+    return config.lleva_flecha(modo) if flecha is None else bool(flecha)
 
 # Qué flecha va con qué fondo. Se busca que case con el ESTILO del vídeo —una
 # calle de otoño pide la amarilla, un parque la verde— y no un color fijo que
@@ -457,15 +468,21 @@ def _color_del_fondo(video: Path, t: float) -> str:
     return "rosa"
 
 
-def _flecha(salida: Path, on_log: OnLog, semilla: str = "") -> None:
-    """Pone la flecha al carrito los últimos segundos. Si falla, sin flecha."""
+def _flecha(
+    salida: Path, on_log: OnLog, semilla: str = "", segundos: float = FLECHA_SEGUNDOS,
+) -> None:
+    """Pone la flecha al carrito los últimos segundos. Si falla, sin flecha.
+
+    El color sale del fondo del vídeo en ese tramo y el estilo rota por
+    prenda: así casa con el tono de cada vídeo y dos seguidos no la repiten.
+    """
     from src.nicho_pov_bof.pipeline.duration_match import probe_duration
     from src.tiktok_shop.pipeline.ready_video import _arrows_dir, _pick_arrow
 
     try:
         dur = probe_duration(salida)
-        t0 = max(0.0, dur - FLECHA_SEGUNDOS)
-        color = _color_del_fondo(salida, t0 + FLECHA_SEGUNDOS / 2)
+        t0 = max(0.0, dur - segundos)
+        color = _color_del_fondo(salida, t0 + segundos / 2)
         carpeta = _arrows_dir()
         ruta = _elegir_flecha(color, semilla or salida.stem, carpeta) if carpeta else None
         if not ruta:
@@ -492,19 +509,23 @@ def _flecha(salida: Path, on_log: OnLog, semilla: str = "") -> None:
             "-t", f"{dur:.3f}", "-movflags", "+faststart", str(tmp),
         ], on_log)
         tmp.replace(salida)
-        on_log(f"[nicho_ropa] flecha {ruta.stem} los últimos {FLECHA_SEGUNDOS:.0f}s")
+        on_log(f"[nicho_ropa] flecha {ruta.stem} ({color}) los últimos {segundos:.0f}s")
     except Exception as e:  # noqa: BLE001 — la flecha es un extra
         on_log(f"[nicho_ropa] no se pudo poner la flecha ({str(e)[:160]}) — sale sin ella")
 
 
 def _rematar(
     salida: Path, modo: str, semilla: str, on_log: OnLog, texto_subs: str = "",
+    flecha: bool | None = None,
 ) -> None:
     """Subtítulos, flecha y texto de temporada (si los lleva) y metadatos fuera."""
     if texto_subs.strip():
         _subtitular(salida, texto_subs, on_log)
-    if modo and config.lleva_flecha(modo):
+    if modo and config.lleva_flecha(modo) and flecha is not False:
         _flecha(salida, on_log, semilla)
+    elif flecha:
+        # Activada a mano en un formato que no la trae: más corta.
+        _flecha(salida, on_log, semilla, FLECHA_OPCIONAL_SEGUNDOS)
     texto = config.texto_de_modo(modo, semilla) if modo else {}
     if texto.get("titulo"):
         _quemar_texto(salida, texto, semilla, on_log)

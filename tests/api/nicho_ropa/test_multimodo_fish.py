@@ -93,7 +93,7 @@ class TestMontaje:
         videos: list = []
         monkeypatch.setattr(
             "src.nicho_ropa.repos.product_repo.guardar_video",
-            lambda carpeta, producto, modo, ruta, at, usuario="": videos.append((modo, ruta, usuario)),
+            lambda carpeta, producto, modo, ruta, at, usuario="", flecha=None: videos.append((modo, ruta, usuario)),
         )
         olvidados: list = []
         monkeypatch.setattr(

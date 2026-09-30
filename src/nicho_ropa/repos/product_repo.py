@@ -319,6 +319,9 @@ def video_de(prod: dict, modo: str) -> dict:
             "video_listo_at": int(mejor.get("video_listo_at") or 0),
             "formato": mejor.get("formato", ""),
             "primer_listo_at": int(mejor.get("primer_listo_at") or mejor.get("video_listo_at") or 0),
+            # Si ese vídeo salió con la flecha CTA: es la prueba de si la flecha
+            # da más visitas en un nicho donde no se suele poner.
+            "flecha": bool(mejor.get("flecha")),
         }
     modo = config.modo_valido(modo)
     guardado = ((prod or {}).get("modos") or {}).get(modo) or {}
@@ -472,6 +475,7 @@ def olvidar_clips(carpeta: str, producto: str, modo: str, usuario: str = "") -> 
 
 def guardar_video(
     carpeta: str, producto: str, modo: str, ruta: str, listo_at: int, usuario: str = "",
+    flecha: bool | None = None,
 ) -> dict:
     """Apunta el vídeo de un modo sin tocar el de los demás."""
     from src.nicho_ropa import config
@@ -492,6 +496,8 @@ def guardar_video(
         if "primer_listo_at" not in hueco:
             hueco["primer_listo_at"] = int(hueco.get("video_listo_at") or listo_at)
         hueco.update({"video_path": ruta, "video_listo_at": listo_at})
+        if flecha is not None:
+            hueco["flecha"] = bool(flecha)
         # Estaba marcado «🔁 Rehacer» y llega el vídeo nuevo: deja de estar
         # pendiente y queda como rehecho (para revisarlo antes de subirlo).
         if prod.pop("rehacer", None):

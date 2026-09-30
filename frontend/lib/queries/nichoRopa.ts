@@ -545,6 +545,8 @@ export interface VideoMultimodo {
   /** El producto ya no está en TikTok Shop: el vídeo no se sube ni se baja,
    *  pero se queda en su puesto por si vuelve. Es del producto, no del usuario. */
   sin_stock?: boolean;
+  /** Salió con la flecha CTA al final (prueba de si da más visitas). */
+  flecha?: boolean;
 }
 
 export interface TandasMultimodoResponse {

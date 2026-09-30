@@ -1432,6 +1432,9 @@ async def upload_video(
     # Qué mitad del vídeo es, en los formatos que se graban en dos clips
     # (calle dividido). 0 o 1 en los de siempre, que son de un clip.
     parte: Annotated[int, Form()] = 0,
+    # Flecha CTA los últimos segundos: "1"/"0", o vacío = lo del formato.
+    # En el multimodo (que no la lleva) se prueba en algunos vídeos.
+    flecha: Annotated[str, Form()] = "",
 ) -> VideoRopaUploadResponse:
     """Sube el vídeo generado fuera y encola el encuadre.
 
@@ -1515,6 +1518,11 @@ async def upload_video(
             "conservar_audio": con_audio,
             "modo": modo_norm,
             "operator": operator,
+            "con_flecha": (
+                True if flecha.strip().lower() in ("1", "true", "si", "sí")
+                else False if flecha.strip().lower() in ("0", "false", "no")
+                else None
+            ),
         },
         enqueued_by=operator or None,
     )

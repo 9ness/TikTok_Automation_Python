@@ -265,3 +265,31 @@ class TestSinStock:
         assert vs["3"]["video_path"] == "/v1.mp4"
         product_repo.update_product(c, "3", sin_stock=False)
         assert not product_repo.videos_multimodo([c], "ana")[0]["sin_stock"]
+
+
+class TestFlechaOpcional:
+    def test_se_pone_solo_si_se_pide_y_mas_corta(self, monkeypatch, tmp_path):
+        from src.nicho_ropa.pipeline import video_editor as ve
+
+        puestas: list = []
+        monkeypatch.setattr(ve, "_flecha", lambda s, log, sem="", seg=ve.FLECHA_SEGUNDOS: puestas.append(seg))
+        monkeypatch.setattr(ve, "_limpiar", lambda *a, **k: None)
+        v = tmp_path / "v.mp4"
+        ve._rematar(v, "mm_espejo", "c/1", lambda *_: None)
+        assert puestas == []  # el multimodo no la trae
+        ve._rematar(v, "mm_espejo", "c/1", lambda *_: None, flecha=True)
+        assert puestas == [ve.FLECHA_OPCIONAL_SEGUNDOS]
+        # Y se puede quitar en un formato que sí la lleva.
+        ve._rematar(v, "calle_dividido", "c/1", lambda *_: None, flecha=False)
+        assert puestas == [ve.FLECHA_OPCIONAL_SEGUNDOS]
+        assert ve.pone_flecha("mm_espejo", None) is False
+        assert ve.pone_flecha("calle_dividido", None) is True
+
+    def test_queda_apuntado_en_el_video_para_comparar(self, monkeypatch):
+        falso = _RedisDocs()
+        monkeypatch.setattr(product_repo, "get_nicho_ropa_redis", lambda: falso)
+        c = "mujer_web__Carpeta_3"
+        product_repo.guardar_video(c, "3", "mm_espejo", "/v1.mp4", 1, "ana", flecha=True)
+        product_repo.guardar_video(c, "4", "mm_bolso_1", "/v2.mp4", 2, "ana", flecha=False)
+        vs = {v["producto"]: v for v in product_repo.videos_multimodo([c], "ana")}
+        assert vs["3"]["flecha"] is True and vs["4"]["flecha"] is False

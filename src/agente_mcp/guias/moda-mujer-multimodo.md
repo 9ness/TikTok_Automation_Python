@@ -26,6 +26,28 @@ la app al montar: un guion de **punto de dolor** escrito para ese producto
 subtítulos). Sin música: habla. Si Omni/Kling mete voz en el clip, da igual:
 se descarta.
 
+## Flecha CTA al final (prueba, decides tú)
+
+El multimodo sale SIN flecha al carrito, que es lo normal en este nicho. Se
+está probando si con ella hay más visitas. Tú decides en cada vídeo:
+
+- `subir_clip(…, flecha=True)` hace que el montaje ponga la flecha **los 3
+  últimos segundos**. El color lo elige solo según el fondo del vídeo en ese
+  tramo (amarilla en un otoño, verde en un parque, blanca o negra sin color)
+  y el estilo rota por producto, igual que en Calle Dividido o POV BOF. En
+  formatos de dos clips, pásalo en los DOS.
+- **Cuánto:** en **~1 de cada 3 vídeos** de la tanda, repartidos entre tipos
+  (no todos los bolsos con flecha y ninguna ropa). Así se puede comparar.
+- **En cuáles:** en los que acaban con el producto bien visible y el fondo
+  despejado abajo, donde va la flecha. No la pongas si ahí hay manos,
+  piernas o el propio producto, porque lo taparía.
+- Los 🎙️ de 20 s ya la llevan siempre (montaje del POV BOF Largo): no hace
+  falta pasarla.
+- En las tandas, los vídeos con flecha llevan ➡️ delante del formato. Así el
+  operador puede comparar visitas; si funciona, se pondrá en todos.
+- Desde la web es la casilla «➡️ Flecha CTA al final» de la tarjeta, antes
+  de subir el clip.
+
 ## Catálogos
 
 | Catálogo (`catalogo`) | Qué hay |
