@@ -34,7 +34,10 @@ los mismos en los dos casos.
    Magnific: dónde se hace cada foto y cada clip, y cómo.
 4. [`comun/revision-calidad.md`](comun/revision-calidad.md) — cómo decidir si
    una foto o un clip generado vale o se repite.
-5. La guía del **menú** que te han pedido (tabla de abajo).
+5. [`comun/campanas.md`](comun/campanas.md) — Black Friday y Navidad (11 nov
+   – 16 dic): cuándo preparar contenido y cómo orientar guiones sin prometer
+   ofertas que no hay. Estado en vivo con la herramienta `campanas`.
+6. La guía del **menú** que te han pedido (tabla de abajo).
 
 Si el operador trae una **sanción de TikTok Shop** de un vídeo ya publicado,
 el método para apelar (y cuándo no merece la pena) está en `APELACIONES.md`,

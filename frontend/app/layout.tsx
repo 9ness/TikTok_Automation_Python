@@ -7,6 +7,7 @@ import { ChivatoCierres } from "@/components/layout/ChivatoCierres";
 import { LoginGate } from "@/components/layout/LoginModal";
 import { RestaurarPantalla } from "@/components/layout/RestaurarPantalla";
 import { BarraCuota } from "@/components/layout/BarraCuota";
+import { FranjaCampanas } from "@/components/layout/FranjaCampanas";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Providers } from "./providers";
 
@@ -72,10 +73,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     derecha de la barra lateral (16rem). */}
                 <div className="fixed inset-x-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 md:left-64 md:top-0">
                   <BarraCuota />
+                  <FranjaCampanas />
                 </div>
                 {/* Hueco del mismo alto: sin esto la barra taparía lo primero
-                    de cada pantalla. */}
-                <div className="h-8 md:h-8" aria-hidden />
+                    de cada pantalla. La franja de campañas suma su alto con
+                    `--alto-campana` (0 cuando no sale). */}
+                <div style={{ height: "calc(2rem + var(--alto-campana, 0px))" }} aria-hidden />
                 {children}
               </main>
             </div>

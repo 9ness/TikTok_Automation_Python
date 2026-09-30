@@ -50,6 +50,9 @@ Las imágenes y los vídeos se generan SIEMPRE en la web (Flow, GenAI Pro,
 Magnific) controlando el navegador, NUNCA por API. Nunca generes nada sin
 decir antes cuánto vas a lanzar y esperar el «sí». No uses `marcar` salvo que te lo pidan.
 Si te piden rehacer lo marcado, `para_rehacer(menu)` lo lista todo con la nota.
+Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
+antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
+prometer nunca ofertas que la ficha no tenga.
 """
 
 mcp = MCPServer(name="tiktok-shop-ai-pro", instructions=INSTRUCCIONES)
@@ -124,7 +127,8 @@ def guia(menu: str = "") -> str:
     Con `menu` (ver `menus`): el paso a paso de ese menú. Léelas antes de trabajar."""
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
-            "README.md", "comun/app.md", "comun/plataformas.md", "comun/revision-calidad.md"))
+            "README.md", "comun/app.md", "comun/plataformas.md", "comun/revision-calidad.md",
+            "comun/campanas.md"))
     m = menus.MENUS.get(menu)
     if not m:
         raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}.")
@@ -139,6 +143,20 @@ def menus_disponibles() -> str:
          "opciones": m.opciones, "solo_guia": m.tipo == "solo_guia"}
         for m in menus.MENUS.values()
     ])
+
+
+@_herramienta(structured_output=False)
+def campanas() -> str:
+    """Calendario de campañas de TikTok Shop (Black Friday, Cyber Monday,
+    Navidad): la campaña en curso, la próxima con los días que faltan, avisos
+    de preparación y el ángulo recomendado para guiones y prompts. Míralo antes
+    de escribir guiones. Regla: no prometas ofertas que la ficha no tenga."""
+    from src.cuotas import campanas as cal
+
+    e = cal.estado()
+    e.pop("semanas", None)  # el agente no necesita la cuadrícula día a día
+    e["contexto_guion"] = cal.contexto_guion()
+    return _json(e)
 
 
 @_herramienta(structured_output=False)

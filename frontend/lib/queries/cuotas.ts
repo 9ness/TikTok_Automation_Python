@@ -66,6 +66,51 @@ export function useCuotaHoy() {
   });
 }
 
+export interface Campana {
+  id: string;
+  nombre: string;
+  corto: string;
+  emoji: string;
+  color: string;
+  inicio: string;
+  fin: string;
+  tema: string;
+  consejo: string;
+  guion: string;
+  dias_para: number;
+  dias_restantes: number;
+}
+
+export interface CampanasEstado {
+  hoy: string;
+  inicio: string;
+  fin: string;
+  visible: boolean;
+  terminado: boolean;
+  activa: Campana | null;
+  proxima: Campana | null;
+  avisos: string[];
+  aviso_dias: number;
+  campanas: Campana[];
+  semanas: {
+    n: number;
+    dias: { fecha: string; dia: string; campana: string | null; destacado: boolean }[];
+  }[];
+  regla_promocion: string;
+}
+
+/** Calendario de campañas (Black Friday, Navidad). Cambia una vez al día: se
+ *  pide poco y se refresca al volver a la pestaña. */
+export function useCampanas() {
+  return useQuery<CampanasEstado>({
+    queryKey: ["cuotas", "campanas"],
+    queryFn: () => api.get<CampanasEstado>(`${ROOT}/campanas`),
+    staleTime: 30 * 60_000,
+    refetchInterval: 60 * 60_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
 /** Fija a mano lo subido fuera de la app (o corrige el recuento). */
 export function useAjustarCuota() {
   const qc = useQueryClient();

@@ -3,6 +3,7 @@
 - GET  /api/v1/cuotas/hoy    → lo publicado hoy y sus topes
 - GET  /api/v1/cuotas/mes    → lo publicado cada día del mes (historial)
 - POST /api/v1/cuotas/ajuste → fija a mano lo subido fuera de la app
+- GET  /api/v1/cuotas/campanas → calendario de campañas (Black Friday, Navidad)
 
 El contador NO es de un nicho: el límite es de la cuenta de TikTok, y da igual
 con qué nicho se grabara el vídeo. Se reinicia solo a medianoche (la fecha va
@@ -18,6 +19,7 @@ from pydantic import BaseModel
 
 from src.api.dependencies import get_current_user, get_web_user
 from src.api.exceptions import APIError
+from src.cuotas import campanas
 from src.cuotas.repos import cuota_repo
 
 router = APIRouter(
@@ -49,6 +51,12 @@ def cuota_mes(
         return cuota_repo.resumen_mes(usuario, mes)
     except ValueError as e:
         raise APIError(str(e), status_code=400) from e
+
+
+@router.get("/campanas")
+def campanas_estado() -> dict:
+    """Calendario de campañas (Black Friday, Navidad): la franja de la web."""
+    return campanas.estado()
 
 
 @router.post("/ajuste")
