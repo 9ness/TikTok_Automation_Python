@@ -98,6 +98,14 @@ Si tras un re-login algo sigue diciendo «Not logged in», hay que reiniciar
 `claude-chat` y todos los `claude-remote@*`, porque guardan el token en memoria.
 Más gotchas en `learnings.md` (buscar «Remote Control»).
 
+## Elegir qué proyectos tienen sesión (desde la app)
+
+App › **Accesos › «Sesiones de Claude por proyecto»**: casillas con las carpetas de
+`~/proyectos`; «Guardar» abre y activa las marcadas y cierra/desactiva el resto (no borra
+nada). Script `deploy/claude-login/claude-remotas` (en `/usr/local/bin/`), vía
+`webhook_listener` `/admin/claude-remotas`. Necesitan la sesión de Claude del VPS conectada
+(tarjeta «Sesión de Claude en el VPS»; ver `deploy/NAVEGADOR_REMOTO.md`).
+
 ## Estado actual (29-sep-2026): solo `bet-ai-master` encendido
 
 Cada `claude-remote@<proyecto>` gasta 75-220 MB aunque no se use y el VPS tiene 8 GB, así que

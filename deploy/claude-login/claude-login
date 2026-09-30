@@ -51,6 +51,7 @@ case "${1:-estado}" in
         # Lo que dependía de la sesión: las Remote Control ACTIVADAS y el chat de la app.
         for s in $(systemctl list-unit-files --no-legend 'claude-remote@*' | awk '$2=="enabled"{print $1}') \
                  $(systemctl list-units --no-legend --plain 'claude-remote@*' | awk '{print $1}'); do
+          systemctl reset-failed "$s" 2>/dev/null   # tras muchos fallos sin sesión, systemd se rinde
           systemctl restart "$s" 2>/dev/null
         done
         systemctl restart claude-chat 2>/dev/null

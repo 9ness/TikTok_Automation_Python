@@ -34,6 +34,8 @@ Endpoints:
     GET  /admin/deploy/log?n=200  — tail de logs/deploy.log
     GET  /admin/system            — uptime + disk + mem
     GET  /admin/navegador/estado  — Chrome remoto (Flow/Magnific): encendido, RAM, pestañas
+    GET  /admin/claude-remotas        — sesiones de Claude Remote por proyecto
+    POST /admin/claude-remotas        — {proyectos:[…]} los que quedan abiertos
     GET  /admin/claude-login/estado   — ¿está Claude Code logueado en el VPS?
     POST /admin/claude-login/iniciar|codigo|cancelar — renovar esa sesión desde la web
     GET  /admin/navegador/clave   — contraseña de la pantalla (solo admin)
@@ -276,6 +278,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_claude_login("estado")
             return
 
+        if path == "/admin/claude-remotas":
+            self._handle_claude_remotas(None)
+            return
+
         if path == "/admin/navegador/clave":
             if not self._check_admin_auth():
                 return
@@ -320,6 +326,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_claude_sdk("free")
             return
 
+        if path == "/admin/claude-remotas":
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                cuerpo = json.loads(self.rfile.read(min(n, 16384)) or b"{}")
+                lista = [str(x) for x in cuerpo.get("proyectos", []) if str(x).strip()]
+            except (ValueError, json.JSONDecodeError, AttributeError):
+                self._json_response(400, {"error": "cuerpo no válido"})
+                return
+            self._handle_claude_remotas(lista)
+            return
+
         if path in ("/admin/claude-login/iniciar", "/admin/claude-login/codigo",
                     "/admin/claude-login/cancelar"):
             self._handle_claude_login(path.rsplit("/", 1)[1])
@@ -334,6 +351,27 @@ class WebhookHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
     # Handlers
     # ------------------------------------------------------------------
+    def _handle_claude_remotas(self, abiertas: list[str] | None) -> None:
+        """Ver (None) o fijar qué proyectos tienen Remote Control (`claude-remotas`).
+
+        La lista va por STDIN; el script solo acepta carpetas que existan en
+        ~/proyectos, así que un nombre raro no llega a systemctl.
+        """
+        if not self._check_admin_auth():
+            return
+        accion = "estado" if abiertas is None else "aplicar"
+        try:
+            p = subprocess.run(
+                ["sudo", "-n", "/usr/local/bin/claude-remotas", accion],
+                input=None if abiertas is None else "\n".join(abiertas) + "\n",
+                capture_output=True, text=True, timeout=120,
+            )
+            data = json.loads(p.stdout.strip().splitlines()[-1])
+        except (subprocess.TimeoutExpired, IndexError, json.JSONDecodeError) as e:
+            self._json_response(500, {"error": f"claude-remotas {accion}: {e}"})
+            return
+        self._json_response(200, data)
+
     def _handle_claude_login(self, accion: str) -> None:
         """Renovar la sesión de claude.ai del VPS (`/usr/local/bin/claude-login`).
 

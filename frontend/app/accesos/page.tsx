@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 
 import { NavegadorRemoto } from "@/components/settings/NavegadorRemoto";
 import { SesionClaudeVps } from "@/components/settings/SesionClaudeVps";
+import { SesionesRemotas } from "@/components/settings/SesionesRemotas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMe } from "@/lib/queries/auth";
@@ -49,6 +50,9 @@ export default function AccesosPage() {
 
           {/* Renovar el login de Claude del VPS (caduca ~cada mes). */}
           <SesionClaudeVps />
+
+          {/* Qué proyectos tienen Claude remoto abierto. */}
+          <SesionesRemotas />
 
           <Card>
             <CardHeader className="pb-2">

@@ -57,6 +57,25 @@ def codigo(
     return _accion(settings, "POST", "/admin/claude-login/codigo", {"codigo": codigo})
 
 
+@router.get("/remotas")
+def remotas(
+    _: Annotated[str, Depends(exigir_admin)],
+    settings: Annotated[APISettings, Depends(get_settings)],
+) -> dict[str, Any]:
+    """Proyectos de ~/proyectos y si tienen sesión de Claude Remote abierta."""
+    return _accion(settings, "GET", "/admin/claude-remotas")
+
+
+@router.post("/remotas")
+def fijar_remotas(
+    _: Annotated[str, Depends(exigir_admin)],
+    settings: Annotated[APISettings, Depends(get_settings)],
+    proyectos: Annotated[list[str], Body(embed=True, max_length=60)],
+) -> dict[str, Any]:
+    """Deja ABIERTAS solo las de `proyectos` (el resto se apagan; no se borra nada)."""
+    return _accion(settings, "POST", "/admin/claude-remotas", {"proyectos": proyectos})
+
+
 @router.post("/cancelar")
 def cancelar(
     _: Annotated[str, Depends(exigir_admin)],

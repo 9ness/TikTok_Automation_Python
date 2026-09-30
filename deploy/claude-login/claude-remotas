@@ -1,0 +1,52 @@
+#!/bin/bash
+# claude-remotas estado|aplicar — qué proyectos tienen sesión de Claude Remote Control en el VPS.
+#
+# Cada `claude-remote@<proyecto>` gasta ~75-220 MB aunque no se use, así que el operador
+# elige desde la app (Accesos › «Sesiones de Claude por proyecto») cuáles quiere abiertas.
+#   estado  → JSON con cada carpeta de ~/proyectos: activada (arranca con el servidor),
+#             encendida y MB que gasta.
+#   aplicar → lee por STDIN la lista de proyectos a dejar ABIERTOS (uno por línea); enciende
+#             y activa esos, y apaga y desactiva el resto. No borra nada.
+set -u
+PROY=/home/nebulabsai/proyectos
+
+proyectos() { find "$PROY" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -f; }
+
+estado() {
+  for p in $(proyectos); do
+    u="claude-remote@$p.service"
+    act=$(systemctl is-enabled "$u" 2>/dev/null)
+    enc=$(systemctl is-active "$u" 2>/dev/null)
+    b=$(systemctl show "$u" -p MemoryCurrent --value 2>/dev/null)
+    [[ "$b" =~ ^[0-9]+$ ]] || b=0
+    printf '%s\t%s\t%s\t%s\n' "$p" "$act" "$enc" "$((b/1024/1024))"
+  done | python3 -c '
+import json,sys
+out=[]
+for l in sys.stdin:
+    p,act,enc,mb=l.rstrip("\n").split("\t")
+    out.append({"proyecto":p,"activada":act=="enabled","encendida":enc=="active","mb":int(mb)})
+print(json.dumps({"proyectos":out}))'
+}
+
+case "${1:-estado}" in
+  estado) estado ;;
+  aplicar)
+    mapfile -t pedidos
+    validos=$(proyectos)
+    for p in $validos; do
+      u="claude-remote@$p.service"
+      if printf '%s\n' "${pedidos[@]}" | grep -qxF "$p"; then
+        # reset-failed: si falló muchas veces (p. ej. sin sesión de Claude), systemd deja
+        # de reintentarlo y `enable --now` no lo levantaría.
+        systemctl reset-failed "$u" 2>/dev/null
+        systemctl enable "$u" >/dev/null 2>&1
+        systemctl is-active --quiet "$u" || systemctl restart "$u"
+      else
+        systemctl disable --now "$u" >/dev/null 2>&1
+      fi
+    done
+    sleep 4
+    estado ;;
+  *) echo "uso: claude-remotas estado|aplicar" ;;
+esac
