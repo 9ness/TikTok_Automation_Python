@@ -1,3 +1,9 @@
+## 🎄 Productos Q4 (ness) — pendiente (30 sep 2026)
+
+- [ ] **Recargar OpenAI** (o esperar a que Gemini recupere cuota): sin IA no se escriben guiones ni funciona la voz «auto».
+- [ ] Hacer los **10 en modo «Precio»** que se pidieron (productos 11-20 de «Productos Q4»). Hoy los 20 salieron en «Punto de dolor» porque la tanda de «precio» no se pudo escribir sin IA. El modo es de todo el catálogo: cambiar a «precio», escribir los guiones 11-20, subir otra vez sus clips (están en la bandeja) → segundo vídeo por producto.
+- [ ] Comprimir el aviso: `test_queue.py::TestCancelJob` (4 tests) ya fallaba antes de estos cambios.
+
 ## 🎛️ Multimodo (Ana) — RELEVO para la siguiente sesión (29 sep 2026)
 
 > **Empieza por aquí.** Contexto completo: `src/agente_mcp/guias/moda-mujer-multimodo.md`
