@@ -110,7 +110,10 @@ Trampas:
   29/9). Solo AÑADE al final, por producto: «Exactly one hand, never a second
   one», «switched off / nothing lights up», «no steam, no smoke», «the workbench
   stays EMPTY», lo que no debe moverse, y `Avoid: …`.
-- Va de 3 en 3 (más → «Generation failed», se reembolsa). ~3-6 min cada uno.
+- Va de 3 en 3 (más → «Generation failed», se reembolsa). ~3-6 min cada uno. (30/9: 20 a la vez sin fallos,
+  pero con la cola cargada cada clip tardó 20-35 min; el estado se lee en `/api/v2/veo/histories?page=N&limit=20`.)
+- **Nada de cifras en el prompt de vídeo** («20 cm»): Veo las escribe en el vídeo. Productos con botones o
+  incienso (luces que se encienden, humo) salen mejor en Flow Omni.
   Tras «Generar» espera 8-10 s antes de subir la siguiente imagen.
 - Leer resultados: los `<video>` de la lista llevan `src=files.genaipro.io/video_<uuid>.mp4`
   → se bajan con `curl` sin pulsar Download. Los más nuevos van arriba; hay
