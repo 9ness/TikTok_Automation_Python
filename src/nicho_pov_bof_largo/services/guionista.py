@@ -95,9 +95,9 @@ def escribir(
     # separan aquí y el largo se mide SIN ellas (no se locutan).
     from src.nicho_pov_bof_largo.pipeline.insertos import separar_golpes
 
-    tope = max_caracteres or config.GUION_MAX_CARACTERES
-    # 2 golpes en los vídeos de 2 clips (≤20 s), 3 en los más largos.
-    maximo = 2 if tope <= config.caracteres_guion(20) else config.INSERTOS_MAXIMOS
+    # Cuántos golpes lo decide el guion (2 a 4, ver guion_epico.md); aquí
+    # solo se corta lo que pase del máximo.
+    maximo = config.INSERTOS_MAXIMOS
     guion, golpes = separar_golpes(bruto, maximo)
     if golpes:
         on_log(f"[{etiqueta}] {len(golpes)} golpe(s) épico(s): " + " · ".join(g["texto"] for g in golpes))

@@ -828,9 +828,9 @@ def video_dir() -> Path:
 # Cuánto dura cada inserto en el vídeo. Medido en las referencias: entre 0,6 y
 # 1,5 s; con 1 s el golpe se oye entero y no corta el ritmo de la voz.
 INSERTO_S = 1.0
-# Cuántos golpes puede marcar el guion. Dos en guiones cortos, tres en los de
-# 24 s o más (lo decide el propio guion).
-INSERTOS_MAXIMOS = 3
+# Cuántos golpes puede marcar el guion: lo decide la IA según cuántas frases
+# potentes tenga (mínimo 2). Las referencias meten 3-4 en 20 s.
+INSERTOS_MAXIMOS = 4
 # El sonido del golpe (el de la referencia que eligió el operador).
 SONIDO_INSERTO = "assets/sfx/golpe_epico.wav"
 

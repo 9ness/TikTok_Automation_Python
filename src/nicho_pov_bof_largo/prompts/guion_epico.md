@@ -18,7 +18,7 @@ MODO ÉPICO — además de todo lo anterior, este guion se monta con «golpes»:
 3. MARCA LOS GOLPES. Justo DESPUÉS de las frases más potentes escribe una marca con este formato exacto:
    [[GOLPE: TEXTO EN PANTALLA | escena]]
    - El PRIMER golpe va SIEMPRE justo después de la primera frase (el gancho).
-   - Pon 2 golpes si el guion dura 20 segundos o menos, y 3 si dura más. Nunca más de 3. Nunca dos seguidos ni después de la llamada a la acción final.
+   - Pon entre 2 y 4 golpes: tantos como frases realmente potentes tenga el guion (un dolor claro, una característica llamativa, un dato concreto de la ficha). Mínimo 2; no metas golpes de relleno detrás de frases flojas. Nunca dos seguidos ni después de la llamada a la acción final.
    - TEXTO EN PANTALLA: 2 o 3 palabras en MAYÚSCULAS que resuman LA FRASE QUE TIENE JUSTO DELANTE (no otra): en el gancho, el dolor («PIEL IRRITADA»); en una característica, esa característica («CABEZAL 9D»). Tiene que ser verdad según la ficha: nada de descuentos, precios, «gratis», «el mejor» ni promesas.
    - Pon los demás golpes detrás de la frase de la característica más llamativa del producto, no detrás del precio.
    - escena: qué parte del producto enseñar en ese corte, en 6-12 palabras. No describas el fondo: lo decide la edición.

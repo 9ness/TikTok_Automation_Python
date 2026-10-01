@@ -1088,7 +1088,7 @@ export default function PovBofLargoPage() {
             </div>
             <p className="w-full text-[11px] leading-relaxed text-muted-foreground">
               {estiloActual === "epico"
-                ? "Como punto de dolor, pero con un gancho de menos de 3 s y frases cortas: el guion marca 2-3 «golpes» y en cada uno entra un inserto épico de 1 s (producto con fondo épico + golpe de sonido). Cada golpe pide su clip de 5 s."
+                ? "Como punto de dolor, pero con un gancho de menos de 3 s y frases cortas: el guion marca de 2 a 4 «golpes» según sus frases potentes y en cada uno entra un inserto épico de 1 s (producto con fondo épico + golpe de sonido). Cada golpe pide su clip de 5 s."
                 : estiloActual === "dolor"
                 ? "El vídeo empieza con tres a cinco problemas dirigidos al espectador y el precio va al final."
                 : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}{" "}

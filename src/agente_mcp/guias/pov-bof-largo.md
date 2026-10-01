@@ -127,7 +127,7 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
 ## ⚡ Modo «Épico» (oct 2026)
 
 Tercer modo del guion, junto a «Precio» y «Punto de dolor». Es el de dolor del
-curso, pero con un gancho de menos de 3 s y frases cortas. El guion marca 2-3
+curso, pero con un gancho de menos de 3 s y frases cortas. El guion marca de 2 a 4 (según cuántas frases potentes tenga)
 **golpes**: en cada uno la voz se calla, entra un **inserto** de 1 s (el
 producto con fondo épico, el texto grande arriba y un golpe de sonido) y sigue
 la voz. Las pausas de antes y de después se recortan solas. Patrón y pruebas:
