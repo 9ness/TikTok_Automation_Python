@@ -27,6 +27,7 @@ no hay rótulo ni subtítulos, igual que en las referencias.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import unicodedata
 from pathlib import Path
@@ -62,7 +63,10 @@ def separar_golpes(guion: str, maximo: int = 3) -> tuple[str, list[dict]]:
         texto_hasta_aqui = " ".join(p for p in limpio_partes if p)
         frases = re.split(r"(?<=[.!?…])\s+", texto_hasta_aqui.strip())
         tras = frases[-1].strip() if frases and frases[-1].strip() else ""
-        if not tras or len(golpes) >= maximo:
+        # Dos marcas seguidas tras la misma frase serían dos cortes en la
+        # misma pausa: el segundo no se encontraría en la voz y pediría un
+        # inserto de más. Vale la primera.
+        if not tras or len(golpes) >= maximo or (golpes and golpes[-1]["tras"] == tras):
             continue
         golpes.append({
             "tras": tras,
@@ -243,5 +247,7 @@ def aplicar(
     salida = work_dir / "ep_final.mp4"
     _run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lista),
           *enc, "-movflags", "+faststart", str(salida)], on_log)
-    salida.replace(video)
+    # `move` y no `Path.replace`: el vídeo vive en el mount de Drive y el
+    # trabajo en /tmp — son dos sistemas de ficheros y `rename` da EXDEV.
+    shutil.move(str(salida), str(video))
     return video

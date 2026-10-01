@@ -70,6 +70,13 @@ def test_el_primer_golpe_siempre_tras_el_gancho():
     assert golpes[0]["tras"] == "¿Te irrita afeitarte?"
 
 
+def test_dos_marcas_tras_la_misma_frase_son_un_golpe():
+    g = ("¿Tu setup ya no cabe? [[GOLPE: SIN ESPACIO | de frente]] Tiene forma de L y luces RGB. "
+         "[[GOLPE: FORMA DE L | de lado]] [[GOLPE: LUCES RGB | las luces]] Ve al carrito naranja.")
+    _, golpes = insertos.separar_golpes(g)
+    assert [x["texto"] for x in golpes] == ["SIN ESPACIO", "FORMA DE L"]
+
+
 def test_localiza_aunque_whisper_oiga_mal():
     palabras = [_w("Si", 0.0, 0.14), _w("rita", 0.14, 0.42), _w("feitarte", 0.42, 0.82),
                 _w("cada", 0.82, 0.94), _w("mañana", 0.94, 1.4), _w("esto", 1.74, 2.0)]
