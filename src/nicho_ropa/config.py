@@ -482,6 +482,91 @@ TEXTO_MARCA: dict[str, dict] = {
     "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0, "y": 0.2},
 }
 
+# La TEMPORADA de los rótulos y de la música. Los rótulos se queman al MONTAR,
+# pero el vídeo se publica días después (las tandas van por delante de lo que
+# se sube), así que se mira la fecha en que se PUBLICARÁ. Y nunca un mes en el
+# texto: un «septiembre» publicado en octubre delata un vídeo viejo.
+#
+#   otoño     hasta el 31 oct (Halloween del 10 al 31, sumado a lo de otoño)
+#   invierno  del 1 nov al 30 nov y del 7 ene a febrero — la previa de Black
+#             Friday se vende ya con abrigo y bota
+#   navidad   del 1 dic al 6 ene
+#
+# Fuera de eso (primavera, verano) se queda lo de otoño, que es lo que pide
+# el formato: los Vintage son otoñales por diseño.
+ADELANTO_PUBLICAR_DIAS = 3
+TEMPORADAS_MULTIMODO = ("otono", "invierno", "navidad")
+
+
+def temporada_multimodo(hoy=None, adelanto: int = ADELANTO_PUBLICAR_DIAS) -> str:
+    """`"otono"`, `"invierno"` o `"navidad"` para el día en que se publicará."""
+    import datetime as _dt
+
+    dia = (hoy or _dt.date.today()) + _dt.timedelta(days=adelanto)
+    md = (dia.month, dia.day)
+    if md >= (12, 1) or md <= (1, 6):
+        return "navidad"
+    if (11, 1) <= md or md <= (2, 29):
+        return "invierno"
+    return "otono"
+
+
+def halloween_al_publicar(hoy=None) -> bool:
+    """¿Se publicará en plena semana de Halloween? Para el RÓTULO (se quema al
+    montar): un 🎃 publicado el 2 de noviembre ya llega tarde."""
+    import datetime as _dt
+
+    dia = (hoy or _dt.date.today()) + _dt.timedelta(days=ADELANTO_PUBLICAR_DIAS)
+    return dia.month == 10 and dia.day >= 10
+
+
+# Los de marca (espejo, zapatos, POV): el curso pone UN rótulo a todos, pero
+# sesenta vídeos seguidos con «AUTUMN · cozy season» se leen como plantilla.
+# Varias frases por temporada, la primera la del curso; invierno y Navidad con
+# sus `emojis`, porque las hojas del adorno no pegan en enero.
+_MARCA_FRASES = {
+    "marca_espejo": {
+        "otono": [("AUTUMN", "cozy season"), ("FALL EDIT", "outfit de temporada"),
+                  ("AUTUMN LOOK", "cozy & chic"), ("NUEVA TEMPORADA", "otoño con estilo")],
+        "invierno": [("WINTER", "cozy season", ("🤍", "❄️")),
+                     ("WINTER LOOK", "abrígate con estilo", ("❄️", "❄️")),
+                     ("COZY WINTER", "outfit de temporada", ("☕", "🤍"))],
+        "navidad": [("HOLIDAY SEASON", "cozy & chic", ("✨", "🎄")),
+                    ("HOLIDAY LOOK", "brilla estas fiestas", ("✨", "✨")),
+                    ("WINTER WONDERLAND", "outfit de fiesta", ("❄️", "🎄"))],
+    },
+    "marca_zapatos": {
+        "otono": [("AUTUMN BOOTS", "step into style"), ("FALL SHOES", "paso a paso"),
+                  ("AUTUMN STEPS", "nueva temporada")],
+        "invierno": [("WINTER BOOTS", "step into style", ("🤍", "❄️")),
+                     ("WINTER STEPS", "listas para el frío", ("❄️", "❄️"))],
+        "navidad": [("HOLIDAY BOOTS", "step into style", ("✨", "🎄")),
+                    ("HOLIDAY STEPS", "brilla estas fiestas", ("✨", "✨"))],
+    },
+    "marca_pov": {
+        "otono": [("AUTUMN", "cozy season"), ("FALL VIBES", "paso a paso"),
+                  ("COZY SEASON", "mi par favorito")],
+        "invierno": [("WINTER", "cozy season", ("☕", "❄️")),
+                     ("COZY WINTER", "mi par favorito", ("🤍", "❄️"))],
+        "navidad": [("HOLIDAY SEASON", "cozy vibes", ("✨", "🎄")),
+                    ("HOLIDAY STEPS", "brilla estas fiestas", ("✨", "✨"))],
+    },
+}
+
+
+def _frases(lista: list) -> list[dict]:
+    return [
+        {"titulo": f[0], "bajada": f[1], **({"emojis": f[2]} if len(f) > 2 else {})}
+        for f in lista
+    ]
+
+
+for _clave, _por in _MARCA_FRASES.items():
+    TEXTO_MARCA[_clave]["variantes"] = _frases(_por["otono"])
+    TEXTO_MARCA[_clave]["temporadas"] = {
+        "invierno": _frases(_por["invierno"]), "navidad": _frases(_por["navidad"]),
+    }
+
 # Los Vintage del multimodo (bolsos y botas). La web pide el rótulo otoñal
 # DENTRO de la imagen (Nano Banana), y Kling lo deforma a mitad de clip —salió
 # "ESENCIALES DE OTOÑO" convertido en "POEAOP"—. Se quita del prompt de imagen
@@ -492,7 +577,7 @@ TEXTO_MARCA: dict[str, dict] = {
 # rótulo de las imágenes de referencia.
 _VINTAGE_BOLSO = [
     ("Otoño esencial", "colección de temporada"),
-    ("Colección de Otoño", "la elegancia de septiembre"),
+    ("Colección de Otoño", "elegancia de temporada"),
     ("Autumn Essentials", "cozy season"),
     ("Esencia de Otoño", "nueva temporada"),
     ("Autumn Mood", "tu bolso de temporada"),
@@ -510,87 +595,157 @@ _VINTAGE_BOTAS = [
     ("Otoño a tus pies", "nueva temporada"),
     ("Boots Season", "cozy vibes"),
 ]
-# Frases de Halloween: se suman a las de otoño SOLO en su ventana (del 10 de
-# octubre al 1 de noviembre), con sus propios emojis. Fuera de ella no salen:
-# un 🎃 en septiembre queda raro.
+# Frases de Halloween: se suman a las de otoño SOLO si el vídeo se publica en
+# su semana (`halloween_al_publicar`), con sus propios emojis.
 _VINTAGE_HALLOWEEN = [
     ("Spooky Season", "look de Halloween", ("🎃", "🎃")),
     ("Halloween Vibes", "otoño con un toque oscuro", ("🎃", "👻")),
     ("Noche de Halloween", "el complemento perfecto", ("🦇", "🎃")),
 ]
-for _clave, _frases in (
-    ("vintage_bolso_1", _VINTAGE_BOLSO), ("vintage_bolso_2", _VINTAGE_BOLSO),
-    ("vintage_bolso_3", _VINTAGE_BOLSO), ("vintage_botas_1", _VINTAGE_BOTAS),
-    ("vintage_botas_2", _VINTAGE_BOTAS), ("vintage_botas_largas_1", _VINTAGE_BOTAS),
-    ("vintage_botas_largas_2", _VINTAGE_BOTAS),
+# Invierno y Navidad SUSTITUYEN a las de otoño. «Idea de regalo» sí, «regalo»
+# a secas no: suena a que viene algo gratis y eso es promoción incoherente.
+_VINTAGE_BOLSO_INVIERNO = [
+    ("Winter Essentials", "cozy season", ("🤍", "❄️")),
+    ("Esenciales de invierno", "tu bolso para el frío", ("☕", "❄️")),
+    ("Winter Mood", "abrigo, café y tu bolso", ("☕", "🤍")),
+    ("Nueva temporada", "invierno con estilo", ("❄️", "❄️")),
+    ("Cozy Winter", "el bolso que combina con todo", ("🤍", "🤍")),
+    ("Winter Edit", "must have de invierno", ("❄️", "✨")),
+]
+_VINTAGE_BOTAS_INVIERNO = [
+    ("Winter Boots", "cozy season", ("🤍", "❄️")),
+    ("Pasos de invierno", "calentitas y con estilo", ("❄️", "❄️")),
+    ("Winter Edit", "step into style", ("❄️", "✨")),
+    ("Botas de temporada", "listas para el frío", ("☕", "❄️")),
+    ("Cozy Winter", "paso a paso", ("🤍", "🤍")),
+    ("Boots Season", "winter vibes", ("❄️", "🤍")),
+]
+_VINTAGE_BOLSO_NAVIDAD = [
+    ("Holiday Season", "brilla estas fiestas", ("✨", "🎄")),
+    ("Navidad con estilo", "una idea de regalo que acierta", ("🎄", "🎁")),
+    ("Winter Wonderland", "tu bolso de fiestas", ("❄️", "✨")),
+    ("Ideas de regalo", "para ella", ("🎁", "🎁")),
+    ("Cozy Christmas", "café, luces y tu bolso", ("☕", "🎄")),
+]
+_VINTAGE_BOTAS_NAVIDAD = [
+    ("Holiday Season", "step into style", ("✨", "🎄")),
+    ("Navidad a tus pies", "una idea de regalo", ("🎄", "🎁")),
+    ("Winter Wonderland", "botas de fiesta", ("❄️", "✨")),
+    ("Cozy Christmas", "paso a paso", ("☕", "🎄")),
+    ("Holiday Boots", "brilla estas fiestas", ("✨", "✨")),
+]
+
+
+for _claves, _otono, _invierno, _navidad in (
+    (("vintage_bolso_1", "vintage_bolso_2", "vintage_bolso_3"),
+     _VINTAGE_BOLSO, _VINTAGE_BOLSO_INVIERNO, _VINTAGE_BOLSO_NAVIDAD),
+    (("vintage_botas_1", "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2"),
+     _VINTAGE_BOTAS, _VINTAGE_BOTAS_INVIERNO, _VINTAGE_BOTAS_NAVIDAD),
 ):
-    TEXTO_MARCA[_clave] = {
-        "variantes": [{"titulo": t, "bajada": b} for t, b in _frases],
-        "halloween": [{"titulo": t, "bajada": b, "emojis": e} for t, b, e in _VINTAGE_HALLOWEEN],
-        "segundos": 0.0, "grado": False, "quitar_de_imagen": True,
-    }
+    for _clave in _claves:
+        TEXTO_MARCA[_clave] = {
+            "variantes": _frases(_otono),
+            "halloween": _frases(_VINTAGE_HALLOWEEN),
+            "temporadas": {"invierno": _frases(_invierno), "navidad": _frases(_navidad)},
+            "segundos": 0.0, "grado": False, "quitar_de_imagen": True,
+        }
 
 
 # La música la pone el operador en TikTok al publicar (los vídeos salen
-# mudos). Para no pensarla vídeo a vídeo, cada formato trae QUÉ tipo de música
-# le va y varias búsquedas para la biblioteca de sonidos de TikTok; a cada
-# producto le toca una (por semilla), así dos vídeos seguidos no llevan el
-# mismo sonido. En inglés porque así están etiquetados los sonidos en TikTok.
-MUSICA_MULTIMODO: dict[str, dict] = {
-    "espejo_musica": {
-        "estilo": "pop pegadizo de tendencia, alegre, para enseñar el outfit",
-        "busca": ["outfit check", "fit check trend", "get ready with me song", "fashion trending sound"],
-    },
-    "marca_espejo": {
-        "estilo": "indie suave y acogedor, vibra de vlog de otoño",
-        "busca": ["cozy autumn vibes", "aesthetic vlog music", "soft indie autumn", "fall aesthetic"],
-    },
-    "maniqui": {
-        "estilo": "beat minimal de moda, tipo desfile",
-        "busca": ["runway beat", "fashion show music", "minimal house fashion"],
-    },
-    "sarcastica_mujer": {
-        "estilo": "sonido de humor con risas (el formato lo pide)",
-        "busca": ["sitcom laugh", "funny laugh sound", "sarcastic meme sound"],
-    },
-    "zapatillas_espejo": {
-        "estilo": "hip hop chill o lo-fi con ritmo marcado",
-        "busca": ["sneaker check", "lofi hip hop chill", "chill beat fashion"],
-    },
-    "marca_zapatos": {
-        "estilo": "acústica cálida, otoño cinematográfico",
-        "busca": ["autumn acoustic", "cozy fall music", "cinematic autumn"],
-    },
-    "marca_pov": {
-        "estilo": "jazz de cafetería, tranquilo",
-        "busca": ["coffee shop jazz", "cozy autumn jazz", "rainy day jazz"],
-    },
+# mudos). Para no pensarla vídeo a vídeo, cada formato trae VARIOS estilos que
+# le van, cada uno con sus búsquedas para la biblioteca de sonidos de TikTok;
+# a cada producto le toca un estilo y una búsqueda (por semilla), así dos
+# vídeos seguidos no suenan igual. Con un estilo por formato, una tanda de
+# bolsos y botas era toda «jazz vintage». En inglés porque así están
+# etiquetados los sonidos en TikTok. Lo de temporada se suma aparte.
+def _m(estilo: str, *busca: str) -> dict:
+    return {"estilo": estilo, "busca": list(busca)}
+
+
+_MUSICA_VINTAGE_BOLSO = [
+    _m("jazz o soul vintage", "vintage jazz", "70s soul aesthetic", "motown soul", "old vinyl aesthetic"),
+    _m("canción francesa de café", "old french song", "chanson française", "parisian cafe music"),
+    _m("bossa nova suave", "bossa nova vintage", "bossa nova cafe", "brazilian jazz chill"),
+    _m("pop de los 60 con encanto", "60s girl group", "retro 60s pop", "vintage love song"),
+]
+_MUSICA_VINTAGE_BOTAS = [
+    _m("soul o funk de los 70", "70s soul aesthetic", "retro funk groove", "old vinyl aesthetic"),
+    _m("country y folk vintage", "vintage country aesthetic", "cowboy aesthetic song", "western aesthetic"),
+    _m("folk rock de carretera", "folk rock 70s", "road trip indie folk", "acoustic road trip"),
+    _m("blues y guitarra vintage", "blues guitar vintage", "slow blues aesthetic", "vintage rock ballad"),
+]
+MUSICA_MULTIMODO: dict[str, list[dict]] = {
+    "espejo_musica": [
+        _m("pop pegadizo de tendencia, para enseñar el outfit",
+           "outfit check", "fit check trend", "outfit of the day song", "fashion trending sound"),
+        _m("pop con actitud, de pasarela casera",
+           "main character energy", "confident walk song", "catwalk sound", "girly pop aesthetic"),
+        _m("dance o house ligero de get ready",
+           "get ready with me song", "pop dance trend", "house music get ready", "party getting ready"),
+    ],
+    "marca_espejo": [
+        _m("indie suave y acogedor, vibra de vlog", "aesthetic vlog music", "soft indie", "bedroom pop chill"),
+        _m("folk acústico tranquilo", "indie folk acoustic", "soft guitar aesthetic", "slow morning vlog"),
+        _m("dream pop envolvente", "dreamy indie pop", "dream pop aesthetic", "ethereal pop"),
+    ],
+    "maniqui": [
+        _m("beat minimal de desfile", "runway beat", "fashion show music", "minimal house fashion"),
+        _m("deep house de tienda chic", "deep house fashion", "boutique lounge music", "chic minimal beat"),
+        _m("techno elegante", "techno runway", "dark minimal techno fashion", "model walk beat"),
+    ],
+    "sarcastica_mujer": [
+        _m("sonido de humor con risas (el formato lo pide)",
+           "sitcom laugh", "funny laugh sound", "sarcastic meme sound", "laugh track", "awkward moment sound"),
+    ],
+    "zapatillas_espejo": [
+        _m("hip hop chill con ritmo marcado", "sneaker check", "chill beat fashion", "boom bap chill"),
+        _m("lo-fi urbano", "lofi hip hop chill", "city walk lofi", "street style beat"),
+        _m("r&b suave", "rnb chill vibe", "smooth rnb aesthetic", "late night rnb"),
+    ],
+    "marca_zapatos": [
+        _m("acústica cálida y cinematográfica", "cinematic acoustic", "acoustic guitar warm", "folk walk music"),
+        _m("piano suave de película", "piano cinematic soft", "emotional piano aesthetic", "soft piano walk"),
+        _m("indie folk de paseo", "indie folk walk", "happy acoustic stroll", "sunny indie folk"),
+    ],
+    "marca_pov": [
+        _m("jazz de cafetería, tranquilo", "coffee shop jazz", "sunday morning jazz", "piano jazz morning"),
+        _m("lo-fi jazz", "lofi jazz", "jazzhop chill", "study jazz lofi"),
+        _m("bossa nova de cafetería", "bossa nova cafe", "cafe bossa nova", "brazilian jazz chill"),
+    ],
 }
-for _clave in (
-    "vintage_bolso_1", "vintage_bolso_2", "vintage_bolso_3", "vintage_botas_1",
-    "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2",
-):
-    MUSICA_MULTIMODO[_clave] = {
-        "estilo": "jazz o soul vintage, o acústica otoñal tranquila",
-        "busca": ["vintage jazz", "old french song", "autumn lofi", "70s soul aesthetic"],
-    }
-_MUSICA_HALLOWEEN = ["spooky season", "halloween aesthetic"]
+for _clave in ("vintage_bolso_1", "vintage_bolso_2", "vintage_bolso_3"):
+    MUSICA_MULTIMODO[_clave] = _MUSICA_VINTAGE_BOLSO
+for _clave in ("vintage_botas_1", "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2"):
+    MUSICA_MULTIMODO[_clave] = _MUSICA_VINTAGE_BOTAS
+# Se SUMA una a las búsquedas del estilo que toque: así una parte de los
+# vídeos suena a la época y el resto no se queda anclado en ella.
+_MUSICA_TEMPORADA = {
+    "otono": ["autumn vibes", "fall aesthetic", "cozy autumn", "autumn lofi"],
+    "invierno": ["winter vibes", "cozy winter", "snow day aesthetic", "winter lofi"],
+    "navidad": ["christmas aesthetic", "christmas jazz", "christmas lofi", "cozy christmas"],
+}
+_MUSICA_HALLOWEEN = ["spooky season", "halloween aesthetic", "witchy vibes"]
 
 
-def musica_de(modo: str, semilla: str = "") -> dict:
+def musica_de(modo: str, semilla: str = "", hoy=None) -> dict:
     """`{busqueda, alternativas, estilo}` para ponerle sonido en TikTok.
 
     `{}` si el formato no tiene sugerencia (los que hablan no la necesitan).
+    Se calcula al LISTAR, que es cuando se publica: la temporada es la de hoy.
     """
     import hashlib
 
-    meta = MUSICA_MULTIMODO.get(estilo_de_modo(modo)) if modo else None
-    if not meta:
+    estilos = MUSICA_MULTIMODO.get(estilo_de_modo(modo)) if modo else None
+    if not estilos:
         return {}
-    busca = list(meta["busca"])
-    if es_halloween():
-        busca += _MUSICA_HALLOWEEN
     h = hashlib.sha1(("musica:" + str(semilla or "")).encode("utf-8")).digest()
+    meta = estilos[h[1] % len(estilos)]
+    # UNA de temporada (y una de Halloween en su semana): con todas, la mitad
+    # de los vídeos acababa con «autumn vibes».
+    temporada = _MUSICA_TEMPORADA[temporada_multimodo(hoy, adelanto=0)]
+    busca = list(meta["busca"]) + [temporada[h[2] % len(temporada)]]
+    if es_halloween(hoy):
+        busca.append(_MUSICA_HALLOWEEN[h[3] % len(_MUSICA_HALLOWEEN)])
     i = h[0] % len(busca)
     return {
         "busqueda": busca[i],
@@ -1122,18 +1277,25 @@ def lleva_subtitulos(modo: str) -> bool:
     return bool((ESTILOS_MOF10.get(estilo_de_modo(modo)) or {}).get("subtitulos"))
 
 
-def texto_de_modo(modo: str, semilla: str = "") -> dict:
+def texto_de_modo(modo: str, semilla: str = "", hoy=None) -> dict:
     """El texto quemado que le toca a ese modo. `{}` si no lleva ninguno.
 
     Los que traen `variantes` eligen una por prenda (`semilla`), determinista:
-    remontar el mismo vídeo no le cambia la frase.
+    remontar el mismo vídeo en la misma temporada no le cambia la frase. La
+    temporada es la del día en que se PUBLICARÁ (`temporada_multimodo`).
     """
     import hashlib
 
     texto = dict(TEXTO_MARCA.get(estilo_de_modo(modo)) or {})
     variantes = texto.pop("variantes", None)
     halloween = texto.pop("halloween", None)
-    if variantes and halloween and es_halloween():
+    temporadas = texto.pop("temporadas", None) or {}
+    propia = temporadas.get(temporada_multimodo(hoy))
+    if isinstance(propia, list):
+        variantes = propia
+    elif propia:
+        texto.update(propia)
+    elif variantes and halloween and halloween_al_publicar(hoy):
         variantes = variantes + halloween
     if variantes:
         h = hashlib.sha1(("frase:" + str(semilla or "")).encode("utf-8")).digest()

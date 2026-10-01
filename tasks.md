@@ -4,6 +4,18 @@
 - [x] (1/10) Hechos los **10 en modo «Precio»** que se pidieron (productos 11-20 de «Productos Q4»). Hoy los 20 salieron en «Punto de dolor» porque la tanda de «precio» no se pudo escribir sin IA. El modo es de todo el catálogo: cambiar a «precio», escribir los guiones 11-20, subir otra vez sus clips (están en la bandeja) → segundo vídeo por producto.
 - [ ] Comprimir el aviso: `test_queue.py::TestCancelJob` (4 tests) ya fallaba antes de estos cambios.
 
+## 🎛️ Multimodo (Ana) — PLAN Q4 (1 oct 2026)
+
+> **Qué toca cada día:** [`docs/PLAN_MULTIMODO_Q4.md`](docs/PLAN_MULTIMODO_Q4.md) — tandas 7-28
+> producto a producto (formato, ➡️, música, rótulo), reservas de invierno/fiesta y descartes
+> (verano, duplicados entre carpetas).
+
+- [ ] Desplegar rótulos/música por temporada (`nicho_ropa/config.py`) antes de montar nada nuevo.
+- [ ] Remontar los puestos 60, 63 y 67 (rótulo «la elegancia de septiembre»): clip de Magnific o regenerar.
+- [ ] Extraer textos de Ropa C4-C10 y C17 y Zapatos C5-C17 (sin título ni guion para los 🎙️).
+- [ ] 👤 Importar ZIPs nuevos de la web del curso (ropa/zapatos/accesorios de invierno y fiesta): el catálogo útil se acaba el 23 oct y faltan ~600 productos para nov-dic. Bolsos: solo quedan 5.
+- [ ] 👤 URL del MCP de Ana para subir.
+
 ## 🎛️ Multimodo (Ana) — RELEVO para la siguiente sesión (29 sep 2026)
 
 > **Empieza por aquí.** Contexto completo: `src/agente_mcp/guias/moda-mujer-multimodo.md`

@@ -92,6 +92,52 @@ class TestRotuloVintage:
         assert not config.es_halloween(dt.date(2026, 11, 5))
 
 
+class TestTemporada:
+    """Rótulos por la fecha en que se PUBLICARÁ, y nunca con un mes dentro."""
+
+    def test_ventanas(self):
+        import datetime as dt
+        t = config.temporada_multimodo
+        assert t(dt.date(2026, 10, 15), adelanto=0) == "otono"
+        assert t(dt.date(2026, 11, 2), adelanto=0) == "invierno"
+        assert t(dt.date(2026, 12, 20), adelanto=0) == "navidad"
+        assert t(dt.date(2027, 1, 3), adelanto=0) == "navidad"
+        assert t(dt.date(2027, 1, 20), adelanto=0) == "invierno"
+        # Montado el 29 oct se publica ya en noviembre: rótulo de invierno.
+        assert t(dt.date(2026, 10, 29)) == "invierno"
+
+    def test_ninguna_frase_lleva_un_mes(self):
+        meses = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                 "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+        for meta in config.TEXTO_MARCA.values():
+            frases = list(meta.get("variantes") or []) + list(meta.get("halloween") or [])
+            for por in (meta.get("temporadas") or {}).values():
+                frases += por if isinstance(por, list) else [por]
+            frases.append(meta)
+            for f in frases:
+                txt = f"{f.get('titulo', '')} {f.get('bajada', '')}".lower()
+                assert not any(m in txt for m in meses), txt
+
+    def test_rotulo_de_invierno_y_navidad(self):
+        import datetime as dt
+        nov, dic = dt.date(2026, 11, 12), dt.date(2026, 12, 10)
+        assert "WINTER" in config.texto_de_modo("mm_espejo_escenas", "c/1", nov)["titulo"]
+        assert "HOLIDAY" in config.texto_de_modo("mm_zapatos_pov", "c/1", dic)["titulo"]
+        bolso = config.texto_de_modo("mm_bolso_1", "c/1", nov)
+        assert bolso["emojis"] and "Otoño" not in bolso["titulo"]
+
+    def test_el_espejo_no_lleva_siempre_el_mismo_rotulo(self):
+        import datetime as dt
+        oct_ = dt.date(2026, 10, 3)
+        frases = {config.texto_de_modo("mm_espejo_escenas", f"c/{i}", oct_)["titulo"] for i in range(30)}
+        assert "AUTUMN" in frases and len(frases) >= 3
+
+    def test_halloween_no_se_quema_si_se_publica_en_noviembre(self):
+        import datetime as dt
+        assert config.halloween_al_publicar(dt.date(2026, 10, 20))
+        assert not config.halloween_al_publicar(dt.date(2026, 10, 30))
+
+
 class TestMusica:
     def test_cada_formato_trae_su_busqueda(self):
         for modo in config.modos_multimodo():
@@ -105,6 +151,11 @@ class TestMusica:
 
     def test_estable_por_producto(self):
         assert config.musica_de("mm_bolso_1", "c/3") == config.musica_de("mm_bolso_1", "c/3")
+
+    def test_varios_estilos_por_formato(self):
+        for modo in ("mm_bolso_1", "mm_botas_2", "mm_espejo", "mm_zapatos_pov"):
+            estilos = {config.musica_de(modo, f"c/{i}")["estilo"] for i in range(40)}
+            assert len(estilos) >= 3, modo
 
 
 class TestMovimientoSinTexto:

@@ -229,10 +229,15 @@ orden de salida»: se cruzan.
 - Ningún prompt debe acabar poniendo texto: `plan_producto` ya quita el
   rótulo del prompt de imagen de los Vintage y termina el de movimiento con
   «vídeo limpio, sin texto». Si copias el prompt a mano, cópialo ENTERO.
-- El rótulo (otoño, con Halloween en octubre) y sus emojis los **quema el
+- El rótulo de temporada y sus emojis los **quema el
   montaje**, una frase distinta por producto. Si la IA pone letras, se
   rechaza, aunque parezcan buenas: salen deformes o inventadas («POEAOP»,
   «2024», «PIAPIODMIRMA»).
+- La temporada del rótulo es la del día en que se **publicará** (hoy + 3
+  días, `config.temporada_multimodo`): otoño hasta el 31 oct (Halloween solo
+  si se publica del 10 al 31), invierno en noviembre y de enero a febrero,
+  Navidad del 1 dic al 6 ene. Nunca lleva un mes escrito: un «septiembre»
+  publicado en octubre delata un vídeo viejo.
 - En Zapatos POV el rótulo va arriba para no tapar el zapato.
 - El rótulo respeta las **zonas seguras de TikTok** (`SAFE_X`/`SAFE_Y`: ni bajo
   los botones de la derecha ni sobre la descripción de abajo): el montaje lo
@@ -314,5 +319,7 @@ quien publica.
 
 Cada vídeo trae **🎵 la música que le va** (`musica` en la API): una búsqueda
 para la biblioteca de sonidos de TikTok, otras de repuesto y el estilo. Sale
-de `config.MUSICA_MULTIMODO` por formato y cambia de un producto a otro; en
-Halloween se suman búsquedas de temporada.
+de `config.MUSICA_MULTIMODO`: cada formato tiene 3-4 ESTILOS (jazz, francesa,
+bossa nova, country, house…) y a cada producto le toca uno, así una tanda no
+suena toda igual. Se suman búsquedas de la temporada del día (otoño, invierno,
+Navidad) y, del 10 al 31 de octubre, de Halloween.
