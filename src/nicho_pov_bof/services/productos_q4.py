@@ -40,6 +40,13 @@ _EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 _MANIFIESTO = "q4:manifiesto"
 SOURCE = config.CATALOGO_Q4
 CARPETA = config.CARPETA_Q4
+
+
+def _clave(carpeta: str) -> str:
+    meta = config.CARPETAS_ESPECIALES.get(carpeta or CARPETA)
+    if not meta:
+        raise ValueError(f"Carpeta especial desconocida: {carpeta!r}. Válidas: {list(config.CARPETAS_ESPECIALES)}")
+    return meta["manifiesto"]
 # Campos de texto que viajan con el producto. `envio` y `plazos` son lo que
 # la ficha deja PROMETER: sin ellos la copia cae al precio y el guion puede
 # ofrecer envío gratis o plazos que el producto no tiene (promoción
@@ -50,27 +57,27 @@ _CAMPOS = (
 )
 
 
-def manifiesto() -> dict[str, str]:
-    """`{"<source>|<folder>|<producto>": "<número en Productos Q4>"}`."""
+def manifiesto(carpeta: str = CARPETA) -> dict[str, str]:
+    """`{"<source>|<folder>|<producto>": "<número en la carpeta especial>"}`."""
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         return {}
-    return r.get_json(_MANIFIESTO) or {}
+    return r.get_json(_clave(carpeta)) or {}
 
 
-def _guardar_manifiesto(doc: dict) -> None:
+def _guardar_manifiesto(doc: dict, carpeta: str = CARPETA) -> None:
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         raise RuntimeError(
             "Redis (Upstash) no está configurado — no se puede llevar la cuenta "
             "de qué productos ya están en Productos Q4."
         )
-    if not r.set_json(_MANIFIESTO, doc):
+    if not r.set_json(_clave(carpeta), doc):
         raise RuntimeError("Redis no aceptó guardar el índice de Productos Q4.")
 
 
-def _dir() -> Path:
-    d = config.dir_zip(SOURCE) / CARPETA
+def _dir(carpeta: str = CARPETA) -> Path:
+    d = config.dir_zip(SOURCE) / carpeta
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -88,6 +95,7 @@ def _siguiente_numero(destino: Path, manifiesto_doc: dict) -> int:
 
 def anadir(
     refs: list[str], *, segundos_guion: float = 0, on_log: OnLog = _noop,
+    carpeta: str = CARPETA,
 ) -> dict:
     """Copia a «Productos Q4» los productos `"<source>|<carpeta>|<producto>"`.
 
@@ -98,8 +106,8 @@ def anadir(
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import drive_client, photo_pairing
 
-    doc = manifiesto()
-    destino = _dir()
+    doc = manifiesto(carpeta)
+    destino = _dir(carpeta)
     añadidos: list[dict] = []
     ya_estaban: list[dict] = []
     omitidos: list[dict] = []
@@ -123,8 +131,8 @@ def anadir(
             omitidos.append({"ref": ref, "motivo": "formato: <catálogo>|<carpeta>|<producto>"})
             continue
         source, folder, producto = partes
-        if folder == CARPETA:
-            omitidos.append({"ref": ref, "motivo": "ya es un producto de Productos Q4"})
+        if config.es_carpeta_especial(folder):
+            omitidos.append({"ref": ref, "motivo": "ya es una copia de una carpeta especial"})
             continue
         if ref in doc:
             ya_estaban.append({"ref": ref, "producto": str(doc[ref])})
@@ -166,33 +174,33 @@ def anadir(
         textos["origen"] = ref
         if segundos_guion and segundos_guion > 0:
             textos["segundos_guion"] = float(segundos_guion)
-        product_repo.save_extracted_texts(SOURCE, CARPETA, {numero: textos})
+        product_repo.save_extracted_texts(SOURCE, carpeta, {numero: textos})
 
         doc[ref] = numero
-        _guardar_manifiesto(doc)
+        _guardar_manifiesto(doc, carpeta)
         añadidos.append({"ref": ref, "producto": numero, "titulo": textos.get("titulo", "")})
-        on_log(f"[q4] {ref} → {CARPETA} #{numero}")
+        on_log(f"[especial] {ref} → {carpeta} #{numero}")
 
-    _invalidar()
+    _invalidar(carpeta)
     return {
-        "carpeta": CARPETA, "añadidos": añadidos, "ya_estaban": ya_estaban,
+        "carpeta": carpeta, "añadidos": añadidos, "ya_estaban": ya_estaban,
         "omitidos": omitidos, "total": len(doc),
     }
 
 
-def _invalidar() -> None:
+def _invalidar(carpeta: str = CARPETA) -> None:
     """Tras copiar, los listados cacheados (carpetas y fotos) ya no valen."""
     from src.nicho_pov_bof.services import drive_client, productos_web
 
     productos_web._invalidar()
     try:
         drive_client.list_product_folders(SOURCE, refresh=True)
-        drive_client.list_photos(SOURCE, CARPETA, refresh=True)
+        drive_client.list_photos(SOURCE, carpeta, refresh=True)
     except Exception:  # noqa: BLE001
         pass
 
 
-def recopiar_promesas() -> dict[str, dict]:
+def recopiar_promesas(carpeta: str = CARPETA) -> dict[str, dict]:
     """Vuelve a traer `envio`, `plazos` y `sin_stock` del original a cada copia.
 
     Para las copias hechas antes de que esos campos viajaran con el producto.
@@ -200,7 +208,7 @@ def recopiar_promesas() -> dict[str, dict]:
     from src.nicho_pov_bof.repos import product_repo
 
     salida: dict[str, dict] = {}
-    for ref, numero in manifiesto().items():
+    for ref, numero in manifiesto(carpeta).items():
         partes = ref.split("|")
         if len(partes) != 3:
             continue
@@ -209,5 +217,5 @@ def recopiar_promesas() -> dict[str, dict]:
         campos["sin_stock"] = bool(origen.get("sin_stock"))
         salida[str(numero)] = campos
     if salida:
-        product_repo.save_extracted_texts(SOURCE, CARPETA, salida)
+        product_repo.save_extracted_texts(SOURCE, carpeta, salida)
     return salida

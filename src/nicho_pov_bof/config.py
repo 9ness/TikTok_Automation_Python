@@ -203,6 +203,27 @@ def ve_carpeta_q4(usuario: str) -> bool:
     return not usuario or usuario in USUARIOS_Q4
 
 
+# Las carpetas de COPIAS dentro del Inventario (mismo mecanismo que Q4, ver
+# `services/productos_q4.py`). Cada una con su manifiesto. `temporada` mete en
+# el guion el ángulo de Black Friday/Navidad; `etiqueta` es lo que enseña la
+# pantalla. Van arriba del todo de la lista y solo para USUARIOS_Q4.
+CARPETA_EPICO_OCT = "Épico Octubre"
+CARPETAS_ESPECIALES: dict[str, dict] = {
+    CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True,
+                 "etiqueta": "🎄 Productos Q4"},
+    CARPETA_EPICO_OCT: {"manifiesto": "especial:epico_octubre:manifiesto", "temporada": False,
+                        "etiqueta": "⚡ Épico Octubre"},
+}
+
+
+def es_carpeta_especial(folder: str) -> bool:
+    return folder in CARPETAS_ESPECIALES
+
+
+def es_temporada(folder: str) -> bool:
+    return bool((CARPETAS_ESPECIALES.get(folder) or {}).get("temporada"))
+
+
 def es_fuente_propia(source: str) -> bool:
     """True si la fuente son productos subidos por el operador (no del curso)."""
     return bool((SOURCES.get(source) or {}).get("propia"))

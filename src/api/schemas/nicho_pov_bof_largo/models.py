@@ -208,6 +208,8 @@ class Q4AnadirRequest(BaseModel):
     refs: list[str]
     # Duración que se le pide al guion de los nuevos: 24 = tres clips de 8s.
     segundos_guion: float = 24
+    # Qué carpeta especial: "" = «Productos Q4»; también «Épico Octubre».
+    carpeta: str = ""
 
 
 class MarkCompletedLargoResponse(BaseModel):

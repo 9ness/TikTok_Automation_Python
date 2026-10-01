@@ -40,8 +40,8 @@ def _prepara(tmp_path, monkeypatch):
     from src.nicho_pov_bof.services import drive_client, photo_pairing
 
     monkeypatch.setattr(productos_q4, "get_nicho_pov_bof_redis", lambda: redis)
-    monkeypatch.setattr(productos_q4, "_dir", lambda: destino.mkdir(exist_ok=True) or destino)
-    monkeypatch.setattr(productos_q4, "_invalidar", lambda: None)
+    monkeypatch.setattr(productos_q4, "_dir", lambda c="": destino.mkdir(exist_ok=True) or destino)
+    monkeypatch.setattr(productos_q4, "_invalidar", lambda c="": None)
     monkeypatch.setattr(drive_client, "list_photos", lambda s, f, **k: [
         {"id": str(p), "name": p.name} for p in sorted(origen.iterdir())
     ])
@@ -115,3 +115,11 @@ def test_el_guion_de_temporada_lleva_el_angulo_regalo_sin_promesas():
     assert "Black Friday" in q4 and "fechas de entrega" in q4
     # La cabecera del fichero es para el repo, no para Gemini.
     assert "Bloque que se AÑADE" not in q4
+
+
+def test_carpeta_epico_con_su_manifiesto(tmp_path, monkeypatch):
+    destino, redis, guardados = _prepara(tmp_path, monkeypatch)
+    productos_q4.anadir(["inventario_general|Carpeta_22|3"], segundos_guion=16, carpeta=config.CARPETA_EPICO_OCT)
+    assert "especial:epico_octubre:manifiesto" in redis.d and "q4:manifiesto" not in redis.d
+    assert (config.CATALOGO_Q4, config.CARPETA_EPICO_OCT) in guardados
+    assert config.es_temporada(config.CARPETA_Q4) and not config.es_temporada(config.CARPETA_EPICO_OCT)

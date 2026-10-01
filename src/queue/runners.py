@@ -2472,11 +2472,11 @@ def _es_plazos(textos: dict) -> bool:
     return pov_config.hay_plazos(textos)
 
 
-def _carpeta_q4() -> str:
-    """La carpeta de temporada, cuyos guiones llevan el ángulo de campaña."""
+def _es_temporada(folder: str) -> bool:
+    """Carpeta especial con ángulo de campaña (Black Friday / Navidad)."""
     from src.nicho_pov_bof import config as pov_config
 
-    return pov_config.CARPETA_Q4
+    return pov_config.es_temporada(folder)
 
 
 def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
@@ -2602,7 +2602,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             plazos=plazos,
             prompt=largo_config.prompt_guion(
                 plazos, modo, envio, segundos,
-                temporada=folder == _carpeta_q4(),
+                temporada=_es_temporada(folder),
             ),
             max_caracteres=largo_config.caracteres_guion(segundos),
             on_log=on_log,
@@ -3635,7 +3635,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
                 plazos=plazos,
                 prompt=largo_config.prompt_guion(
                     plazos, estilo, envio, segundos,
-                    temporada=carpeta == _carpeta_q4(),
+                    temporada=_es_temporada(carpeta),
                 ),
                 max_caracteres=largo_config.caracteres_guion(segundos),
             )

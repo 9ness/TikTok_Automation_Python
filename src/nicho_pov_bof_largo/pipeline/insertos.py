@@ -39,7 +39,7 @@ _MARCA_RE = re.compile(r"\[\[\s*GOLPE\s*:\s*([^|\]]+?)\s*(?:\|\s*([^\]]*?))?\s*\
 # Margen que se deja tras la última palabra y antes de la siguiente: sin él la
 # consonante final se corta en seco y suena a error de edición.
 _MARGEN_S = 0.06
-_FUENTE = "assets/fonts/Montserrat-ExtraBold.ttf"
+_FUENTE = str(Path(__file__).resolve().parents[3] / "assets/fonts/Montserrat-ExtraBold.ttf")
 
 
 # ---------------------------------------------------------------------------

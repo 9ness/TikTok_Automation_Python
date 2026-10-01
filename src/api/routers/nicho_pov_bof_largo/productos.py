@@ -336,10 +336,10 @@ def list_folders(
     # trabaja.
     from src.nicho_pov_bof import config as pov_config
 
-    q4 = [i for i in items if i.name == pov_config.CARPETA_Q4]
-    items = [i for i in items if i.name != pov_config.CARPETA_Q4]
-    if q4 and pov_config.ve_carpeta_q4(usuario):
-        items.insert(0, q4[0])
+    especiales = [i for i in items if pov_config.es_carpeta_especial(i.name)]
+    items = [i for i in items if not pov_config.es_carpeta_especial(i.name)]
+    if pov_config.ve_carpeta_q4(usuario):
+        items = especiales + items
     # La virtual va la PRIMERA y solo si tiene algo: son vídeos terminados que
     # no se pueden publicar, y mezclados con el resto se perdían de vista.
     try:
@@ -379,7 +379,7 @@ def list_folders(
     current = next(
         (
             i.name for i in items
-            if not i.completed and not i.virtual and i.name != pov_config.CARPETA_Q4
+            if not i.completed and not i.virtual and not pov_config.es_carpeta_especial(i.name)
         ),
         None,
     )
@@ -455,16 +455,23 @@ def mark_completed(
 
 
 @router.get("/q4")
-def q4_manifiesto(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
-    """Qué productos hay en «Productos Q4» y de dónde salió cada uno."""
+def q4_manifiesto(
+    carpeta: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Qué productos hay en una carpeta especial («Productos Q4» por defecto,
+    o «Épico Octubre») y de dónde salió cada uno."""
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.services import productos_q4
 
     if not pov_config.ve_carpeta_q4(usuario):
-        raise APIError("La carpeta Productos Q4 es de la cuenta de ness.", status_code=403)
-    doc = productos_q4.manifiesto()
+        raise APIError("Las carpetas especiales son de la cuenta de ness.", status_code=403)
+    carpeta = carpeta or pov_config.CARPETA_Q4
+    if not pov_config.es_carpeta_especial(carpeta):
+        raise _bad(f"carpeta debe ser una de {list(pov_config.CARPETAS_ESPECIALES)}")
+    doc = productos_q4.manifiesto(carpeta)
     return {
-        "source": pov_config.CATALOGO_Q4, "carpeta": pov_config.CARPETA_Q4,
+        "source": pov_config.CATALOGO_Q4, "carpeta": carpeta,
         "productos": [{"ref": ref, "producto": n} for ref, n in doc.items()],
     }
 
@@ -474,16 +481,19 @@ def q4_anadir(
     body: Q4AnadirRequest,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Copia productos a «Productos Q4» (fotos + textos, sin tocar el original)."""
+    """Copia productos a una carpeta especial (fotos + textos, sin tocar el original)."""
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.services import productos_q4
 
     if not pov_config.ve_carpeta_q4(usuario):
-        raise APIError("La carpeta Productos Q4 es de la cuenta de ness.", status_code=403)
+        raise APIError("Las carpetas especiales son de la cuenta de ness.", status_code=403)
+    carpeta = body.carpeta or pov_config.CARPETA_Q4
+    if not pov_config.es_carpeta_especial(carpeta):
+        raise _bad(f"carpeta debe ser una de {list(pov_config.CARPETAS_ESPECIALES)}")
     if not body.refs:
         raise _bad("Dime qué productos: refs = ['<catálogo>|<carpeta>|<producto>', …]")
     try:
-        return productos_q4.anadir(body.refs, segundos_guion=body.segundos_guion)
+        return productos_q4.anadir(body.refs, segundos_guion=body.segundos_guion, carpeta=carpeta)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
@@ -1217,7 +1227,7 @@ def escribir_guion(
             plazos=plazos,
             prompt=config.prompt_guion(
                 plazos, estilo, envio_gratis, segundos,
-                temporada=body.folder == pov_config.CARPETA_Q4,
+                temporada=pov_config.es_temporada(body.folder),
             ),
             max_caracteres=config.caracteres_guion(segundos),
         )
