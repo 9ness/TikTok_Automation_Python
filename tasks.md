@@ -10,11 +10,11 @@
 > producto a producto (formato, ➡️, música, rótulo), reservas de invierno/fiesta y descartes
 > (verano, duplicados entre carpetas).
 
-- [ ] Desplegar rótulos/música por temporada (`nicho_ropa/config.py`) antes de montar nada nuevo.
+- [x] (1/10) Desplegados rótulos/música por temporada (`nicho_ropa/config.py`).
 - [ ] Remontar los puestos 60, 63 y 67 (rótulo «la elegancia de septiembre»): clip de Magnific o regenerar.
-- [ ] Extraer textos de Ropa C4-C10 y C17 y Zapatos C5-C17 (sin título ni guion para los 🎙️).
+- [x] (1/10) Textos de Ropa C4-C10 y C17 y Zapatos C5-C17: 197/203 (las 3 parejas de fichas idénticas no salen; sustituidas en el plan). Gemini estaba sin cuota (gratis: 20 peticiones/día; la de pago es prepago a 0) y salió por OpenAI tras recargarlo.
 - [ ] 👤 Importar ZIPs nuevos de la web del curso (ropa/zapatos/accesorios de invierno y fiesta): el catálogo útil se acaba el 23 oct y faltan ~600 productos para nov-dic. Bolsos: solo quedan 5.
-- [ ] 👤 URL del MCP de Ana para subir.
+- [x] (1/10) URLs del MCP de ness, ana y mauro en `MCP_URLS.local.md`.
 
 ## 🎛️ Multimodo (Ana) — RELEVO para la siguiente sesión (29 sep 2026)
 

@@ -65,10 +65,10 @@ lo que viene, cada producto sale UNA vez; la lista de lo que se descarta está a
 
 ## 4. Antes de empezar
 
-1. **Desplegar** el cambio de rótulos y música (antes de montar nada nuevo).
+1. ✅ Desplegado (1 oct) el cambio de rótulos y música.
 2. **URL del MCP de Ana** (no está en `MCP_URLS.local.md`).
-3. **Extraer textos** de las carpetas sin ellos: Ropa C4-C10 y C17, Zapatos C5-C17
-   (sin título no hay `tipo_multimodo` fiable ni guion para los 🎙️). Gemini, poco coste.
+3. ✅ Textos extraídos (1 oct) de Ropa C4-C10 y C17 y Zapatos C5-C17: 197/203. Faltan las
+   3 parejas de fotos idénticas (Z9.6/9.7, Z14.5/14.6, Z15.6/15.8), ya sustituidas en las tandas.
 4. **Importar ZIPs nuevos** de la web del curso (ver § 6): con lo de hoy, el catálogo
    útil se acaba el **23 oct**.
 
@@ -231,7 +231,7 @@ Del 10 al 31 aparecen solos los rótulos y búsquedas de Halloween.
 | Ropa C14·10 | Conjunto de punto Massima Grazia | 🪞 Espejo |  | pop con actitud, de pasarela casera → «girly pop aesthetic» |  |
 | Ropa C6·4 | Camiseta burdeos manga corta | 🧍 Maniquí |  | deep house de tienda chic → «halloween aesthetic» |  |
 | Zapatos C9·2 | Zapatilla negra de piel | 👀 Zapatos POV | ➡️ | lo-fi jazz → «spooky season» | COZY SEASON · mi par favorito |
-| Zapatos C14·5 | Botín de cordones marrón | 🍂 Botas 2 |  | folk rock de carretera → «folk rock 70s» | Pasos de Otoño · botas de temporada |
+| Zapatos C16·5 | Botas chelsea de felpa | 🍂 Botas 2 |  | folk rock de carretera → «road trip indie folk» | Boots Season · cozy vibes |
 | Zapatos C16·3 | Bota de cordones plataforma | 🍂 Botas Largas 2 |  | soul o funk de los 70 → «autumn vibes» | Halloween Vibes · otoño con un toque oscuro |
 | Zapatos C17·3 | Bota slouch camel de tacón | 🎙️ Sentado 20s |  | — (voz Fish) |  |
 
@@ -263,7 +263,7 @@ Del 10 al 31 aparecen solos los rótulos y búsquedas de Halloween.
 | Zapatos C4·9 | HOBIBEAR correr punta ancha | 👀 Zapatos POV | ➡️ | bossa nova de cafetería → «spooky season» | AUTUMN · cozy season |
 | Zapatos C16·4 | Botín de ante con anilla | 🍂 Botas 2 |  | soul o funk de los 70 → «retro funk groove» | Nueva Colección · otoño paso a paso |
 | Zapatos C14·4 | Bota alta con hebilla gris | 🍂 Botas Largas 2 |  | soul o funk de los 70 → «old vinyl aesthetic» | Otoño esencial · paso a paso |
-| Zapatos C15·6 | Bota alta cognac con hebilla | 🎙️ Sentado 20s |  | — (voz Fish) |  |
+| Zapatos C15·10 | Botas con forro de pelo | 🎙️ Sentado 20s |  | — (voz Fish) |  |
 
 #### Tanda 20 · vie 16 oct
 
@@ -308,7 +308,7 @@ Del 10 al 31 aparecen solos los rótulos y búsquedas de Halloween.
 | Zapatos C8·9 | Zapatilla blanca suela roja | 👟 Zapatillas Espejo |  | lo-fi urbano → «autumn lofi» |  |
 | Zapatos C16·7 | Botín calcetín de tacón | 🍂 Botas 1 | ➡️ | folk rock de carretera → «halloween aesthetic» | Autumn Boots · cozy season |
 | Zapatos C15·7 | Bota alta negra plataforma | 🍂 Botas Largas 1 |  | soul o funk de los 70 → «70s soul aesthetic» | Fall Favorites · must have de otoño |
-| Zapatos C9·6 | Zapatilla retro negra franjas | 🎙️ POV 20s |  | — (voz Fish) |  |
+| Zapatos C7·9 | Zapatillas de ajuste ancho (HOBIBEAR) | 🎙️ POV 20s |  | — (voz Fish) |  |
 
 #### Tanda 23 · lun 19 oct
 
@@ -407,7 +407,7 @@ bolsos de invierno. Campañas: Front Run 11-17 nov, Mid 18-24, **Peak 25-29** (v
 Cyber Monday 30. El rótulo NO promete descuentos (sancionan); el ángulo es «para el
 frío / de temporada». Más 🎙️ de 20 s si funcionan los primeros.
 
-Reserva de invierno (17): Ropa C4·4 Abrigo negro largo · Ropa C4·6 Abrigo de pelo crema · Ropa C4·7 Chaleco acolchado con capucha · Ropa C7·4 Abrigo gris cruzado · Ropa C8·5 Abrigo de pelo a rayas marrón · Ropa C11·6 Chaqueta Armonias Amelie de pelo · Ropa C17·6 Abrigo de pelo marrón · Ropa C17·8 Chaleco acolchado rojo · Ropa C18·9 Abrigo London clásico · Ropa C20·8 Vestido de punto Margaret · Ropa C21·9 Jersey cuello alto Ütopya · Ropa C23·5 Chaqueta de punto con cremallera · Zapatos C14·7 Botín forrado de pelo mostaza · Zapatos C15·10 Botín forrado blanco · Zapatos C16·5 Botín chelsea blanco forrado · Zapatos C4·7 HOBIBEAR botas de nieve · Accesorios C3·10 Bolso acolchado impermeable.
+Reserva de invierno (15): Ropa C4·4 Abrigo negro largo · Ropa C4·6 Abrigo de pelo crema · Ropa C4·7 Chaleco acolchado con capucha · Ropa C7·4 Abrigo gris cruzado · Ropa C8·5 Abrigo de pelo a rayas marrón · Ropa C11·6 Chaqueta Armonias Amelie de pelo · Ropa C17·6 Abrigo de pelo marrón · Ropa C17·8 Chaleco acolchado rojo · Ropa C18·9 Abrigo London clásico · Ropa C20·8 Vestido de punto Margaret · Ropa C21·9 Jersey cuello alto Ütopya · Ropa C23·5 Chaqueta de punto con cremallera · Zapatos C14·7 Botín forrado de pelo mostaza · Zapatos C4·7 HOBIBEAR botas de nieve · Accesorios C3·10 Bolso acolchado impermeable.
 
 **Diciembre (tandas 66-96) — Navidad y fiesta.** Rótulo navideño automático del
 1 dic al 6 ene («Holiday Season», «Ideas de regalo»…). Terciopelo, brillo,
@@ -426,6 +426,6 @@ VERANO: R1.5 R1.8 R2.2 R2.3 R2.4 R2.7 R2.8 R4.8 R4.9 R4.10 R5.1 R5.2 R5.5 R5.7 R
 DUPLICADOS (se hace UNO): R27.7=R4.1 · R6.8=R4.3 · R23.4=R4.5 · R23.7=R4.6 · R23.9=R4.7 · R25.9=R5.3 · R25.2=R5.6 · R25.6=R5.8 · R29.5=R5.10 · R9.4=R19.8=R6.6 · R21.10=R7.1 · R18.1=R7.7 · R22.6=R7.9 · R20.2=R8.9 · R19.2=R9.2 · R18.3=R10.1 · R18.10=R10.2 · R18.6=R10.3 · R19.4=R10.6 · R16.10=R11.2 · R22.1=R17.7 · R22.5=R2.1 · R28.3=R2.10 · R28.7=R28.8 · R27.1=R28.2 · R26.5=R5.1
 YA PUBLICADOS en otra carpeta: R26.8 y R27.2 (=Conjunto Palermo, R3.9) · R13.5 (Palermo fucsia) · R27.4 (=R3.8) · R27.9 (=R3.7) · R28.1 (=R3.4) · R27.8 (≈R3.6, dudoso) · A3.8 (=A1.6 YOHI) · Z11.9 (=Z3.5) · Z12.3 (=Z3.4) · Z12.4 (≈Z3.1) · Z12.6 (=Z1.10) · Z12.7 (≈Z1.6)
 YA EN TANDAS PENDIENTES: Z12.2 (=Z3.6, puesto 53) · Z16.10 (=Z2.6, puesto 61) · Z12.5 (≈Z2.1, puesto 59) · Z5.1 (=Z4.5, puesto 44)
-REPETIDOS DENTRO DE ZAPATOS: Z4.4=Z4.3 · Z14.6=Z14.5 · Z15.4=Z15.3 · Z15.8=Z15.6 · Z9.7=Z9.6
+REPETIDOS DENTRO DE ZAPATOS: Z4.4=Z4.3 · Z15.4=Z15.3 · y las parejas Z9.6=Z9.7, Z14.5=Z14.6 y Z15.6=Z15.8, que además se quedan SIN TEXTOS (con dos fichas idénticas el extractor no saca nada)
 HOBIBEAR casi idénticos (no se usan, saturarían): Z5.4 Z5.5 Z5.8 Z5.9 Z5.10 Z6.2 Z6.4 Z6.6 Z6.8 Z6.9 Z7.1 Z7.3 Z7.5 Z7.7 Z7.9 Z8.1 Z8.3 Z8.5 Z8.6 Z8.7 Z8.8 Z9.3 Z9.4 Z9.5 Z9.9 Z10.1 Z10.3 Z10.7 Z10.8 Z10.10 Z11.2 Z11.3 Z11.5 Z11.7 (reserva si falta calzado)
 OTROS: R1.9 (la foto limpia es una captura) · A1.1/A1.2 gafas
