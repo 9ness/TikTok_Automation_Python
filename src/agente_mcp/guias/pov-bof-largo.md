@@ -76,6 +76,16 @@ tarjeta**.
    `clip_1.mp4`, `clip_2.mp4`…
 
 ### 3. Subir a editar (en la tarjeta de cada producto)
+0. **Ordena los clips con criterio antes de subirlos** (petición del operador,
+   1/10/2026). Mira los fotogramas de todos los clips del producto y no los subas
+   en el orden en que salieron:
+   - **Clip 1 = el que mejor enseña el producto** (entero, reconocible, como en la
+     ficha): engancha y deja claro qué se vende.
+   - Luego una progresión que el espectador note: cerca → lejos (detalle →
+     contexto), uno → varios (una silla con funda → el comedor con cuatro), de
+     día → de noche / encendido al final si el producto da luz.
+   - Si el guion nombra algo en un momento (una pieza, el uso), que ese tramo lo
+     enseñe.
 1. Antes de subir, en la tarjeta:
    - **Voz**: deja «🖐️ Auto» (la IA decide por la mano: mujer salvo reloj o
      vello) salvo que el operador diga otra cosa.
