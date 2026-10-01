@@ -638,6 +638,11 @@ def _listar(
             clip3=_clip_puesto(mio.get("clip3_path"), float(mio.get("video_listo_at") or 0)),
             clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
             clip5=_clip_puesto(mio.get("clip5_path"), float(mio.get("video_listo_at") or 0)),
+            golpes=list(mio.get("golpes") or []),
+            insertos_subidos=[
+                n for n in range(1, config.INSERTOS_MAXIMOS + 1)
+                if _clip_puesto(mio.get(f"inserto{n}_path"), float(mio.get("video_listo_at") or 0))
+            ],
             # Con guiones largos dos clips se quedan cortos y el montaje tendría
             # que estirarlos hasta deformar el gesto: ahí se piden más.
             clips_necesarios=_huecos(
@@ -1230,6 +1235,7 @@ def escribir_guion(
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=estilo, guion_segundos=segundos,
+            golpes=escrito.get("golpes") or [],
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
@@ -1500,7 +1506,10 @@ def quitar_clip(
 
     Solo borra el hueco. No toca el vídeo ya montado ni el guion.
     """
-    if not 1 <= slot <= config.CLIPS_MAXIMOS:
+    if inserto:
+        if not 1 <= inserto <= config.INSERTOS_MAXIMOS:
+            raise _bad(f"inserto debe estar entre 1 y {config.INSERTOS_MAXIMOS}")
+    elif not 1 <= slot <= config.CLIPS_MAXIMOS:
         raise _bad(
             f"slot debe estar entre 1 y {config.CLIPS_MAXIMOS}, recibido: {slot}"
         )
@@ -1543,6 +1552,9 @@ async def upload_clip(
     con_subliminal: Annotated[bool, Form()] = False,
     con_subtitulos: Annotated[bool, Form()] = True,
     estilo_texto: Annotated[str, Form()] = "",
+    # Modo Épico: >0 = este fichero es el clip del INSERTO n (el corte épico
+    # del golpe n del guion), no un clip normal. `slot` se ignora.
+    inserto: Annotated[int, Form()] = 0,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> ClipLargoUploadResponse:
     """Sube UNO de los dos clips. Solo encola cuando están los dos.
@@ -1589,7 +1601,7 @@ async def upload_clip(
 
     stub = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{source}_{folder}_{producto}")
     destino = upload_subdir("nicho_pov_bof_largo") / (
-        f"{stub}_clip{slot}_{int(time.time())}{ext}"
+        f"{stub}_{'inserto' + str(inserto) if inserto else 'clip' + str(slot)}_{int(time.time())}{ext}"
     )
     try:
         with destino.open("wb") as out:
@@ -1606,6 +1618,7 @@ async def upload_clip(
         con_subliminal=con_subliminal,
         con_subtitulos=con_subtitulos,
         estilo_texto=estilo_texto,
+        inserto=inserto,
     )
 
 
@@ -1626,6 +1639,7 @@ def _encolar_clip(
     con_subliminal: bool = False,
     con_subtitulos: bool = True,
     estilo_texto: str = "",
+    inserto: int = 0,
 ) -> ClipLargoUploadResponse:
     """Guarda el clip en su hueco y encola el montaje si ya están los dos.
 
@@ -1638,7 +1652,7 @@ def _encolar_clip(
     try:
         prod = product_repo.update_product(
             source, folder, producto, usuario=usuario,
-            **{f"clip{slot}_path": str(destino)},
+            **{(f"inserto{inserto}_path" if inserto else f"clip{slot}_path"): str(destino)},
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
@@ -1651,6 +1665,18 @@ def _encolar_clip(
         prod.get(f"clip{n}_path") for n in range(1, hacen_falta + 1)
     ]
     puestos = [r for r in rutas if _clip_puesto(r, montado_at)]
+    # Modo Épico: además, un clip por golpe del guion.
+    golpes = list(prod.get("golpes") or []) if config.es_epico(_modo(source, usuario)) else []
+    faltan_ins = [
+        n for n in range(1, len(golpes) + 1)
+        if not _clip_puesto(prod.get(f"inserto{n}_path"), montado_at)
+    ]
+    hueco = f"Inserto {inserto}" if inserto else f"Clip {slot}"
+    if len(puestos) == hacen_falta and faltan_ins:
+        return ClipLargoUploadResponse(
+            encolado=False,
+            message=f"{hueco} guardado. Falta el inserto " + " y el ".join(map(str, faltan_ins)) + ".",
+        )
     if len(puestos) < hacen_falta:
         faltan = [
             n for n in range(1, hacen_falta + 1)
@@ -1659,9 +1685,10 @@ def _encolar_clip(
         return ClipLargoUploadResponse(
             encolado=False,
             message=(
-                f"Clip {slot} guardado. Falta el clip "
+                f"{hueco} guardado. Falta el clip "
                 + " y el ".join(str(n) for n in faltan)
                 + (f" (este guion necesita {hacen_falta})" if hacen_falta > 2 else "")
+                + (f" y el inserto {' y el '.join(map(str, faltan_ins))}" if faltan_ins else "")
                 + "."
             ),
         )
@@ -1688,6 +1715,10 @@ def _encolar_clip(
             **{
                 f"clip{n}_path": prod.get(f"clip{n}_path") or ""
                 for n in range(1, hacen_falta + 1)
+            },
+            **{
+                f"inserto{n}_path": prod.get(f"inserto{n}_path") or ""
+                for n in range(1, len(golpes) + 1)
             },
             "sexo": sexo, "operator": usuario,
             "con_gancho": bool(con_gancho), "con_titulo": bool(con_titulo),
@@ -1716,6 +1747,7 @@ def _encolar_clip(
         product_repo.update_product(
             source, folder, producto, usuario=usuario,
             **{f"clip{n}_path": "" for n in range(1, config.CLIPS_MAXIMOS + 1)},
+            **{f"inserto{n}_path": "" for n in range(1, config.INSERTOS_MAXIMOS + 1)},
         )
     except RuntimeError:
         # El montaje ya está encolado; que no falle la respuesta por esto.

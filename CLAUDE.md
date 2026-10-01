@@ -427,6 +427,12 @@ Tres cosas del guion que no son del curso y hay que saber:
   escuchándolas decir un guion nuestro. El car/s de cada una está MEDIDO con
   nuestro texto: el que anuncia el catálogo de Fish se desvía hasta 3 car/s.
 
+**⚡ Modo «Épico»** (`estilo_guion="epico"`): el prompt de dolor + `prompts/guion_epico.md`.
+La IA marca `[[GOLPE: TEXTO | escena]]`, que se guardan en `golpes` y la voz no
+lee. `pipeline/insertos.py` mete tras el montaje un inserto de 1 s por golpe
+(clip de 5 s de Kling subido con `inserto=N`), con destello, texto y
+`assets/sfx/golpe_epico.wav`, y recorta la pausa de antes y de después.
+
 **🎄 Productos Q4** (`nicho_pov_bof/services/productos_q4.py`): carpeta real
 «Productos Q4» dentro del Inventario General, primera de la lista y solo para
 `ness`, con COPIAS de productos (fotos + textos + `segundos_guion`) para grabar

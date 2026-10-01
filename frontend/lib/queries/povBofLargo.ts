@@ -427,6 +427,8 @@ export function useSubirClipLargo() {
       conSubliminal?: boolean;
       /** "" el bloque de siempre (color), "blanco" el de los POV de 20s. */
       estiloTexto?: string;
+      /** Modo Épico: >0 = es el clip del inserto N, no un clip normal. */
+      inserto?: number;
     }
   >({
     mutationFn: async (v) => {
@@ -443,6 +445,7 @@ export function useSubirClipLargo() {
       fd.append("con_flecha", String(v.conFlecha));
       fd.append("con_subliminal", String(v.conSubliminal ?? false));
       fd.append("estilo_texto", v.estiloTexto ?? "");
+      if (v.inserto) fd.append("inserto", String(v.inserto));
       return api.post<ClipLargoUploadResponse>(`${ROOT}/clip/upload`, fd);
     },
     onSuccess: (_r, v) => invalidarProductos(qc, v.source, v.folder),

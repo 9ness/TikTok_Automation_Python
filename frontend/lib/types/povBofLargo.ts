@@ -67,6 +67,10 @@ export interface ProductoLargo {
   clip3?: boolean;
   clip4?: boolean;
   clip5?: boolean;
+  /** Modo Épico: dónde van los insertos (texto en pantalla, escena, frase). */
+  golpes?: { tras: string; texto: string; escena: string }[];
+  /** Insertos ya subidos (1, 2, 3). */
+  insertos_subidos?: number[];
   /** Cuántos clips pide este guion (2, o 3 si la voz no cabe en dos). */
   clips_necesarios?: number;
   /** Duración de los clips que genera el operador: 8 o 10 segundos. Cambia

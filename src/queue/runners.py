@@ -2550,7 +2550,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     # El guion se guarda: si el operador remonta el mismo producto, se
     # reutiliza en vez de gastar otra llamada a Gemini y salir distinto.
     guardado = product_repo.get_product(source, folder, producto, operator, estilo)
-    escrito = {k: guardado.get(k) for k in ("guion", "subliminal", "nombre_guion")}
+    escrito = {k: guardado.get(k) for k in ("guion", "subliminal", "nombre_guion", "golpes")}
     plazos = _es_plazos(textos)
     # Un guion guardado en el OTRO modo no vale: si el producto es de plazos y
     # el guion se escribió sin la frase de financiación (o al revés, porque se
@@ -2612,6 +2612,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             guion=escrito["guion"], subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=modo, guion_segundos=segundos,
+            golpes=escrito.get("golpes") or [],
         )
     else:
         on_log("[pov_bof_largo] reutilizando el guion ya escrito")
@@ -2707,6 +2708,16 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             on_log=on_log,
             on_progress=_progreso,
         )
+        # Modo Épico: los insertos van DESPUÉS del montaje, sobre el vídeo
+        # terminado (ver `nicho_pov_bof_largo/pipeline/insertos.py`).
+        golpes = list(escrito.get("golpes") or [])
+        insertos = [
+            Path(p[f"inserto{n}_path"])
+            for n in range(1, largo_config.INSERTOS_MAXIMOS + 1)
+            if p.get(f"inserto{n}_path")
+        ]
+        if largo_config.es_epico(estilo) and golpes and insertos:
+            _insertos_epicos(salida, golpes, insertos, work, on_log, on_progress)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -2745,6 +2756,38 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     on_progress(1.0, "✅ Listo")
     return str(salida)
 
+
+
+def _insertos_epicos(salida: Path, golpes: list, insertos: list, work: Path,
+                     on_log: OnLog, on_progress: OnProgress) -> None:
+    """Mete los insertos del modo Épico en el vídeo ya montado (en sitio).
+
+    Si algo falla se deja el vídeo SIN insertos y se avisa: el montaje normal
+    ya es un vídeo publicable y no merece tumbarlo por el adorno.
+    """
+    import subprocess
+
+    from src.nicho_pov_bof.pipeline import video_editor as pov_editor
+    from src.nicho_pov_bof_largo import config as largo_config
+    from src.nicho_pov_bof_largo.pipeline import insertos as ins
+    from src.subtitles import transcribe
+
+    on_progress(0.93, "⚡ Metiendo los insertos épicos…")
+    try:
+        wav = work / "epico_16k.wav"
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-i", str(salida), "-ac", "1", "-ar", "16000", str(wav)],
+            check=True, capture_output=True,
+        )
+        palabras = transcribe(str(wav), model_size="base", language="es")
+        sonido = Path(__file__).resolve().parents[2] / largo_config.SONIDO_INSERTO
+        ins.aplicar(
+            salida, palabras, golpes, insertos, work / "epico",
+            sonido=sonido, dur=largo_config.INSERTO_S, on_log=on_log,
+        )
+        pov_editor.limpiar_metadatos(salida, on_log)
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[pov_bof_largo] ⚠️ insertos épicos no aplicados: {str(e)[:200]}")
 
 
 def _segundos_de_video(clips: list[Path], estirado: bool = True) -> float:
@@ -3607,6 +3650,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=estilo, guion_segundos=segundos,
+            golpes=escrito.get("golpes") or [],
         )
         return True
 

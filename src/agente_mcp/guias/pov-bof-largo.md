@@ -124,6 +124,34 @@ Aquí «Vendió» **no** marca «Subido» solo. La carpeta: «Completada».
   clips. La marca se quita sola al montarse el vídeo nuevo, y el producto pasa a la carpeta virtual **«🔁 Rehechos»** (arriba del todo en la lista de carpetas, con la nota de qué se arregló) hasta que el operador lo marca «📤 Subido». Sin ficha («URL» en gris) → se puede hacer, pero
   no se podrá publicar con carrito: pregunta.
 
+## ⚡ Modo «Épico» (oct 2026)
+
+Tercer modo del guion, junto a «Precio» y «Punto de dolor». Es el de dolor del
+curso, pero con un gancho de menos de 3 s y frases cortas. El guion marca 2-3
+**golpes**: en cada uno la voz se calla, entra un **inserto** de 1 s (el
+producto con fondo épico, el texto grande arriba y un golpe de sonido) y sigue
+la voz. Las pausas de antes y de después se recortan solas. Patrón y pruebas:
+`_agente/ness/referencias_epico/analisis/`.
+
+Por producto, además de sus clips normales:
+1. `plan_producto` lista los golpes (`epico_N.png` / `epico_N.mp4`): texto en
+   pantalla, frase y escena.
+2. **Imagen (Flow, Nano Banana 2, modo imagen)**: adjunta un **fotograma de TUS
+   clips** del producto y pide «edita esta imagen manteniendo producto y mano
+   EXACTAMENTE iguales; cambia SOLO el fondo». Fondo según el producto:
+   escenario negro con foco cenital y neblina (tecnología, herramientas,
+   muebles) o blanco a contraluz (cosmética, hogar claro). Revísala contra la
+   foto limpia: color y logo exactos. La luz cálida tira el color, así que pide
+   luz neutra.
+3. **Clip (Magnific, Kling 2.5 · 9:16 · 5 s · 720p ∞)** en el **«Video
+   Generator #2»** del Space, conectado a su nodo «Creation». **No toques el
+   «Video Generator #1»** (10 s, prompt de otros flujos). Prompt: acercamiento
+   lento de cámara, el producto y la mano quietos, sin texto. Kling 2.5 no
+   admite imagen final; Kling 2.6 sí, pero solo en 1080p y con créditos, así
+   que no se usa.
+4. `subir_clip(..., inserto=N)` por cada golpe. El montaje arranca cuando están
+   los clips normales y todos los insertos.
+
 ## 🎄 Productos Q4 (Black Friday y Navidad)
 
 Carpeta de temporada dentro de **📦 Inventario General**, la primera de la lista

@@ -77,6 +77,10 @@ class ProductoLargo(BaseModel):
     clip3: bool = False
     clip4: bool = False
     clip5: bool = False
+    # Modo Épico: dónde van los insertos (texto en pantalla y escena) y
+    # qué insertos hay subidos ya.
+    golpes: list[dict] = []
+    insertos_subidos: list[int] = []
     clips_necesarios: int = 2
     # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
     clip_s: int = 8

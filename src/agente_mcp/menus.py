@@ -43,7 +43,7 @@ MENUS: dict[str, Menu] = {
     for m in [
         Menu(
             "pov_bof_largo", "POV BOF Largo", "pov-bof-largo", "largo",
-            opciones={"estilo_guion": ["precio", "dolor"], "clip_s": [8, 10]},
+            opciones={"estilo_guion": ["precio", "dolor", "epico"], "clip_s": [8, 10]},
             notas="Mano POV señalando el producto; 2-5 clips mudos de la MISMA imagen; la voz la pone la app.",
         ),
         Menu(
@@ -315,6 +315,9 @@ def resumen(c: Ctx, p: dict) -> dict:
                  clip_s=p.get("clip_s"))
         if c.m.tipo == "largo":
             r["estilo_guion"] = p.get("guion_estilo") or p.get("estilo_guion")
+            if p.get("golpes"):
+                r["golpes"] = [g.get("texto") for g in p["golpes"]]
+                r["insertos_subidos"] = p.get("insertos_subidos") or []
     elif c.m.tipo == "ropa":
         r.update(guion=bool(p.get("guion") or p.get("guiones")), plazos=p.get("plazos", False))
         if c.m.modalidad == "multimodo":
@@ -512,6 +515,34 @@ async def plan(c: Ctx, prod: str) -> dict:
                 "segundos": seg, "habla": False, "plataformas": _plataformas(False, False, seg),
             })
         out["voz"] = "La pone la app (Fish). Por defecto «auto»: decide por la mano."
+        # Modo Épico: un inserto por golpe del guion (ver guía pov-bof-largo).
+        for i, g in enumerate(p.get("golpes") or [], start=1):
+            out["imagenes"].append({
+                "archivo": f"epico_{i}.png", "inserto": i,
+                "adjuntar": ["un fotograma de TUS clips de este producto (o imagen_1.png)"],
+                "donde": f"{FLOW} · Nano Banana 2 · EDITAR la imagen adjunta", "formato": "9:16",
+                "prompt": (
+                    "Edita esta imagen manteniendo el producto y la mano EXACTAMENTE iguales "
+                    "(mismo color, forma, logo y texto, misma posición). Cambia SOLO el fondo y "
+                    "la luz por: <ELIGE: escenario negro con un foco cenital y neblina | fondo "
+                    "blanco puro a contraluz | fondo de color oscuro con luz lateral>. "
+                    f"Escena: {g.get('escena') or 'el producto en primer plano'}. "
+                    "Alto contraste, cinematográfico. Sin ningún texto añadido."
+                ),
+                "texto_en_pantalla": g.get("texto", ""),
+                "va_tras_la_frase": g.get("tras", ""),
+                "revisar": "Producto idéntico a la foto limpia (color y logo exactos). Si cambia el color, repítela.",
+            })
+            out["clips"].append({
+                "clip": f"inserto {i}", "inserto": i, "archivo": f"epico_{i}.mp4",
+                "prompt": ("Slow cinematic camera push-in, very smooth. The light and haze move "
+                           "subtly. The product and the hand stay completely still and never change "
+                           "shape, colour, logo or size; nothing appears or disappears. No text on screen."),
+                "imagen": f"epico_{i}.png", "como_entra_la_imagen": "FRAME INICIAL",
+                "segundos": 5, "habla": False,
+                "plataformas": ["Magnific (Kling 2.5, 5 s, 720p) en un generador APARTE del de 10 s"],
+                "subir": f"subir_clip(..., inserto={i})",
+            })
     elif t == "ugc":
         cfg = await c.api.get(f"{UGC}/config")
         ficha = next((x.get("ficha") for x in cfg.get("personajes", [])
@@ -683,11 +714,18 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
 # Subir un clip y montar
 # ---------------------------------------------------------------------------
 async def subir_clip(c: Ctx, prod: str, clip: int, datos: bytes, nombre: str,
-                     voz: str = "auto", flecha: bool | None = None) -> dict:
+                     voz: str = "auto", flecha: bool | None = None, inserto: int = 0) -> dict:
     p = await producto(c, prod)
     pid = str(p["producto"])
     fichero = (nombre or f"clip_{clip}.mp4", datos, "video/mp4")
     t = c.m.tipo
+    if t == "largo" and inserto:
+        golpes = p.get("golpes") or []
+        if not 1 <= inserto <= len(golpes):
+            raise ErrorApp(f"Este guion tiene {len(golpes)} golpe(s): inserto debe ir de 1 a {len(golpes)}.")
+        return await c.api.post_form(f"{LARGO}/clip/upload", {
+            "source": c.catalogo, "folder": c.carpeta, "producto": pid, "slot": 1,
+            "sexo": voz or "auto", "inserto": inserto}, fichero)
     if t == "largo":
         n = int(p.get("clips_necesarios") or 2)
         if not 1 <= clip <= n:

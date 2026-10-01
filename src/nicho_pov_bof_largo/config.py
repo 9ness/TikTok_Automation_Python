@@ -342,6 +342,11 @@ VENTANA_TOLERANCIA_S = 1.0
 ESTILOS_GUION: dict[str, dict[str, str]] = {
     "precio": {"label": "Urgencia de precio", "fichero": "guion.md"},
     "dolor": {"label": "Punto de dolor", "fichero": "guion_dolor.md"},
+    # El de dolor del curso, literal, MÁS el bloque `guion_epico.md`: gancho
+    # corto (≤3 s) y frases cortas que dejan pausas para los INSERTOS épicos
+    # (escenario oscuro / fondo blanco + golpe de sonido), que la IA marca en
+    # el propio guion. Ver `pipeline/insertos.py`.
+    "epico": {"label": "Épico", "fichero": "guion_dolor.md", "extra": "guion_epico.md"},
 }
 ESTILO_GUION_DEFECTO = "precio"
 
@@ -466,7 +471,7 @@ ESTILOS_TEXTO = ("blanco", "clasico")
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico"}
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:
@@ -534,6 +539,10 @@ def prompt_guion(
         extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
         # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini
         # solo se le manda lo que va después del separador.
+        _, _, cuerpo = extra.partition("\n---\n")
+        base = f"{base}\n\n{cuerpo.strip()}"
+    if meta.get("extra"):
+        extra = (prompts_dir() / meta["extra"]).read_text(encoding="utf-8")
         _, _, cuerpo = extra.partition("\n---\n")
         base = f"{base}\n\n{cuerpo.strip()}"
     if temporada:
@@ -811,3 +820,20 @@ def video_dir() -> Path:
         destino = Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_pov_bof_largo" / "videos"
     destino.mkdir(parents=True, exist_ok=True)
     return destino
+
+
+# ---------------------------------------------------------------------------
+# Modo «Épico»: insertos
+# ---------------------------------------------------------------------------
+# Cuánto dura cada inserto en el vídeo. Medido en las referencias: entre 0,6 y
+# 1,5 s; con 1 s el golpe se oye entero y no corta el ritmo de la voz.
+INSERTO_S = 1.0
+# Cuántos golpes puede marcar el guion. Dos en guiones cortos, tres en los de
+# 24 s o más (lo decide el propio guion).
+INSERTOS_MAXIMOS = 3
+# El sonido del golpe (el de la referencia que eligió el operador).
+SONIDO_INSERTO = "assets/sfx/golpe_epico.wav"
+
+
+def es_epico(estilo: str) -> bool:
+    return (estilo or "").strip().lower() == "epico"

@@ -434,8 +434,9 @@ async def ver(ctx: Context, ruta_bandeja: str = "", archivo_id: str = "", url: s
 async def subir_clip(ctx: Context, menu: str, catalogo: str, carpeta: str, producto: str,
                      clip: int = 1, ruta_bandeja: str = "", archivo_id: str = "", url: str = "",
                      modo: str = "", gancho: str = "", duracion: str = "",
-                     voz: str = "auto", flecha: bool | None = None) -> str:
-    """Sube UN clip al hueco `clip` (1, 2…) de un producto. Fuente (una):
+                     voz: str = "auto", flecha: bool | None = None, inserto: int = 0) -> str:
+    """Sube UN clip al hueco `clip` (1, 2…) de un producto. POV BOF Largo en
+    modo Épico: `inserto=N` sube el clip épico del golpe N (no un clip normal). Fuente (una):
     `ruta_bandeja` (lo guardaste en la bandeja del Drive), `archivo_id` (lo
     subiste a `<url del MCP>/subir`) o `url` pública. Al llenar el último hueco
     la app monta sola (salvo UGC: llama a `montar`). POV BOF/Largo: `voz`
@@ -448,7 +449,7 @@ async def subir_clip(ctx: Context, menu: str, catalogo: str, carpeta: str, produ
                                                ruta_bandeja=ruta_bandeja)
     if not archivos.es_video(nombre, datos):
         raise ErrorApp(f"{nombre!r} no parece un vídeo.")
-    r = await menus.subir_clip(c, producto, int(clip), datos, nombre, voz, flecha)
+    r = await menus.subir_clip(c, producto, int(clip), datos, nombre, voz, flecha, int(inserto or 0))
     return _json(r)
 
 

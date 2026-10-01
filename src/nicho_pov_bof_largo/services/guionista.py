@@ -88,9 +88,16 @@ def escribir(
     if not isinstance(datos, dict):
         raise ValueError(f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}")
 
-    guion = " ".join(str(datos.get("guion") or "").split())
-    if not guion:
+    bruto = " ".join(str(datos.get("guion") or "").split())
+    if not bruto:
         raise ValueError("Gemini no devolvió guion")
+    # Modo Épico: el guion trae marcas [[GOLPE: …]] que la voz no lee. Se
+    # separan aquí y el largo se mide SIN ellas (no se locutan).
+    from src.nicho_pov_bof_largo.pipeline.insertos import separar_golpes
+
+    guion, golpes = separar_golpes(bruto, config.INSERTOS_MAXIMOS)
+    if golpes:
+        on_log(f"[{etiqueta}] {len(golpes)} golpe(s) épico(s): " + " · ".join(g["texto"] for g in golpes))
 
     tope = max_caracteres or config.GUION_MAX_CARACTERES
     if len(guion) > tope:
@@ -101,8 +108,16 @@ def escribir(
         try:
             corto = _acortar(
                 (prompt or config.prompt_guion(plazos)), descripcion, imagenes,
-                guion, tope, on_log,
+                bruto if golpes else guion, tope, on_log,
             )
+            if corto and golpes:
+                corto_limpio, golpes_cortos = separar_golpes(corto, config.INSERTOS_MAXIMOS)
+                # Solo vale si conserva los golpes: un guion épico sin ellos
+                # se queda sin el formato que se pidió.
+                if golpes_cortos:
+                    corto, golpes = corto_limpio, golpes_cortos
+                else:
+                    corto = ""
         except Exception as e:  # noqa: BLE001 — lo de antes vale, aunque largo
             on_log(f"[{etiqueta}] no se pudo acortar: {e}")
             corto = ""
@@ -121,7 +136,15 @@ def escribir(
         # El subliminal va en DOS líneas; el modelo a veces las manda con
         # `\n` literal escapado y a veces con salto real.
         "subliminal": str(datos.get("subliminal") or "").replace("\\n", "\n").strip(),
+        # Vacío en precio y dolor; en Épico, dónde van los insertos.
+        "golpes": golpes,
     }
+
+
+def _sin_marcas(guion: str) -> str:
+    from src.nicho_pov_bof_largo.pipeline.insertos import separar_golpes
+
+    return separar_golpes(guion)[0]
 
 
 def _acortar(
@@ -140,7 +163,7 @@ def _acortar(
     # cuesta un clip entero. Apuntando un 10% por debajo aterriza dentro.
     pedido = int(tope * 0.9)
     aviso = (
-        f"\n\nATENCIÓN: tu guion anterior tenía {len(guion)} caracteres y no "
+        f"\n\nATENCIÓN: tu guion anterior tenía {len(_sin_marcas(guion))} caracteres y no "
         f"cabe. Tiene que quedarse en {pedido} caracteres o menos. Este era:"
         f"\n«{guion}»\n\nDevuelve el MISMO JSON, con "
         "el mismo producto y la misma estructura, pero con el guion por debajo "
@@ -155,10 +178,18 @@ def _acortar(
         "cabe todo, QUITA características enteras —una o dos— en vez de "
         "recortar por el medio: mejor decir menos cosas y decirlas bien que "
         "nombrarlas todas a trozos."
+        + (
+            "\nConserva las marcas [[GOLPE: …]] tal cual, detrás de las mismas "
+            "frases (o de las que las sustituyan): no cuentan en el límite."
+            if "[[GOLPE" in guion else ""
+        )
     )
     datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes)
     if not isinstance(datos, dict):
         return ""
     nuevo = " ".join(str(datos.get("guion") or "").split())
-    # Solo se acepta lo que de verdad sea más corto.
-    return nuevo if nuevo and len(nuevo) < len(guion) else ""
+    # Solo se acepta lo que de verdad sea más corto (sin contar las marcas).
+    from src.nicho_pov_bof_largo.pipeline.insertos import separar_golpes
+
+    largo = lambda g: len(separar_golpes(g)[0])  # noqa: E731
+    return nuevo if nuevo and largo(nuevo) < largo(guion) else ""
