@@ -360,7 +360,7 @@ def _call_openai_fallback(
     imágenes (no vídeo). Mismo contrato que generate_text."""
     import openai
 
-    model = os.getenv("TIKTOK_SHOP_OPENAI_FALLBACK_MODEL", "gpt-4o-mini")
+    model = os.getenv("TIKTOK_SHOP_OPENAI_FALLBACK_MODEL", "gpt-5.4")
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     content: list[dict[str, Any]] = [{"type": "text", "text": user_prompt}]
     for img in images or []:

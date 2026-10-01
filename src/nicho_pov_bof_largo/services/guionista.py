@@ -117,7 +117,7 @@ def escribir(
                 corto_limpio, golpes_cortos = separar_golpes(corto, maximo)
                 # Solo vale si conserva los golpes: un guion épico sin ellos
                 # se queda sin el formato que se pidió.
-                if golpes_cortos:
+                if len(golpes_cortos) >= min(2, len(golpes)):
                     corto, golpes = corto_limpio, golpes_cortos
                 else:
                     corto = ""
