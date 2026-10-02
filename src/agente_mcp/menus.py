@@ -502,18 +502,42 @@ async def plan(c: Ctx, prod: str) -> dict:
             out["avisos"].append("Aún no tiene guion: llama a `preparar_carpeta` y espera la cola.")
         seg = int(p.get("clip_s") or (8 if t == "largo" else 10))
         n = int(p.get("clips_necesarios") or 2)
-        out["imagenes"].append({
-            "archivo": "imagen_1.png", "prompt": pr["imagen"], "adjuntar": ["foto_limpia"],
-            "donde": f"{FLOW} · Nano Banana 2", "formato": "9:16",
-            "revisar": "El producto idéntico a la foto limpia; la mano señala sin tocarlo; sin precios ni texto inventado.",
-        })
+        # UNA IMAGEN POR CLIP, cada una pensada para lo que dice la voz encima
+        # de ese clip (petición del operador, oct 2026): si el guion habla de
+        # aguantar 120 kg, ese tramo enseña el banco con discos al lado; si es
+        # genérico, otro sitio distinto. Nada de fotos al azar.
+        from src.nicho_pov_bof_largo import config as largo_config
+
+        trozos = largo_config.trozos_por_clip(str(p.get("guion") or ""), n) if t == "largo" else []
         for i in range(1, n + 1):
+            dice = trozos[i - 1] if i - 1 < len(trozos) else ""
+            out["imagenes"].append({
+                "archivo": f"imagen_{i}.png", "clip": i, "prompt": pr["imagen"],
+                "adjuntar": ["foto_limpia"],
+                "donde": f"{FLOW} · Nano Banana 2", "formato": "9:16",
+                "dice_la_voz_en_este_clip": dice,
+                "escena": (
+                    "Añade al prompt un párrafo con el SITIO y el ENCUADRE que casen con lo que "
+                    "dice la voz en este clip (`dice_la_voz_en_este_clip`): si nombra una "
+                    "característica, que se vea (plegado, de lado, con lo que trae al lado…); "
+                    "si nombra un uso, el sitio donde se usa. La persona nunca usa el producto: "
+                    "solo la mano que lo señala. Si el tramo es genérico (cierre, CTA), un sitio "
+                    "distinto de los otros clips. Cada clip en un sitio o encuadre diferente."
+                ) if dice else "Cada clip en un sitio distinto.",
+                "revisar": "El producto idéntico a la foto limpia; la mano señala sin tocarlo; nada flotando; sin precios ni texto inventado.",
+            })
             out["clips"].append({
                 "clip": i, "archivo": f"clip_{i}.mp4", "prompt": pr["video"],
-                "imagen": "imagen_1.png",
-                "como_entra_la_imagen": "FRAME INICIAL (en GenAI Pro: start frame Y end frame = la misma imagen_1.png)",
+                "imagen": f"imagen_{i}.png",
+                "como_entra_la_imagen": f"FRAME INICIAL (en GenAI Pro: start frame Y end frame = la misma imagen_{i}.png)",
                 "segundos": seg, "habla": False, "plataformas": _plataformas(False, False, seg),
             })
+        if t == "largo" and n > 1:
+            out["orden_de_los_clips"] = (
+                "Sube los clips en el orden del guion: el clip 1 va con el principio de la voz y "
+                "el último con el cierre. Con 3 clips o más la voz se reparte a partes iguales; "
+                "con 2 se corta en la pausa más larga, así que el reparto es aproximado."
+            )
         out["voz"] = "La pone la app (Fish). Por defecto «auto»: decide por la mano."
         # Modo Épico: un inserto por golpe del guion (ver guía pov-bof-largo).
         for i, g in enumerate(p.get("golpes") or [], start=1):

@@ -237,6 +237,15 @@ Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
 - **Una imagen por clip, cada una en un sitio distinto** (cocina / salón,
   taller / suelo junto a un enchufe…), no dos clips de la misma imagen: el
   vídeo parece otro plano en vez de repetirse.
+- **Cada imagen, según lo que dice la voz en ESE clip** (oct 2026). El plan
+  trae `dice_la_voz_en_este_clip` en cada imagen: con 3 clips o más la voz se
+  reparte a partes iguales, así que el tramo es casi exacto. Si nombra una
+  característica, que se vea («aguanta 120 kg» → el banco con discos al lado;
+  «plegable» → plegado junto a la pared; «con mando» → el mando bien visible);
+  si nombra un uso o un sitio, ese sitio. La persona NUNCA usa el producto:
+  solo la mano que señala. Si el tramo es genérico (cierre, CTA), elige el
+  plano que mejor enseñe el producto entero. Sube los clips en el orden del
+  guion, no al azar.
 - **Lee título y ficha antes de escribir la escena**: tamaño real (un mini
   móvil de 8,9 cm junto a una taza para que se vea diminuto; una carpa 3×3 o
   una bici enteras en el plano, señaladas desde lejos), para quién es

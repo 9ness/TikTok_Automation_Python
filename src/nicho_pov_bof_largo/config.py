@@ -295,6 +295,39 @@ def cta_inversa(segundos: float = 0) -> str:
     return CTA_INVERSA
 
 
+def trozos_por_clip(guion: str, n: int) -> list[str]:
+    """Qué dice la voz, más o menos, encima de cada clip.
+
+    Con tres clips o más el montaje reparte la voz a PARTES IGUALES de tiempo
+    (`video_editor._reparto_por_capacidad`), así que aquí se parte el texto en
+    `n` trozos de longitud parecida, cortando en el final de frase más cercano
+    (o en la palabra más cercana si no hay frase a mano). Sirve para elegir la
+    imagen de cada clip según lo que se está diciendo (plan del MCP). Con dos
+    clips el corte real cae en la pausa más larga, así que es aproximado."""
+    texto = " ".join((guion or "").split())
+    if n <= 1 or not texto:
+        return [texto] if texto else []
+    fines = [m.end() for m in re.finditer(r"[.!?…]\s", texto + " ")]
+    espacios = [m.start() for m in re.finditer(r"\s", texto)]
+    largo = len(texto)
+    cortes: list[int] = []
+    for k in range(1, n):
+        ideal = largo * k / n
+        tramo = largo / n
+        cerca = [f for f in fines if abs(f - ideal) <= tramo * 0.2 and (not cortes or f > cortes[-1])]
+        if cerca:
+            corte = min(cerca, key=lambda f: abs(f - ideal))
+        else:
+            libres = [e for e in espacios if not cortes or e > cortes[-1]]
+            corte = min(libres, key=lambda e: abs(e - ideal)) if libres else largo
+        cortes.append(corte)
+    trozos, ini = [], 0
+    for c in cortes + [largo]:
+        trozos.append(texto[ini:c].strip())
+        ini = c
+    return trozos
+
+
 def es_inversa(estilo: str) -> bool:
     return (estilo or "").strip().lower() == "inversa"
 

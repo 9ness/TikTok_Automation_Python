@@ -91,10 +91,11 @@ class ApiFalsa:
         return self.respuestas[ruta]
 
 
-def test_plan_largo_pide_un_clip_por_hueco_desde_la_misma_imagen():
+def test_plan_largo_pide_una_imagen_por_clip_segun_lo_que_dice_la_voz():
     api = ApiFalsa({
         f"{menus.LARGO}/productos": {"items": [{
-            "producto": "3", "titulo": "Cama\npara perros", "guion": "…",
+            "producto": "3", "titulo": "Cama\npara perros",
+            "guion": "Tu perro duerme mal. Esta cama es mullida y lavable. Ve al carrito naranja.",
             "clips_necesarios": 3, "clip_s": 8, "product_url": "https://x",
         }]},
         f"{menus.POV}/prompts": {"imagen": "PROMPT IMAGEN", "video": "PROMPT VIDEO"},
@@ -102,9 +103,12 @@ def test_plan_largo_pide_un_clip_por_hueco_desde_la_misma_imagen():
     c = menus.Ctx(menus.MENUS["pov_bof_largo"], api, "inventario_general", "Carpeta_24")
     plan = asyncio.run(menus.plan(c, "3"))
     assert plan["producto"]["titulo"] == "Cama para perros"
-    assert [i["prompt"] for i in plan["imagenes"]] == ["PROMPT IMAGEN"]
+    assert [i["prompt"] for i in plan["imagenes"]] == ["PROMPT IMAGEN"] * 3
     assert [cl["clip"] for cl in plan["clips"]] == [1, 2, 3]
-    assert all(cl["imagen"] == "imagen_1.png" and not cl["habla"] for cl in plan["clips"])
+    assert [cl["imagen"] for cl in plan["clips"]] == ["imagen_1.png", "imagen_2.png", "imagen_3.png"]
+    assert not any(cl["habla"] for cl in plan["clips"])
+    assert [i["dice_la_voz_en_este_clip"] for i in plan["imagenes"]] == [
+        "Tu perro duerme mal.", "Esta cama es mullida y lavable.", "Ve al carrito naranja."]
     # Clip de 8 s y mudo: valen las tres plataformas.
     assert set(plan["clips"][0]["plataformas"]) == {menus.FLOW, menus.GENAIPRO, menus.MAGNIFIC}
 
