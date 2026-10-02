@@ -224,10 +224,10 @@ CARPETAS_ESPECIALES: dict[str, dict] = {
     # `modo`: la carpeta trabaja SIEMPRE en ese modo de guion, esté como esté
     # el catálogo (no hay que cambiar el modo de todo el Inventario para verla).
     CARPETA_EPICO_OCT: {"manifiesto": "especial:epico_octubre:manifiesto", "temporada": False,
-                        "modo": "epico",
+                        "modo": "epico", "desde": "2026-10-03",
                         "etiqueta": "⚡ Épico Octubre · subir 3-5 oct (modo Épico)"},
     CARPETA_INVERSA: {"manifiesto": "especial:venta_inversa:manifiesto", "temporada": False,
-                      "modo": "inversa",
+                      "modo": "inversa", "desde": "2026-10-06",
                       "etiqueta": "🔄 Venta Inversa · subir 6-9 oct (modo Venta inversa)"},
     # Los vídeos de «Replicar viral» (`src/replicar_viral/`): cada producto
     # lleva `replica_id` y su guion y sus clips salen de la réplica. Es de
@@ -235,7 +235,8 @@ CARPETAS_ESPECIALES: dict[str, dict] = {
     CARPETA_REPLICAS: {"manifiesto": "especial:replicas_virales:manifiesto", "temporada": False,
                        "modo": "viral", "todos": True,
                        "etiqueta": "🔁 Réplicas virales (modo Réplica viral)"},
-    CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True,
+    # `desde`: primer día en que se puede PUBLICAR (lo respeta «Mis tandas»).
+    CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True, "desde": "2026-10-28",
                  "etiqueta": "🎄 Productos Q4 · subir 28 oct-10 nov (modo Dolor/Precio)"},
 }
 
