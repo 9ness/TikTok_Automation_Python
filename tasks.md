@@ -1,3 +1,7 @@
+## 🧰 Herramientas disponibles cuando hagan falta
+
+- [ ] **MarkItDown** (Microsoft, gratis, `pip install 'markitdown[all]'`): pasa `.docx`, `.xlsx`, `.pptx`, PDF, HTML y transcripciones de YouTube/audio a Markdown. Instalarlo en el VPS el día que llegue un documento del curso que haya que meter en el repo como `.md`. Usar el CLI (`markitdown fichero.docx > fichero.md`), NO su servidor MCP. No sirve para vídeo sin audio.
+
 ## 🔁 Replicar vídeos virales (clase 30 sep 2026)
 
 - [ ] 👤 **Recargar Gemini**: el 2 oct 2026 las tres claves dan 429 (PAID «prepayment credits are depleted» en AI Studio; FREE y legacy sin cuota). Sin esto fallan guiones, textos y la réplica.
