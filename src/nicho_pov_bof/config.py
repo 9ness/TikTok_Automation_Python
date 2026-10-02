@@ -203,12 +203,20 @@ def ve_carpeta_q4(usuario: str) -> bool:
     return not usuario or usuario in USUARIOS_Q4
 
 
+def ve_carpeta_especial(folder: str, usuario: str) -> bool:
+    """Las especiales son de ness, salvo las marcadas `todos` (Réplicas)."""
+    if (CARPETAS_ESPECIALES.get(folder) or {}).get("todos"):
+        return True
+    return ve_carpeta_q4(usuario)
+
+
 # Las carpetas de COPIAS dentro del Inventario (mismo mecanismo que Q4, ver
 # `services/productos_q4.py`). Cada una con su manifiesto. `temporada` mete en
 # el guion el ángulo de Black Friday/Navidad; `etiqueta` es lo que enseña la
 # pantalla. Van arriba del todo de la lista y solo para USUARIOS_Q4.
 CARPETA_EPICO_OCT = "Épico Octubre"
 CARPETA_INVERSA = "Venta Inversa"
+CARPETA_REPLICAS = "Réplicas virales"
 # En el ORDEN en que el operador las publica, y con las fechas en la
 # etiqueta: con tantas carpetas listas a la vez no sabía cuál tocaba (2 oct
 # 2026). El calendario entero está en `docs/CALENDARIO_POV_BOF_LARGO.md`.
@@ -221,6 +229,12 @@ CARPETAS_ESPECIALES: dict[str, dict] = {
     CARPETA_INVERSA: {"manifiesto": "especial:venta_inversa:manifiesto", "temporada": False,
                       "modo": "inversa",
                       "etiqueta": "🔄 Venta Inversa · subir 6-9 oct (modo Venta inversa)"},
+    # Los vídeos de «Replicar viral» (`src/replicar_viral/`): cada producto
+    # lleva `replica_id` y su guion y sus clips salen de la réplica. Es de
+    # TODOS los usuarios (`todos`), no solo de ness.
+    CARPETA_REPLICAS: {"manifiesto": "especial:replicas_virales:manifiesto", "temporada": False,
+                       "modo": "viral", "todos": True,
+                       "etiqueta": "🔁 Réplicas virales (modo Réplica viral)"},
     CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True,
                  "etiqueta": "🎄 Productos Q4 · subir 28 oct-10 nov (modo Dolor/Precio)"},
 }

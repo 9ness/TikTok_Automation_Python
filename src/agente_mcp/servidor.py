@@ -206,6 +206,20 @@ async def anadir_a_q4(ctx: Context, productos: list[str], clips: int = 3,
 
 
 @_herramienta(structured_output=False)
+async def anadir_replica(ctx: Context, producto: str, replica_id: str) -> str:
+    """«Montar en el Largo» una réplica viral (`src/replicar_viral/`): copia el
+    producto "<catálogo>|<carpeta>|<producto>" a la carpeta «Réplicas virales»
+    del Inventario General (modo fijo «Réplica viral», 2 clips de 8 s), le ata
+    la réplica y deja escrito el guion adaptado (sin llamar a la IA). Después,
+    `plan_producto(menu="pov_bof_largo", catalogo="inventario_general",
+    carpeta="Réplicas virales", producto=<el que devuelve>)` da las imágenes y
+    clips con los prompts de la réplica. Idempotente por producto."""
+    api = Interno(_usuario(ctx))
+    return _json(await api.post("/api/v1/nicho-pov-bof-largo/replica/anadir",
+                                {"ref": str(producto), "replica_id": str(replica_id)}))
+
+
+@_herramienta(structured_output=False)
 async def productos(ctx: Context, menu: str, catalogo: str, carpeta: str, modo: str = "",
                     gancho: str = "", duracion: str = "") -> str:
     """Los productos de una carpeta con su estado: textos, guion, clips que
@@ -229,7 +243,7 @@ async def preparar_carpeta(ctx: Context, menu: str, catalogo: str, carpeta: str,
     """El «Paso 1» de la web: lee los textos de las fichas que falten y escribe
     los guiones/escenas que falten. Devuelve un `tarea_id` para `estado`.
     POV BOF / Largo: `clip_s` (8|10) fija la duración de clip de toda la carpeta;
-    Largo: `estilo_guion` (precio|dolor|epico|inversa) — cambia el modo de TODO
+    Largo: `estilo_guion` (precio|dolor|epico|inversa|viral) — cambia el modo de TODO
     el catálogo; «epico» marca golpes con insertos de 5 s, «inversa» es la
     venta inversa irónica y siempre son 3 clips. `rehacer=True` REESCRIBE lo
     que ya está: solo si el operador lo pide. `productos` ("1,3,5") limita los

@@ -2596,7 +2596,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         modo = estilo or largo_config.ESTILO_GUION_DEFECTO
         envio = envio_gratis
         segundos = segundos_pedidos
-        escrito = guionista.escribir(
+        # Réplica viral: el guion ya viene adaptado en la réplica.
+        escrito = largo_config.guion_de_replica(
+            str(guardado.get("replica_id") or ""), textos.get("titulo", ""),
+        ) if largo_config.es_viral(modo) else guionista.escribir(
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),
@@ -3633,7 +3636,10 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         # pedido a mano.
         segundos = largo_config.segundos_de_estilo(estilo, float(t.get("segundos_guion") or 0))
         try:
-            escrito = guionista.escribir(
+            escrito = largo_config.guion_de_replica(
+                str(product_repo.get_product(source, carpeta, pid, usuario, estilo).get("replica_id") or ""),
+                t.get("titulo", ""),
+            ) if largo_config.es_viral(estilo) else guionista.escribir(
                 titulo=t.get("titulo", ""),
                 tienda=t.get("tienda", ""),
                 caption=t.get("caption", ""),

@@ -50,6 +50,7 @@ from src.api.schemas.nicho_pov_bof_largo import (
     ProductoLargo,
     ProductosLargoResponse,
     Q4AnadirRequest,
+    ReplicaAnadirRequest,
     VocesLargoResponse,
     VozLargo,
 )
@@ -343,8 +344,7 @@ def list_folders(
     for i in especiales:
         i.etiqueta = pov_config.CARPETAS_ESPECIALES[i.name].get("etiqueta", "")
     items = [i for i in items if not pov_config.es_carpeta_especial(i.name)]
-    if pov_config.ve_carpeta_q4(usuario):
-        items = especiales + items
+    items = [i for i in especiales if pov_config.ve_carpeta_especial(i.name, usuario)] + items
     # La virtual va la PRIMERA y solo si tiene algo: son vídeos terminados que
     # no se pueden publicar, y mezclados con el resto se perdían de vista.
     try:
@@ -501,6 +501,46 @@ def q4_anadir(
         return productos_q4.anadir(body.refs, segundos_guion=body.segundos_guion, carpeta=carpeta)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
+
+
+@router.post("/replica/anadir")
+def replica_anadir(
+    body: ReplicaAnadirRequest,
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """«Montar en el Largo» de una réplica viral: copia el producto a
+    «Réplicas virales», le guarda `replica_id` y deja escrito su guion (el de
+    la réplica, sin llamar a la IA). Idempotente por `ref`: si ya estaba, se
+    le cambia la réplica y se reescribe el guion."""
+    from src.nicho_pov_bof import config as pov_config
+    from src.nicho_pov_bof.services import productos_q4
+
+    carpeta = pov_config.CARPETA_REPLICAS
+    if not config.replica_de(body.replica_id):
+        raise APIError(f"No encuentro la réplica {body.replica_id!r}.", status_code=404)
+    try:
+        r = productos_q4.anadir([body.ref], segundos_guion=config.SEGUNDOS_VIRAL, carpeta=carpeta)
+    except RuntimeError as e:
+        raise APIError(str(e), status_code=503) from e
+    hecho = (r.get("añadidos") or r.get("ya_estaban") or [None])[0]
+    if not hecho:
+        motivo = ((r.get("omitidos") or [{}])[0]).get("motivo", "no se pudo copiar")
+        raise _bad(f"{body.ref}: {motivo}")
+    producto = str(hecho["producto"])
+    fuente = pov_config.CATALOGO_Q4
+    product_repo.update_product(
+        fuente, carpeta, producto, usuario=usuario, estilo="viral", replica_id=body.replica_id,
+    )
+    guion = escribir_guion(
+        GuionLargoRequest(source=fuente, folder=carpeta, producto=producto, rehacer=True),
+        queue=queue, usuario=usuario,
+    )
+    return {
+        "carpeta": carpeta, "producto": producto,
+        "ya_estaban": bool(r.get("ya_estaban")),
+        "guion": guion.producto.guion,
+    }
 
 
 def _montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
@@ -1223,7 +1263,9 @@ def escribir_guion(
         foto = None
 
     try:
-        escrito = guionista.escribir(
+        escrito = config.guion_de_replica(
+            str(guardado.get("replica_id") or ""), textos.get("titulo", ""),
+        ) if config.es_viral(estilo) else guionista.escribir(
             titulo=textos.get("titulo", ""),
             tienda=textos.get("tienda", ""),
             caption=textos.get("caption", ""),

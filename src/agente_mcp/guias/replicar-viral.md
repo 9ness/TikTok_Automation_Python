@@ -68,8 +68,9 @@ en el Inventario General (modo fijo `viral`):
    como en cualquier vídeo del Largo: Fish locuta y se monta solo.
 3. Sale en **Mis tandas** del operador con el color de «Réplica viral».
 
-(Si `anadir_replica` aún no existe en tu MCP, es que el Largo no lo ha
-desplegado: deja los clips en la bandeja y avisa.)
+`plan_producto` de ese producto ya trae cada imagen y cada clip con el
+`prompt_imagen`/`prompt_video` de la réplica añadido al prompt base del POV.
+La carpeta la ve cualquier usuario (las otras especiales solo ness).
 
 ## Reglas
 

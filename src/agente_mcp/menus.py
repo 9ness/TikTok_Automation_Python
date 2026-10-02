@@ -43,7 +43,7 @@ MENUS: dict[str, Menu] = {
     for m in [
         Menu(
             "pov_bof_largo", "POV BOF Largo", "pov-bof-largo", "largo",
-            opciones={"estilo_guion": ["precio", "dolor", "epico", "inversa"], "clip_s": [8, 10]},
+            opciones={"estilo_guion": ["precio", "dolor", "epico", "inversa", "viral"], "clip_s": [8, 10]},
             notas="Mano POV señalando el producto; 2-5 clips mudos de la MISMA imagen; la voz la pone la app.",
         ),
         Menu(
@@ -519,10 +519,15 @@ async def plan(c: Ctx, prod: str) -> dict:
         from src.nicho_pov_bof_largo import config as largo_config
 
         trozos = largo_config.trozos_por_clip(str(p.get("guion") or ""), n) if t == "largo" else []
+        # Réplica viral: los prompts de imagen y de vídeo de cada clip vienen
+        # ya escritos en la réplica (clip1 / clip2).
+        rep = (largo_config.replica_de(str(p.get("replica_id") or "")).get("adaptacion") or {}) if t == "largo" else {}
         for i in range(1, n + 1):
             dice = trozos[i - 1] if i - 1 < len(trozos) else ""
+            rc = rep.get(f"clip{i}") or {}
             out["imagenes"].append({
-                "archivo": f"imagen_{i}.png", "clip": i, "prompt": pr["imagen"],
+                "archivo": f"imagen_{i}.png", "clip": i,
+                "prompt": (f"{pr['imagen']}\n\n{rc['prompt_imagen']}" if rc.get("prompt_imagen") else pr["imagen"]),
                 "adjuntar": ["foto_limpia"],
                 "donde": f"{FLOW} · Nano Banana 2", "formato": "9:16",
                 "dice_la_voz_en_este_clip": dice,
@@ -537,7 +542,8 @@ async def plan(c: Ctx, prod: str) -> dict:
                 "revisar": "El producto idéntico a la foto limpia; la mano señala sin tocarlo; nada flotando; sin precios ni texto inventado.",
             })
             out["clips"].append({
-                "clip": i, "archivo": f"clip_{i}.mp4", "prompt": pr["video"],
+                "clip": i, "archivo": f"clip_{i}.mp4",
+                "prompt": (f"{pr['video']} {rc['prompt_video']}" if rc.get("prompt_video") else pr["video"]),
                 "imagen": f"imagen_{i}.png",
                 "como_entra_la_imagen": f"FRAME INICIAL (en GenAI Pro: start frame Y end frame = la misma imagen_{i}.png)",
                 "segundos": seg, "habla": False, "plataformas": _plataformas(False, False, seg),

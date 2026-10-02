@@ -203,6 +203,14 @@ class MarkPendienteLargoRequest(BaseModel):
     pendiente: bool = True
 
 
+class ReplicaAnadirRequest(BaseModel):
+    """Copia un producto a «Réplicas virales» atado a una réplica."""
+
+    # "<catálogo>|<carpeta>|<producto>"
+    ref: str
+    replica_id: str
+
+
 class Q4AnadirRequest(BaseModel):
     """Copia productos a la carpeta de temporada «Productos Q4»."""
 

@@ -341,8 +341,46 @@ SEGUNDOS_INVERSA = 24.0
 
 def segundos_de_estilo(estilo: str, pedidos: float = 0) -> float:
     """Los segundos con los que se escribe y se monta el guion de ese modo:
-    los pedidos para el producto, salvo en la venta inversa (siempre 24)."""
-    return SEGUNDOS_INVERSA if es_inversa(estilo) else float(pedidos or 0)
+    los pedidos para el producto, salvo en la venta inversa (siempre 24) y en
+    la réplica viral (siempre dos clips de 8 s)."""
+    if es_inversa(estilo):
+        return SEGUNDOS_INVERSA
+    if es_viral(estilo):
+        return SEGUNDOS_VIRAL
+    return float(pedidos or 0)
+
+
+SEGUNDOS_VIRAL = 16.0
+
+
+def es_viral(estilo: str) -> bool:
+    return (estilo or "").strip().lower() == "viral"
+
+
+def replica_de(replica_id: str) -> dict:
+    """El documento de la réplica (`src/replicar_viral/`), o {} si no está.
+    Import diferido: sin ese módulo el Largo sigue funcionando."""
+    if not replica_id:
+        return {}
+    try:
+        from src.replicar_viral.repos import obtener
+    except Exception:  # noqa: BLE001
+        return {}
+    return obtener(replica_id) or {}
+
+
+def guion_de_replica(replica_id: str, titulo: str = "") -> dict:
+    """`{guion, nombre, subliminal, golpes}` sacado de la réplica, sin llamar a
+    la IA. Lanza ValueError si la réplica no existe o no trae guion."""
+    doc = replica_de(replica_id)
+    guion = str(((doc.get("adaptacion") or {}).get("guion")) or "").strip()
+    if not guion:
+        raise ValueError(f"La réplica {replica_id!r} no existe o no tiene guion adaptado.")
+    nombre = " ".join(str(titulo or (doc.get("producto") or {}).get("titulo") or "").split())
+    return {
+        "guion": guion, "nombre": nombre, "golpes": [],
+        "subliminal": f"Han ajustado el precio de\n{nombre}\nRevisa también tus cupones de descuento\npara mejorarlo aún más." if nombre else "",
+    }
 
 
 def cerrar_guion(guion: str, estilo: str) -> str:
@@ -454,6 +492,10 @@ ESTILOS_GUION: dict[str, dict[str, str]] = {
     # cabecera de `guion_inversa.md`). Sin urgencia de precio y con su propio
     # cierre de disponibilidad (`CTA_INVERSA`).
     "inversa": {"label": "Venta inversa", "fichero": "guion_inversa.md"},
+    # «Replicar viral» (`src/replicar_viral/`): el guion NO se escribe aquí,
+    # viene ya adaptado en la réplica del producto (`replica_id`). Siempre dos
+    # clips de 8 s. Ver `guion_de_replica`.
+    "viral": {"label": "Réplica viral", "fichero": "", "replica": "1"},
 }
 ESTILO_GUION_DEFECTO = "precio"
 
@@ -582,7 +624,7 @@ ESTILOS_TEXTO = ("blanco", "clasico")
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco"}
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "viral": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:

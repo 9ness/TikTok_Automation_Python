@@ -439,6 +439,8 @@ un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si 
 prompt nuestro por ingeniería inversa de la web del curso (`prompts/guion_inversa.md`,
 muestras en `docs/venta_inversa/`); cierre de disponibilidad (`CTAS_INVERSA`), sin precio, siempre 3 clips (`SEGUNDOS_INVERSA`).
 
+**🔁 Réplica viral** (`estilo_guion="viral"`, carpeta especial «Réplicas virales», de todos los usuarios): el guion y los prompts de los clips salen de la réplica (`src/replicar_viral/`, campo `replica_id`), sin IA; `POST /replica/anadir` y MCP `anadir_replica`. Siempre 2 clips.
+
 **Calendario de subidas** (qué carpeta toca cada día): [`docs/CALENDARIO_POV_BOF_LARGO.md`](docs/CALENDARIO_POV_BOF_LARGO.md).
 Las carpetas especiales (`CARPETAS_ESPECIALES`: Épico Octubre, Venta Inversa, Q4) van en orden de publicación y con sus fechas en la etiqueta.
 

@@ -128,3 +128,20 @@ def test_carpetas_especiales_con_modo_fijo():
     assert pov_config.modo_de_carpeta("Venta Inversa") == "inversa"
     assert pov_config.modo_de_carpeta("Épico Octubre") == "epico"
     assert pov_config.modo_de_carpeta("Carpeta_3") == ""
+
+
+def test_replica_viral(monkeypatch):
+    import sys, types
+    from src.nicho_pov_bof import config as pov_config
+    falso = types.ModuleType("src.replicar_viral.repos")
+    falso.obtener = lambda rid: {"adaptacion": {"guion": "Mira esto. Ve al carrito naranja y aplica tus cupones."}} if rid == "abc" else None
+    monkeypatch.setitem(sys.modules, "src.replicar_viral.repos", falso)
+    e = config.guion_de_replica("abc", "Termómetro\nMomcozy")
+    assert e["guion"].endswith("cupones.") and e["nombre"] == "Termómetro Momcozy"
+    import pytest
+    with pytest.raises(ValueError):
+        config.guion_de_replica("nada")
+    assert config.segundos_de_estilo("viral", 40) == 16
+    assert pov_config.modo_de_carpeta("Réplicas virales") == "viral"
+    assert pov_config.ve_carpeta_especial("Réplicas virales", "mauro")
+    assert not pov_config.ve_carpeta_especial("Épico Octubre", "mauro")
