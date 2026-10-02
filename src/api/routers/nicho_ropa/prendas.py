@@ -413,6 +413,18 @@ def multimodo_tandas(
         }
         for i in range(0, len(videos), por_tanda)
     ]
+    # Fecha orientativa de publicación: la primera tanda abierta es hoy y cada
+    # una de las siguientes, un día más (10 vídeos al día). Con su época, para
+    # que el operador sepa qué está subiendo (otoño, Halloween, Navidad…).
+    import datetime as _dt
+
+    dia = _dt.date.today()
+    for t in tandas:
+        if all(_cerrado(x) for x in t["items"]):
+            continue
+        t["fecha"] = dia.isoformat()
+        t["temporada"] = config.etiqueta_temporada(dia)
+        dia += _dt.timedelta(days=1)
     return {
         "total": len(videos),
         "subidos": sum(1 for x in videos if x["uploaded"]),

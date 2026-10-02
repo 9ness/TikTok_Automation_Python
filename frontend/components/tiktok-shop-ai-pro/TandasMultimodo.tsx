@@ -37,6 +37,12 @@ const MOTIVOS_MULTIMODO = [
  *  El multimodo recorre ropa, zapatos y accesorios, así que lo montado queda
  *  repartido por muchas carpetas. Para publicar se trabaja al revés: por
  *  orden de montaje, bajando una tanda entera y marcando lo que se sube. */
+/** «sáb 3 oct» a partir de «2026-10-03». */
+function fechaCorta(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }).replace(".", "");
+}
+
 export function TandasMultimodo() {
   const tandas = useTandasMultimodo();
   // Los mismos hashtags que las tarjetas de Moda Mujer: el caption se copia
@@ -165,6 +171,12 @@ export function TandasMultimodo() {
                     >
                       {t.subidos}/{t.items.length} subidos
                     </span>
+                    {t.fecha ? (
+                      <span className="ml-1 rounded-full bg-sky-500/15 px-1.5 py-px text-[10px] text-sky-600 dark:text-sky-400">
+                        📅 {fechaCorta(t.fecha)}
+                        {t.temporada ? ` · ${t.temporada}` : ""}
+                      </span>
+                    ) : null}
                     {t.sin_stock ? (
                       <span className="ml-1 rounded-full bg-rose-500/15 px-1.5 py-px text-[10px] text-rose-500">
                         🚫 {t.sin_stock}

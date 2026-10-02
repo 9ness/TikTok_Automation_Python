@@ -511,6 +511,18 @@ def temporada_multimodo(hoy=None, adelanto: int = ADELANTO_PUBLICAR_DIAS) -> str
     return "otono"
 
 
+def etiqueta_temporada(dia) -> str:
+    """La etiqueta que ve el operador en cada tanda: qué época toca ese día."""
+    if dia.month == 10 and dia.day >= 10:
+        return "🎃 Halloween"
+    t = temporada_multimodo(dia, adelanto=0)
+    if t == "navidad":
+        return "🎄 Navidad"
+    if t == "invierno":
+        return "❄️ Invierno · Black Friday" if dia.month == 11 else "❄️ Invierno"
+    return "🍂 Otoño"
+
+
 def halloween_al_publicar(hoy=None) -> bool:
     """¿Se publicará en plena semana de Halloween? Para el RÓTULO (se quema al
     montar): un 🎃 publicado el 2 de noviembre ya llega tarde."""

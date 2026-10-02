@@ -139,6 +139,15 @@ class TestTemporada:
         frases = {config.texto_de_modo("mm_espejo_escenas", f"c/{i}", oct_)["titulo"] for i in range(40)}
         assert any("SPOOKY" in f or "HALLOWEEN" in f for f in frases)
 
+    def test_etiqueta_de_cada_tanda(self):
+        import datetime as dt
+        e = config.etiqueta_temporada
+        assert e(dt.date(2026, 10, 5)) == "🍂 Otoño"
+        assert e(dt.date(2026, 10, 20)) == "🎃 Halloween"
+        assert e(dt.date(2026, 11, 5)) == "🍂 Otoño"
+        assert "Black Friday" in e(dt.date(2026, 11, 25))
+        assert e(dt.date(2026, 12, 10)) == "🎄 Navidad"
+
     def test_halloween_no_se_quema_si_se_publica_en_noviembre(self):
         import datetime as dt
         assert config.halloween_al_publicar(dt.date(2026, 10, 20))

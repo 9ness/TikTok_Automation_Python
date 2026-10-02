@@ -554,7 +554,16 @@ export interface TandasMultimodoResponse {
   subidos: number;
   /** Vídeos sin subir cuyo producto está sin stock. */
   sin_stock?: number;
-  tandas: { numero: number; items: VideoMultimodo[]; subidos: number; sin_stock?: number }[];
+  tandas: {
+    numero: number;
+    items: VideoMultimodo[];
+    subidos: number;
+    sin_stock?: number;
+    /** Día orientativo de publicación (AAAA-MM-DD), solo en las tandas abiertas. */
+    fecha?: string;
+    /** «🍂 Otoño», «🎃 Halloween», «❄️ Invierno», «🎄 Navidad». */
+    temporada?: string;
+  }[];
 }
 
 /** «🚫 Sin stock» de una fila de las tandas. Se pinta al momento, como el
