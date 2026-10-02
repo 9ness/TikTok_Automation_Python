@@ -339,7 +339,9 @@ def _cache_nicho(f: dict, usuario: str) -> Path | None:
     if f["nicho"] == "pov":
         return Path(pov_config.video_cache_path(f["carpeta"], f["producto"], usuario))
     if f["nicho"] == "largo":
-        return Path(pov_config.video_cache_path(f["carpeta"], f["producto"], usuario, nicho="largo"))
+        return Path(pov_config.video_cache_path(
+            f["carpeta"], f["producto"], usuario, nicho="largo", estilo=f.get("modo") or "",
+        ))
     return None
 
 

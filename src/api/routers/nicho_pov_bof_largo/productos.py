@@ -1796,7 +1796,8 @@ def get_video(
     # así; esto es lo mismo.
     from src.nicho_pov_bof import config as pov_config
 
-    p = Path(pov_config.video_cache_path(folder, producto, usuario, nicho="largo"))
+    modo = _modo(source, usuario, folder)
+    p = Path(pov_config.video_cache_path(folder, producto, usuario, nicho="largo", estilo=modo))
     if not p.is_file():
         p = Path(ruta)
         # Se copia al vuelo para que la SIGUIENTE ya sea rápida: los vídeos
@@ -1804,7 +1805,7 @@ def get_video(
         if p.is_file():
             try:
                 destino = Path(
-                    pov_config.video_cache_path(folder, producto, usuario, nicho="largo")
+                    pov_config.video_cache_path(folder, producto, usuario, nicho="largo", estilo=modo)
                 )
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(p, destino)

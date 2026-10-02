@@ -522,7 +522,7 @@ def video_cache_dir() -> str:
 
 
 def video_cache_path(
-    folder: str, producto: str, usuario: str = "", nicho: str = "",
+    folder: str, producto: str, usuario: str = "", nicho: str = "", estilo: str = "",
 ) -> str:
     """Ruta de la copia local de un vídeo. Nombre plano y saneado.
 
@@ -537,6 +537,11 @@ def video_cache_path(
     """
     quien = usuario or "ness"
     marca = f"{nicho}__" if nicho else ""
+    # Y el MODO del Largo (salvo el de serie, que ya tiene ficheros con el
+    # nombre de antes): el mismo producto montado en «dolor» y en «precio» son
+    # dos vídeos, y sin esto el segundo pisaba al primero en la caché.
+    if estilo and estilo != "precio":
+        marca = f"{marca}{estilo}__"
     seguro = re.sub(r"[^A-Za-z0-9_.-]+", "_", f"{marca}{quien}__{producto}__{folder}")
     return os.path.join(video_cache_dir(), f"{seguro}.mp4")
 

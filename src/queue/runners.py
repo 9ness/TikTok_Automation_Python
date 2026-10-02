@@ -2733,7 +2733,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     # gestor de Android se cansa de esperar y deja alguno "esperando red".
     # Aquí faltaba: el corto sí la hacía y el Largo no.
     try:
-        cache = Path(config.video_cache_path(folder, producto, operator, nicho="largo"))
+        cache = Path(config.video_cache_path(folder, producto, operator, nicho="largo", estilo=estilo))
         cache.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(salida, cache)
         config.limpiar_video_cache()
