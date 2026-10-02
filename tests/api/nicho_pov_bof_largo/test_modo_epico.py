@@ -109,3 +109,7 @@ def test_venta_inversa_prompt_y_cierre():
     assert config.ctas_posibles(False, False, inversa=True)[0].startswith("Te lo dejo")
     assert not config.es_cierre_inverso("Y es bueno. Ve al carrito naranja y aplica tus cupones.")
     assert config.estilo_texto_de("inversa") == "blanco"
+    # una sola duración: tres clips, pida lo que pida el producto
+    assert config.segundos_de_estilo("inversa", 16) == config.SEGUNDOS_INVERSA == 24
+    assert config.segundos_de_estilo("dolor", 16) == 16
+    assert config.CTA_INVERSA in config.prompt_guion(False, "inversa", True, 24)

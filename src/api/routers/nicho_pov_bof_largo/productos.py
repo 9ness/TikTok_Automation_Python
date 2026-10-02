@@ -1165,7 +1165,7 @@ def escribir_guion(
     # Cuántos segundos tiene que durar. Sale de los TEXTOS, que son los del
     # POV BOF: el producto es el mismo y lo que pide la tienda no cambia
     # porque el guion empiece por el precio o por el dolor.
-    segundos = float(textos.get("segundos_guion") or 0)
+    segundos = config.segundos_de_estilo(estilo, float(textos.get("segundos_guion") or 0))
     # Se reaprovecha el guion salvo que sea del otro modo: un producto de
     # plazos con un guion escrito sin la frase de financiación no vale.
     if (

@@ -201,9 +201,11 @@ la web (`docs/venta_inversa/`).
   (en 30 s) cómo se usa → «El único problema es que… / Lo peor es que…» →
   cierre de disponibilidad: «Te lo voy a intentar dejar en el carrito naranja,
   pero no puedo asegurarte que siga disponible cuando veas el vídeo».
-- Dos duraciones: **2 clips (~15 s)** o **30 s** (4 de 8 s o 3 de 10 s). En el
-  corto el gancho ya lleva el primer dato y el cierre es el corto («Te lo dejo
-  en el carrito naranja, pero no te aseguro que siga disponible»).
+- **Una sola duración: 3 clips** (~24 s; con clips de 10 s se recortan). El
+  guion «de 15 s» de la web son ~400 caracteres (~22 s de voz) y en 2 clips no
+  cabe sin mutilar el cierre. Lo fija `config.SEGUNDOS_INVERSA`, pida lo que
+  pida el producto.
+- Ningún dato ni frase se repite (la web repetía «120 kilos» dos veces).
 - Sin urgencia de precio ni frase de plazos. La escalera de cierres al locutar
   es la suya (`config.CTAS_INVERSA`); el recorte por precio no la toca.
 - Revisa la ironía: que se entienda que lo recomiendas, sin efectos sobre el

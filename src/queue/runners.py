@@ -2582,7 +2582,9 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     # Los segundos que se pidieron para ESTE producto (0 = el vídeo normal).
     # Se leen fuera del `if` porque además de escribir el guion deciden el
     # mínimo que tiene que durar el vídeo al sortear la voz.
-    segundos_pedidos = float(textos.get("segundos_guion") or 0)
+    segundos_pedidos = largo_config.segundos_de_estilo(
+        estilo, float(textos.get("segundos_guion") or 0),
+    )
     # Lo que este producto puede prometer. Se lee aquí y no solo al escribir el
     # guion porque también decide el CIERRE con el que se locuta (el encaje).
     envio_gratis = largo_config.hay_envio_gratis(textos)
@@ -3628,7 +3630,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         # La duración pedida para ESE producto (0 = la del curso). Sin esto, un
         # lote pisaba con veinte segundos el guion de treinta que se había
         # pedido a mano.
-        segundos = float(t.get("segundos_guion") or 0)
+        segundos = largo_config.segundos_de_estilo(estilo, float(t.get("segundos_guion") or 0))
         try:
             escrito = guionista.escribir(
                 titulo=t.get("titulo", ""),

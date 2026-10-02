@@ -435,7 +435,7 @@ un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si 
 
 **🔄 Venta inversa** (`estilo_guion="inversa"`): «No lo compres si no quieres…»,
 prompt nuestro por ingeniería inversa de la web del curso (`prompts/guion_inversa.md`,
-muestras en `docs/venta_inversa/`); cierre de disponibilidad (`CTAS_INVERSA`), sin precio.
+muestras en `docs/venta_inversa/`); cierre de disponibilidad (`CTAS_INVERSA`), sin precio, siempre 3 clips (`SEGUNDOS_INVERSA`).
 
 **🎄 Productos Q4** (`nicho_pov_bof/services/productos_q4.py`): carpeta real
 «Productos Q4» dentro del Inventario General, primera de la lista y solo para

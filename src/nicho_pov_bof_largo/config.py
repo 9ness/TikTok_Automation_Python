@@ -299,6 +299,19 @@ def es_inversa(estilo: str) -> bool:
     return (estilo or "").strip().lower() == "inversa"
 
 
+# La venta inversa tiene UNA sola duración, la de TRES clips de 8 s (con clips
+# de 10 s se recortan, como siempre). Medido en la web del curso: su guion «de
+# 15 s» son ~400 caracteres, unos 22 s de voz, y no cabe en dos clips sin
+# mutilar el cierre de disponibilidad, que es lo que da la gracia al formato.
+SEGUNDOS_INVERSA = 24.0
+
+
+def segundos_de_estilo(estilo: str, pedidos: float = 0) -> float:
+    """Los segundos con los que se escribe y se monta el guion de ese modo:
+    los pedidos para el producto, salvo en la venta inversa (siempre 24)."""
+    return SEGUNDOS_INVERSA if es_inversa(estilo) else float(pedidos or 0)
+
+
 def es_cierre_inverso(guion: str) -> bool:
     """¿El guion acaba con el cierre de disponibilidad de la venta inversa?
 

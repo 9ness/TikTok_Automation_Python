@@ -1097,7 +1097,7 @@ export default function PovBofLargoPage() {
               {estiloActual === "epico"
                 ? "Como punto de dolor, pero con un gancho de menos de 3 s y frases cortas: el guion marca de 2 a 4 «golpes» según sus frases potentes y en cada uno entra un inserto épico de 1 s (producto con fondo épico + golpe de sonido). Cada golpe pide su clip de 5 s."
                 : estiloActual === "inversa"
-                ? "Irónico: «No lo compres si no quieres…» y cada motivo es una ventaja real; acaba con «El único problema es que…» y «te lo intento dejar en el carrito naranja, pero no te aseguro que siga disponible». Sin urgencia de precio. Usa 2 clips (~15 s) o 4 de 8 s / 3 de 10 s (~30 s)."
+                ? "Irónico: «No lo compres si no quieres…» y cada motivo es una ventaja real; acaba con «El único problema es que…» y «te lo intento dejar en el carrito naranja, pero no te aseguro que siga disponible». Sin urgencia de precio. Siempre 3 clips (~24 s)."
                 : estiloActual === "dolor"
                 ? "El vídeo empieza con tres a cinco problemas dirigidos al espectador y el precio va al final."
                 : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}{" "}

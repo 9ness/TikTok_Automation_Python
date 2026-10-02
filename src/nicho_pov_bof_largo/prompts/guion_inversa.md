@@ -13,6 +13,9 @@
      - Cierre literal: «Te lo voy a intentar dejar en el carrito naranja…».
      Lo que su versión hace mal y aquí se prohíbe: repetir el gancho dos veces
      (la de 15 s lo hizo, y su propio control le dio 10/100).
+     UNA sola duración: tres clips (~24 s, `config.SEGUNDOS_INVERSA`). Su
+     guion «de 15 s» son ~400 car. (~22 s de voz) y en dos clips no cabe sin
+     mutilar el cierre. Decidido con el operador el 2 oct 2026.
 
      Misma salida que los otros prompts (nombre, guion, movimiento,
      subliminal): el resto del nicho no se entera de qué modo se usó. -->
@@ -59,12 +62,8 @@ No añadas nada después.
 REGLAS GENERALES
 El guion está destinado a una voz en off de aproximadamente 20 segundos.
 El guion completo no puede superar los 360 caracteres, contando letras, espacios y signos de puntuación. Comprueba el número exacto de caracteres antes de entregarlo.
-En un guion CORTO (unos 15 segundos) no caben las cinco partes, y la forma es SIEMPRE esta, con estos tamaños aproximados:
-«[Gancho que ya lleva el primer dato concreto, unos 65 caracteres]. Tampoco lo compres si no quieres [segundo dato concreto y para qué sirve, unos 60 caracteres]. [Problema positivo con «El único problema es que…» o «Lo peor es que…», unos 45 caracteres]. [Cierre]»
-Ejemplo corto: «No compres estas fundas si no quieres que se ajusten a tus sillas como una segunda piel. Tampoco las compres si no quieres meterlas en la lavadora cada vez que se manchen. Lo peor es que tus sillas viejas van a parecer nuevas. Te lo dejo en el carrito naranja, pero no te aseguro que siga disponible.»
-Si el gancho NO es una negación («El gran problema de…», «Estos son los motivos…»), la segunda frase empieza por «No lo compres si no quieres…» en vez de «Tampoco…», y el problema positivo va con «Lo peor es que…» para no repetir la palabra «problema».
-Escríbelo directamente a esa medida: si te pasas, habrá que recortarlo y perderá naturalidad.
-En un guion LARGO (30 segundos o más) usa las cinco partes: tres o cuatro negaciones y la demostración.
+Medida del vídeo: unos 24 segundos de voz. Con eso caben el gancho, DOS o TRES negaciones con datos distintos, una frase de cómo se usa si la ficha lo dice, el problema positivo y el cierre. Si la ficha da poco, dos negaciones bien contadas antes que tres con relleno.
+NO REPITAS NADA: ninguna frase, ningún dato y ninguna idea pueden salir dos veces en el guion (si el gancho ya habla de los 120 kilos, ninguna negación vuelve a nombrarlos). Si el gancho NO es una negación («El gran problema de…», «Estos son los motivos…»), la primera negación empieza por «No lo compres si no quieres…» y no por «Tampoco»; y si el gancho ya dice «problema», el problema positivo va con «Lo peor es que…».
 No utilices preguntas ni signos de interrogación.
 No menciones marcas, modelos ni nombres comerciales dentro de la voz en off.
 No menciones precios concretos ni hables del precio: este enfoque no lleva urgencia de precio.
