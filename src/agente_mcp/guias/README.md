@@ -216,5 +216,16 @@ vídeos).
     Sin `productos` vacía la carpeta entera. No se deshace.
 
 Lo que el MCP **no** hace: generar imágenes o vídeos (Flow, GenAI Pro y
-Magnific no tienen API) ni publicar en TikTok. Carruseles aún no tiene
+Magnific no tienen API) ni publicar en TikTok.
+
+### Mantener el MCP al día (para quien toque la app)
+
+Desde oct 2026 los vídeos los hacen sobre todo los agentes, así que **cada
+función nueva de un menú entra también en el MCP en el mismo cambio**:
+el valor nuevo en `menus.py` (`opciones` del menú), lo que haga falta en
+`menus.plan`/`preparar`/`subir_clip`, el docstring de la herramienta en
+`servidor.py` (es lo que lee el agente) y la guía del menú. Si un agente ha
+tenido que tirar de la API a mano para algo, eso es una herramienta que falta:
+añádela. Y lo que se aprenda haciendo vídeos (qué falla, qué queda mejor) va a
+la guía del menú, no solo a `learnings.md`. Carruseles aún no tiene
 herramientas: hazlo por la web con [`carruseles.md`](carruseles.md).

@@ -225,9 +225,11 @@ async def preparar_carpeta(ctx: Context, menu: str, catalogo: str, carpeta: str,
     """El «Paso 1» de la web: lee los textos de las fichas que falten y escribe
     los guiones/escenas que falten. Devuelve un `tarea_id` para `estado`.
     POV BOF / Largo: `clip_s` (8|10) fija la duración de clip de toda la carpeta;
-    Largo: `estilo_guion` (precio|dolor). `rehacer=True` REESCRIBE lo que ya
-    está: solo si el operador lo pide. Moda: `productos` ("1,3,5") limita los
-    guiones a esas prendas (sin él, toda la carpeta)."""
+    Largo: `estilo_guion` (precio|dolor|epico|inversa) — cambia el modo de TODO
+    el catálogo; «epico» marca golpes con insertos de 5 s, «inversa» es la
+    venta inversa irónica y siempre son 3 clips. `rehacer=True` REESCRIBE lo
+    que ya está: solo si el operador lo pide. `productos` ("1,3,5") limita los
+    guiones a esos productos (Moda y Largo; sin él, toda la carpeta)."""
     c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion)
     tid = tareas.lanzar(f"Preparar {c.m.label} · {c.carpeta}",
                         lambda: menus.preparar(c, clip_s, estilo_guion, rehacer, productos))
@@ -274,7 +276,9 @@ async def plan_producto(ctx: Context, menu: str, catalogo: str, carpeta: str, pr
     """Todo lo necesario para UN producto: enlaces a sus fotos, cada imagen a
     generar (prompt, qué adjuntar, dónde, formato) y cada clip (prompt, qué
     imagen, FRAME INICIAL o INGREDIENTES, segundos, si habla, plataformas
-    válidas), más los avisos. Los prompts se pegan TAL CUAL."""
+    válidas), más los avisos. Los prompts se pegan TAL CUAL. POV BOF Largo:
+    una imagen POR CLIP con `dice_la_voz_en_este_clip` (elige la escena según
+    ese tramo) y, en modo Épico, las imágenes/clips de cada inserto."""
     c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion)
     return _json(_con_enlaces(_usuario(ctx), await menus.plan(c, producto)))
 

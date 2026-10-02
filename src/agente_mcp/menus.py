@@ -414,6 +414,16 @@ async def preparar(c: Ctx, clip_s: int = 0, estilo_guion: str = "", rehacer: boo
         if rehacer or any(not p.get("guion") for p in items):
             await c.api.post(f"{POV}/guiones/lote", {"source": c.catalogo, "folder": c.carpeta})
             hecho.append("guiones que faltaban → en la cola")
+    elif t == "largo" and solo:
+        # Solo esos productos: uno a uno por `/guion` (síncrono, ~10 s cada
+        # uno). Es lo que hace falta para rehacer el guion de UN producto sin
+        # reescribir la carpeta entera.
+        hechos = []
+        for pid in solo:
+            await c.api.post(f"{LARGO}/guion", {"source": c.catalogo, "folder": c.carpeta,
+                                               "producto": pid, "rehacer": rehacer})
+            hechos.append(pid)
+        hecho.append(f"guiones de {', '.join(hechos)} escritos")
     elif t == "largo":
         if rehacer or any(not p.get("guion") for p in items):
             await c.api.post(f"{LARGO}/guiones/lote",
