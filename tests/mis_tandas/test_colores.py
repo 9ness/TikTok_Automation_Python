@@ -43,3 +43,8 @@ def test_cada_nicho_de_mis_tandas_tiene_color():
     claves = set(re.findall(r"^\s*(\w+):", _bloque("COLOR_NICHO"), re.M))
     faltan = set(config.NICHOS) - claves
     assert not faltan, f"Nichos de Mis tandas sin color en coloresModo.ts: {sorted(faltan)}"
+
+
+def test_estilo_viral_tiene_color():
+    claves = set(re.findall(r"^\s*(\w+):", _bloque("ESTILOS_LARGO"), re.M))
+    assert "viral" in claves

@@ -31,6 +31,7 @@ const ESTILOS_LARGO: Record<string, string> = {
   dolor: "bg-rose-500/15 text-rose-700 dark:text-rose-300",
   epico: "bg-red-600/25 text-red-700 dark:text-red-300",
   inversa: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
+  viral: "bg-sky-600/20 text-sky-700 dark:text-sky-300",
 };
 
 /** Familias de formatos del multimodo (por cómo empieza su clave): mismo

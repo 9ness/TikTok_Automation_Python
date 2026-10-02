@@ -52,6 +52,7 @@ decir antes cuánto vas a lanzar y esperar el «sí». No uses `marcar` salvo qu
 Si te piden rehacer lo marcado, `para_rehacer(menu)` lo lista todo con la nota.
 Lo montado de todos los nichos, en tandas de diez para publicar, está en
 `mis_tandas` (solo lectura: lo que montes aparece ahí solo, no se sube nada).
+Para copiar la fórmula de un vídeo viral con un producto nuestro: `replicar_viral`.
 Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
 antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
 prometer nunca ofertas que la ficha no tenga.
@@ -609,6 +610,30 @@ async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
         body["rehacer"] = rehacer
         body["rehacer_nota"] = nota_rehacer
     return _json(await api.post("/api/v1/mis-tandas/estado", body))
+
+
+@_herramienta(structured_output=False)
+async def replicar_viral(ctx: Context, catalogo: str, carpeta: str, producto: str,
+                         url: str = "", archivo_id: str = "") -> str:
+    """Copia la FÓRMULA de un vídeo viral de TikTok con un producto nuestro
+    (catálogo/carpeta/producto del POV BOF). Da el enlace (`url`, lo baja la
+    app) o sube el vídeo antes y pasa su `archivo_id`. Gemini ve el vídeo
+    entero y devuelve: `original` (transcripción, escenas, gancho, por qué
+    funciona), `apto` (si se puede hacer sin caras hablando) y `adaptacion`:
+    guion de voz en off de ~16 s y, para cada uno de los DOS clips mudos de
+    8 s, `prompt_imagen` (imagen inicial, con la foto del producto como
+    referencia) y `prompt_video`. Tarda ~1 min; solo texto, no genera nada.
+    Lee antes la guía `replicar-viral.md`."""
+    api = Interno(_usuario(ctx))
+    datos = {"source": catalogo, "folder": carpeta, "producto": producto, "url": url}
+    if archivo_id:
+        contenido, nombre = await archivos.leer_origen(_usuario(ctx), archivo_id=archivo_id)
+        return _json(await api.post_form("/api/v1/replicar-viral/analizar", datos,
+                                         (nombre or "viral.mp4", contenido, "video/mp4")))
+    if not url:
+        raise ErrorApp("Falta `url` (enlace de TikTok) o `archivo_id`.")
+    r = await api._pedir("POST", "/api/v1/replicar-viral/analizar", data=datos)
+    return _json(r.json())
 
 
 @_herramienta(structured_output=False)

@@ -1,5 +1,9 @@
 ## 🔁 Replicar vídeos virales (clase 30 sep 2026)
 
+- [ ] 👤 **Recargar Gemini**: el 2 oct 2026 las tres claves dan 429 (PAID «prepayment credits are depleted» en AI Studio; FREE y legacy sin cuota). Sin esto fallan guiones, textos y la réplica.
+- [x] (2/10) Analizador `src/replicar_viral/` + MCP `replicar_viral` + guía. Descarga con tikwm (yt-dlp y Lovetik bloqueados desde la IP del VPS).
+- [ ] Estilo `viral` + carpeta «Réplicas virales» + `replica/anadir` en el POV BOF Largo (lo hace el agente del Largo, acordado el 2 oct).
+
 Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/2026-09-30_clase_miercoles.md).
 - [ ] Social1 Pro: prueba de 7 días desde el 2 oct, renovación YA cancelada por el operador (acceso hasta el 9 oct). Social1 bloquea el Chrome del VPS (Vercel «Code 11»): la búsqueda la hace el operador desde el móvil y pasa enlaces.
 - [ ] Con los enlaces: virales de ES/EE. UU. SIN persona hablando a cámara (mudos o voz en off), con carrito activo, casados con productos NUESTROS del mismo estilo (lo que se vea en los clips tiene que ser el producto enlazado). Formato: 2 clips mudos de 8 s (GenAI Pro / Magnific) + voz Fish. TikTok bloquea la descarga desde la IP del VPS (yt-dlp); probar Lovetik.
