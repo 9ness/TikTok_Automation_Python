@@ -480,8 +480,13 @@ def _generate_text_gemini(
                     break  # break del inner loop → for key
 
                 # Última key con 429: si quedan attempts, esperar y reintentar
+                delay_s = _extract_retry_delay(str(e)) or (15 * (attempt + 1))
+                # Sin saldo, Google pide esperar HORAS (visto 21903 s, oct
+                # 2026): dormir eso en la cola la bloquea entera. Más de
+                # `_ESPERA_MAX_S` = no hay cuota hoy → se propaga ya.
+                if delay_s > _ESPERA_MAX_S:
+                    raise
                 if attempt < max_attempts - 1:
-                    delay_s = _extract_retry_delay(str(e)) or (15 * (attempt + 1))
                     log_warning(_LOGGER_NAME,
                                 "Quota última key, esperando antes de reintentar",
                                 key=label, attempt=attempt + 1,
@@ -505,6 +510,9 @@ def _strip_json_fences(text: str) -> str:
         text = re.sub(r"^```[a-zA-Z]*\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
     return text.strip()
+
+
+_ESPERA_MAX_S = 120
 
 
 def _extract_retry_delay(err_str: str) -> int | None:
