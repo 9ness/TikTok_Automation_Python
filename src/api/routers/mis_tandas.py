@@ -1,0 +1,104 @@
+"""«Mis tandas»: los vídeos montados del usuario, de todos sus nichos, en
+tandas de diez para publicar.
+
+Solo LEE lo de cada nicho y sus botones escriben en el documento original
+(ver `src/mis_tandas/`). Para los agentes: aquí no se sube nada; lo que montan
+en su nicho aparece solo.
+"""
+
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+from src.api.dependencies import get_current_user, get_web_user
+from src.api.exceptions import APIError
+from src.mis_tandas import servicio
+
+router = APIRouter(
+    prefix="/api/v1/mis-tandas",
+    tags=["tiktok-shop-ai-pro · mis tandas"],
+    dependencies=[Depends(get_current_user)],
+)
+
+
+class EstadoRequest(BaseModel):
+    """Un cambio de una fila. Solo se aplica lo que venga."""
+
+    id: str
+    uploaded: bool | None = None
+    sin_stock: bool | None = None
+    rehacer: bool | None = None
+    rehacer_nota: str | None = None
+
+
+def _error(e: Exception) -> APIError:
+    if isinstance(e, servicio.ErrorTanda):
+        return APIError(str(e), status_code=e.status)
+    if isinstance(e, RuntimeError):
+        return APIError(str(e), status_code=503)
+    return APIError(f"{type(e).__name__}: {e}", status_code=500)
+
+
+@router.get("")
+def get_tandas(
+    todas: Annotated[bool, Query()] = False,
+    fresco: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Tandas abiertas con sus vídeos (con `todas`, también las cerradas).
+    `fresco` vuelve a leer los nichos en vez de usar lo leído hace segundos."""
+    try:
+        return servicio.tandas(usuario, todas=todas, fresco=fresco)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.post("/estado")
+def set_estado(
+    body: EstadoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Subido / sin stock / rehacer, escrito en el nicho del vídeo."""
+    try:
+        return servicio.marcar(
+            usuario, body.id, uploaded=body.uploaded, sin_stock=body.sin_stock,
+            rehacer=body.rehacer, rehacer_nota=body.rehacer_nota,
+        )
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.get("/video")
+def get_video(
+    id: Annotated[str, Query()],
+    descargar: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    """El vídeo de POV BOF o Largo (los del multimodo, por su nicho)."""
+    try:
+        path, nombre = servicio.video(usuario, id)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+    return FileResponse(str(path), media_type="video/mp4", filename=nombre if descargar else None)
+
+
+@router.get("/foto")
+def get_foto(
+    id: Annotated[str, Query()],
+    w: Annotated[int, Query(ge=32, le=800)] = 96,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> FileResponse:
+    """Miniatura de la foto limpia del producto."""
+    try:
+        path = servicio.foto(usuario, id, w)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+    return FileResponse(
+        str(path),
+        media_type="image/png" if path.suffix.lower() == ".png" else "image/jpeg",
+        headers={"Cache-Control": "private, max-age=86400"},
+    )

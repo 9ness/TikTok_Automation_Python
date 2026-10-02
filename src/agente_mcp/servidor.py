@@ -50,6 +50,8 @@ Las imágenes y los vídeos se generan SIEMPRE en la web (Flow, GenAI Pro,
 Magnific) controlando el navegador, NUNCA por API. Nunca generes nada sin
 decir antes cuánto vas a lanzar y esperar el «sí». No uses `marcar` salvo que te lo pidan.
 Si te piden rehacer lo marcado, `para_rehacer(menu)` lo lista todo con la nota.
+Lo montado de todos los nichos, en tandas de diez para publicar, está en
+`mis_tandas` (solo lectura: lo que montes aparece ahí solo, no se sube nada).
 Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
 antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
 prometer nunca ofertas que la ficha no tenga.
@@ -555,6 +557,53 @@ async def marcar(ctx: Context, menu: str, catalogo: str, carpeta: str, producto:
     c = await _ctx(ctx, menu, catalogo, carpeta, "", gancho, duracion)
     r = await menus.marcar(c, producto, subido, escaparate, vendio, rehacer, nota_rehacer)
     return _json({"ok": True, "producto": r.get("producto", producto)})
+
+
+@_herramienta(structured_output=False)
+async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) -> str:
+    """«Mis tandas» del usuario del token: los vídeos YA MONTADOS de POV BOF,
+    POV BOF Largo y Moda Mujer · Multimodo, de diez en diez y en el orden en
+    que toca publicarlos (cada tanda abierta lleva `fecha` y `temporada`).
+    Es solo una vista: NO se sube nada aquí — lo que montas en su nicho aparece
+    solo al final de la cola (`fresco=True` para verlo ya). Por defecto solo
+    las tandas abiertas; `todas=True` trae también las ya subidas.
+    Cada vídeo trae `id` (para `marcar_tanda`), su nicho, catálogo, carpeta y
+    producto (para ir a su menú) y `descargar`."""
+    u = _usuario(ctx)
+    params = {"todas": "true" if todas else "false", "fresco": "true" if fresco else "false"}
+    d = await Interno(u).get("/api/v1/mis-tandas", **params)
+    from urllib.parse import quote
+
+    for t in d.get("tandas", []):
+        for v in t.get("items", []):
+            if v.get("nicho") == "mm":
+                ruta = (f"/api/v1/nicho-ropa/video?producto={quote(str(v['producto']), safe='')}"
+                        f"&carpeta={quote(v['carpeta'], safe='')}"
+                        f"&modo={quote(v.get('formato', ''), safe='')}&descargar=true")
+            else:
+                ruta = f"/api/v1/mis-tandas/video?id={quote(v['id'], safe='')}&descargar=true"
+            v["descargar"] = archivos.enlace_interno(u, ruta)
+    return _json(d)
+
+
+@_herramienta(structured_output=False)
+async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
+                       sin_stock: bool | None = None, rehacer: bool | None = None,
+                       nota_rehacer: str = "") -> str:
+    """Botones de una fila de «Mis tandas» (`id` sale de `mis_tandas`). Escribe
+    en el documento del NICHO del vídeo, así que su pantalla lo ve igual.
+    SOLO si el operador te lo pide: «Subido» es lo que ha publicado él;
+    «sin stock» es del producto (vale para todos los usuarios y nichos);
+    «rehacer» con su nota (no existe en el POV BOF corto)."""
+    body: dict = {"id": id}
+    if subido is not None:
+        body["uploaded"] = subido
+    if sin_stock is not None:
+        body["sin_stock"] = sin_stock
+    if rehacer is not None:
+        body["rehacer"] = rehacer
+        body["rehacer_nota"] = nota_rehacer
+    return _json(await Interno(_usuario(ctx)).post("/api/v1/mis-tandas/estado", body))
 
 
 @_herramienta(structured_output=False)

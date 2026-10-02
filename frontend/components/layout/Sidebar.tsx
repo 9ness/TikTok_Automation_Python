@@ -38,6 +38,7 @@ import {
   Video,
   Wrench,
   X,
+  ListChecks,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -119,6 +120,9 @@ const NAV: NavGroup[] = [
     basePath: "/tiktok-shop-ai-pro",
     icon: Rocket,
     items: [
+      // Lo primero de todo para los tres: los vídeos ya montados de todos los
+      // nichos, de diez en diez para subirlos (`src/mis_tandas/`).
+      { href: "/tiktok-shop-ai-pro/mis-tandas", label: "Mis tandas", icon: ListChecks },
       { href: "/tiktok-shop-ai-pro/viralizacion", label: "Viralización 1K", icon: Video },
       // La Cuenta Piloto no es un módulo del curso (no lleva número), así que
       // va suelta aquí y no en `modulos.ts`.
@@ -181,6 +185,7 @@ const BASE_AI_PRO = "/tiktok-shop-ai-pro";
 
 /** Lo que se usa a diario va primero; el resto sigue debajo en su orden. */
 const ORDEN_AI_PRO = [
+  `${BASE_AI_PRO}/mis-tandas`,
   `${BASE_AI_PRO}/viralizacion`,
   // Los cuatro que comparten catálogo, en el orden en que se trabajan.
   `${BASE_AI_PRO}/nicho-pov-bof`,
@@ -203,6 +208,7 @@ const ORDEN_AI_PRO = [
  *  Es solo el MENÚ: las demás pantallas siguen existiendo si se escribe la URL
  *  (el backend corta aparte lo que no les toca, ver `_PREFIJOS_PRO`). */
 const ITEMS_PRO = [
+  `${BASE_AI_PRO}/mis-tandas`,
   `${BASE_AI_PRO}/nicho-pov-bof`,
   `${BASE_AI_PRO}/pov-bof-largo`,
   `${BASE_AI_PRO}/nicho-ropa-mujer`,
@@ -235,6 +241,16 @@ export function claveNav(n: NavGroup): string {
   return n.kind === "single" ? n.item.href : n.basePath;
 }
 
+/** Lo que va PRIMERO aunque la persona tenga su propio orden guardado: un
+ *  orden guardado antes de que existiera esta pantalla la dejaría al final.
+ *  Si alguien la coloca a mano en otro sitio, manda lo suyo. */
+const PRIMEROS = [`${BASE_AI_PRO}/mis-tandas`];
+
+function primerosDelante<T extends { href: string }>(items: T[], ordenPropio: string[]): T[] {
+  const fijos = items.filter((i) => PRIMEROS.includes(i.href) && !ordenPropio.includes(i.href));
+  return [...fijos, ...items.filter((i) => !fijos.includes(i))];
+}
+
 /** Lo que NO se puede esconder, pase lo que pase: es desde donde se vuelve a
  *  encender el resto. Sin esto, ocultar "Settings" deja el menú sin arreglo
  *  posible salvo escribiendo la URL a mano. */
@@ -255,8 +271,11 @@ export function aplicarPrefs(nav: NavGroup[], prefs: MenuPrefs): NavGroup[] {
       n.kind === "group"
         ? {
             ...n,
-            items: ordenar(
-              n.items.filter((i) => !ocultos.has(i.href)),
+            items: primerosDelante(
+              ordenar(
+                n.items.filter((i) => !ocultos.has(i.href)),
+                prefs.orden_items[n.basePath] ?? [],
+              ),
               prefs.orden_items[n.basePath] ?? [],
             ),
           }

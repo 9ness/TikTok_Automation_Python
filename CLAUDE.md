@@ -39,6 +39,7 @@ nichos.
 
 | Función | Modo | Propósito |
 |---|---|---|
+| 📦 Mis tandas | (sin modo — no edita vídeo) | PRIMERO del menú para los tres: lo ya montado en POV BOF, POV BOF Largo y Multimodo del usuario, de 10 en 10 con fecha y época. Solo lee; subido/sin stock/rehacer escriben en el nicho de cada vídeo (`src/mis_tandas/`, guía `mis-tandas.md`) |
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |

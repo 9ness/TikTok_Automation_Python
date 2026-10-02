@@ -47,6 +47,7 @@ en la raíz del repo.
 
 | Menú de la app (sidebar «Tiktok Shop AI Pro») | Ruta | Guía |
 |---|---|---|
+| **Mis tandas** (vídeos montados de todos los nichos, para publicar; no se sube nada) | `/tiktok-shop-ai-pro/mis-tandas` | [`mis-tandas.md`](mis-tandas.md) |
 | POV BOF Largo | `/tiktok-shop-ai-pro/pov-bof-largo` | [`pov-bof-largo.md`](pov-bof-largo.md) · recetas: [`pov-bof-largo-recetas.md`](pov-bof-largo-recetas.md) |
 | Nicho POV BOF | `/tiktok-shop-ai-pro/nicho-pov-bof` | [`pov-bof.md`](pov-bof.md) |
 | Moda Mujer · Aleatorios | `/tiktok-shop-ai-pro/nicho-ropa-mujer` | [`moda-mujer-aleatorios.md`](moda-mujer-aleatorios.md) |

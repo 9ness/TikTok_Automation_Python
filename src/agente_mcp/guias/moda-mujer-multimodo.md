@@ -273,6 +273,10 @@ TikTok penaliza el contenido estático. Por eso:
 
 ## Vídeos listos
 
+> Lo mismo, junto con lo de los demás nichos del usuario, sale en **Mis
+> tandas** (`mis-tandas.md`): mismo orden para el multimodo y los botones
+> escriben aquí. No hay que subir nada allí.
+
 Arriba de la pantalla, **«📦 Vídeos listos por tandas»** junta todo lo montado
 del multimodo (de cualquier catálogo y carpeta) de diez en diez: primero lo
 ya subido, y lo que falta MEZCLADO por tipo y formato para que la cuenta no

@@ -45,6 +45,7 @@ from src.api.exceptions import register_exception_handlers
 from src.api.routers import (
     auth_router,
     ui_menu_router,
+    mis_tandas_router,
     cuotas_router,
     construccion_pov_router,
     deploy_router,
@@ -305,6 +306,7 @@ def create_app() -> FastAPI:
         }
 
     app.include_router(ui_menu_router)
+    app.include_router(mis_tandas_router)
     app.include_router(products_router)
     app.include_router(product_photo_file_router)
     app.include_router(users_router)
@@ -407,6 +409,9 @@ _PREFIJOS_PRO = (
     # respondía 403 al leer sus preferencias y se caía al menú del rol: lo que
     # se le escondiera por persona no se aplicaba nunca.
     "/api/v1/ui",
+    # «Mis tandas»: los vídeos montados de SUS nichos para publicar. Solo lee
+    # y escribe en los documentos de esos nichos, que ya tiene permitidos.
+    "/api/v1/mis-tandas",
     # Solo LEER el estado del despliegue (el aviso "Al día · último
     # despliegue…" de la Cola). Nada de `/run`, `/rebuild` ni `/restart`:
     # por eso va la ruta exacta y no el prefijo `/api/v1/deploy`.

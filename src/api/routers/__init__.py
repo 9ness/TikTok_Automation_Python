@@ -62,6 +62,7 @@ from .stats import router as stats_router
 from .dashboard import router as dashboard_router
 from .auth import router as auth_router
 from .ui_menu import router as ui_menu_router
+from .mis_tandas import router as mis_tandas_router
 from .deploy import router as deploy_router
 from .navegador import router as navegador_router
 from .claude_vps import router as claude_vps_router
@@ -93,6 +94,7 @@ __all__ = [
     "fonts_file_router",
     "auth_router",
     "ui_menu_router",
+    "mis_tandas_router",
     "deploy_router",
     "navegador_router",
     "claude_vps_router",

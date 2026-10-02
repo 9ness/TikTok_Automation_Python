@@ -1,3 +1,17 @@
+## 🔁 Replicar vídeos virales (clase 30 sep 2026)
+
+Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/2026-09-30_clase_miercoles.md).
+- [ ] Social1 Pro: prueba de 7 días desde el 2 oct, renovación YA cancelada por el operador (acceso hasta el 9 oct). Social1 bloquea el Chrome del VPS (Vercel «Code 11»): la búsqueda la hace el operador desde el móvil y pasa enlaces.
+- [ ] Con los enlaces: virales de ES/EE. UU. SIN persona hablando a cámara (mudos o voz en off), con carrito activo, casados con productos NUESTROS del mismo estilo (lo que se vea en los clips tiene que ser el producto enlazado). Formato: 2 clips mudos de 8 s (GenAI Pro / Magnific) + voz Fish. TikTok bloquea la descarga desde la IP del VPS (yt-dlp); probar Lovetik.
+- [ ] Si sale bien: estilo «Replicar viral» en el POV BOF Largo (Gemini analiza el vídeo → plan de escenas + guion adaptado → prompts de los 2 clips + guion para Fish).
+- [ ] Carruseles virales (ej. lámpara de olas de @alexdeals_, refs en `TIKTOK_SHOP_AI_PRO/_clases/referencias/` del Drive): solo en cuentas fuera de estado crítico de CRH (@pisadaviva ~120 el 19/09), pocos al día.
+
+## 📦 Mis tandas — siguientes pasos (2 oct 2026)
+
+- [ ] Añadir lectores para UGC (Nicho General), BOF Cine, Cuenta Piloto y los otros modos de Moda Mujer / Ropa Hombre si se quieren ahí (`src/mis_tandas/fuentes.py`). Hoy entran POV BOF, POV BOF Largo (todos los modos) y Multimodo.
+- [ ] ¿Tandas al día por usuario? `mis_tandas/config.py:TANDAS_DIA` (hoy 1 para todos; ness sube 10-20).
+- [ ] Las carpetas especiales del Largo (Épico, Venta Inversa, Q4) tienen su ventana de fechas: valorar que la fecha de la tanda la respete.
+
 ## 🔄 Venta Inversa — cuarto modo del POV BOF Largo (2 oct 2026, HECHO: probar con vídeos reales)
 - Lo publicó el curso en TTShop AI Pro › Asistente de Guiones › «Venta inversa · Irónica»: «No lo compres si no quieres…» → beneficios → supuesto problema positivo → CTA de disponibilidad. Los otros enfoques de la web: Dolor (problema → solución → beneficio → CTA) y Beneficio principal (beneficio → demostración → resultado → CTA).
 - La web saca 6 hooks tipados (`NEGATIVE_VERDICT`…) con una línea de por qué, marca uno «Recomendado», y luego el guion. Dicen que se apoya en +300 reels virales de EE. UU. Jonny NO va a publicar el prompt.
@@ -518,6 +532,8 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+
+- [x] (2/10/2026) **Menú «Mis tandas»** (`/tiktok-shop-ai-pro/mis-tandas`, primero del menú para los tres): lo montado en POV BOF, Largo y Multimodo de diez en diez con fecha y época; subido/sin stock/rehacer escriben en el nicho. MCP `mis_tandas` + `marcar_tanda`, guía `mis-tandas.md`.
 
 - [2026-08-10] [POV BOF Largo] **Pantalla unificada con la del POV BOF** a
   paridad completa (mismo catálogo/carpetas, progreso INDIVIDUAL; NO se fusionan
