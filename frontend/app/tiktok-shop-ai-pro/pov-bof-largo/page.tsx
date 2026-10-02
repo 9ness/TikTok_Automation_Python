@@ -126,6 +126,8 @@ import { InsertosEpicos } from "@/components/tiktok-shop-ai-pro/InsertosEpicos";
 const CARPETA_Q4 = "Productos Q4";
 /** Copias elegidas para el modo Épico (octubre). */
 const CARPETA_EPICO = "Épico Octubre";
+/** Copias elegidas para el modo Venta inversa. */
+const CARPETA_INVERSA = "Venta Inversa";
 
 /** Nombre para enseñar: las carpetas virtuales tienen un nombre interno. */
 function nombreCarpeta(folder: string): string {
@@ -134,6 +136,7 @@ function nombreCarpeta(folder: string): string {
   // Carpeta REAL del Inventario, pero de temporada (Black Friday + Navidad).
   if (folder === CARPETA_Q4) return "Productos Q4 · Black Friday y Navidad";
   if (folder === CARPETA_EPICO) return "Épico Octubre · formato épico";
+  if (folder === CARPETA_INVERSA) return "Venta Inversa · formato irónico";
   return folder;
 }
 
@@ -826,7 +829,7 @@ export default function PovBofLargoPage() {
                 ? f.tipo_virtual === "rehechos"
                   ? `🔁 Rehechos (${f.esperando ?? 0})`
                   : `⏳ Esperando stock (${f.esperando ?? 0})`
-                : f.name === CARPETA_Q4 ? "🎄 Productos Q4" : f.name === CARPETA_EPICO ? "⚡ Épico Octubre" : f.name}
+                : f.etiqueta || f.name}
               {/* Cuántos productos de esta carpeta tienen ya la ficha
                   enlazada: es el trabajo que hay dentro. Sin esto había que
                   entrar carpeta por carpeta para descubrir que estaba a cero.
@@ -912,7 +915,7 @@ export default function PovBofLargoPage() {
           trabajo, que es lo que viene justo debajo. */}
       {data && folder && (
         <Caja
-          icono={folder === "__rehechos__" ? "🔁" : folder === "__esperando_stock__" ? "⏳" : folder === CARPETA_Q4 ? "🎄" : folder === CARPETA_EPICO ? "⚡" : "📂"}
+          icono={folder === "__rehechos__" ? "🔁" : folder === "__esperando_stock__" ? "⏳" : folder === CARPETA_Q4 ? "🎄" : folder === CARPETA_EPICO ? "⚡" : folder === CARPETA_INVERSA ? "🔄" : "📂"}
           titulo={nombreCarpeta(folder)}
           hint={`Carpeta ${idx + 1} de ${total}${currentItem?.completed ? " · ya completada" : ""}`}
         >

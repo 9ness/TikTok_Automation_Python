@@ -208,11 +208,17 @@ def ve_carpeta_q4(usuario: str) -> bool:
 # el guion el ángulo de Black Friday/Navidad; `etiqueta` es lo que enseña la
 # pantalla. Van arriba del todo de la lista y solo para USUARIOS_Q4.
 CARPETA_EPICO_OCT = "Épico Octubre"
+CARPETA_INVERSA = "Venta Inversa"
+# En el ORDEN en que el operador las publica, y con las fechas en la
+# etiqueta: con tantas carpetas listas a la vez no sabía cuál tocaba (2 oct
+# 2026). El calendario entero está en `docs/CALENDARIO_POV_BOF_LARGO.md`.
 CARPETAS_ESPECIALES: dict[str, dict] = {
-    CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True,
-                 "etiqueta": "🎄 Productos Q4"},
     CARPETA_EPICO_OCT: {"manifiesto": "especial:epico_octubre:manifiesto", "temporada": False,
-                        "etiqueta": "⚡ Épico Octubre"},
+                        "etiqueta": "⚡ Épico Octubre · subir 3-5 oct (modo Épico)"},
+    CARPETA_INVERSA: {"manifiesto": "especial:venta_inversa:manifiesto", "temporada": False,
+                      "etiqueta": "🔄 Venta Inversa · subir 6-9 oct (modo Venta inversa)"},
+    CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True,
+                 "etiqueta": "🎄 Productos Q4 · subir 28 oct-10 nov (modo Dolor/Precio)"},
 }
 
 

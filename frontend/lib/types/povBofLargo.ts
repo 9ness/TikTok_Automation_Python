@@ -138,6 +138,8 @@ export interface FolderLargo {
   /** Los vídeos ya están hechos pero falta subirlos (se preparan de días
    *  futuros). Es independiente de `completed`. */
   pendiente_subir?: boolean;
+  /** Nombre con su ventana de fechas (carpetas especiales). */
+  etiqueta?: string;
 }
 
 export interface FoldersLargoResponse {

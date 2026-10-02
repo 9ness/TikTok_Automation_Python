@@ -191,7 +191,8 @@ async def anadir_a_q4(ctx: Context, productos: list[str], clips: int = 3,
     Se copian fotos y textos: el original no se toca y en la copia todo (guion,
     clips, vídeo, subido) es nuevo. `clips` fija la duración del guion (3 = 24s
     con clips de 8s). Idempotente: lo ya copiado sale en `ya_estaban`. Solo la
-    cuenta de ness. `carpeta`: «Productos Q4» (por defecto) o «Épico Octubre».
+    cuenta de ness. `carpeta`: «Productos Q4» (por defecto), «Épico Octubre» o
+    «Venta Inversa» (cualquiera de `CARPETAS_ESPECIALES`).
     Después, `preparar_carpeta(menu="pov_bof_largo",
     catalogo="inventario_general", carpeta="Productos Q4", clip_s=8, ...)`."""
     api = Interno(_usuario(ctx))

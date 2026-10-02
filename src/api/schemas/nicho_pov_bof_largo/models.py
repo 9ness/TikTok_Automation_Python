@@ -160,6 +160,8 @@ class FolderLargo(BaseModel):
     # El Drive del curso ya no tiene esta carpeta: sale de nuestra copia.
     desde_copia: bool = False
     name: str
+    # Nombre para enseñar en las carpetas especiales (con su ventana de fechas).
+    etiqueta: str = ""
     id: str = ""
     completed: bool = False
     # Cuántos de sus productos tienen ya enlazada la ficha de TikTok Shop. Es

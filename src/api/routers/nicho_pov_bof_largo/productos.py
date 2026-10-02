@@ -337,6 +337,11 @@ def list_folders(
     from src.nicho_pov_bof import config as pov_config
 
     especiales = [i for i in items if pov_config.es_carpeta_especial(i.name)]
+    # En el orden de publicación (el del dict) y con su etiqueta de fechas.
+    orden = list(pov_config.CARPETAS_ESPECIALES)
+    especiales.sort(key=lambda i: orden.index(i.name))
+    for i in especiales:
+        i.etiqueta = pov_config.CARPETAS_ESPECIALES[i.name].get("etiqueta", "")
     items = [i for i in items if not pov_config.es_carpeta_especial(i.name)]
     if pov_config.ve_carpeta_q4(usuario):
         items = especiales + items
