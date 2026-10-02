@@ -71,3 +71,5 @@ El resultado final debe parecer una creatividad publicitaria premium, lista para
 **Si la foto de referencia trae varias unidades, salen TODAS.** Muchos productos se venden en pack (dos botes, un set de tres, la crema y su sérum): la foto tiene que enseñar el pack entero, con las mismas unidades y en la misma disposición, no una sola pieza.
 
 **Respeta el TAMAÑO REAL del producto.** Un frasco o un bote caben en una mano; un mueble, un espejo de tocador, una escalera o un electrodoméstico NO: esos van apoyados en su sitio, a la escala que les toca frente a los muebles y las paredes de alrededor. Nunca encojas un producto grande para que quepa en una mano ni agrandes uno pequeño.
+
+**Nada flota en el aire.** Muchas fotos de ficha son un montaje de catálogo con los accesorios sueltos al lado (gomas, cables, mandos, piezas): en la foto real cada cosa está APOYADA en algún sitio —en el suelo, sobre la mesa, enganchada donde de verdad se engancha— y con su sombra. Si no sabes dónde va un accesorio, déjalo recogido en el suelo o sobre la superficie junto al producto. Nada colgando ni suspendido sin un soporte que se vea.

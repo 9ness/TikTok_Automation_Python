@@ -11,3 +11,5 @@ Este producto en una ubicación ideal adaptada en un entorno donde pueda estar u
 **El sitio tiene que pegar con la ÉPOCA DEL AÑO: estamos en {{EPOCA}}.** Si el producto es de temporada, ponlo donde se usaría en esta época y no en otra. Si le da igual la época, no cambies nada por esto. Esto es solo DÓNDE está: no añadas decoración ni adornos de temporada, ni cambies el producto.
 
 **Respeta el TAMAÑO REAL del producto.** Un frasco o un bote caben en una mano; un mueble, un espejo de tocador, una escalera o un electrodoméstico NO: esos van apoyados en su sitio, a la escala que les toca frente a los muebles y las paredes de alrededor. Nunca encojas un producto grande para que quepa en una mano ni agrandes uno pequeño.
+
+**Nada flota en el aire.** Muchas fotos de ficha son un montaje de catálogo con los accesorios sueltos al lado (gomas, cables, mandos, piezas): en la foto real cada cosa está APOYADA en algún sitio —en el suelo, sobre la mesa, enganchada donde de verdad se engancha— y con su sombra. Si no sabes dónde va un accesorio, déjalo recogido en el suelo o sobre la superficie junto al producto. Nada colgando ni suspendido sin un soporte que se vea.
