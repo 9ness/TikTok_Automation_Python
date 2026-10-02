@@ -159,10 +159,21 @@ def replicar(
             mode="replicar_viral", title=f"Replicar viral: {textos.get('titulo', '')[:60]}", user=usuario,
         )
         try:
+            # Sin esperar a la cuota: con las claves agotadas, el cliente
+            # esperaba lo que dijera Google antes de reintentar (llegó a 6 h)
+            # y la petición se quedaba colgada. Mejor fallar y decirlo.
             crudo = generate_text(
                 sistema, mensaje, model=MODELO, expect_json=True, videos=[str(video)],
                 images=[str(foto)] if foto else None, temperature=0.6, max_output_tokens=8192,
+                max_retries_on_quota=1,
             )
+        except Exception as e:  # noqa: BLE001
+            if "429" in str(e) or "quota" in str(e).lower() or "exhausted" in str(e).lower():
+                raise ErrorReplica(
+                    "Gemini no tiene cuota ahora mismo (claves agotadas o sin saldo). "
+                    "Recarga en AI Studio o prueba más tarde.", status=503,
+                ) from e
+            raise
         finally:
             try:
                 finalize_and_persist()
