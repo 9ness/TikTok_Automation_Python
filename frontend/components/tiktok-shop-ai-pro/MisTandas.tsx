@@ -251,6 +251,57 @@ export function MisTandas() {
         </div>
       ) : null}
 
+      {datos?.esperando_stock?.length ? (
+        <details className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2">
+          <summary className="cursor-pointer text-[11px] font-semibold text-rose-500">
+            ⏳ Esperando stock · {datos.esperando_stock.length}
+          </summary>
+          <p className="my-1 text-[10px] text-muted-foreground">
+            Montados pero sin stock en TikTok Shop: no ocupan sitio en las tandas. Si el producto
+            vuelve, pulsa 🚫 y entra solo en la siguiente tanda que le toque.
+          </p>
+          <ul className="space-y-1">
+            {datos.esperando_stock.map((v) => (
+              <li key={v.id} className="flex flex-wrap items-center gap-1 text-[11px]">
+                <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${COLOR_NICHO[v.nicho] ?? ""}`}>
+                  {NOMBRE_NICHO[v.nicho] ?? v.nicho}
+                </span>
+                {v.modo_label ? (
+                  <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${colorModo(v.nicho, v.modo)}`}>
+                    {v.modo_label}
+                  </span>
+                ) : null}
+                <span className="min-w-0 flex-1 break-words">
+                  {v.titulo || `Producto ${v.producto}`}{" "}
+                  <span className="text-[10px] text-muted-foreground">
+                    · {v.catalogo_label} · {v.carpeta_corta} · P{v.producto}
+                  </span>
+                </span>
+                {v.product_url ? (
+                  <a
+                    href={v.product_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Abrir la ficha para ver si ha vuelto"
+                    className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px]"
+                  >
+                    🛍️
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => marcar.mutate({ id: v.id, sin_stock: false, video: v })}
+                  className="rounded-md border border-rose-500/60 bg-rose-500/15 px-1.5 py-0.5 text-[10px] text-rose-500"
+                  title="Ha vuelto: quitar «sin stock»"
+                >
+                  🚫 Ha vuelto
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
       {tandas.isLoading ? (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
@@ -379,6 +430,14 @@ export function MisTandas() {
                               <span className="break-words">
                                 {v.carpeta_corta} · P{v.producto}
                               </span>
+                              {v.desde ? (
+                                <span
+                                  title="Su carpeta no se publica antes de este día"
+                                  className="rounded bg-sky-500/15 px-1.5 py-px text-[9px] font-semibold text-sky-600 dark:text-sky-400"
+                                >
+                                  📅 desde {fechaCorta(v.desde)}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </div>

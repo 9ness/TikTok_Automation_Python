@@ -18,6 +18,23 @@ siempre (generar, `subir_clip`, montar). Cuando el vídeo queda montado en su
 nicho, **aparece solo al final** de Mis tandas. No hay ninguna herramienta
 para «añadir a Mis tandas», y no hace falta.
 
+## Cómo se reparte (calendario)
+
+El orden de base es fijo (lo nuevo entra al final), con tres reglas que lo
+ajustan sin bloquear a los demás:
+- **Fecha mínima de las carpetas especiales** (`desde` en
+  `nicho_pov_bof.config.CARPETAS_ESPECIALES`: Épico Octubre 3 oct, Venta
+  Inversa 6 oct, Productos Q4 28 oct). Nada se pone en una tanda anterior, y en
+  cuanto llega su día **tiene prioridad** sobre lo normal (caduca). Calendario:
+  `docs/CALENDARIO_POV_BOF_LARGO.md`.
+- **El mismo producto no sale dos veces en menos de 7 días**
+  (`SEPARACION_MISMO_PRODUCTO`): otro modo del Largo, la copia de Q4… El
+  segundo espera. Cuenta también lo ya subido.
+- **Lo pendiente sin stock no ocupa sitio**: sale en «⏳ Esperando stock» y al
+  quitarle el 🚫 vuelve a la siguiente tanda que le toque.
+
+Por eso puede haber tandas de menos de 10 al final (lo que espera su fecha).
+
 ## Sincronía
 
 Mis tandas no guarda estados propios. Cada botón escribe en el documento del

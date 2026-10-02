@@ -40,6 +40,8 @@ export interface VideoTanda {
   puede_rehacer: boolean;
   video_listo_at: number;
   flecha: boolean;
+  /** Primer día en que se puede publicar (carpetas especiales), o "". */
+  desde: string;
   musica: { busqueda: string; alternativas: string[]; estilo: string } | null;
 }
 
@@ -68,6 +70,8 @@ export interface MisTandasResponse {
   /** Quitados de la lista por el usuario (ya no se van a subir). */
   ocultos: number;
   ocultos_items: VideoTanda[];
+  /** Lo pendiente sin stock: fuera de las tandas hasta que vuelva. */
+  esperando_stock: VideoTanda[];
   tandas: Tanda[];
 }
 
@@ -187,7 +191,10 @@ export function useMarcarTanda(todas = false) {
     },
     // Las pantallas de cada nicho enseñan el mismo estado: quedan como viejas
     // para la próxima vez que se abran, sin recargarlas ahora.
-    onSettled: () => {
+    onSettled: (_r, _e, c) => {
+      // Sin stock cambia el reparto (sale de las tandas o vuelve a entrar):
+      // se relee la lista entera.
+      if (c.sin_stock !== undefined) void qc.invalidateQueries({ queryKey: misTandasKeys.all });
       void qc.invalidateQueries({ queryKey: ["nicho-ropa"], refetchType: "none" });
       void qc.invalidateQueries({ queryKey: ["nicho-pov-bof"], refetchType: "none" });
       void qc.invalidateQueries({ queryKey: ["pov-bof-largo"], refetchType: "none" });

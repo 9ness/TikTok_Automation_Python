@@ -124,19 +124,163 @@ def _publica(f: dict) -> dict:
     salida["nicho_label"] = meta.get("label", f["nicho"])
     salida["hashtags_nicho"] = meta.get("hashtags", "")
     salida["pantalla"] = meta.get("pantalla", "")
+    d = _desde(f)
+    salida["desde"] = d.isoformat() if d else ""
+    return salida
+
+
+def _desde(f: dict) -> dt.date | None:
+    """Primer día en que se puede publicar: el `desde` de su carpeta especial
+    del Largo (Q4 no antes del 28 oct, Venta Inversa del 6 oct…)."""
+    if f["nicho"] not in ("pov", "largo"):
+        return None
+    try:
+        from src.nicho_pov_bof import config as pov_config
+
+        valor = (pov_config.CARPETAS_ESPECIALES.get(f["carpeta"]) or {}).get("desde")
+        return dt.date.fromisoformat(str(valor)) if valor else None
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _clave_producto(f: dict) -> str:
+    """Mismo producto aunque sea otro vídeo (otro modo del Largo, la copia de
+    Q4…): por tienda + título; sin título, por su sitio en el catálogo."""
+    titulo = " ".join(f.get("titulo", "").lower().split())
+    if titulo:
+        return f"{' '.join(f.get('tienda', '').lower().split())}|{titulo}"
+    return f"{f['nicho']}|{f['source']}|{f['carpeta']}|{f['producto']}"
+
+
+def _repartir(lista: list[dict], dia: dt.date, por_dia: int) -> list[tuple[list[dict], dt.date | None]]:
+    """Reparte en tandas de `POR_TANDA` respetando el ORDEN fijo, salvo dos
+    cosas que obligan a esperar (sin bloquear a los demás):
+
+    - la fecha mínima de su carpeta (`desde`);
+    - que el mismo producto no se publique dos veces en menos de
+      `SEPARACION_MISMO_PRODUCTO` días.
+
+    Lo subido no espera nunca (ya está publicado) y una tanda solo con subidos
+    no gasta día. Devuelve [(vídeos, fecha o None si está cerrada)].
+    """
+    n = config.POR_TANDA
+    sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO)
+    ultimo: dict[str, dt.date] = {}
+    for f in lista:
+        if f["uploaded"] and f["uploaded_at"]:
+            d = dt.datetime.fromtimestamp(f["uploaded_at"], _TZ).date()
+            c = _clave_producto(f)
+            ultimo[c] = max(ultimo.get(c, d), d)
+
+    hueco = {"fecha": dia, "usados": 0}
+
+    def nuevo_dia(minimo: dt.date | None = None) -> dt.date:
+        if hueco["usados"] >= por_dia:
+            hueco["fecha"] += dt.timedelta(days=1)
+            hueco["usados"] = 0
+        if minimo and minimo > hueco["fecha"]:
+            hueco["fecha"], hueco["usados"] = minimo, 0
+        hueco["usados"] += 1
+        return hueco["fecha"]
+
+    def cabe(f: dict, fecha: dt.date) -> bool:
+        d = _desde(f)
+        if d and fecha < d:
+            return False
+        previo = ultimo.get(_clave_producto(f))
+        return not (previo and fecha < previo + sep)
+
+    def requisito(f: dict) -> dt.date:
+        """El primer día en que `f` podría entrar."""
+        cands = [hueco["fecha"]]
+        d = _desde(f)
+        if d:
+            cands.append(d)
+        previo = ultimo.get(_clave_producto(f))
+        if previo:
+            cands.append(previo + sep)
+        return max(cands)
+
+    def poner(f: dict, fecha: dt.date, tanda: list[dict]) -> None:
+        tanda.append(f)
+        c = _clave_producto(f)
+        ultimo[c] = max(ultimo.get(c, fecha), fecha)
+
+    salida: list[tuple[list[dict], dt.date | None]] = []
+    esperan: list[dict] = []
+    cur: list[dict] = []
+    fecha: dt.date | None = None
+
+    def cerrar() -> None:
+        nonlocal cur, fecha
+        if cur:
+            salida.append((cur, fecha))
+        cur, fecha = [], None
+
+    hecho: set[str] = set()  # colocado o apartado a esperar
+
+    def llenar_prioritarios(desde_i: int) -> None:
+        """Al abrir una tanda entra primero lo que esperaba y ya puede, y
+        después lo que tiene fecha propia (carpetas especiales) y ya está en su
+        ventana: es lo que caduca, lo normal puede ir otro día."""
+        for e in list(esperan):
+            if len(cur) < n and cabe(e, fecha):
+                esperan.remove(e)
+                poner(e, fecha, cur)
+        for e in lista[desde_i:]:
+            if len(cur) >= n:
+                break
+            if e["id"] in hecho or e["uploaded"] or not _desde(e):
+                continue
+            if cabe(e, fecha):
+                hecho.add(e["id"])
+                poner(e, fecha, cur)
+
+    for i, f in enumerate(lista):
+        if f["id"] in hecho:
+            continue
+        hecho.add(f["id"])
+        if f["uploaded"]:
+            cur.append(f)
+        else:
+            if fecha is None:
+                fecha = nuevo_dia()
+                llenar_prioritarios(i)
+            if len(cur) < n and cabe(f, fecha):
+                poner(f, fecha, cur)
+            else:
+                esperan.append(f)
+        if len(cur) >= n:
+            cerrar()
+    cerrar()
+
+    # Lo que sigue esperando: tandas nuevas en cuanto llegue su fecha.
+    while esperan:
+        minimo = min(requisito(e) for e in esperan)
+        fecha = nuevo_dia(minimo)
+        cur = []
+        for e in list(esperan):
+            if len(cur) < n and cabe(e, fecha):
+                esperan.remove(e)
+                poner(e, fecha, cur)
+        if not cur:  # no debería pasar; evita un bucle infinito
+            hueco["fecha"] += dt.timedelta(days=1)
+            hueco["usados"] = 0
+            continue
+        salida.append((cur, fecha))
     return salida
 
 
 def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos: bool = False) -> dict:
     """Las tandas ABIERTAS con sus vídeos y, de las cerradas, solo cuántas hay
-    (con `todas`, también sus vídeos). Una tanda está cerrada cuando todo lo
-    suyo está subido o sin stock."""
+    (con `todas`, también sus vídeos). Lo pendiente sin stock no ocupa sitio:
+    sale aparte en `esperando_stock` hasta que vuelva."""
     usuario = usuario or "ness"
     escondidos = ocultos(usuario)
     completa = filas(usuario, fresco=fresco)
     lista = [f for f in completa if f["id"] not in escondidos]
-    n = config.POR_TANDA
-    grupos = [lista[i:i + n] for i in range(0, len(lista), n)]
+    sin_stock = [f for f in lista if f["sin_stock"] and not f["uploaded"]]
+    publicables = [f for f in lista if not (f["sin_stock"] and not f["uploaded"])]
 
     dia = dt.datetime.now(_TZ).date()
     hoy = sum(
@@ -154,24 +298,22 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     abiertas_vistas = 0
     cerradas = 0
     precalentar: list[dict] = []
-    for i, grupo in enumerate(grupos):
-        abierta = not all(_cerrado(f) for f in grupo)
+    for i, (grupo, fecha) in enumerate(_repartir(publicables, dia, por_dia)):
+        abierta = not all(f["uploaded"] for f in grupo)
         t = {
             "numero": i + 1,
             "total": len(grupo),
             "subidos": sum(1 for f in grupo if f["uploaded"]),
-            "sin_stock": sum(1 for f in grupo if f["sin_stock"] and not f["uploaded"]),
+            "sin_stock": 0,
             "rehacer": sum(1 for f in grupo if f["rehacer"] and not f["uploaded"]),
             "abierta": abierta,
             "nichos": sorted({f["nicho"] for f in grupo}),
         }
-        if abierta:
-            # Fecha orientativa: `por_dia` tandas por día desde hoy (o mañana).
-            dia_tanda = dia + dt.timedelta(days=abiertas_vistas // por_dia)
-            t["fecha"] = dia_tanda.isoformat()
-            t["temporada"] = ropa_config.etiqueta_temporada(dia_tanda)
+        if abierta and fecha:
+            t["fecha"] = fecha.isoformat()
+            t["temporada"] = ropa_config.etiqueta_temporada(fecha)
             if abiertas_vistas < config.PRECALENTAR_TANDAS:
-                precalentar += [f for f in grupo if not _cerrado(f)]
+                precalentar += [f for f in grupo if not f["uploaded"]]
             abiertas_vistas += 1
         else:
             cerradas += 1
@@ -181,15 +323,16 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     _precalentar(usuario, precalentar)
     return {
         "usuario": usuario,
-        "por_tanda": n,
+        "por_tanda": config.POR_TANDA,
         "total": len(lista),
         "subidos": sum(1 for f in lista if f["uploaded"]),
-        "sin_stock": sum(1 for f in lista if f["sin_stock"] and not f["uploaded"]),
+        "sin_stock": len(sin_stock),
         "subidos_hoy": hoy,
         "cerradas": cerradas,
         "abiertas": abiertas_vistas,
         "ocultos": sum(1 for f in completa if f["id"] in escondidos),
         "ocultos_items": [_publica(f) for f in completa if f["id"] in escondidos] if ver_ocultos else [],
+        "esperando_stock": [_publica(f) for f in sin_stock],
         "tandas": salida,
     }
 

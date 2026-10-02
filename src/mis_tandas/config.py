@@ -13,6 +13,10 @@ SUBIDAS_DIA_HECHO = 8
 # 20 según el día; se deja en una y abre la siguiente si le da tiempo.
 TANDAS_DIA: dict[str, int] = {"ness": 1, "ana": 1, "mauro": 1}
 
+# El mismo producto (otro modo del Largo, la copia de Q4…) no se publica dos
+# veces en menos de estos días: el segundo espera.
+SEPARACION_MISMO_PRODUCTO = 7
+
 # Cuánto vale la lista ya leída (por usuario y proceso). Los botones la
 # corrigen en el sitio, así que esto solo decide cada cuánto se ven los vídeos
 # NUEVOS que montan los agentes.

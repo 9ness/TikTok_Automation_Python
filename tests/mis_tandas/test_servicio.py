@@ -24,9 +24,11 @@ class FakeRedis:
         return True
 
 
-def fila(id_, nicho="pov", uploaded=False, uploaded_at=0.0, orden_at=0.0, sin_stock=False):
+def fila(id_, nicho="pov", uploaded=False, uploaded_at=0.0, orden_at=0.0, sin_stock=False,
+         titulo=None, carpeta="c"):
     return fuentes._fila(id=id_, nicho=nicho, uploaded=uploaded, uploaded_at=uploaded_at,
-                         orden_at=orden_at, sin_stock=sin_stock)
+                         orden_at=orden_at, sin_stock=sin_stock, carpeta=carpeta,
+                         titulo=id_ if titulo is None else titulo)
 
 
 @pytest.fixture()
@@ -101,3 +103,39 @@ def test_ocultos_salen_y_el_siguiente_ocupa_su_hueco(redis, monkeypatch):
     assert servicio.tandas("ness")["ocultos"] == 0
     with pytest.raises(servicio.ErrorTanda):
         servicio.ocultar("ness", "pov|x|y|1")
+
+
+def _sin_precalentar(monkeypatch, lista):
+    monkeypatch.setattr(servicio, "filas", lambda u, fresco=False: lista)
+    monkeypatch.setattr(servicio, "_precalentar", lambda u, l: None)
+
+
+def test_sin_stock_sale_aparte_y_no_ocupa_sitio(redis, monkeypatch):
+    lista = [fila(f"pov|s|c|{i}", sin_stock=i < 3, orden_at=i) for i in range(13)]
+    _sin_precalentar(monkeypatch, lista)
+    d = servicio.tandas("mauro")
+    assert len(d["esperando_stock"]) == 3
+    assert [len(t["items"]) for t in d["tandas"]] == [10]
+
+
+def test_fecha_minima_espera_sin_bloquear(redis, monkeypatch):
+    hoy = dt.datetime.now(servicio._TZ).date()
+    lista = [fila(f"largo|s|Q4|{i}|", "largo", orden_at=i) for i in range(3)]
+    lista += [fila(f"pov|s|c|{i}", orden_at=10 + i) for i in range(12)]
+    _sin_precalentar(monkeypatch, lista)
+    monkeypatch.setattr(servicio, "_desde", lambda f: hoy + dt.timedelta(days=5) if "Q4" in f["id"] else None)
+    d = servicio.tandas("mauro")
+    q4 = [t for t in d["tandas"] if any("Q4" in i["id"] for i in t["items"])]
+    assert q4 and all(t["fecha"] >= (hoy + dt.timedelta(days=5)).isoformat() for t in q4)
+    assert d["tandas"][0]["fecha"] == hoy.isoformat() and len(d["tandas"][0]["items"]) == 10
+
+
+def test_mismo_producto_separado_una_semana(redis, monkeypatch):
+    lista = [fila("largo|s|c|1|", "largo", titulo="Lámpara", orden_at=1),
+             fila("largo|s|c|1|dolor", "largo", titulo="Lámpara", orden_at=2)]
+    lista += [fila(f"pov|s|c|{i}", orden_at=10 + i) for i in range(30)]
+    _sin_precalentar(monkeypatch, lista)
+    d = servicio.tandas("mauro")
+    fechas = [t["fecha"] for t in d["tandas"] for i in t["items"] if i["titulo"] == "Lámpara"]
+    a, b = (dt.date.fromisoformat(x) for x in fechas)
+    assert (b - a).days >= 7
