@@ -99,12 +99,13 @@ class TestTemporada:
         import datetime as dt
         t = config.temporada_multimodo
         assert t(dt.date(2026, 10, 15), adelanto=0) == "otono"
-        assert t(dt.date(2026, 11, 2), adelanto=0) == "invierno"
+        assert t(dt.date(2026, 11, 2), adelanto=0) == "otono"
+        assert t(dt.date(2026, 11, 20), adelanto=0) == "invierno"
         assert t(dt.date(2026, 12, 20), adelanto=0) == "navidad"
         assert t(dt.date(2027, 1, 3), adelanto=0) == "navidad"
         assert t(dt.date(2027, 1, 20), adelanto=0) == "invierno"
-        # Montado el 29 oct se publica ya en noviembre: rótulo de invierno.
-        assert t(dt.date(2026, 10, 29)) == "invierno"
+        # Montado el 12 nov se publica el 15: rótulo de invierno.
+        assert t(dt.date(2026, 11, 12)) == "invierno"
 
     def test_ninguna_frase_lleva_un_mes(self):
         meses = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
@@ -120,7 +121,7 @@ class TestTemporada:
 
     def test_rotulo_de_invierno_y_navidad(self):
         import datetime as dt
-        nov, dic = dt.date(2026, 11, 12), dt.date(2026, 12, 10)
+        nov, dic = dt.date(2026, 11, 20), dt.date(2026, 12, 10)
         assert "WINTER" in config.texto_de_modo("mm_espejo_escenas", "c/1", nov)["titulo"]
         assert "HOLIDAY" in config.texto_de_modo("mm_zapatos_pov", "c/1", dic)["titulo"]
         bolso = config.texto_de_modo("mm_bolso_1", "c/1", nov)
@@ -131,6 +132,12 @@ class TestTemporada:
         oct_ = dt.date(2026, 10, 3)
         frases = {config.texto_de_modo("mm_espejo_escenas", f"c/{i}", oct_)["titulo"] for i in range(30)}
         assert "AUTUMN" in frases and len(frases) >= 3
+
+    def test_halloween_tambien_en_los_de_marca(self):
+        import datetime as dt
+        oct_ = dt.date(2026, 10, 18)
+        frases = {config.texto_de_modo("mm_espejo_escenas", f"c/{i}", oct_)["titulo"] for i in range(40)}
+        assert any("SPOOKY" in f or "HALLOWEEN" in f for f in frases)
 
     def test_halloween_no_se_quema_si_se_publica_en_noviembre(self):
         import datetime as dt

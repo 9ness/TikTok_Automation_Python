@@ -526,10 +526,30 @@ def _rematar(
     elif flecha:
         # Activada a mano en un formato que no la trae: más corta.
         _flecha(salida, on_log, semilla, FLECHA_OPCIONAL_SEGUNDOS)
-    texto = config.texto_de_modo(modo, semilla) if modo else {}
+    texto = config.texto_de_modo(modo, semilla, hoy=_dia_rotulo(semilla)) if modo else {}
     if texto.get("titulo"):
         _quemar_texto(salida, texto, semilla, on_log)
     _limpiar(salida, on_log)
+
+
+def _dia_rotulo(semilla: str):
+    """El «hoy» con el que se elige el rótulo de temporada.
+
+    Los vídeos se montan días o semanas antes de publicarse. Si el plan apuntó
+    cuándo sale ESTE vídeo (`multimodo:publicacion`, clave `carpeta/producto`
+    → `AAAA-MM-DD`), el rótulo es el de ese día; si no, el de hoy (+3).
+    """
+    import datetime as dt
+
+    try:
+        from src.nicho_ropa.repos.redis_base import get_nicho_ropa_redis
+
+        fecha = (get_nicho_ropa_redis().get_json("multimodo:publicacion") or {}).get(semilla)
+        if fecha:
+            return dt.date.fromisoformat(fecha) - dt.timedelta(days=config.ADELANTO_PUBLICAR_DIAS)
+    except Exception:  # noqa: BLE001 — sin fecha, el rótulo de hoy
+        pass
+    return None
 
 
 def _quemar_texto(

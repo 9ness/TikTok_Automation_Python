@@ -487,9 +487,9 @@ TEXTO_MARCA: dict[str, dict] = {
 # se sube), así que se mira la fecha en que se PUBLICARÁ. Y nunca un mes en el
 # texto: un «septiembre» publicado en octubre delata un vídeo viejo.
 #
-#   otoño     hasta el 31 oct (Halloween del 10 al 31, sumado a lo de otoño)
-#   invierno  del 1 nov al 30 nov y del 7 ene a febrero — la previa de Black
-#             Friday se vende ya con abrigo y bota
+#   otoño     hasta el 14 nov (Halloween del 10 al 31 oct, con el doble de peso)
+#   invierno  del 15 nov al 30 nov y del 7 ene a febrero — Black Friday se
+#             vende ya con abrigo y bota
 #   navidad   del 1 dic al 6 ene
 #
 # Fuera de eso (primavera, verano) se queda lo de otoño, que es lo que pide
@@ -506,7 +506,7 @@ def temporada_multimodo(hoy=None, adelanto: int = ADELANTO_PUBLICAR_DIAS) -> str
     md = (dia.month, dia.day)
     if md >= (12, 1) or md <= (1, 6):
         return "navidad"
-    if (11, 1) <= md or md <= (2, 29):
+    if (11, 15) <= md or md <= (2, 29):
         return "invierno"
     return "otono"
 
@@ -561,8 +561,14 @@ def _frases(lista: list) -> list[dict]:
     ]
 
 
+_MARCA_HALLOWEEN = [
+    ("SPOOKY SEASON", "cozy & chic", ("🎃", "🍂")),
+    ("HALLOWEEN LOOK", "outfit de temporada", ("🎃", "🖤")),
+    ("SPOOKY VIBES", "otoño con un toque oscuro", ("🦇", "🎃")),
+]
 for _clave, _por in _MARCA_FRASES.items():
     TEXTO_MARCA[_clave]["variantes"] = _frases(_por["otono"])
+    TEXTO_MARCA[_clave]["halloween"] = _frases(_MARCA_HALLOWEEN)
     TEXTO_MARCA[_clave]["temporadas"] = {
         "invierno": _frases(_por["invierno"]), "navidad": _frases(_por["navidad"]),
     }
@@ -1296,7 +1302,8 @@ def texto_de_modo(modo: str, semilla: str = "", hoy=None) -> dict:
     elif propia:
         texto.update(propia)
     elif variantes and halloween and halloween_al_publicar(hoy):
-        variantes = variantes + halloween
+        # Doble peso: en la semana de Halloween es lo que se busca.
+        variantes = variantes + halloween + halloween
     if variantes:
         h = hashlib.sha1(("frase:" + str(semilla or "")).encode("utf-8")).digest()
         texto.update(variantes[h[0] % len(variantes)])
