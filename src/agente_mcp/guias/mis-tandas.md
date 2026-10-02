@@ -37,6 +37,20 @@ Se fija una vez y lo nuevo entra al final; marcar subido no mueve nada. En el
 multimodo se respeta su propio orden (`multimodo:orden:<usuario>`), que
 intercala formatos.
 
+## Quitar de la lista
+
+Lo que el operador ya no va a subir (p. ej. vídeos viejos del POV BOF) se
+**quita** con el botón 👁‍🗨 de la fila (pide confirmación): sale de las tandas
+y su hueco lo ocupa el siguiente. No se borra nada del nicho. «Ver los N
+quitados» los lista con «Devolver». Se guarda por usuario en
+`viralizacion:mis_tandas:ocultos:<usuario>`. MCP: `marcar_tanda(id, quitar=True)`.
+
+## Descargas
+
+Cada fila baja su vídeo con un enlace normal (como el POV BOF Largo): se
+pueden pedir varios a la vez. La cabecera de la tanda tiene **Todos (N)** y
+**Pendientes (M)** (solo lo que falta por subir); lo sin stock no se baja.
+
 ## Colores
 
 Cada vídeo enseña su **nicho** (píldora fuerte), su **modo o estilo**

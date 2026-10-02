@@ -86,3 +86,18 @@ def test_sin_stock_cierra_la_tanda(redis, monkeypatch):
     monkeypatch.setattr(servicio, "filas", lambda u, fresco=False: lista)
     monkeypatch.setattr(servicio, "_precalentar", lambda u, l: None)
     assert servicio.tandas("ana")["abiertas"] == 0
+
+
+def test_ocultos_salen_y_el_siguiente_ocupa_su_hueco(redis, monkeypatch):
+    lista = [fila(f"pov|src|c|{i}", orden_at=i) for i in range(12)]
+    monkeypatch.setattr(servicio, "filas", lambda u, fresco=False: lista)
+    monkeypatch.setattr(servicio, "_precalentar", lambda u, l: None)
+    servicio.ocultar("ness", "pov|src|c|3")
+    d = servicio.tandas("ness", ver_ocultos=True)
+    ids = [x["id"] for x in d["tandas"][0]["items"]]
+    assert "pov|src|c|3" not in ids and ids[-1] == "pov|src|c|10"
+    assert d["ocultos"] == 1 and d["ocultos_items"][0]["id"] == "pov|src|c|3"
+    servicio.ocultar("ness", "pov|src|c|3", False)
+    assert servicio.tandas("ness")["ocultos"] == 0
+    with pytest.raises(servicio.ErrorTanda):
+        servicio.ocultar("ness", "pov|x|y|1")

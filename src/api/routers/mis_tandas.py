@@ -47,12 +47,14 @@ def _error(e: Exception) -> APIError:
 def get_tandas(
     todas: Annotated[bool, Query()] = False,
     fresco: Annotated[bool, Query()] = False,
+    ver_ocultos: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Tandas abiertas con sus vídeos (con `todas`, también las cerradas).
-    `fresco` vuelve a leer los nichos en vez de usar lo leído hace segundos."""
+    `fresco` vuelve a leer los nichos en vez de usar lo leído hace segundos.
+    `ver_ocultos` añade la lista de lo quitado (para devolverlo)."""
     try:
-        return servicio.tandas(usuario, todas=todas, fresco=fresco)
+        return servicio.tandas(usuario, todas=todas, fresco=fresco, ver_ocultos=ver_ocultos)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 
@@ -68,6 +70,24 @@ def set_estado(
             usuario, body.id, uploaded=body.uploaded, sin_stock=body.sin_stock,
             rehacer=body.rehacer, rehacer_nota=body.rehacer_nota,
         )
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+class OcultarRequest(BaseModel):
+    id: str
+    oculto: bool = True
+
+
+@router.post("/ocultar")
+def set_oculto(
+    body: OcultarRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Quita un vídeo de la lista (ya no se va a subir) o lo devuelve. No toca
+    nada del nicho: solo deja de salir aquí y su hueco lo ocupa el siguiente."""
+    try:
+        return servicio.ocultar(usuario, body.id, body.oculto)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 

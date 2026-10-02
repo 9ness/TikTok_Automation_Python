@@ -30,6 +30,7 @@ NICHOS: dict[str, dict[str, str]] = {
 
 ORDEN_KEY = "mis_tandas:orden:{usuario}"
 FOTO_KEY = "mis_tandas:fotos"
+OCULTOS_KEY = "mis_tandas:ocultos:{usuario}"
 
 
 def cache_dir() -> str:

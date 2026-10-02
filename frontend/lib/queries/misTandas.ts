@@ -65,12 +65,16 @@ export interface MisTandasResponse {
   subidos_hoy: number;
   cerradas: number;
   abiertas: number;
+  /** Quitados de la lista por el usuario (ya no se van a subir). */
+  ocultos: number;
+  ocultos_items: VideoTanda[];
   tandas: Tanda[];
 }
 
 export const misTandasKeys = {
   all: ["mis-tandas"] as const,
   lista: (todas: boolean) => [...misTandasKeys.all, todas ? "todas" : "abiertas"] as const,
+  ocultos: () => [...misTandasKeys.all, "ocultos"] as const,
 };
 
 /** Las tandas del usuario con sesión. Por defecto solo las ABIERTAS: ness
@@ -80,6 +84,29 @@ export function useMisTandas(todas = false) {
     queryKey: misTandasKeys.lista(todas),
     queryFn: () => api.get<MisTandasResponse>(`${ROOT}${todas ? "?todas=true" : ""}`),
     staleTime: 30 * 1000,
+  });
+}
+
+/** Lo que el usuario ha quitado de la lista, para poder devolverlo. */
+export function useOcultosTandas(activo: boolean) {
+  return useQuery<VideoTanda[]>({
+    queryKey: misTandasKeys.ocultos(),
+    queryFn: async () => (await api.get<MisTandasResponse>(`${ROOT}?ver_ocultos=true`)).ocultos_items ?? [],
+    enabled: activo,
+  });
+}
+
+/** Quitar un vídeo de la lista (o devolverlo). Su hueco lo ocupa el
+ *  siguiente, así que se relee la lista entera. */
+export function useOcultarTanda() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { id: string; oculto: boolean }>({
+    mutationFn: (body) => api.post(`${ROOT}/ocultar`, body),
+    onSuccess: (_r, b) => {
+      toast.success(b.oculto ? "Quitado de la lista" : "Devuelto a la lista");
+      void qc.invalidateQueries({ queryKey: misTandasKeys.all });
+    },
+    onError: (e) => toast.error(`No se pudo: ${e.message}`),
   });
 }
 

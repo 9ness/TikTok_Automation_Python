@@ -84,6 +84,30 @@ def filas(usuario: str, fresco: bool = False) -> list[dict]:
     return ordenadas
 
 
+# ---------------------------------------------------------------------------
+# Ocultos: vídeos que el usuario ya no quiere subir. Salen de la lista y su
+# hueco lo ocupa el siguiente; no se borra nada del nicho.
+# ---------------------------------------------------------------------------
+def ocultos(usuario: str) -> set[str]:
+    r = _redis()
+    if not r.is_available():
+        return set()
+    return set((r.get_json(config.OCULTOS_KEY.format(usuario=usuario or "ness")) or {}).get("ids") or [])
+
+
+def ocultar(usuario: str, id_: str, oculto: bool = True) -> dict:
+    usuario = usuario or "ness"
+    _fila_de(usuario, id_)
+    r = _redis()
+    if not r.is_available():
+        raise ErrorTanda("Redis no está disponible.", status=503)
+    clave = config.OCULTOS_KEY.format(usuario=usuario)
+    ids = set((r.get_json(clave) or {}).get("ids") or [])
+    (ids.add if oculto else ids.discard)(id_)
+    r.set_json(clave, {"ids": sorted(ids), "updated_at": time.time()})
+    return {"ok": True, "id": id_, "oculto": oculto, "ocultos": len(ids)}
+
+
 def _cerrado(f: dict) -> bool:
     return bool(f["uploaded"] or f["sin_stock"])
 
@@ -103,12 +127,14 @@ def _publica(f: dict) -> dict:
     return salida
 
 
-def tandas(usuario: str, todas: bool = False, fresco: bool = False) -> dict:
+def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos: bool = False) -> dict:
     """Las tandas ABIERTAS con sus vídeos y, de las cerradas, solo cuántas hay
     (con `todas`, también sus vídeos). Una tanda está cerrada cuando todo lo
     suyo está subido o sin stock."""
     usuario = usuario or "ness"
-    lista = filas(usuario, fresco=fresco)
+    escondidos = ocultos(usuario)
+    completa = filas(usuario, fresco=fresco)
+    lista = [f for f in completa if f["id"] not in escondidos]
     n = config.POR_TANDA
     grupos = [lista[i:i + n] for i in range(0, len(lista), n)]
 
@@ -162,6 +188,8 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False) -> dict:
         "subidos_hoy": hoy,
         "cerradas": cerradas,
         "abiertas": abiertas_vistas,
+        "ocultos": sum(1 for f in completa if f["id"] in escondidos),
+        "ocultos_items": [_publica(f) for f in completa if f["id"] in escondidos] if ver_ocultos else [],
         "tandas": salida,
     }
 
@@ -303,29 +331,45 @@ def _fila_de(usuario: str, id_: str) -> dict:
     raise ErrorTanda("Ese vídeo no es tuyo o ya no existe.", status=404)
 
 
+def _cache_nicho(f: dict, usuario: str) -> Path | None:
+    """La copia local que deja el MONTAJE (la misma que sirve la pantalla del
+    nicho): es instantánea, el Drive tarda 20-50 s en frío."""
+    from src.nicho_pov_bof import config as pov_config
+
+    if f["nicho"] == "pov":
+        return Path(pov_config.video_cache_path(f["carpeta"], f["producto"], usuario))
+    if f["nicho"] == "largo":
+        return Path(pov_config.video_cache_path(f["carpeta"], f["producto"], usuario, nicho="largo"))
+    return None
+
+
 def _copia_local(f: dict, usuario: str) -> Path | None:
-    """Copia en disco del vídeo (servir desde el mount de Drive tarda ~35 s
-    en frío). La versión va en el nombre: si se rehace, es otro fichero."""
+    """Copia en disco del vídeo. Primero la del nicho, si es ESTE vídeo (su
+    nombre no lleva el modo del Largo ni la fuente: se comprueba que mide lo
+    mismo que el del Drive). Si no, una propia con la versión en el nombre."""
     import re
 
     origen = Path(f["video_path"])
-    if f["nicho"] == "pov":
-        from src.nicho_pov_bof import config as pov_config
-
-        # La misma caché que su pantalla: el montaje ya la deja escrita.
-        destino = Path(pov_config.video_cache_path(f["carpeta"], f["producto"], usuario))
-        if destino.is_file() and (not origen.is_file() or destino.stat().st_mtime >= origen.stat().st_mtime - 5):
-            return destino
-    else:
-        nombre = re.sub(
-            r"[^A-Za-z0-9_.-]+", "_",
-            f"{f['nicho']}__{usuario}__{f['source']}__{f['carpeta']}__{f['producto']}"
-            f"__{f['modo']}__{int(f['video_listo_at'])}",
-        )
-        destino = Path(config.cache_dir()) / f"{nombre}.mp4"
-        if destino.is_file():
-            return destino
-    if not origen.is_file():
+    try:
+        tam_origen = origen.stat().st_size if origen.is_file() else -1
+    except OSError:
+        tam_origen = -1
+    cand = _cache_nicho(f, usuario)
+    if cand is not None and cand.is_file():
+        try:
+            if tam_origen < 0 or cand.stat().st_size == tam_origen:
+                return cand
+        except OSError:
+            pass
+    nombre = re.sub(
+        r"[^A-Za-z0-9_.-]+", "_",
+        f"{f['nicho']}__{usuario}__{f['source']}__{f['carpeta']}__{f['producto']}"
+        f"__{f['modo']}__{int(f['video_listo_at'])}",
+    )
+    destino = Path(config.cache_dir()) / f"{nombre}.mp4"
+    if destino.is_file():
+        return destino
+    if tam_origen < 0:
         return None
     try:
         destino.parent.mkdir(parents=True, exist_ok=True)

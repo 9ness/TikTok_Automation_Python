@@ -589,12 +589,17 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) ->
 @_herramienta(structured_output=False)
 async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
                        sin_stock: bool | None = None, rehacer: bool | None = None,
-                       nota_rehacer: str = "") -> str:
+                       nota_rehacer: str = "", quitar: bool | None = None) -> str:
     """Botones de una fila de «Mis tandas» (`id` sale de `mis_tandas`). Escribe
     en el documento del NICHO del vídeo, así que su pantalla lo ve igual.
     SOLO si el operador te lo pide: «Subido» es lo que ha publicado él;
     «sin stock» es del producto (vale para todos los usuarios y nichos);
-    «rehacer» con su nota (no existe en el POV BOF corto)."""
+    «rehacer» con su nota (no existe en el POV BOF corto).
+    `quitar=True` saca el vídeo de la lista (ya no se va a subir; no se borra
+    nada del nicho y su hueco lo ocupa el siguiente); `quitar=False` lo devuelve."""
+    api = Interno(_usuario(ctx))
+    if quitar is not None:
+        return _json(await api.post("/api/v1/mis-tandas/ocultar", {"id": id, "oculto": quitar}))
     body: dict = {"id": id}
     if subido is not None:
         body["uploaded"] = subido
@@ -603,7 +608,7 @@ async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
     if rehacer is not None:
         body["rehacer"] = rehacer
         body["rehacer_nota"] = nota_rehacer
-    return _json(await Interno(_usuario(ctx)).post("/api/v1/mis-tandas/estado", body))
+    return _json(await api.post("/api/v1/mis-tandas/estado", body))
 
 
 @_herramienta(structured_output=False)

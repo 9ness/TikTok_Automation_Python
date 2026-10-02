@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, ExternalLink, Loader2, RefreshCw, RotateCcw } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, EyeOff, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ import {
   buildVideoTandaUrl,
   useMarcarTanda,
   useMisTandas,
+  useOcultarTanda,
+  useOcultosTandas,
   useRecargarTandas,
   type VideoTanda,
 } from "@/lib/queries/misTandas";
@@ -103,8 +105,14 @@ export function MisTandas() {
       : "";
 
   const [aRehacer, setARehacer] = useState<VideoTanda | null>(null);
-  const [bajando, setBajando] = useState<number | null>(null);
-  const [bajandoUno, setBajandoUno] = useState<string | null>(null);
+  // Qué descarga de tanda está en marcha («12|todos»): solo se bloquea ESE
+  // botón, el resto de la pantalla sigue usable.
+  const [bajando, setBajando] = useState<string | null>(null);
+  // Pide confirmación en la propia fila antes de quitar un vídeo.
+  const [aOcultar, setAOcultar] = useState<string | null>(null);
+  const [verOcultos, setVerOcultos] = useState(false);
+  const ocultar = useOcultarTanda();
+  const listaOcultos = useOcultosTandas(verOcultos);
   const [progreso, setProgreso] = useState("");
   const [abierta, setAbierta] = useState<number | null>(null);
 
@@ -121,20 +129,17 @@ export function MisTandas() {
       v.modo,
     ) + ".mp4";
 
-  async function bajarUno(numero: number, i: number, v: VideoTanda) {
-    setBajandoUno(v.id);
-    const r = await bajarEnOrden([{ href: buildVideoTandaUrl(v, true), nombre: nombre(numero, i, v) }]);
-    setBajandoUno(null);
-    if (r.fallidas) toast.error("No se pudo descargar el vídeo");
-  }
-
-  async function bajarTanda(numero: number) {
+  /** Baja la tanda entera o solo lo que falta por subir. Sin stock nunca
+   *  (no se puede publicar). Cada vídeo conserva su puesto en el nombre, así
+   *  la carpeta del móvil cuadra con esta lista. */
+  async function bajarTanda(numero: number, soloPendientes: boolean) {
     const t = datos?.tandas.find((x) => x.numero === numero);
     if (!t) return;
-    setBajando(numero);
-    // Sin stock no se baja (no se puede publicar); el resto conserva su
-    // puesto en el nombre para que la tanda bajada cuadre con esta lista.
-    const elegidos = t.items.map((v, i) => ({ v, i })).filter(({ v }) => !(v.sin_stock && !v.uploaded));
+    const clave = `${numero}|${soloPendientes ? "pendientes" : "todos"}`;
+    setBajando(clave);
+    const elegidos = t.items
+      .map((v, i) => ({ v, i }))
+      .filter(({ v }) => (soloPendientes ? !v.uploaded && !v.sin_stock : !(v.sin_stock && !v.uploaded)));
     const r = await bajarEnOrden(
       elegidos.map(({ v, i }) => ({ href: buildVideoTandaUrl(v, true), nombre: nombre(numero, i, v) })),
       (hechos, total) => setProgreso(`${hechos}/${total}`),
@@ -191,7 +196,60 @@ export function MisTandas() {
             {verCerradas ? "Ocultar" : "Ver"} las {datos.cerradas} tandas ya subidas
           </button>
         ) : null}
+        {datos?.ocultos ? (
+          <button
+            type="button"
+            onClick={() => setVerOcultos((x) => !x)}
+            className={`rounded-md border px-2 py-1 text-[10px] ${
+              verOcultos
+                ? "border-rose-500/60 bg-rose-500/10 text-rose-500"
+                : "border-border/60 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <EyeOff className="mr-1 inline h-3 w-3" />
+            {verOcultos ? "Ocultar" : "Ver"} los {datos.ocultos} quitados
+          </button>
+        ) : null}
       </div>
+
+      {verOcultos ? (
+        <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2">
+          <p className="mb-1 text-[10px] text-muted-foreground">
+            Quitados de la lista (no se van a subir). «Devolver» lo vuelve a poner en su puesto.
+          </p>
+          {listaOcultos.isLoading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : (
+            <ul className="space-y-1">
+              {(listaOcultos.data ?? []).map((v) => (
+                <li key={v.id} className="flex flex-wrap items-center gap-1 text-[11px]">
+                  <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${COLOR_NICHO[v.nicho] ?? ""}`}>
+                    {NOMBRE_NICHO[v.nicho] ?? v.nicho}
+                  </span>
+                  {v.modo_label ? (
+                    <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${colorModo(v.nicho, v.modo)}`}>
+                      {v.modo_label}
+                    </span>
+                  ) : null}
+                  <span className="min-w-0 flex-1 break-words">
+                    {v.titulo || `Producto ${v.producto}`}{" "}
+                    <span className="text-[10px] text-muted-foreground">
+                      · {v.catalogo_label} · {v.carpeta_corta} · P{v.producto}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => ocultar.mutate({ id: v.id, oculto: false })}
+                    className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    Devolver
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       {tandas.isLoading ? (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -256,15 +314,34 @@ export function MisTandas() {
                       ) : null}
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    disabled={bajando !== null}
-                    onClick={() => void bajarTanda(t.numero)}
-                    className="flex shrink-0 items-center gap-1 rounded-md border border-violet-500/50 px-2 py-1 text-[11px] text-violet-400 hover:bg-violet-500/10 disabled:opacity-50"
-                  >
-                    {bajando === t.numero ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                    {bajando === t.numero && progreso ? progreso : "Bajar"}
-                  </button>
+                  <div className="flex shrink-0 flex-col items-stretch gap-1">
+                    {(
+                      [
+                        [false, "Todos", t.items.filter((v) => !(v.sin_stock && !v.uploaded)).length],
+                        [true, "Pendientes", t.items.filter((v) => !v.uploaded && !v.sin_stock).length],
+                      ] as const
+                    ).map(([solo, etiqueta, cuantos]) => {
+                      const clave = `${t.numero}|${solo ? "pendientes" : "todos"}`;
+                      if (solo && (cuantos === 0 || cuantos === t.items.length)) return null;
+                      return (
+                        <button
+                          key={clave}
+                          type="button"
+                          disabled={bajando === clave || cuantos === 0}
+                          onClick={() => void bajarTanda(t.numero, solo)}
+                          title={solo ? "Bajar solo lo que falta por subir" : "Bajar la tanda entera"}
+                          className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50 ${
+                            solo
+                              ? "border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
+                              : "border-violet-500/50 text-violet-400 hover:bg-violet-500/10"
+                          }`}
+                        >
+                          {bajando === clave ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                          {bajando === clave && progreso ? progreso : `${etiqueta} (${cuantos})`}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 {abiertaEsta && (
                   <ul className="divide-y divide-border/40 border-t border-border/40">
@@ -343,15 +420,17 @@ export function MisTandas() {
                             </Link>
                           ) : null}
                         <div className="ml-auto flex items-center gap-1">
-                          <button
-                            type="button"
-                            disabled={bajandoUno !== null}
-                            onClick={() => void bajarUno(t.numero, i, v)}
+                          {/* Un enlace normal, como en el POV BOF Largo: el
+                              navegador baja cada vídeo por su cuenta y se pueden
+                              pedir varios a la vez sin esperar. */}
+                          <a
+                            href={buildVideoTandaUrl(v, true)}
+                            download={nombre(t.numero, i, v)}
                             title="Descargar este vídeo"
-                            className="flex shrink-0 items-center rounded-md border border-border/60 px-1.5 py-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                            className="flex shrink-0 items-center rounded-md border border-border/60 px-1.5 py-1 text-muted-foreground hover:text-foreground"
                           >
-                            {bajandoUno === v.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                          </button>
+                            <Download className="h-3 w-3" />
+                          </a>
                           {v.product_url ? (
                             <a
                               href={v.product_url}
@@ -401,6 +480,25 @@ export function MisTandas() {
                             }`}
                           >
                             <RotateCcw className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (aOcultar === v.id) {
+                                ocultar.mutate({ id: v.id, oculto: true });
+                                setAOcultar(null);
+                              } else setAOcultar(v.id);
+                            }}
+                            onBlur={() => setAOcultar((x) => (x === v.id ? null : x))}
+                            title="Quitar de la lista: ya no lo vas a subir (no se borra nada del nicho)"
+                            className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] ${
+                              aOcultar === v.id
+                                ? "border-rose-500/60 bg-rose-500/15 text-rose-500"
+                                : "border-border/60 text-muted-foreground hover:text-rose-500"
+                            }`}
+                          >
+                            <EyeOff className="h-3 w-3" />
+                            {aOcultar === v.id ? "¿Quitar?" : null}
                           </button>
                           <button
                             type="button"
