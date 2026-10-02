@@ -1,4 +1,4 @@
-## 🔄 Venta Inversa — cuarto modo del POV BOF Largo (2 oct 2026, pendiente)
+## 🔄 Venta Inversa — cuarto modo del POV BOF Largo (2 oct 2026, HECHO: probar con vídeos reales)
 - Lo publicó el curso en TTShop AI Pro › Asistente de Guiones › «Venta inversa · Irónica»: «No lo compres si no quieres…» → beneficios → supuesto problema positivo → CTA de disponibilidad. Los otros enfoques de la web: Dolor (problema → solución → beneficio → CTA) y Beneficio principal (beneficio → demostración → resultado → CTA).
 - La web saca 6 hooks tipados (`NEGATIVE_VERDICT`…) con una línea de por qué, marca uno «Recomendado», y luego el guion. Dicen que se apoya en +300 reels virales de EE. UU. Jonny NO va a publicar el prompt.
 - Plan: el operador abre la web en el navegador del VPS; 1-2 pruebas con un producto (fotos de referencia), mirar qué llega al navegador (estructura de hooks/guion), y reproducirlo con un prompt nuestro (`prompts/guion_inversa.md`) sobre la base del de dolor. Pocas pruebas: que no parezca uso masivo.

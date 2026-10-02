@@ -43,7 +43,7 @@ MENUS: dict[str, Menu] = {
     for m in [
         Menu(
             "pov_bof_largo", "POV BOF Largo", "pov-bof-largo", "largo",
-            opciones={"estilo_guion": ["precio", "dolor", "epico"], "clip_s": [8, 10]},
+            opciones={"estilo_guion": ["precio", "dolor", "epico", "inversa"], "clip_s": [8, 10]},
             notas="Mano POV señalando el producto; 2-5 clips mudos de la MISMA imagen; la voz la pone la app.",
         ),
         Menu(

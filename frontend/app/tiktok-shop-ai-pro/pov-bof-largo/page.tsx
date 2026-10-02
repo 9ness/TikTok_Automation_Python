@@ -299,6 +299,7 @@ export default function PovBofLargoPage() {
     precio: "border-emerald-500 bg-emerald-500/15 text-emerald-400",
     dolor: "border-amber-500 bg-amber-500/15 text-amber-400",
     epico: "border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-400",
+    inversa: "border-sky-500 bg-sky-500/15 text-sky-400",
   };
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
@@ -1047,6 +1048,8 @@ export default function PovBofLargoPage() {
             className={`flex flex-wrap items-center gap-2 rounded-xl border p-3 transition ${
               estiloActual === "epico"
                 ? "border-fuchsia-500/40 bg-fuchsia-500/[0.06]"
+                : estiloActual === "inversa"
+                ? "border-sky-500/40 bg-sky-500/[0.06]"
                 : estiloActual === "dolor"
                 ? "border-amber-500/40 bg-amber-500/[0.06]"
                 : "border-violet-500/40 bg-violet-500/[0.06]"
@@ -1058,11 +1061,12 @@ export default function PovBofLargoPage() {
                 · todo el catálogo
               </span>
             </span>
-            <div className="ml-auto flex gap-1.5">
+            <div className="ml-auto flex flex-wrap gap-1.5">
               {[
                 { k: "precio", txt: "Precio" },
                 { k: "dolor", txt: "Punto de dolor" },
                 { k: "epico", txt: "Épico" },
+                { k: "inversa", txt: "Venta inversa" },
               ].map((e) => (
                 <button
                   key={e.k}
@@ -1092,6 +1096,8 @@ export default function PovBofLargoPage() {
             <p className="w-full text-[11px] leading-relaxed text-muted-foreground">
               {estiloActual === "epico"
                 ? "Como punto de dolor, pero con un gancho de menos de 3 s y frases cortas: el guion marca de 2 a 4 «golpes» según sus frases potentes y en cada uno entra un inserto épico de 1 s (producto con fondo épico + golpe de sonido). Cada golpe pide su clip de 5 s."
+                : estiloActual === "inversa"
+                ? "Irónico: «No lo compres si no quieres…» y cada motivo es una ventaja real; acaba con «El único problema es que…» y «te lo intento dejar en el carrito naranja, pero no te aseguro que siga disponible». Sin urgencia de precio. Usa 2 clips (~15 s) o 4 de 8 s / 3 de 10 s (~30 s)."
                 : estiloActual === "dolor"
                 ? "El vídeo empieza con tres a cinco problemas dirigidos al espectador y el precio va al final."
                 : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}{" "}

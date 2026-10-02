@@ -95,3 +95,17 @@ def test_sonidos_por_video_y_boom_en_blanco(tmp_path):
     # con un fichero suelto, todos iguales
     f = tmp_path / config.SONIDO_BLANCO
     assert insertos.elegir_sonidos(f, tmp_path / "x.mp4", [False, True]) == [f, f]
+
+
+def test_venta_inversa_prompt_y_cierre():
+    p = config.prompt_guion(True, "inversa", True, 16)
+    assert "VENTA INVERSA" in p and "El único problema es que" in p
+    assert "pagarlo en cómodos plazos" not in p          # sin bloque de plazos
+    assert "aperturas de precio" not in p
+    g = "El gran problema de este banco es que no hay excusas. " + config.CTA_INVERSA
+    assert config.es_cierre_inverso(g)
+    # el recorte por precio no le cambia el cierre
+    assert config.recortar_cta(g, plazos=False, envio=False) == g
+    assert config.ctas_posibles(False, False, inversa=True)[0].startswith("Te lo dejo")
+    assert not config.es_cierre_inverso("Y es bueno. Ve al carrito naranja y aplica tus cupones.")
+    assert config.estilo_texto_de("inversa") == "blanco"

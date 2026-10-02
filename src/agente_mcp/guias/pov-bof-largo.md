@@ -189,6 +189,26 @@ eso, los accesorios salen **flotando en el aire** y el vídeo no se puede
 publicar (pasó con el banco de pesas, oct 2026). En la escena di DÓNDE están:
 «las gomas, recogidas en el suelo junto a la pata del banco», nunca «colgadas».
 
+## 🔄 Modo «Venta inversa» (oct 2026)
+
+Cuarto modo del guion (`estilo_guion="inversa"`), el que el curso sacó en su web
+(«Venta inversa · Irónica») sin publicar el prompt. El nuestro está en
+`prompts/guion_inversa.md`, hecho por ingeniería inversa de dos generaciones de
+la web (`docs/venta_inversa/`).
+
+- Forma: gancho irónico («El gran problema de… es que…», «No lo compres si no
+  quieres…», «Ni se te ocurra…») → negaciones con DATOS reales de la ficha →
+  (en 30 s) cómo se usa → «El único problema es que… / Lo peor es que…» →
+  cierre de disponibilidad: «Te lo voy a intentar dejar en el carrito naranja,
+  pero no puedo asegurarte que siga disponible cuando veas el vídeo».
+- Dos duraciones: **2 clips (~15 s)** o **30 s** (4 de 8 s o 3 de 10 s). En el
+  corto el gancho ya lleva el primer dato y el cierre es el corto («Te lo dejo
+  en el carrito naranja, pero no te aseguro que siga disponible»).
+- Sin urgencia de precio ni frase de plazos. La escalera de cierres al locutar
+  es la suya (`config.CTAS_INVERSA`); el recorte por precio no la toca.
+- Revisa la ironía: que se entienda que lo recomiendas, sin efectos sobre el
+  cuerpo («te pone en forma») ni datos inventados (programas, niveles).
+
 ## 🎄 Productos Q4 (Black Friday y Navidad)
 
 Carpeta de temporada dentro de **📦 Inventario General**, la primera de la lista

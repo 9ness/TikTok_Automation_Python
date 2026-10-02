@@ -268,7 +268,48 @@ CTA_TODO = (
 )
 
 
-def ctas_posibles(plazos: bool, envio: bool) -> tuple[str, ...]:
+# Los cierres de la VENTA INVERSA. No llevan cupones ni promesas: el cierre del
+# curso es solo «no te aseguro que siga disponible». También van de corto a
+# largo para que el ENCAJE de la voz pueda cuadrar la duración con ellos.
+CTA_INVERSA = (
+    "Te lo voy a intentar dejar en el carrito naranja, pero no puedo "
+    "asegurarte que siga disponible cuando veas el vídeo."
+)
+CTAS_INVERSA = (
+    "Te lo dejo en el carrito naranja, pero no te aseguro que siga disponible.",
+    CTA_INVERSA,
+    "Te lo voy a intentar dejar en el carrito naranja con tus cupones, pero no "
+    "puedo asegurarte que siga disponible cuando veas el vídeo.",
+    "Así que te lo voy a intentar dejar en el carrito naranja por esta zona del "
+    "vídeo, pero no puedo asegurarte que cuando veas este vídeo siga disponible.",
+)
+
+
+def cta_inversa(segundos: float = 0) -> str:
+    """El cierre que se le PIDE a la IA en la venta inversa. En el vídeo corto
+    el literal del curso (113 car., ~6 s) se comería el 40% de la voz, así que
+    hasta `GUION_OBJETIVO_S` se pide el corto. Al locutar, el encaje puede
+    cambiarlo por cualquiera de `CTAS_INVERSA`."""
+    if not segundos or segundos <= GUION_OBJETIVO_S:
+        return CTAS_INVERSA[0]
+    return CTA_INVERSA
+
+
+def es_inversa(estilo: str) -> bool:
+    return (estilo or "").strip().lower() == "inversa"
+
+
+def es_cierre_inverso(guion: str) -> bool:
+    """¿El guion acaba con el cierre de disponibilidad de la venta inversa?
+
+    Se mira el TEXTO y no el modo: así un guion inverso se reconoce en todos
+    los sitios que tocan el cierre (recorte por precio, encaje de la voz,
+    duración estimada) sin pasarles el modo a cada uno."""
+    frases = _CTA_FINAL_RE.findall(guion or "")
+    return bool(frases) and "disponible" in frases[-1].lower()
+
+
+def ctas_posibles(plazos: bool, envio: bool, inversa: bool = False) -> tuple[str, ...]:
     """Los cierres que ese producto puede decir, de corto a largo.
 
     Los plazos van al final de la escalera a propósito: el cuerpo del guion ya
@@ -276,7 +317,12 @@ def ctas_posibles(plazos: bool, envio: bool) -> tuple[str, ...]:
     el cierre es decir la misma promesa dos veces. Se acepta solo cuando el
     guion se ha quedado corto y hay que rellenar — antes que dejar el vídeo por
     debajo del mínimo, mejor repetir la promesa.
+
+    Con `inversa` la escalera es la de la venta inversa (`CTAS_INVERSA`): un
+    «Ve al carrito naranja y aplica tus cupones» rompería la ironía.
     """
+    if inversa:
+        return tuple(sorted(CTAS_INVERSA, key=len))
     escalera = [CTA_CUPONES, CTA_CUPONES_BARATO]
     if envio:
         escalera += [CTA_ENVIO, CTA_ENVIO_BARATO]
@@ -347,6 +393,11 @@ ESTILOS_GUION: dict[str, dict[str, str]] = {
     # (escenario oscuro / fondo blanco + golpe de sonido), que la IA marca en
     # el propio guion. Ver `pipeline/insertos.py`.
     "epico": {"label": "Épico", "fichero": "guion_dolor.md", "extra": "guion_epico.md"},
+    # Venta inversa irónica («No lo compres si no quieres…»): prompt NUESTRO
+    # sacado por ingeniería inversa de la web del curso (oct 2026, ver la
+    # cabecera de `guion_inversa.md`). Sin urgencia de precio y con su propio
+    # cierre de disponibilidad (`CTA_INVERSA`).
+    "inversa": {"label": "Venta inversa", "fichero": "guion_inversa.md"},
 }
 ESTILO_GUION_DEFECTO = "precio"
 
@@ -399,6 +450,10 @@ def recortar_cta(guion: str, *, plazos: bool, envio: bool) -> str:
     if not guion:
         return ""
     guion = sin_minimo_plazos(guion)
+    # El cierre de la venta inversa no promete nada que el precio cambie:
+    # cambiarlo por el de cupones le quitaría la gracia al guion.
+    if es_cierre_inverso(guion):
+        return guion
     # El tamaño del guion ES el que decide si el envío gratis cabe: un guion de
     # 30s lo dice y uno de 16s no. Se mide el guion entero (CTA vieja incluida)
     # porque las dos CTA se diferencian en 24 caracteres y el umbral está a 116
@@ -471,7 +526,7 @@ ESTILOS_TEXTO = ("blanco", "clasico")
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco"}
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:
@@ -534,8 +589,10 @@ def prompt_guion(
         base = base.split("-->", 1)[1].strip()
     base = base.replace(
         "{{CTA_FINAL}}", cta_final(plazos, envio_gratis, caracteres_guion(segundos))
-    )
-    if plazos:
+    ).replace("{{CTA_INVERSA}}", cta_inversa(segundos))
+    # La venta inversa no habla de precio ni de pagos: su prompt lo prohíbe y
+    # el bloque de plazos pediría justo lo contrario.
+    if plazos and not es_inversa(estilo):
         extra = (prompts_dir() / "guion_plazos.md").read_text(encoding="utf-8")
         # El fichero lleva una cabecera para quien lo lea en el repo; a Gemini
         # solo se le manda lo que va después del separador.
@@ -549,7 +606,7 @@ def prompt_guion(
         extra = (prompts_dir() / "guion_temporada.md").read_text(encoding="utf-8")
         _, _, cuerpo = extra.partition("\n---\n")
         base = f"{base}\n\n{cuerpo.strip()}"
-    return _alargar(base, segundos) + _caracteristicas(segundos) + _epoca()
+    return _alargar(base, segundos) + _caracteristicas(segundos, estilo) + _epoca()
 
 
 # Por debajo de qué parte del tope se considera que el guion se quedó corto.
@@ -560,7 +617,7 @@ def prompt_guion(
 GUION_MINIMO_RATIO = 0.93
 
 
-def _caracteristicas(segundos: float = 0) -> str:
+def _caracteristicas(segundos: float = 0, estilo: str = "") -> str:
     """Añadido NUESTRO: cuánto tiene que medir el guion y en qué se gasta.
 
     El cierre se recortó a propósito (`cta_final`) para que el hueco fuera a
@@ -601,10 +658,16 @@ def _caracteristicas(segundos: float = 0) -> str:
         "nada de frases sueltas de tres palabras ('El impacto frustra.') y "
         "nada de lengua de ficha de producto: no digas 'ofrece', 'cuenta "
         "con', 'permite', 'proporciona' ni 'dispone de' — cuéntalo como se lo "
-        "contarías a un amigo. Y empieza con una de las aperturas de precio "
-        "que se te han dado ARRIBA, copiada tal cual: son verbales a "
-        "propósito."
-        "\n\nESTO MANDA SOBRE TODO LO ANTERIOR, y ya te lo han dicho arriba: "
+        "contarías a un amigo."
+        + (
+            " Y empieza con una de las fórmulas de gancho que se te han dado "
+            "ARRIBA: la ironía tiene que entenderse desde la primera frase."
+            if es_inversa(estilo) else
+            " Y empieza con una de las aperturas de precio "
+            "que se te han dado ARRIBA, copiada tal cual: son verbales a "
+            "propósito."
+        )
+        + "\n\nESTO MANDA SOBRE TODO LO ANTERIOR, y ya te lo han dicho arriba: "
         "NADA DE PROMESAS DEFINITIVAS. Hablar como una persona no es afirmar "
         "en seco lo que el producto consigue. No digas 'te lo alivia', 'se te "
         "va el dolor', 'te lo soluciona', 'acaba con', 'elimina' ni 'te lo "

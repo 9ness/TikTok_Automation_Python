@@ -1,0 +1,291 @@
+[
+ {
+  "fichero": "1790927721.575_res.json",
+  "tipo": "respuesta",
+  "json": {
+   "analysis": {
+    "product_name": "MERACH Plataforma vibratoria de alto rendimiento",
+    "full_description": "Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capacidad no especificada en el texto.",
+    "category": "Equipamiento deportivo / Fitness",
+    "price": "89,99 € (79,99 € con cupones)",
+    "seller": "Merach ES Sports",
+    "dimensions": [],
+    "materials": [],
+    "package_contents": [],
+    "visible_features": [
+     "Plataforma vibratoria",
+     "Pantalla digital integrada en la base",
+     "Diseño ergonómico"
+    ],
+    "visible_benefits": [
+     "Entrenamiento de alto rendimiento"
+    ],
+    "instructions": [],
+    "warnings": [],
+    "visible_claims": [
+     "4,8 estrellas (155 valoraciones)",
+     "2279 vendidos",
+     "Garantía de devolución del dinero de TikTok Shop"
+    ],
+    "target_audience": "Personas interesadas en fitness y entrenamiento en casa",
+    "raw_transcription": "Imagen 1: MERACH. Imagen 2: 14:48, Merach ES Sports, 89,99 €, IVA incluido, Paga 79,99 € con cupones, Envío gratis, Entrega: 18-21 ago, MERACH Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capac..., Vendido por Merach ES Sports, 4,8 (155) 2279 vendidos, Garantía de devolución del dinero de TikTok Shop, Color: Selecciona, Añadir al carrito, Comprar.",
+    "all_visible_text": [
+     "MERACH",
+     "14:48",
+     "Merach ES Sports",
+     "89,99 €",
+     "IVA incluido",
+     "Paga 79,99 € con cupones",
+     "Envío gratis",
+     "Entrega: 18-21 ago",
+     "MERACH Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capac...",
+     "Vendido por Merach ES Sports",
+     "4,8",
+     "(155)",
+     "2279 vendidos",
+     "Garantía de devolución del dinero de TikTok Shop",
+     "Color: Selecciona",
+     "Añadir al carrito",
+     "Comprar"
+    ],
+    "uncertainties": [
+     "La descripción completa está truncada en la interfaz de usuario como 'capac...'",
+     "No se especifican dimensiones, materiales ni contenido exacto del paquete en el texto visible."
+    ]
+   },
+   "provider": "gemini"
+  }
+ },
+ {
+  "fichero": "1790927868.972_req.json",
+  "tipo": "peticion",
+  "json": {
+   "action": "hooks",
+   "product": {
+    "product_name": "MERACH Plataforma vibratoria de alto rendimiento",
+    "category": "Equipamiento deportivo / Fitness",
+    "visible_features": [
+     "Plataforma vibratoria",
+     "Pantalla digital integrada en la base",
+     "Diseño ergonómico"
+    ],
+    "extracted_details": "Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capacidad no especificada en el texto.\n\nPrecio: 89,99 € (79,99 € con cupones)\n\nVendedor: Merach ES Sports\n\nBeneficios visibles: Entrenamiento de alto rendimiento\n\nPúblico: Personas interesadas en fitness y entrenamiento en casa\n\nTextos promocionales: 4,8 estrellas (155 valoraciones) · 2279 vendidos · Garantía de devolución del dinero de TikTok Shop\n\nTranscripción literal completa:\nImagen 1: MERACH. Imagen 2: 14:48, Merach ES Sports, 89,99 €, IVA incluido, Paga 79,99 € con cupones, Envío gratis, Entrega: 18-21 ago, MERACH Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capac..., Vendido por Merach ES Sports, 4,8 (155) 2279 vendidos, Garantía de devolución del dinero de TikTok Shop, Color: Selecciona, Añadir al carrito, Comprar.\n\nTexto clasificado: MERACH | 14:48 | Merach ES Sports | 89,99 € | IVA incluido | Paga 79,99 € con cupones | Envío gratis | Entrega: 18-21 ago | MERACH Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capac... | Vendido por Merach ES Sports | 4,8 | (155) | 2279 vendidos | Garantía de devolución del dinero de TikTok Shop | Color: Selecciona | Añadir al carrito | Comprar",
+    "confirmed_facts": ""
+   },
+   "structure": "negative_verdict",
+   "country": "esp",
+   "script_type": "bof",
+   "angle": "objection",
+   "duration": "30",
+   "tone": "natural",
+   "creator_format": "voiceover",
+   "language": "es"
+  }
+ },
+ {
+  "fichero": "1790927871.236_res.json",
+  "tipo": "respuesta",
+  "json": {
+   "options": [
+    {
+     "text": "Estos son los motivos por los que no deberías comprar la plataforma vibratoria MERACH",
+     "category": "negative_verdict",
+     "reason": "Establece una duda inmediata sobre el producto que invita a ver el vídeo completo.",
+     "recommended": false
+    },
+    {
+     "text": "No compres la plataforma MERACH si no quieres entrenar todo tu cuerpo en casa",
+     "category": "negative_verdict",
+     "reason": "Utiliza la psicología inversa para resaltar la conveniencia del entrenamiento en casa.",
+     "recommended": false
+    },
+    {
+     "text": "Mantente lejos de la plataforma MERACH si prefieres seguir sin una rutina diaria",
+     "category": "negative_verdict",
+     "reason": "Apela al deseo de constancia física mediante una advertencia irónica.",
+     "recommended": false
+    },
+    {
+     "text": "Tampoco la compres si no quieres aprovechar su pantalla digital integrada durante tu entrenamiento",
+     "category": "negative_verdict",
+     "reason": "Destaca una característica técnica específica de forma irónica.",
+     "recommended": false
+    },
+    {
+     "text": "El gran problema de la plataforma MERACH es que te obliga a entrenar siempre",
+     "category": "negative_verdict",
+     "reason": "Presenta el uso frecuente como un inconveniente humorístico, reforzando el valor del producto.",
+     "recommended": true
+    },
+    {
+     "text": "Ni se te ocurra probar la MERACH si no quieres resultados visibles de alto rendimiento",
+     "category": "negative_verdict",
+     "reason": "Conecta la advertencia con el beneficio principal de alto rendimiento de forma directa.",
+     "recommended": false
+    }
+   ],
+   "recommended_index": 4,
+   "source": "Metodología TTShop AI Pro Reels-105 + biblioteca profesional de hooks"
+  }
+ },
+ {
+  "fichero": "1790927920.733_req.json",
+  "tipo": "peticion",
+  "json": {
+   "action": "generate",
+   "product": {
+    "product_name": "MERACH Plataforma vibratoria de alto rendimiento",
+    "category": "Equipamiento deportivo / Fitness",
+    "visible_features": [
+     "Plataforma vibratoria",
+     "Pantalla digital integrada en la base",
+     "Diseño ergonómico"
+    ],
+    "extracted_details": "Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capacidad no especificada en el texto.\n\nPrecio: 89,99 € (79,99 € con cupones)\n\nVendedor: Merach ES Sports\n\nBeneficios visibles: Entrenamiento de alto rendimiento\n\nPúblico: Personas interesadas en fitness y entrenamiento en casa\n\nTextos promocionales: 4,8 estrellas (155 valoraciones) · 2279 vendidos · Garantía de devolución del dinero de TikTok Shop\n\nTranscripción literal completa:\nImagen 1: MERACH. Imagen 2: 14:48, Merach ES Sports, 89,99 €, IVA incluido, Paga 79,99 € con cupones, Envío gratis, Entrega: 18-21 ago, MERACH Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capac..., Vendido por Merach ES Sports, 4,8 (155) 2279 vendidos, Garantía de devolución del dinero de TikTok Shop, Color: Selecciona, Añadir al carrito, Comprar.\n\nTexto clasificado: MERACH | 14:48 | Merach ES Sports | 89,99 € | IVA incluido | Paga 79,99 € con cupones | Envío gratis | Entrega: 18-21 ago | MERACH Plataforma vibratoria de alto rendimiento, equipo de entrenamiento, capac... | Vendido por Merach ES Sports | 4,8 | (155) | 2279 vendidos | Garantía de devolución del dinero de TikTok Shop | Color: Selecciona | Añadir al carrito | Comprar",
+    "confirmed_facts": ""
+   },
+   "structure": "negative_verdict",
+   "country": "esp",
+   "script_type": "bof",
+   "angle": "objection",
+   "duration": "30",
+   "tone": "natural",
+   "creator_format": "voiceover",
+   "language": "es",
+   "variants": 1,
+   "selected_hook": "El gran problema de la plataforma MERACH es que te obliga a entrenar siempre",
+   "hook_category": "negative_verdict",
+   "cta": "CTA natural al final: carrito naranja, comprobar cupones de descuento activos, revisar si está disponible el pago a plazos y comprobar si además tiene envío gratis. No mencionar gastos de envío ni importes mínimos y no garantizar disponibilidad."
+  }
+ },
+ {
+  "fichero": "1790927927.315_res.json",
+  "tipo": "respuesta",
+  "json": {
+   "result": {
+    "content_idea": "Venta inversa irónica de la plataforma vibratoria MERACH enfocada en la facilidad de uso y la eficiencia del entrenamiento en casa.",
+    "objective_emotion": "Curiosidad divertida y deseo de conveniencia.",
+    "hook": "El gran problema de la plataforma MERACH es que te obliga a entrenar siempre",
+    "strategy": {
+     "audience": "Personas interesadas en fitness que buscan optimizar su tiempo en casa.",
+     "core_problem": "La falta de tiempo o motivación para realizar entrenamientos complejos.",
+     "verified_benefit": "Entrenamiento de alto rendimiento accesible en casa mediante vibración.",
+     "creative_route": "Venta inversa irónica: usar negaciones para resaltar beneficios reales.",
+     "cta_style": "Irónico, invitando a comprobar disponibilidad y beneficios en el carrito naranja."
+    },
+    "variants": [
+     {
+      "title": "La trampa de la plataforma MERACH",
+      "full_script": "El gran problema de la plataforma MERACH es que te obliga a entrenar siempre. No la compres si no quieres integrar el ejercicio mientras ves tu serie favorita. Tampoco la compres si no quieres sentir la vibración de alto rendimiento bajo tus pies sin salir de casa. Y ni se te ocurra comprarla si no quieres una pantalla digital que te marca el tiempo exacto. El único problema es que es tan fácil de usar que ya no tienes excusas para no moverte. Así que te lo voy a intentar dejar en el carrito naranja por esta zona del vídeo, pero no puedo asegurarte que cuando veas este vídeo siga disponible.",
+      "scenes": [
+       {
+        "time": "00:00-00:05",
+        "visual": "Creador parado frente a la plataforma, señalando la base con ironía.",
+        "voice": "El gran problema de la plataforma MERACH es que te obliga a entrenar siempre.",
+        "onscreen_text": "El problema de MERACH"
+       },
+       {
+        "time": "00:05-00:12",
+        "visual": "Creador subido a la plataforma, viendo una tablet mientras la máquina vibra.",
+        "voice": "No la compres si no quieres integrar el ejercicio mientras ves tu serie favorita.",
+        "onscreen_text": "Entrena viendo series"
+       },
+       {
+        "time": "00:12-00:18",
+        "visual": "Primer plano de los pies en la plataforma y la pantalla digital encendida.",
+        "voice": "Tampoco la compres si no quieres sentir la vibración de alto rendimiento bajo tus pies sin salir de casa.",
+        "onscreen_text": "Vibración de alto rendimiento"
+       },
+       {
+        "time": "00:18-00:24",
+        "visual": "El creador baja de la plataforma, se ve el diseño ergonómico.",
+        "voice": "Y ni se te ocurra comprarla si no quieres una pantalla digital que te marca el tiempo exacto.",
+        "onscreen_text": "Control digital claro"
+       },
+       {
+        "time": "00:24-00:30",
+        "visual": "Creador apuntando al icono del carrito naranja en la pantalla.",
+        "voice": "Así que te lo voy a intentar dejar en el carrito naranja por esta zona del vídeo, pero no puedo asegurarte que cuando veas este vídeo siga disponible.",
+        "onscreen_text": "Carrito naranja · Comprueba disponibilidad"
+       }
+      ],
+      "recording_plan": {
+       "shots": [
+        "Plano medio de entrada",
+        "Plano detalle de pies y vibración",
+        "Plano medio de uso con tablet",
+        "Plano detalle de pantalla",
+        "Plano final con carrito naranja"
+       ],
+       "product_placement": "Plataforma MERACH en el centro del salón, bien iluminada.",
+       "lighting_background": "Luz natural de día, fondo de salón ordenado.",
+       "demonstration": "El creador sube y baja de la plataforma, mostrando que es compacta y fácil de usar.",
+       "materials": [
+        "Plataforma vibratoria MERACH",
+        "Tablet",
+        "Ropa deportiva"
+       ]
+      },
+      "editing_plan": {
+       "pace": "Dinámico con cortes precisos en cada cambio de beneficio.",
+       "cuts": "Cortes secos entre frases para mantener la ironía.",
+       "sound": "Música de fondo optimista pero suave.",
+       "captions": "Subtítulos dinámicos en el centro de la pantalla."
+      }
+     }
+    ],
+    "quality_review": {
+     "selection_alignment": {
+      "objective": true,
+      "angle": true,
+      "tone": true,
+      "format": true,
+      "duration": true,
+      "language": true,
+      "market": true,
+      "cta": true,
+      "hook": true
+     },
+     "naturalness_score": 95,
+     "specificity_score": 90,
+     "duration_fit": true,
+     "notes": [
+      "Tensión dominante: la supuesta 'obligación' de entrenar.",
+      "Contrato de evidencia: uso de pantalla y vibración visual como prueba.",
+      "Afirmaciones descartadas: resultados de pérdida de peso o salud médica.",
+      "Comprensión sin audio: los textos y la acción de subir a la máquina explican el beneficio.",
+      "Validado con la metodología TTShop AI Pro Reels-105."
+     ],
+     "selected_hook_verified": true,
+     "cta_verified": true
+    },
+    "compliance": {
+     "risk": "low",
+     "safety_score": 100,
+     "safety_level": "high",
+     "prohibited_wording": [],
+     "corrections": [],
+     "coverage_note": "El guion cumple estrictamente con no prometer resultados de salud ni médicos, enfocándose solo en la función de equipamiento deportivo.",
+     "checks": [
+      {
+       "category": "Seguridad de producto",
+       "status": "passed",
+       "note": "El producto es un equipo de fitness, no se mencionan usos médicos.",
+       "source_id": "TikTok Shop Policy",
+       "source_url": "https://seller-es.tiktok.com/university/essay?from=policy&identity=1&knowledge_id=6090183864452886&role=2"
+      }
+     ],
+     "official_source": "https://seller-es.tiktok.com/university/essay?from=policy&identity=1&knowledge_id=6090183864452886&role=2",
+     "reviewed_at": "2023-10-27T10:00:00Z",
+     "policy_source_count": 0
+    },
+    "methodology_version": "reels-105-v6-ironic-body-availability-cta"
+   },
+   "provider": "gemini",
+   "quota": {
+    "used": 1,
+    "limit": 120
+   }
+  }
+ }
+]

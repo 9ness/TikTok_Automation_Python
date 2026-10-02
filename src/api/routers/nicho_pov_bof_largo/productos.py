@@ -120,7 +120,7 @@ def _segundos(
     if cuerpo:
         return voz_svc.duracion_con_encaje(
             cuerpo,
-            config.ctas_posibles(plazos, envio),
+            config.ctas_posibles(plazos, envio, inversa=config.es_cierre_inverso(limpio)),
             ventana=config.ventana_video(
                 float(prod.get("guion_segundos") or 0), huecos * clip_s,
             ),

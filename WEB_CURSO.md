@@ -106,3 +106,17 @@ Textos listos para pegar: `Escritorio\Peticiones TTShop AI Pro.txt`.
 Estado: **las tres enviadas el 2026-09-08**, en "pending". Si alguna se
 integra, revisar qué se puede quitar de nuestro lado (subida ZIP a ZIP,
 pegote de consola, backup diario del Drive) y si dan créditos.
+
+
+## Asistente de guiones · Venta inversa (visto el 2 oct 2026)
+
+`#guiones` → 6 pasos: fotos (hasta 3) → confirmar ficha → enfoque (Punto de
+dolor / **Venta inversa · Irónica** / Beneficio principal) → grabación
+(cara o faceless) → 6 hooks (uno «Recomendado») → duración 15/30/45/60 y
+generar. Todo va a `POST /.netlify/functions/script-assistant` con
+`action` = `analyze` (fotos en base64 → ficha JSON, Gemini), `hooks`
+(no gasta generación) y `generate` (gasta 1 de las 120/mes). Parámetros:
+`structure: negative_verdict`, `angle: objection`, `script_type: bof`,
+`tone: natural`, `creator_format: voiceover`, `country: esp`. El prompt NO
+viaja al navegador. Muestras completas: `docs/venta_inversa/`. Nuestro modo
+equivalente: `nicho_pov_bof_largo/prompts/guion_inversa.md`.

@@ -1,0 +1,300 @@
+[
+ {
+  "fichero": "1790928066.248_res.json",
+  "tipo": "respuesta",
+  "json": {
+   "analysis": {
+    "product_name": "Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench",
+    "full_description": "Multifunctional workout bench for bench press, sit-ups, leg training, and full body training fitness machine gym.",
+    "category": "Fitness Equipment",
+    "price": "75,60 €",
+    "seller": "Shorkey",
+    "dimensions": [],
+    "materials": [
+     "Steel frame",
+     "Padded upholstery"
+    ],
+    "package_contents": [
+     "1 x Foldable workout bench",
+     "2 x Resistance bands with handles"
+    ],
+    "visible_features": [
+     "Foldable design",
+     "Adjustable backrest",
+     "Leg support rollers",
+     "Resistance bands included",
+     "Steel frame construction"
+    ],
+    "visible_benefits": [
+     "120kg load capacity",
+     "Full body training",
+     "Suitable for bench press, sit-ups, and leg training"
+    ],
+    "instructions": [],
+    "warnings": [],
+    "visible_claims": [
+     "120kg Load Capacity",
+     "Envío gratis",
+     "Devoluciones gratis"
+    ],
+    "target_audience": "Fitness enthusiasts",
+    "raw_transcription": "Imagen 1: (Sin texto). Imagen 2: 11:14, 33, Shorkey, Beneficios exclusivos, 75,60 €, IVA incluido, Paga 65,60 € con cupones, Envío gratis, Entrega: 27-30 jul, Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench For Bench Press Sit-Ups Leg Training Full Body Training Fitness Machine Gym, Vendido por Shorkey, Enviado desde Europa, Devoluciones gratis en puntos de entre, Ofertas, Ver todas, Declame tus ofertas antes, Sujeto a los términos y condiciones, Añadir al carrito, Comprar Envío gratis.",
+    "all_visible_text": [
+     "11:14",
+     "33",
+     "Shorkey",
+     "Beneficios exclusivos",
+     "75,60 €",
+     "IVA incluido",
+     "Paga 65,60 € con cupones",
+     "Envío gratis",
+     "Entrega: 27-30 jul",
+     "Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench For Bench Press Sit-Ups Leg Training Full Body Training Fitness Machine Gym",
+     "Vendido por Shorkey",
+     "Enviado desde Europa",
+     "Devoluciones gratis en puntos de entre",
+     "Ofertas",
+     "Ver todas",
+     "Declame tus ofertas antes",
+     "Sujeto a los términos y condiciones",
+     "Añadir al carrito",
+     "Comprar Envío gratis"
+    ],
+    "uncertainties": [
+     "El texto 'Devoluciones gratis en puntos de entre' parece estar cortado en la imagen.",
+     "El texto 'Declame tus ofertas antes' podría ser 'Reclame tus ofertas antes' debido a la calidad de la imagen."
+    ]
+   },
+   "provider": "gemini"
+  }
+ },
+ {
+  "fichero": "1790928074.485_req.json",
+  "tipo": "peticion",
+  "json": {
+   "action": "hooks",
+   "product": {
+    "product_name": "Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench",
+    "category": "Fitness Equipment",
+    "visible_features": [
+     "Foldable design",
+     "Adjustable backrest",
+     "Leg support rollers",
+     "Resistance bands included",
+     "Steel frame construction"
+    ],
+    "extracted_details": "Multifunctional workout bench for bench press, sit-ups, leg training, and full body training fitness machine gym.\n\nPrecio: 75,60 €\n\nVendedor: Shorkey\n\nMateriales: Steel frame · Padded upholstery\n\nContenido: 1 x Foldable workout bench · 2 x Resistance bands with handles\n\nBeneficios visibles: 120kg load capacity · Full body training · Suitable for bench press, sit-ups, and leg training\n\nPúblico: Fitness enthusiasts\n\nTextos promocionales: 120kg Load Capacity · Envío gratis · Devoluciones gratis\n\nTranscripción literal completa:\nImagen 1: (Sin texto). Imagen 2: 11:14, 33, Shorkey, Beneficios exclusivos, 75,60 €, IVA incluido, Paga 65,60 € con cupones, Envío gratis, Entrega: 27-30 jul, Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench For Bench Press Sit-Ups Leg Training Full Body Training Fitness Machine Gym, Vendido por Shorkey, Enviado desde Europa, Devoluciones gratis en puntos de entre, Ofertas, Ver todas, Declame tus ofertas antes, Sujeto a los términos y condiciones, Añadir al carrito, Comprar Envío gratis.\n\nTexto clasificado: 11:14 | 33 | Shorkey | Beneficios exclusivos | 75,60 € | IVA incluido | Paga 65,60 € con cupones | Envío gratis | Entrega: 27-30 jul | Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench For Bench Press Sit-Ups Leg Training Full Body Training Fitness Machine Gym | Vendido por Shorkey | Enviado desde Europa | Devoluciones gratis en puntos de entre | Ofertas | Ver todas | Declame tus ofertas antes | Sujeto a los términos y condiciones | Añadir al carrito | Comprar Envío gratis",
+    "confirmed_facts": ""
+   },
+   "structure": "negative_verdict",
+   "country": "esp",
+   "script_type": "bof",
+   "angle": "objection",
+   "duration": "30",
+   "tone": "natural",
+   "creator_format": "voiceover",
+   "language": "es"
+  }
+ },
+ {
+  "fichero": "1790928076.757_res.json",
+  "tipo": "respuesta",
+  "json": {
+   "options": [
+    {
+     "text": "No compres este banco de Shorkey si no quieres entrenar todo tu cuerpo en casa.",
+     "category": "negative_verdict",
+     "reason": "Establece una contradicción directa entre la compra y el beneficio de entrenamiento integral.",
+     "recommended": false
+    },
+    {
+     "text": "Estos son los motivos por los que no deberías comprar este banco de acero plegable.",
+     "category": "negative_verdict",
+     "reason": "Genera curiosidad inmediata al cuestionar la compra de un producto con especificaciones técnicas claras.",
+     "recommended": false
+    },
+    {
+     "text": "Mantente lejos de este banco si prefieres seguir sin poder hacer press y sentadillas.",
+     "category": "negative_verdict",
+     "reason": "Utiliza la ironía para resaltar la versatilidad de ejercicios que permite el equipo.",
+     "recommended": false
+    },
+    {
+     "text": "No lo compres si no quieres aprovechar la carga de 120 kilos para tus pesas.",
+     "category": "negative_verdict",
+     "reason": "Destaca la capacidad de carga real del producto de forma irónica y directa.",
+     "recommended": true
+    },
+    {
+     "text": "El gran problema de este banco es que te obliga a entrenar tus piernas diariamente.",
+     "category": "negative_verdict",
+     "reason": "Convierte una característica técnica (soporte de piernas) en una consecuencia positiva humorística.",
+     "recommended": false
+    },
+    {
+     "text": "Ni se te ocurra probarlo si no quieres añadir bandas de resistencia a tus rutinas.",
+     "category": "negative_verdict",
+     "reason": "Enfoca la crítica irónica en uno de los accesorios incluidos más valorados.",
+     "recommended": false
+    }
+   ],
+   "recommended_index": 3,
+   "source": "Metodología TTShop AI Pro Reels-105 + biblioteca profesional de hooks"
+  }
+ },
+ {
+  "fichero": "1790928095.910_req.json",
+  "tipo": "peticion",
+  "json": {
+   "action": "generate",
+   "product": {
+    "product_name": "Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench",
+    "category": "Fitness Equipment",
+    "visible_features": [
+     "Foldable design",
+     "Adjustable backrest",
+     "Leg support rollers",
+     "Resistance bands included",
+     "Steel frame construction"
+    ],
+    "extracted_details": "Multifunctional workout bench for bench press, sit-ups, leg training, and full body training fitness machine gym.\n\nPrecio: 75,60 €\n\nVendedor: Shorkey\n\nMateriales: Steel frame · Padded upholstery\n\nContenido: 1 x Foldable workout bench · 2 x Resistance bands with handles\n\nBeneficios visibles: 120kg load capacity · Full body training · Suitable for bench press, sit-ups, and leg training\n\nPúblico: Fitness enthusiasts\n\nTextos promocionales: 120kg Load Capacity · Envío gratis · Devoluciones gratis\n\nTranscripción literal completa:\nImagen 1: (Sin texto). Imagen 2: 11:14, 33, Shorkey, Beneficios exclusivos, 75,60 €, IVA incluido, Paga 65,60 € con cupones, Envío gratis, Entrega: 27-30 jul, Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench For Bench Press Sit-Ups Leg Training Full Body Training Fitness Machine Gym, Vendido por Shorkey, Enviado desde Europa, Devoluciones gratis en puntos de entre, Ofertas, Ver todas, Declame tus ofertas antes, Sujeto a los términos y condiciones, Añadir al carrito, Comprar Envío gratis.\n\nTexto clasificado: 11:14 | 33 | Shorkey | Beneficios exclusivos | 75,60 € | IVA incluido | Paga 65,60 € con cupones | Envío gratis | Entrega: 27-30 jul | Foldable Dumbbell Bench 120kg Load Capacity Steel Frame Multifunctional Workout Bench For Bench Press Sit-Ups Leg Training Full Body Training Fitness Machine Gym | Vendido por Shorkey | Enviado desde Europa | Devoluciones gratis en puntos de entre | Ofertas | Ver todas | Declame tus ofertas antes | Sujeto a los términos y condiciones | Añadir al carrito | Comprar Envío gratis",
+    "confirmed_facts": ""
+   },
+   "structure": "negative_verdict",
+   "country": "esp",
+   "script_type": "bof",
+   "angle": "objection",
+   "duration": "15",
+   "tone": "natural",
+   "creator_format": "voiceover",
+   "language": "es",
+   "variants": 1,
+   "selected_hook": "No lo compres si no quieres aprovechar la carga de 120 kilos para tus pesas.",
+   "hook_category": "negative_verdict",
+   "cta": "CTA natural al final: carrito naranja, comprobar cupones de descuento activos, revisar si está disponible el pago a plazos y comprobar si además tiene envío gratis. No mencionar gastos de envío ni importes mínimos y no garantizar disponibilidad."
+  }
+ },
+ {
+  "fichero": "1790928101.046_res.json",
+  "tipo": "respuesta",
+  "json": {
+   "result": {
+    "content_idea": "Venta inversa irónica sobre la robustez y multifuncionalidad del banco de pesas Foldable Dumbbell Bench.",
+    "objective_emotion": "Curiosidad e ironía.",
+    "hook": "No lo compres si no quieres aprovechar la carga de 120 kilos para tus pesas.",
+    "strategy": {
+     "audience": "Entusiastas del fitness que entrenan en casa.",
+     "core_problem": "Falta de equipo resistente y versátil para entrenamientos completos.",
+     "verified_benefit": "Capacidad de carga de 120kg y diseño multifuncional.",
+     "creative_route": "Venta inversa irónica.",
+     "cta_style": "Irónico, invitando a revisar el carrito naranja."
+    },
+    "variants": [
+     {
+      "title": "Banco de pesas irónico",
+      "full_script": "No lo compres si no quieres aprovechar la carga de 120 kilos para tus pesas. No lo compres si no quieres aprovechar la carga de 120 kilos. Tampoco si te molesta que sea plegable y ocupe poco. El único problema es que te va a sobrar espacio en casa. Así que te lo voy a intentar dejar en el carrito naranja por esta zona del vídeo, pero no puedo asegurarte que cuando veas este vídeo siga disponible.",
+      "scenes": [
+       {
+        "time": "0-4s",
+        "visual": "Primer plano del banco de pesas, alguien coloca unas mancuernas pesadas con seguridad.",
+        "voice": "No lo compres si no quieres aprovechar la carga de 120 kilos para tus pesas. No lo compres si no quieres aprovechar la carga de 120 kilos.",
+        "onscreen_text": "Carga 120kg"
+       },
+       {
+        "time": "4-8s",
+        "visual": "La persona pliega el banco rápidamente y lo desliza bajo un mueble.",
+        "voice": "Tampoco si te molesta que sea plegable y ocupe poco.",
+        "onscreen_text": "Diseño plegable"
+       },
+       {
+        "time": "8-12s",
+        "visual": "Plano amplio de la habitación despejada con el banco guardado.",
+        "voice": "El único problema es que te va a sobrar espacio en casa.",
+        "onscreen_text": "Más espacio"
+       },
+       {
+        "time": "12-15s",
+        "visual": "Señalando el icono del carrito naranja en la interfaz de TikTok Shop.",
+        "voice": "Así que te lo voy a intentar dejar en el carrito naranja por esta zona del vídeo, pero no puedo asegurarte que cuando veas este vídeo siga disponible.",
+        "onscreen_text": "Carrito naranja · Comprueba disponibilidad"
+       }
+      ],
+      "recording_plan": {
+       "shots": [
+        "Plano detalle del banco soportando peso",
+        "Plano medio de la acción de plegado",
+        "Plano general del espacio despejado",
+        "Grabación de pantalla del carrito"
+       ],
+       "product_placement": "El banco debe estar en el centro, bien iluminado.",
+       "lighting_background": "Luz natural de gimnasio doméstico, fondo limpio.",
+       "demonstration": "Demostrar que el banco aguanta peso y se pliega suavemente.",
+       "materials": [
+        "Banco de pesas",
+        "Mancuernas",
+        "Smartphone"
+       ]
+      },
+      "editing_plan": {
+       "pace": "Rápido, cortes precisos con cada frase.",
+       "cuts": "Cortes a ritmo de voz.",
+       "sound": "Sonido ambiente natural de gimnasio.",
+       "captions": "Texto dinámico y legible en el centro."
+      }
+     }
+    ],
+    "quality_review": {
+     "selection_alignment": {
+      "objective": true,
+      "angle": true,
+      "tone": true,
+      "format": true,
+      "duration": true,
+      "language": true,
+      "market": true,
+      "cta": true,
+      "hook": true
+     },
+     "naturalness_score": 95,
+     "specificity_score": 90,
+     "duration_fit": true,
+     "notes": [
+      "Tensión: Robustez vs. espacio ocupado.",
+      "Contrato: Afirmación de carga 120kg + prueba visual de plegado.",
+      "Afirmaciones descartadas: Resultados garantizados, pérdida de peso, éxito total.",
+      "Comprensión sin audio: Los textos y acciones demuestran claramente el beneficio.",
+      "Validado con la metodología TTShop AI Pro Reels-105."
+     ],
+     "selected_hook_verified": true,
+     "cta_verified": true
+    },
+    "compliance": {
+     "risk": "low",
+     "safety_score": 10,
+     "safety_level": "high",
+     "prohibited_wording": [],
+     "corrections": [],
+     "coverage_note": "El contenido se ajusta a las políticas de seguridad de TikTok Shop, evitando promesas médicas o garantías falsas.",
+     "checks": [
+      {
+       "category": "Seguridad del producto",
+       "status": "passed",
+       "note": "El banco se muestra como equipo de ejercicio sin prometer resultados de salud.",
+       "source_id": "TikTok Shop Policy",
+       "source_url": "https://seller-es.tiktok.com/university/essay?from=policy&identity=1&knowledge_id=6090183864452886&role=2"
+      }
+     ],
+     "official_source": "https://seller-es.tiktok.com/university/essay?from=policy&identity=1&knowledge_id=6090183864452886&role=2",
+     "reviewed_at": "2024-05-22T10:00:00Z",
+     "policy_source_count": 0
+    },
+    "methodology_version": "reels-105-v6-ironic-body-availability-cta"
+   },
+   "provider": "gemini",
+   "quota": {
+    "used": 2,
+    "limit": 120
+   }
+  }
+ }
+]

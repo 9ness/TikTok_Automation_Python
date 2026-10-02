@@ -2649,7 +2649,10 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             # duración es el cierre, que es un literal nuestro: corto si el
             # guion viene largo, y con las promesas que el producto cumple si
             # viene corto. Lo que no llegue a cuadrar, el acelerón.
-            ctas=largo_config.ctas_posibles(plazos, envio_gratis),
+            ctas=largo_config.ctas_posibles(
+                plazos, envio_gratis,
+                inversa=largo_config.es_cierre_inverso(escrito["guion"]),
+            ),
             ventana=largo_config.ventana_video(segundos_pedidos, metraje),
         )
         # El cierre puede haber cambiado, así que lo que se apunta y lo que se
