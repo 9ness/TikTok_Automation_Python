@@ -69,6 +69,9 @@ def _fila(**kw) -> dict:
     base = {
         "id": "", "nicho": "", "modo": "", "modo_label": "",
         "source": "", "carpeta": "", "carpeta_label": "", "producto": "",
+        # Catálogo y carpeta por separado: cada catálogo lleva su color en
+        # la pantalla (ropa, zapatos, accesorios, Inventario…).
+        "catalogo": "", "catalogo_label": "", "carpeta_corta": "",
         "titulo": "", "titulo_tiktok_completo": "", "tienda": "",
         "caption": "", "emojis": "", "product_url": "",
         "uploaded": False, "uploaded_at": 0.0, "sin_stock": False,
@@ -188,6 +191,7 @@ def pov_y_largo(usuario: str) -> list[dict]:
                 id=SEP.join(("pov", fuente, carpeta, n)), nicho="pov",
                 source=fuente, carpeta=carpeta,
                 carpeta_label=f"{_label_fuente(fuente)} · {carpeta.strip()}",
+                catalogo=fuente, catalogo_label=_label_fuente(fuente), carpeta_corta=carpeta.strip(),
                 producto=n, **_textos(base), product_url=_url(base),
                 uploaded=bool(base.get("uploaded")),
                 uploaded_at=_num(base.get("uploaded_at")),
@@ -213,6 +217,7 @@ def pov_y_largo(usuario: str) -> list[dict]:
                 modo=modo_real, modo_label=etiqueta,
                 source=fuente, carpeta=carpeta,
                 carpeta_label=f"{_label_fuente(fuente)} · {carpeta.strip()}",
+                catalogo=fuente, catalogo_label=_label_fuente(fuente), carpeta_corta=carpeta.strip(),
                 producto=str(n), **_textos(textos), product_url=_url(textos),
                 uploaded=bool(prod.get("uploaded")),
                 uploaded_at=_num(prod.get("uploaded_at")),
@@ -267,6 +272,7 @@ def multimodo(usuario: str) -> list[dict]:
             modo=formato,
             modo_label=ropa_config.MODOS.get(formato, {}).get("label", formato),
             carpeta=v["carpeta"], carpeta_label=ropa_config.carpeta_label(v["carpeta"]),
+            **_catalogo_ropa(v["carpeta"], ropa_config.carpeta_label(v["carpeta"])),
             producto=str(v["producto"]), **_textos(v), product_url=url or str(v.get("product_url") or ""),
             uploaded=bool(v.get("uploaded")), uploaded_at=_num(v.get("uploaded_at")),
             rehacer=bool(v.get("rehacer")), rehacer_nota=str(v.get("rehacer_nota") or ""),
@@ -278,6 +284,15 @@ def multimodo(usuario: str) -> list[dict]:
             musica=ropa_config.musica_de(formato, f"{v['carpeta']}/{v['producto']}"),
         ))
     return filas
+
+
+def _catalogo_ropa(slug: str, etiqueta: str) -> dict:
+    """`mujer_zapatos_web__Carpeta_1` → catálogo `mujer_zapatos_web`, con su
+    etiqueta («👠 Mujer zapatos») y la carpeta sola («Carpeta_1»)."""
+    catalogo = slug.split("__", 1)[0] if "__" in slug else slug
+    cat_label, _, carpeta = etiqueta.partition(" · ")
+    return {"catalogo": catalogo, "catalogo_label": cat_label or catalogo,
+            "carpeta_corta": carpeta or slug.split("__", 1)[-1]}
 
 
 def todas(usuario: str) -> tuple[list[dict], list[dict]]:

@@ -15,6 +15,13 @@ import {
   type VideoTanda,
 } from "@/lib/queries/misTandas";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
+import {
+  COLOR_NICHO,
+  NOMBRE_NICHO,
+  colorCatalogo,
+  colorModo,
+  familiaModo,
+} from "@/lib/tiktok-shop-ai-pro/coloresModo";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
@@ -31,17 +38,23 @@ const MOTIVOS = [
   "Demasiado estático",
 ];
 
-const COLOR_NICHO: Record<string, string> = {
-  pov: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
-  largo: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
-  mm: "bg-pink-500/15 text-pink-600 dark:text-pink-300",
-};
-const NOMBRE_NICHO: Record<string, string> = { pov: "POV", largo: "Largo", mm: "Multimodo" };
-
 /** «sáb 3 oct» a partir de «2026-10-03». */
 function fechaCorta(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
   return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }).replace(".", "");
+}
+
+/** Qué lleva la tanda: un chip por nicho+modo con cuántos vídeos, en el
+ *  color de ese modo. */
+function resumenModos(items: VideoTanda[]) {
+  const vistos = new Map<string, { clave: string; label: string; color: string; n: number }>();
+  for (const v of items) {
+    const f = familiaModo(v.nicho, v.modo, v.modo_label);
+    const actual = vistos.get(f.clave);
+    if (actual) actual.n += 1;
+    else vistos.set(f.clave, { ...f, n: 1 });
+  }
+  return [...vistos.values()];
 }
 
 function Miniatura({ v }: { v: VideoTanda }) {
@@ -223,9 +236,12 @@ export function MisTandas() {
                           {t.temporada ? ` · ${t.temporada}` : ""}
                         </span>
                       ) : null}
-                      {t.nichos.map((n) => (
-                        <span key={n} className={`rounded-full px-1.5 py-px text-[9px] font-semibold ${COLOR_NICHO[n]}`}>
-                          {NOMBRE_NICHO[n] ?? n}
+                      {resumenModos(t.items).map((m) => (
+                        <span
+                          key={m.clave}
+                          className={`rounded-full px-1.5 py-px text-[9px] font-semibold ${m.color}`}
+                        >
+                          {m.label} · {m.n}
                         </span>
                       ))}
                       {t.sin_stock ? (
@@ -262,20 +278,31 @@ export function MisTandas() {
                           <Miniatura v={v} />
                           <div className="min-w-0 flex-1">
                             <p
-                              className={`line-clamp-2 break-words text-[11px] font-medium leading-tight sm:text-xs ${
+                              className={`break-words text-[11px] font-medium leading-tight sm:text-xs ${
                                 v.sin_stock && !v.uploaded ? "text-muted-foreground line-through" : ""
                               }`}
                             >
                               {v.titulo || `Producto ${v.producto}`}
                             </p>
-                            <p className="truncate text-[10px] text-muted-foreground">
-                              <span className={`mr-1 rounded px-1 py-px text-[9px] font-semibold ${COLOR_NICHO[v.nicho]}`}>
-                                {NOMBRE_NICHO[v.nicho]}
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
+                              <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${COLOR_NICHO[v.nicho] ?? ""}`}>
+                                {NOMBRE_NICHO[v.nicho] ?? v.nicho}
                               </span>
-                              {v.flecha ? "➡️ " : ""}
-                              {v.modo_label ? `${v.modo_label} · ` : ""}
-                              {v.carpeta_label} · P{v.producto}
-                            </p>
+                              {v.modo_label ? (
+                                <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${colorModo(v.nicho, v.modo)}`}>
+                                  {v.modo_label}
+                                </span>
+                              ) : null}
+                              {v.flecha ? (
+                                <span className="rounded bg-muted px-1.5 py-px text-[9px] font-semibold">➡️ Flecha</span>
+                              ) : null}
+                              <span className={`rounded border px-1.5 py-px text-[9px] font-semibold ${colorCatalogo(v.catalogo)}`}>
+                                {v.catalogo_label || v.catalogo}
+                              </span>
+                              <span className="break-words">
+                                {v.carpeta_corta} · P{v.producto}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         {v.sin_stock && !v.uploaded ? (

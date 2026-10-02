@@ -182,6 +182,12 @@ largos. La app se usa desde el móvil y desde la APK.
 
 ---
 
+**Colores de modo** (listas que mezclan nichos, como «Mis tandas»): cada
+nicho, estilo de guion, formato y catálogo tiene un color fijo en
+[`coloresModo.ts`](frontend/lib/tiktok-shop-ai-pro/coloresModo.ts). Un modo
+nuevo se da de alta ahí con su color en el mismo cambio
+(`tests/mis_tandas/test_colores.py` lo exige).
+
 ## 4. Piezas que se reutilizan (no se reescriben)
 
 | Pieza | Para qué |

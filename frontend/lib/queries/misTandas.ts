@@ -21,6 +21,9 @@ export interface VideoTanda {
   source: string;
   carpeta: string;
   carpeta_label: string;
+  catalogo: string;
+  catalogo_label: string;
+  carpeta_corta: string;
   producto: string;
   titulo: string;
   titulo_tiktok_completo: string;

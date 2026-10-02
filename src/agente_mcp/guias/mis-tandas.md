@@ -37,6 +37,20 @@ Se fija una vez y lo nuevo entra al final; marcar subido no mueve nada. En el
 multimodo se respeta su propio orden (`multimodo:orden:<usuario>`), que
 intercala formatos.
 
+## Colores
+
+Cada vídeo enseña su **nicho** (píldora fuerte), su **modo o estilo**
+(píldora suave: Largo precio ámbar, dolor rosa, épico rojo, venta inversa
+turquesa; en el multimodo un color por familia: espejo, camisetas,
+zapatillas, zapatos, botas, bolsos, zapatillas 20 s) y su **catálogo**
+(píldora con borde: Inventario General, Productos Web, Mujer zapatos, Mujer
+accesorios…). La cabecera de cada tanda resume cuántos lleva de cada modo.
+
+**Si creas un modo nuevo** (estilo de guion, formato del multimodo) o metes
+un nicho nuevo en Mis tandas, **asígnale color** en
+`frontend/lib/tiktok-shop-ai-pro/coloresModo.ts` en el mismo cambio:
+`tests/mis_tandas/test_colores.py` falla si no.
+
 ## Con el MCP
 
 - `mis_tandas()` — las tandas abiertas con sus vídeos: `id`, nicho, modo,

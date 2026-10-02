@@ -230,3 +230,10 @@ tenido que tirar de la API a mano para algo, eso es una herramienta que falta:
 añádela. Y lo que se aprenda haciendo vídeos (qué falla, qué queda mejor) va a
 la guía del menú, no solo a `learnings.md`. Carruseles aún no tiene
 herramientas: hazlo por la web con [`carruseles.md`](carruseles.md).
+
+**Modo, estilo o nicho nuevo → color nuevo.** Todo estilo de guion del
+Largo, formato del multimodo o nicho que entre en «Mis tandas» lleva su color
+en `frontend/lib/tiktok-shop-ai-pro/coloresModo.ts` (un color que no use otro
+modo del mismo nicho; formatos de una misma familia, el mismo). El test
+`tests/mis_tandas/test_colores.py` falla si falta. Un nicho nuevo en Mis
+tandas necesita además su lector en `src/mis_tandas/fuentes.py`.
