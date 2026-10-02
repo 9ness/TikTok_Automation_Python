@@ -417,8 +417,19 @@ def multimodo_tandas(
     # una de las siguientes, un día más (10 vídeos al día). Con su época, para
     # que el operador sepa qué está subiendo (otoño, Halloween, Navidad…).
     import datetime as _dt
+    import zoneinfo as _zi
 
-    dia = _dt.date.today()
+    # Si hoy ya se subió la cuota del día (8 o más: algún día faltan enlaces),
+    # la tanda abierta es para MAÑANA, aunque esté empezada.
+    _tz = _zi.ZoneInfo("Europe/Madrid")
+    dia = _dt.datetime.now(_tz).date()
+    hoy_subidos = sum(
+        1 for x in videos
+        if x["uploaded"] and x.get("uploaded_at")
+        and _dt.datetime.fromtimestamp(int(x["uploaded_at"]), _tz).date() == dia
+    )
+    if hoy_subidos >= config.SUBIDAS_DIA_HECHO:
+        dia += _dt.timedelta(days=1)
     for t in tandas:
         if all(_cerrado(x) for x in t["items"]):
             continue
@@ -429,6 +440,7 @@ def multimodo_tandas(
         "total": len(videos),
         "subidos": sum(1 for x in videos if x["uploaded"]),
         "sin_stock": sum(1 for x in videos if x.get("sin_stock") and not x["uploaded"]),
+        "subidos_hoy": hoy_subidos,
         "tandas": tandas,
     }
 

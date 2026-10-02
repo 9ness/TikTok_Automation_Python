@@ -137,7 +137,8 @@ export function TandasMultimodo() {
       extra={
         datos
           ? `${datos.subidos}/${datos.total} subidos` +
-            (datos.sin_stock ? ` · 🚫 ${datos.sin_stock}` : "")
+            (datos.sin_stock ? ` · 🚫 ${datos.sin_stock}` : "") +
+            (datos.subidos_hoy ? ` · hoy ${datos.subidos_hoy}` : "")
           : undefined
       }
     >

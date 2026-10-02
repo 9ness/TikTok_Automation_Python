@@ -511,6 +511,11 @@ def temporada_multimodo(hoy=None, adelanto: int = ADELANTO_PUBLICAR_DIAS) -> str
     return "otono"
 
 
+# Con cuántos vídeos subidos HOY se da el día por hecho (el objetivo son 10;
+# algún día se quedan en 8 porque el enlace del producto no existe).
+SUBIDAS_DIA_HECHO = 8
+
+
 def etiqueta_temporada(dia) -> str:
     """La etiqueta que ve el operador en cada tanda: qué época toca ese día."""
     if dia.month == 10 and dia.day >= 10:

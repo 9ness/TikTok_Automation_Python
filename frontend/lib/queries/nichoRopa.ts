@@ -550,6 +550,8 @@ export interface VideoMultimodo {
 }
 
 export interface TandasMultimodoResponse {
+  /** Vídeos marcados subidos hoy (hora de España). */
+  subidos_hoy?: number;
   total: number;
   subidos: number;
   /** Vídeos sin subir cuyo producto está sin stock. */
