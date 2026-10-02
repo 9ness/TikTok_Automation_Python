@@ -1,3 +1,8 @@
+## ⚡ Épico Octubre (ness) — 11 vídeos listos (2 oct 2026)
+- Hechos y revisados: 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12 (en la bandeja `_agente/ness/pov_bof_largo/Epico_Octubre/videos/`). Sin marcar Subido.
+- Pendiente: 7 (aspiradora) y 13-36 — guiones épicos ya escritos (gpt-5.4, 2 oct); faltan imágenes POV (Flow) + insertos y clips (Kling del Space, generadores #3 y #4).
+- El 12 salió con 2 golpes de 3 (el de «8 NIVELES» no se localizó en la voz): mirar por qué si se repite.
+
 ## 🎄 Productos Q4 (ness) — pendiente (30 sep 2026)
 
 - [ ] **Recargar OpenAI** (o esperar a que Gemini recupere cuota): sin IA no se escriben guiones ni funciona la voz «auto».
