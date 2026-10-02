@@ -114,6 +114,30 @@ def _producto(source: str, folder: str, producto: str, usuario: str, carpeta_tmp
     return textos, foto
 
 
+def _sin_comentarios(texto: str) -> str:
+    import re
+
+    return re.sub(r"<!--.*?-->", "", texto, flags=re.S).strip()
+
+
+def _sistema() -> str:
+    """El prompt de la réplica + las reglas de imagen del POV BOF, leídas de
+    SU fichero: si cambian allí (tamaño real, nada flota, etiqueta intacta…),
+    la réplica las sigue sin tocar nada aquí."""
+    import src.nicho_pov_bof as pov
+    from src.nicho_pov_bof import config as pov_config
+
+    base = _sin_comentarios(PROMPT.read_text(encoding="utf-8"))
+    reglas_pov = Path(pov.__file__).parent / "prompts" / "prompt_imagen.md"
+    try:
+        extra = _sin_comentarios(reglas_pov.read_text(encoding="utf-8")).replace("{{EPOCA}}", pov_config.epoca_actual())
+    except OSError:
+        extra = ""
+    if not extra:
+        return base
+    return base + "\n\n## Reglas de imagen del POV BOF (valen para cada `prompt_imagen`)\n\n" + extra
+
+
 def _ficha(textos: dict) -> str:
     campos = ("titulo", "titulo_tiktok_completo", "tienda", "precio", "caption", "descripcion", "notas")
     lineas = [f"- {c}: {textos[c]}" for c in campos if textos.get(c)]
@@ -144,9 +168,7 @@ def replicar(
         video = _comprimir(origen, tmp / "ref.mp4")
         textos, foto = _producto(source, folder, producto, usuario, tmp)
 
-        sistema = PROMPT.read_text(encoding="utf-8")
-        if sistema.startswith("<!--"):
-            sistema = sistema.split("-->", 1)[1].strip()
+        sistema = _sistema()
         mensaje = (
             "VÍDEO DE REFERENCIA: el vídeo adjunto"
             + (f" (de @{meta['autor']}, {meta['vistas']} vistas: «{meta['titulo']}»)" if meta else "")

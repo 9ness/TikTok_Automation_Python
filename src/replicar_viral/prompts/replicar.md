@@ -36,6 +36,16 @@ demostración, estructura) con NUESTRO producto. Nuestro formato es fijo:
   sin cara. Si el original es una persona hablando a cámara, tradúcelo a planos
   de producto/manos que enseñen lo mismo.
 
+**Normas de la cuenta que mandan sobre el vídeo original:**
+- **NUNCA niños ni bebés** en las imágenes ni en los vídeos (ni de espaldas, ni
+  dormidos, ni una mano pequeña). Si el producto es infantil, el producto va
+  solo, en su sitio (la cuna, la habitación, el cambiador), sin el niño.
+- **La mano solo SEÑALA el producto** (formato POV): no lo coloca, no lo coge,
+  no lo abre, no lo usa ni lo pone sobre nadie.
+- **Nada de promesas de salud ni de resultados** («cura», «alivia», «controla
+  la fiebre», «en tiempo real», «adelgaza»…), aunque el original las haga. Se
+  describe el producto con lo que dice la ficha, sin asegurar efectos.
+
 Reglas del guion (en español de España, natural, como lo diría una persona
 normal enseñando algo que ha comprado):
 - Empieza con un gancho del mismo tipo que el del original.
@@ -61,17 +71,21 @@ los generadores):
   número en pantalla promete algo que la ficha no dice. Si el producto se usa
   con una app, enséñalo puesto o en uso, no la pantalla.
 - Cada clip enseña lo que dice la voz EN SU MITAD del guion.
-- **Si sale una mano, señala el producto o lo presenta, pero NO lo coge, no lo
-  abre ni lo mueve**: al manipularlo, el generador lo redibuja (etiquetas
-  inventadas, deformaciones). Si el original lo usa, enséñalo ya puesto o en su
-  sitio funcionando, sin la mano encima.
+- **La mano solo señala el producto: NO lo coloca, no lo coge, no lo abre ni
+  lo mueve**. Al manipularlo, el generador lo redibuja (etiquetas inventadas,
+  deformaciones). Si el original lo usa, enséñalo en su sitio, sin la mano
+  encima y sin nadie usándolo.
+- Además, las **reglas de imagen del POV BOF** que van al final de este
+  mensaje valen para cada `prompt_imagen` (escríbelas con tus palabras dentro
+  del prompt, en inglés).
 - `prompt_imagen`: la imagen inicial (encuadre, sitio, luz, qué hay en la
   mano) — se generará con la foto del producto como referencia.
 - `prompt_video`: cómo se anima esa imagen durante 8 s (movimiento de cámara,
   qué hace la mano, cortes dentro del clip si el original los tiene, con sus
   segundos: "0-3s …, 3-8s …"). Acaba siempre con: "No one speaks. No text on
-  screen. The hand never grabs or moves the product. The product keeps its
-  exact shape, colors and label."
+  screen. No children or babies. The hand only points at the product, it never
+  places, grabs, moves or uses it. The product keeps its exact shape, colors
+  and label."
 
 Sé estricto con `apto`. Es `false` si el vídeo de referencia **no vende un
 producto físico enseñándolo** (tutoriales, consejos, una persona contando algo

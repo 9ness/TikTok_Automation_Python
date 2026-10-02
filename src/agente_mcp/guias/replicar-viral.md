@@ -74,6 +74,14 @@ La carpeta la ve cualquier usuario (las otras especiales solo ness).
 
 ## Reglas
 
+- **Nunca niños ni bebés** en imágenes ni clips; con productos infantiles, el
+  producto va solo en su sitio.
+- **La mano solo señala** el producto (formato POV): no lo coloca, coge ni usa.
+- **Sin promesas de salud ni de resultados** aunque el original las haga.
+- Las imágenes siguen las reglas del POV BOF (`nicho_pov_bof/prompts/prompt_imagen.md`:
+  etiqueta intacta, tamaño real, nada flota). La app ya se las pasa a Gemini;
+  revisa igualmente que el resultado las cumple antes de generar.
+
 - Una réplica por vídeo y producto: no lances varias del mismo par «por si acaso».
 - Nunca copies la cara, la voz ni el texto literal del creador original.
 - No prometas en el guion nada que no diga la ficha (precio, envío, plazos).
