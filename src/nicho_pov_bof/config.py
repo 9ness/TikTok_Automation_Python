@@ -213,9 +213,13 @@ CARPETA_INVERSA = "Venta Inversa"
 # etiqueta: con tantas carpetas listas a la vez no sabía cuál tocaba (2 oct
 # 2026). El calendario entero está en `docs/CALENDARIO_POV_BOF_LARGO.md`.
 CARPETAS_ESPECIALES: dict[str, dict] = {
+    # `modo`: la carpeta trabaja SIEMPRE en ese modo de guion, esté como esté
+    # el catálogo (no hay que cambiar el modo de todo el Inventario para verla).
     CARPETA_EPICO_OCT: {"manifiesto": "especial:epico_octubre:manifiesto", "temporada": False,
+                        "modo": "epico",
                         "etiqueta": "⚡ Épico Octubre · subir 3-5 oct (modo Épico)"},
     CARPETA_INVERSA: {"manifiesto": "especial:venta_inversa:manifiesto", "temporada": False,
+                      "modo": "inversa",
                       "etiqueta": "🔄 Venta Inversa · subir 6-9 oct (modo Venta inversa)"},
     CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True,
                  "etiqueta": "🎄 Productos Q4 · subir 28 oct-10 nov (modo Dolor/Precio)"},
@@ -224,6 +228,11 @@ CARPETAS_ESPECIALES: dict[str, dict] = {
 
 def es_carpeta_especial(folder: str) -> bool:
     return folder in CARPETAS_ESPECIALES
+
+
+def modo_de_carpeta(folder: str) -> str:
+    """El modo de guion fijo de una carpeta especial ("" si no tiene)."""
+    return str((CARPETAS_ESPECIALES.get(folder or "") or {}).get("modo") or "")
 
 
 def es_temporada(folder: str) -> bool:

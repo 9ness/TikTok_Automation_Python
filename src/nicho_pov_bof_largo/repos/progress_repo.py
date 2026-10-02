@@ -138,9 +138,18 @@ def _key_modo(source: str, usuario: str = "") -> str:
     return f"modo:{source}:{usuario}"
 
 
-def get_modo(source: str, usuario: str = "") -> str:
-    """Con qué modo de guion se está trabajando este catálogo."""
+def get_modo(source: str, usuario: str = "", folder: str = "") -> str:
+    """Con qué modo de guion se está trabajando este catálogo. Con `folder`,
+    una carpeta especial con modo fijo («Venta Inversa», «Épico Octubre»)
+    manda sobre el del catálogo."""
     import time
+
+    if folder:
+        from src.nicho_pov_bof import config as _pov
+
+        fijo = _pov.modo_de_carpeta(folder)
+        if fijo:
+            return fijo
 
     from src.nicho_pov_bof_largo import config as largo_config
 

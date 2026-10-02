@@ -121,3 +121,10 @@ def test_venta_inversa_siempre_cierra_con_disponibilidad():
     assert config.cerrar_guion(g, "dolor") == g
     cerrado = config.cerrar_guion(g, "inversa")
     assert config.cerrar_guion(cerrado, "inversa") == cerrado
+
+
+def test_carpetas_especiales_con_modo_fijo():
+    from src.nicho_pov_bof import config as pov_config
+    assert pov_config.modo_de_carpeta("Venta Inversa") == "inversa"
+    assert pov_config.modo_de_carpeta("Épico Octubre") == "epico"
+    assert pov_config.modo_de_carpeta("Carpeta_3") == ""

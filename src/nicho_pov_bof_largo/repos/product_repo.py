@@ -62,7 +62,7 @@ def _key(source: str, folder: str, usuario: str, estilo: str = "") -> str:
     if not estilo:
         from src.nicho_pov_bof_largo.repos import progress_repo
 
-        estilo = progress_repo.get_modo(source, usuario)
+        estilo = progress_repo.get_modo(source, usuario, folder)
     estilo = (estilo or largo_config.ESTILO_GUION_DEFECTO).strip()
     if estilo == largo_config.ESTILO_GUION_DEFECTO:
         return base
