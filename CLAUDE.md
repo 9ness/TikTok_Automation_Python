@@ -431,7 +431,7 @@ Tres cosas del guion que no son del curso y hay que saber:
 La IA marca `[[GOLPE: TEXTO | escena]]`, que se guardan en `golpes` y la voz no
 lee. `pipeline/insertos.py` mete tras el montaje un inserto de 1 s por golpe
 (clip de 5 s de Kling subido con `inserto=N`), con destello, texto y
-`assets/sfx/golpe_epico.wav`, y recorta la pausa de antes y de después.
+un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si el inserto es de fondo blanco), y recorta la pausa de antes y de después.
 
 **🎄 Productos Q4** (`nicho_pov_bof/services/productos_q4.py`): carpeta real
 «Productos Q4» dentro del Inventario General, primera de la lista y solo para

@@ -82,3 +82,16 @@ def test_localiza_aunque_whisper_oiga_mal():
                 _w("cada", 0.82, 0.94), _w("mañana", 0.94, 1.4), _w("esto", 1.74, 2.0)]
     golpes = [{"tras": "¿Te irrita afeitarte cada mañana?", "texto": "X", "escena": ""}]
     assert insertos.localizar(palabras, golpes) == [(1.4, 1.74)]
+
+
+def test_sonidos_por_video_y_boom_en_blanco(tmp_path):
+    for n in (*config.SONIDOS_OSCURO, config.SONIDO_BLANCO):
+        (tmp_path / n).write_bytes(b"x")
+    s = insertos.elegir_sonidos(tmp_path, tmp_path / "1 Banco.mp4", [False, True, False])
+    assert s[1].name == config.SONIDO_BLANCO
+    assert s[0] == s[2] and s[0].name in config.SONIDOS_OSCURO     # uno por vídeo
+    # el mismo vídeo suena igual al remontarlo
+    assert insertos.elegir_sonidos(tmp_path, tmp_path / "1 Banco.mp4", [False])[0] == s[0]
+    # con un fichero suelto, todos iguales
+    f = tmp_path / config.SONIDO_BLANCO
+    assert insertos.elegir_sonidos(f, tmp_path / "x.mp4", [False, True]) == [f, f]

@@ -831,8 +831,17 @@ INSERTO_S = 1.0
 # Cuántos golpes puede marcar el guion: lo decide la IA según cuántas frases
 # potentes tenga (mínimo 2). Las referencias meten 3-4 en 20 s.
 INSERTOS_MAXIMOS = 4
-# El sonido del golpe (el de la referencia que eligió el operador).
-SONIDO_INSERTO = "assets/sfx/golpe_epico.wav"
+# Banco de sonidos del golpe (carpeta). Para que no suenen todos los vídeos
+# igual, cada vídeo sortea UNO para sus insertos oscuros (`SONIDOS_OSCURO`) y
+# los de fondo blanco llevan el boom grave, como en las referencias (oct 2026,
+# ver `src/agente_mcp/guias/pov-bof-largo.md` › «Variedad»):
+# - golpe_clasico: el de la referencia que eligió el operador (Do#/Sol#).
+# - sting_trailer: nota sostenida + golpe a 0,55 s (La), el de los cortes oscuros.
+# - ritmo_tambores: pulsos de tráiler a ~130 ppm (Si/Sol#), el del remate.
+# - boom_grave: impacto de graves sostenido, el de fondo blanco + letras rojas.
+SONIDO_INSERTO = "assets/sfx/epico"
+SONIDOS_OSCURO = ("golpe_clasico.wav", "sting_trailer.wav", "ritmo_tambores.wav")
+SONIDO_BLANCO = "boom_grave.wav"
 
 
 def es_epico(estilo: str) -> bool:

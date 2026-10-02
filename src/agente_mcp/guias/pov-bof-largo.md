@@ -144,13 +144,50 @@ Por producto, además de sus clips normales:
    foto limpia: color y logo exactos. La luz cálida tira el color, así que pide
    luz neutra.
 3. **Clip (Magnific, Kling 2.5 · 9:16 · 5 s · 720p ∞)** en el **«Video
-   Generator #2»** del Space, conectado a su nodo «Creation». **No toques el
-   «Video Generator #1»** (10 s, prompt de otros flujos). Prompt: acercamiento
-   lento de cámara, el producto y la mano quietos, sin texto. Kling 2.5 no
-   admite imagen final; Kling 2.6 sí, pero solo en 1080p y con créditos, así
-   que no se usa.
+   Generator #4»** del Space (lo alimenta la «List #5»; los clips POV de 10 s
+   van en el #3 con la «List #3»). **No toques el «Video Generator #1»** (10 s,
+   prompt de otros flujos). Prompt: acercamiento lento de cámara, el producto y
+   la mano quietos, sin texto. Kling 2.5 no admite imagen final; Kling 2.6 sí,
+   pero solo en 1080p y con créditos, así que no se usa. Del clip solo se usa
+   el segundo 1-2: lo que pase después no se ve.
 4. `subir_clip(..., inserto=N)` por cada golpe. El montaje arranca cuando están
    los clips normales y todos los insertos.
+
+### Variedad: que no salgan todos iguales (análisis del 2 oct 2026)
+
+Sale de un vídeo de ejemplo que pasó el operador (una creadora que copia al
+viralizador original; `diferentes_efectos_apico.mp4` en su Drive): 7 cortes
+épicos en 21 s. Lo que hace y lo que ya hace la app:
+
+| En el ejemplo | En la app |
+|---|---|
+| Los cortes **oscuros** llevan TODOS el mismo «sting» de 1 s (nota sostenida en La y golpe a 0,55 s), a −25 dB, más bajo que la voz | Cada vídeo sortea UN sonido para sus insertos oscuros entre `golpe_clasico` (el que eligió el operador), `sting_trailer` (el del ejemplo) y `ritmo_tambores`. Dentro de un vídeo no cambia; entre vídeos, sí |
+| El corte de **fondo blanco** suena distinto: un **boom grave sostenido**, mucho más fuerte (−13,5 dB, 95 % de la energía por debajo de 150 Hz) | Si el inserto es de fondo blanco (se mide solo, por el brillo del tercio de arriba), lleva `boom_grave` |
+| Fondo blanco + **titular ROJO con serifa** («VESTIDO PISTACHO»), sin oscurecer la imagen | Fondo blanco → texto rojo `#D7261E` en Playfair Display Black, ajustado al ancho, sin viñeta ni oscurecido. Fondo oscuro → letra blanca con borde negro (como antes) |
+| Fondos: humo **dorado/ámbar** con foco cálido, humo **azul-gris frío**, foco cenital sobre negro y blanco | Varía tú el fondo en la imagen de Flow (abajo) |
+| Los cortes oscuros **no llevan texto**; el remate final es un montaje de 3 cortes seguidos con un ritmo de tambores | No se hace (el operador pidió texto en cada golpe). Si algún día se quiere, es aquí |
+
+Los sonidos están en `assets/sfx/epico/` (se sacaron del ejemplo: los cuatro
+cortes oscuros promediados, para limpiar la voz). Para añadir uno, deja el
+`.wav` (1 s, normalizado a −1 dBFS) en esa carpeta y súmalo a
+`config.SONIDOS_OSCURO`.
+
+**Cómo variar al generar las imágenes épicas** (el fondo lo decides tú):
+- Mezcla en un mismo vídeo un inserto **oscuro** y uno **blanco a contraluz**:
+  el blanco es el que se lleva las letras rojas y el boom, y es el que más
+  impacta. Guárdalo para la característica más fuerte, no para el gancho.
+- En los oscuros alterna entre vídeos: «foco cenital blanco + neblina sobre
+  negro», «humo dorado/ámbar con luz cálida desde arriba» (cuida el color del
+  producto: pide que conserve sus colores reales) y «humo azul-gris frío».
+- Productos claros (blancos, rosas, cosmética) quedan mejor en oscuro; productos
+  negros (muebles, herramientas) se pierden sobre negro: blanco a contraluz o
+  humo dorado.
+
+**Ojo con la foto del producto**: muchas fichas son un montaje de catálogo con
+los accesorios sueltos al lado (gomas, cables, mandos). Si la imagen copia
+eso, los accesorios salen **flotando en el aire** y el vídeo no se puede
+publicar (pasó con el banco de pesas, oct 2026). En la escena di DÓNDE están:
+«las gomas, recogidas en el suelo junto a la pata del banco», nunca «colgadas».
 
 ## 🎄 Productos Q4 (Black Friday y Navidad)
 

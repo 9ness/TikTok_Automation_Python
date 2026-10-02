@@ -41,6 +41,13 @@ _MARCA_RE = re.compile(r"\[\[\s*GOLPE\s*:\s*([^|\]]+?)\s*(?:\|\s*([^\]]*?))?\s*\
 # consonante final se corta en seco y suena a error de edición.
 _MARGEN_S = 0.06
 _FUENTE = str(Path(__file__).resolve().parents[3] / "assets/fonts/Montserrat-ExtraBold.ttf")
+# Fondo blanco: titular rojo con serifa, como los «VESTIDO PISTACHO» de las
+# referencias (oct 2026). Sobre blanco el texto blanco con borde negro no pega.
+_FUENTE_ROJA = str(Path(__file__).resolve().parents[3] / "assets/fonts/PlayfairDisplay-Black.ttf")
+_ROJO = "0xD7261E"
+# Luminancia media (0-255) del tercio de arriba a partir de la cual el inserto
+# se trata como «fondo blanco».
+_CLARO = 170
 
 
 # ---------------------------------------------------------------------------
@@ -162,27 +169,75 @@ def _lineas(texto: str, max_car: int = 13) -> list[str]:
     return lineas[:3]
 
 
+def _talla_que_cabe(lineas: list[str], fuente: Path, *, maximo: int, ancho: int) -> int:
+    """La letra más grande (≤ `maximo`) con la que la línea más larga cabe en
+    `ancho` px. Se mide con PIL; sin PIL, una estimación por caracteres."""
+    if not lineas:
+        return maximo
+    try:
+        from PIL import ImageFont
+
+        f = ImageFont.truetype(str(fuente), 100)
+        mas_ancha = max(f.getlength(x) for x in lineas)
+        return max(60, min(maximo, int(100 * ancho / mas_ancha)))
+    except Exception:  # noqa: BLE001
+        return max(60, min(maximo, int(ancho / (0.75 * max(len(x) for x in lineas)))))
+
+
+def es_fondo_claro(clip: Path, desde: float = 1.0) -> bool:
+    """¿El inserto es de fondo blanco? Se mira el tercio de ARRIBA del
+    fotograma (donde va el texto): en los de contraluz el producto está
+    abajo y oscuro, pero el fondo es blanco."""
+    r = subprocess.run(
+        ["ffmpeg", "-v", "error", "-ss", f"{desde:.2f}", "-i", str(clip), "-frames:v", "1",
+         "-vf", "scale=36:64,crop=36:22:0:0,format=gray", "-f", "rawvideo", "-"],
+        capture_output=True,
+    )
+    datos = r.stdout
+    return bool(datos) and sum(datos) / len(datos) > _CLARO
+
+
 def render_inserto(
     clip: Path, texto: str, salida: Path, sonido: Path, *,
-    dur: float, desde: float = 1.0, fuente: Path | None = None, on_log: OnLog = _noop,
+    dur: float, desde: float = 1.0, fuente: Path | None = None,
+    claro: bool | None = None, on_log: OnLog = _noop,
 ) -> Path:
-    """Un inserto de `dur` s: trozo del clip, oscurecido y con contraste,
-    viñeta, acercamiento lento, destello blanco al entrar, texto grande arriba
-    y el golpe de sonido."""
-    fuente = fuente or Path(_FUENTE)
+    """Un inserto de `dur` s: trozo del clip, destello blanco al entrar,
+    acercamiento lento, texto grande arriba y el golpe de sonido.
+
+    Dos estilos según el fondo (`claro`, que se mide si no se da):
+    - oscuro: contraste, viñeta y letra blanca con borde negro;
+    - blanco: sin oscurecer ni viñeta, titular ROJO con serifa.
+    """
     total = _duracion(clip)
     desde = max(0.0, min(desde, max(0.0, total - dur - 0.05)))
+    if claro is None:
+        claro = es_fondo_claro(clip, desde)
     frames = max(1, int(dur * 30))
     textos = []
-    for i, linea in enumerate(_lineas(texto)):
-        textos.append(
-            f"drawtext=fontfile={fuente}:text='{_texto_ffmpeg(linea)}':fontsize=112:"
-            f"fontcolor=white:borderw=6:bordercolor=black@0.85:shadowx=0:shadowy=8:"
-            f"shadowcolor=black@0.6:x=(w-text_w)/2:y=h*0.17+{i}*132:enable='gte(t,0.08)'"
-        )
+    if claro:
+        fuente = fuente or Path(_FUENTE_ROJA)
+        lineas = _lineas(texto, max_car=11)
+        talla = _talla_que_cabe(lineas, fuente, maximo=150, ancho=960)
+        for i, linea in enumerate(lineas):
+            textos.append(
+                f"drawtext=fontfile={fuente}:text='{_texto_ffmpeg(linea)}':fontsize={talla}:"
+                f"fontcolor={_ROJO}:shadowx=0:shadowy=4:shadowcolor=black@0.25:"
+                f"x=(w-text_w)/2:y=h*0.11+{i}*{int(talla * 1.1)}:enable='gte(t,0.08)'"
+            )
+        tono = "eq=contrast=1.06:saturation=1.05"
+    else:
+        fuente = fuente or Path(_FUENTE)
+        for i, linea in enumerate(_lineas(texto)):
+            textos.append(
+                f"drawtext=fontfile={fuente}:text='{_texto_ffmpeg(linea)}':fontsize=112:"
+                f"fontcolor=white:borderw=6:bordercolor=black@0.85:shadowx=0:shadowy=8:"
+                f"shadowcolor=black@0.6:x=(w-text_w)/2:y=h*0.17+{i}*132:enable='gte(t,0.08)'"
+            )
+        tono = "eq=contrast=1.15:brightness=-0.03:saturation=1.05,vignette=PI/4.5"
     vf = (
         "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
-        "eq=contrast=1.15:brightness=-0.03:saturation=1.05,vignette=PI/4.5,"
+        f"{tono},"
         f"zoompan=z='1.0+0.05*on/{frames}':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1080x1920:fps=30,"
         "fade=t=in:st=0:d=0.15:color=white"
         + ("," + ",".join(textos) if textos else "")
@@ -199,6 +254,26 @@ def render_inserto(
     return salida
 
 
+def elegir_sonidos(sonido: Path, video: Path, claros: list[bool]) -> list[Path]:
+    """El sonido de cada golpe. `sonido` puede ser un fichero (todos igual) o
+    la carpeta del banco: entonces cada VÍDEO sortea uno para sus insertos
+    oscuros (fijo por nombre de vídeo, así un remontaje suena igual) y los de
+    fondo blanco llevan el boom grave."""
+    from src.nicho_pov_bof_largo import config
+
+    sonido = Path(sonido)
+    if not sonido.is_dir():
+        return [sonido] * len(claros)
+    oscuros = [sonido / n for n in config.SONIDOS_OSCURO if (sonido / n).is_file()]
+    blanco = sonido / config.SONIDO_BLANCO
+    import zlib
+    # Sin la hora que lleva el nombre del vídeo («1 Banco … 2244»): el mismo
+    # producto suena igual aunque se remonte.
+    clave = re.sub(r"\s*\d{3,4}$", "", Path(video).stem)
+    base = oscuros[zlib.crc32(clave.encode()) % len(oscuros)] if oscuros else blanco
+    return [blanco if (c and blanco.is_file()) else base for c in claros]
+
+
 def aplicar(
     video: Path, palabras: list[dict], golpes: list[dict], clips: list[Path],
     work_dir: Path, *, sonido: Path, dur: float = 1.0, on_log: OnLog = _noop,
@@ -212,6 +287,9 @@ def aplicar(
     work_dir.mkdir(parents=True, exist_ok=True)
     tiempos = localizar(palabras, golpes)
     cortes = []
+    claros = [bool(i < len(clips) and Path(clips[i]).is_file() and es_fondo_claro(Path(clips[i])))
+              for i in range(len(golpes))]
+    sonidos = elegir_sonidos(sonido, video, claros)
     for i, (g, t) in enumerate(zip(golpes, tiempos)):
         if t is None or i >= len(clips) or not Path(clips[i]).is_file():
             on_log(f"[insertos] golpe {i + 1} («{g['texto']}») sin sitio en la voz o sin clip: se salta")
@@ -219,7 +297,7 @@ def aplicar(
         fin, sig = t
         corte_a = fin + _MARGEN_S
         corte_b = max(corte_a, sig - _MARGEN_S)
-        cortes.append((corte_a, corte_b, Path(clips[i]), g["texto"]))
+        cortes.append((corte_a, corte_b, Path(clips[i]), g["texto"], claros[i], sonidos[i]))
     if not cortes:
         on_log("[insertos] ningún golpe localizado: vídeo sin insertos")
         return video
@@ -229,14 +307,15 @@ def aplicar(
     t0 = 0.0
     enc = ["-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "30",
            "-c:a", "aac", "-ar", "48000", "-ac", "2"]
-    for n, (a, b, clip, texto) in enumerate(cortes):
+    for n, (a, b, clip, texto, claro, son) in enumerate(cortes):
         seg = work_dir / f"ep_seg{n}.mp4"
         _run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t0:.3f}", "-to", f"{a:.3f}", "-i", str(video), *enc, str(seg)], on_log)
         partes.append(seg)
         ins = work_dir / f"ep_ins{n}.mp4"
-        render_inserto(clip, texto, ins, sonido, dur=dur, on_log=on_log)
+        render_inserto(clip, texto, ins, son, dur=dur, claro=claro, on_log=on_log)
         partes.append(ins)
-        on_log(f"[insertos] golpe «{texto}» en {a:.2f}s (pausa {b - a:.2f}s recortada)")
+        on_log(f"[insertos] golpe «{texto}» en {a:.2f}s (pausa {b - a:.2f}s recortada, "
+               f"{'blanco' if claro else 'oscuro'}, {son.stem})")
         t0 = b
     fin = work_dir / "ep_fin.mp4"
     _run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t0:.3f}", "-to", f"{total:.3f}", "-i", str(video), *enc, str(fin)], on_log)
