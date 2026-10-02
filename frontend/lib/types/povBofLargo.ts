@@ -69,6 +69,7 @@ export interface ProductoLargo {
   clip5?: boolean;
   /** Modo Épico: dónde van los insertos (texto en pantalla, escena, frase). */
   golpes?: { tras: string; texto: string; escena: string }[];
+  replica_id?: string;
   /** Insertos ya subidos (1, 2, 3). */
   insertos_subidos?: number[];
   /** Cuántos clips pide este guion (2, o 3 si la voz no cabe en dos). */

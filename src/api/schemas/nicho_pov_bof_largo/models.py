@@ -81,6 +81,8 @@ class ProductoLargo(BaseModel):
     # qué insertos hay subidos ya.
     golpes: list[dict] = []
     insertos_subidos: list[int] = []
+    # Réplica viral: de qué réplica salen el guion y los prompts de los clips.
+    replica_id: str = ""
     clips_necesarios: int = 2
     # Duración elegida para los clips de ESTE producto (8 o 10 segundos).
     clip_s: int = 8

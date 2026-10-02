@@ -694,6 +694,7 @@ def _listar(
             clip4=_clip_puesto(mio.get("clip4_path"), float(mio.get("video_listo_at") or 0)),
             clip5=_clip_puesto(mio.get("clip5_path"), float(mio.get("video_listo_at") or 0)),
             golpes=list(mio.get("golpes") or []),
+            replica_id=str(mio.get("replica_id") or ""),
             insertos_subidos=[
                 n for n in range(1, config.INSERTOS_MAXIMOS + 1)
                 if _clip_puesto(mio.get(f"inserto{n}_path"), float(mio.get("video_listo_at") or 0))
