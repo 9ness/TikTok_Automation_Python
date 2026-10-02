@@ -345,6 +345,16 @@ def segundos_de_estilo(estilo: str, pedidos: float = 0) -> float:
     return SEGUNDOS_INVERSA if es_inversa(estilo) else float(pedidos or 0)
 
 
+def cerrar_guion(guion: str, estilo: str) -> str:
+    """En la venta inversa, el guion SIEMPRE acaba con el cierre de
+    disponibilidad. La IA se lo come a veces (12 de 21 en la primera tanda,
+    oct 2026) y sin él el vídeo se queda sin carrito naranja. Se añade aquí,
+    sin otra llamada. En los demás modos no toca nada."""
+    if not es_inversa(estilo) or not guion or es_cierre_inverso(guion):
+        return guion
+    return f"{guion.rstrip()} {cta_inversa(SEGUNDOS_INVERSA)}"
+
+
 def es_cierre_inverso(guion: str) -> bool:
     """¿El guion acaba con el cierre de disponibilidad de la venta inversa?
 

@@ -2611,7 +2611,8 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         )
         product_repo.update_product(
             source, folder, producto, usuario=operator, estilo=estilo,
-            guion=escrito["guion"], subliminal=escrito["subliminal"],
+            guion=largo_config.cerrar_guion(escrito["guion"], modo),
+            subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=modo, guion_segundos=segundos,
             golpes=escrito.get("golpes") or [],
@@ -3650,7 +3651,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
         product_repo.update_product(
             source, carpeta, pid, usuario=usuario, estilo=estilo,
             guion=largo_config.recortar_cta(
-                escrito["guion"], plazos=plazos, envio=envio,
+                largo_config.cerrar_guion(escrito["guion"], estilo), plazos=plazos, envio=envio,
             ),
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,

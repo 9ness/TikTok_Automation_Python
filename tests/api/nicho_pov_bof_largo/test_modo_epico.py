@@ -113,3 +113,11 @@ def test_venta_inversa_prompt_y_cierre():
     assert config.segundos_de_estilo("inversa", 16) == config.SEGUNDOS_INVERSA == 24
     assert config.segundos_de_estilo("dolor", 16) == 16
     assert config.CTA_INVERSA in config.prompt_guion(False, "inversa", True, 24)
+
+
+def test_venta_inversa_siempre_cierra_con_disponibilidad():
+    g = "No compres este cubo si no quieres tres compartimentos. El único problema es que ordena."
+    assert config.cerrar_guion(g, "inversa").endswith(config.CTA_INVERSA)
+    assert config.cerrar_guion(g, "dolor") == g
+    cerrado = config.cerrar_guion(g, "inversa")
+    assert config.cerrar_guion(cerrado, "inversa") == cerrado

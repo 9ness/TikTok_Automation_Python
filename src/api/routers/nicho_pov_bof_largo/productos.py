@@ -1245,7 +1245,7 @@ def escribir_guion(
         product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
             guion=config.recortar_cta(
-                escrito["guion"], plazos=plazos, envio=envio_gratis,
+                config.cerrar_guion(escrito["guion"], estilo), plazos=plazos, envio=envio_gratis,
             ),
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
