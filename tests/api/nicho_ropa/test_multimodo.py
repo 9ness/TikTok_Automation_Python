@@ -80,7 +80,7 @@ class TestRotuloVintage:
 
     def test_frase_por_prenda_y_sin_grado(self):
         a = config.texto_de_modo("mm_bolso_1", "c/1")
-        assert a["titulo"] and a["segundos"] == 0.0
+        assert a["titulo"] and a["segundos"] == 3.0  # entero = «contenido estático»
         assert a == config.texto_de_modo("mm_bolso_1", "c/1")  # remontar no la cambia
         assert not config.lleva_grado("mm_bolso_1")
         assert config.lleva_grado("mm_espejo_escenas")

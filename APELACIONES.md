@@ -56,6 +56,8 @@ no se apela: se rehace el vídeo.
 | (curso) | Producto con ficha en inglés | contenido en español y ficha en parte en inglés | ✅ aprobada |
 | 28/9/2026 | MIKOMIKA espejo maquillaje LED (Inventario · Carpeta_28 · p7) | es un espejo: refleja la habitación y la mano (6 pruebas, sin fotogramas del clip 1) | ❌ rechazada 28/9 |
 | 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ❌ rechazada 28/9 (respuesta genérica) |
+| 2/10/2026 | Multimodo (Ana) · botas altas Vintage (Zapatos C3 · p6) — «contenido estático» -4 | vídeo real: piernas que se cruzan y mano; el rótulo de temporada fijo 10 s + cámara quieta lo hizo parecer foto con texto (movimiento medido 3,3) | ⏳ pendiente |
+| 2/10/2026 | Multimodo (Ana) · bolso ZS BAG Vintage, versión antigua sin mano | NO se apela: bolso quieto, sin mano y texto metido en la imagen | — |
 | 29/9/2026 | Botas de fútbol SAIBI (Tareas Productos 9 · p10) — sanción -4 «contenido estático / slideshow» | vídeo real con movimiento de mano, voz y subtítulos; el detector lo confundió con imagen fija (escena parecida a las fotos de la ficha) | ✅ aprobada (4 puntos devueltos) |
 
 Texto y pruebas de cada caso nuevo: en el Drive,
@@ -139,3 +141,9 @@ prompt «One continuous shot with the same framing… completely motionless»
 deja el clip casi como una foto: mantén el producto quieto pero deja mover la
 cámara y la mano. Vídeos ya hechos con poco movimiento (diferencia < ~1,5,
 sobre todo en el 2.º clip) son los de más riesgo.
+
+**Rótulo fijo + cámara quieta (2/10/2026, multimodo):** dos vídeos Vintage
+sancionados a los 6 min de publicarse. Uno era de verdad casi una foto (bolso
+quieto, sin mano); el otro tenía movimiento de sobra (3,3), pero el rótulo
+quieto en el centro los 10 s con el fondo inmóvil se lee como «texto animado
+sobre imagen». Desde entonces el rótulo del multimodo dura 3 s.

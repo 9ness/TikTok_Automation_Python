@@ -479,7 +479,9 @@ TEXTO_MARCA: dict[str, dict] = {
     "marca_zapatos": {"titulo": "AUTUMN BOOTS", "bajada": "step into style", "segundos": 3.0},
     # `y`: en la vista POV el zapato va en el CENTRO y el rótulo a la altura de
     # siempre (42%) le caía encima; arriba queda sobre el suelo o la ventana.
-    "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 0.0, "y": 0.2},
+    # 3 s y no todo el vídeo: un rótulo fijo los 10 s sobre una cámara quieta
+    # es lo que TikTok sanciona como «contenido estático» (2/10/2026, -4).
+    "marca_pov": {"titulo": "AUTUMN", "bajada": "cozy season", "segundos": 3.0, "y": 0.2},
 }
 
 # La TEMPORADA de los rótulos y de la música. Los rótulos se queman al MONTAR,
@@ -596,8 +598,8 @@ for _clave, _por in _MARCA_FRASES.items():
 # (`sin_texto_en_imagen`) y lo pone el montaje, como en los de marca: siempre
 # legible y con sus emojis. Varias frases, elegidas por prenda para que dos
 # vídeos seguidos no digan lo mismo. Sin `grado`: la foto ya trae su filtro de
-# otoño y oscurecerla otra vez la apagaba. Se ve el vídeo entero (0), como el
-# rótulo de las imágenes de referencia.
+# otoño y oscurecerla otra vez la apagaba. Se ve 3 s: entero (como en las
+# imágenes de referencia) TikTok lo sancionó como «contenido estático».
 _VINTAGE_BOLSO = [
     ("Otoño esencial", "colección de temporada"),
     ("Colección de Otoño", "elegancia de temporada"),
@@ -670,7 +672,9 @@ for _claves, _otono, _invierno, _navidad in (
             "variantes": _frases(_otono),
             "halloween": _frases(_VINTAGE_HALLOWEEN),
             "temporadas": {"invierno": _frases(_invierno), "navidad": _frases(_navidad)},
-            "segundos": 0.0, "grado": False, "quitar_de_imagen": True,
+            # Solo al principio: fijo los 10 s se sancionó como «contenido
+            # estático / texto animado» (botas Vintage, 2/10/2026).
+            "segundos": 3.0, "grado": False, "quitar_de_imagen": True,
         }
 
 
