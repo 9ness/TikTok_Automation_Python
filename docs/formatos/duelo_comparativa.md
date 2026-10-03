@@ -123,6 +123,11 @@ pasó a mitad de render).
    ~78 % (descripción) ni pegado a la derecha (botones). En el cierre, solo la
    flecha: ningún texto de «mira el precio abajo».
 
+8. **Voces** (Fish, `voces.py`): rival «Amigo con Humor», el nuestro «Chico»
+   (elegida por ness entre las 16 de hombre: la que suena de España). Delante
+   `[excited]` (no se lee) y atempo 1,06; «¿Cuál será mejor?» con las dos a la
+   vez. Muestras de todas: `Formato_Duelo/pruebas_voz/voces_hombre/`.
+
 ### Los fallos (y la regla que dejan)
 
 | Fallo | Regla |
