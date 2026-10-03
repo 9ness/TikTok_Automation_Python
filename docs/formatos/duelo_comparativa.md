@@ -84,8 +84,8 @@ creador real: cara cuando habla, recortes al producto cuando demuestra.
 
 ## Prototipo del paraguas (3 oct 2026)
 
-Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v10.mp4`
-(45 s; la v9 sin insertos ni zonas seguras). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
+Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v11.mp4`
+(45 s). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
 con el navegador del VPS; `voces.py` y `montaje3.py` dentro del contenedor de la
 API, en `/app/temp_work/duelo` (NO en `/tmp`: un despliegue lo borra, y nos
 pasó a mitad de render).
@@ -140,6 +140,9 @@ pasó a mitad de render).
 | 5 clips tirados por cambiar de encuadre después | Decidir el encuadre (y enseñarlo) ANTES de generar clips |
 | Títulos al 6 %: debajo del buscador de TikTok; datos al 83 %: debajo de la descripción | Posiciones de los virales de referencia (paso 7) |
 | El mismo clip del banco en 5-6 frases | Insertos de primer plano y un reposo más (paso 6) |
+| El paraguas del rival «flota»: suelta las manos y se queda de pie solo entre las rodillas. Veo IGNORA «never lets go» | Usar solo el tramo en que lo agarra (`VENTANA` por clip en `montaje3.py`) y generar los clips nuevos con un fotograma de INICIO = FIN sacado de un momento en que ya lo agarra con las dos manos «como un bastón» (`g_f_*.txt`): así sale bien los 8 s |
+| Bandera en una comparativa de TIPOS de producto | Sin bandera: solo si el título compara países («Paraguas español vs coreano») |
+| Datos con el mismo naranja que los subtítulos: no se distinguen | Rótulo de dato blanco con brillo azul (el color del producto) en caja azul marino, en el centro de la pantalla |
 | Planos «quietos» (mesa, perchero) en GenAI inventan manos u objetos; start ≠ end frame saca una segunda mano | Plano compartido con gente moviéndose; inicio = fin |
 
 **GenAI Pro vs Kling 2.5 (Magnific)** en «se abre solo» con la mano: los dos

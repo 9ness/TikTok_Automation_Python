@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 D = Path(sys.argv[1])
 W, H = 1080, 1920
@@ -21,13 +21,18 @@ NARANJA = (255, 106, 0, 255)
 # (y lo mismo repartido en los lados, para seguir en 9:16).
 RECORTE_ARRIBA = 0.08
 Y_TITULOS = 0.105
-Y_BANDERA = 0.175
 # Zona segura de TikTok: abajo (desde ~78 %) va la descripción y a la derecha
-# los botones. El dato va en UNA línea encima de los subtítulos (68 %).
-Y_ROTULO = 0.60
-# Hasta dónde vale cada clip (revisado fotograma a fotograma): a partir de ahí
-# el generador deforma el paraguas.
-LIMITE = {"t2_nuestro.mp4": 6.6}
+# los botones. El dato, en el centro de la pantalla: apartado de los subtítulos (68 %).
+Y_ROTULO = 0.50
+# Tramo VÁLIDO de cada clip (revisado fotograma a fotograma): fuera de él el
+# generador deforma el paraguas o el rival suelta el suyo y se queda de pie
+# solo («flotando»). Lo que no está aquí vale entero.
+VENTANA = {
+    "t2_idle.mp4": (5.0, 7.9), "i_risa.mp4": (4.5, 7.9), "r_risa2.mp4": (3.0, 7.9),
+    "r_idleb2.mp4": (4.5, 7.9), "r_idle2.mp4": (0.5, 3.2), "f_cerrado.mp4": (0.0, 7.9),
+    "t_nuestro.mp4": (0.5, 5.5), "t2_nuestro.mp4": (4.5, 6.6), "f_abierto1.mp4": (3.0, 7.9),
+    "f_abierto2.mp4": (1.5, 7.9),
+}
 
 
 def fuente(ruta, sz):
@@ -65,12 +70,51 @@ def pegar(base, pieza, cx, cy):
     base.alpha_composite(pieza, (int(cx - pieza.width / 2), int(cy - pieza.height / 2)))
 
 
+AZUL_BRILLO = (60, 150, 255, 255)
+AZUL_CAJA = (8, 28, 70, 150)
+
+
+def rotulo_azul(txt: str, sz: int) -> Image.Image:
+    """Dato de la ronda: blanco en cursiva con BRILLO AZUL (el color del
+    paraguas) sobre una caja azul marino translúcida. Distinto a propósito de
+    los subtítulos (Montserrat con borde), para que se lea como «dato»."""
+    fnt = fuente(SERIF, sz)
+    tmp = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    lineas = txt.split("\n")
+    alto_l = int(sz * 1.18)
+    w = int(max(tmp.textlength(l, font=fnt) for l in lineas)) + 2 * int(sz * 0.55)
+    h = alto_l * len(lineas) + int(sz * 0.6)
+    pad = 30  # sitio para el brillo
+    im = Image.new("RGBA", (w + 2 * pad, h + 2 * pad), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rounded_rectangle([pad, pad, pad + w, pad + h], radius=int(sz * 0.35), fill=AZUL_CAJA,
+                                         outline=(120, 190, 255, 200), width=3)
+
+    def pintar(capa_: Image.Image, color, trazo: int) -> None:
+        d = ImageDraw.Draw(capa_)
+        for j, l in enumerate(lineas):
+            d.text((pad + w / 2, pad + int(sz * 0.3) + j * alto_l + alto_l / 2), l, font=fnt, fill=color,
+                   anchor="mm", stroke_width=trazo, stroke_fill=color)
+
+    brillo = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    pintar(brillo, AZUL_BRILLO, max(4, sz // 10))
+    brillo = brillo.filter(ImageFilter.GaussianBlur(sz / 6))
+    im.alpha_composite(brillo)
+    im.alpha_composite(brillo)
+    letras = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(letras)
+    for j, l in enumerate(lineas):
+        d.text((pad + w / 2, pad + int(sz * 0.3) + j * alto_l + alto_l / 2), l, font=fnt, fill=(255, 255, 255, 255),
+               anchor="mm", stroke_width=2, stroke_fill=(10, 40, 110, 255))
+    im.alpha_composite(letras)
+    return cursiva(im)
+
+
 def encajar(txt: str, sz: int, ancho: float) -> Image.Image:
-    """Rótulo naranja que nunca se sale: baja de tamaño hasta caber."""
-    im = texto_cursiva(txt, sz, borde=NARANJA)
+    """Rótulo de dato que nunca se sale: baja de tamaño hasta caber."""
+    im = rotulo_azul(txt, sz)
     while im.width > ancho and sz > 30:
         sz -= 4
-        im = texto_cursiva(txt, sz, borde=NARANJA)
+        im = rotulo_azul(txt, sz)
     return im
 
 
@@ -79,20 +123,20 @@ def capa(linea: dict, sub: str) -> Image.Image:
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     # Títulos fijos arriba, como la referencia.
     # Posiciones medidas en los virales de referencia: títulos centrados al
-    # ~10 % (más arriba los tapa el buscador de TikTok) y la bandera debajo, en
-    # el hueco entre los dos (así no tapa ningún paraguas).
+    # ~10 % (más arriba los tapa el buscador de TikTok). Sin bandera: aquí se
+    # comparan TIPOS de paraguas, no países (la bandera solo si el título es
+    # «Paraguas español / coreano…»).
     pegar(img, texto_cursiva(g["titulo_a"].replace(" ", "\n", 1), 60), W * 0.25, H * Y_TITULOS)
     pegar(img, texto_cursiva("VS", 56), W * 0.5, H * Y_TITULOS)
     pegar(img, texto_cursiva(g["titulo_b"].replace(" ", "\n", 1), 60), W * 0.75, H * Y_TITULOS)
-    pegar(img, bandera_es(105, 70), W * 0.5, H * Y_BANDERA)
     d = ImageDraw.Draw(img)
     # Dato de la ronda, en cursiva sobre el lado del nuestro.
     if linea.get("callout"):
         # Una línea; si es un dato doble («105 cm abierto · 38 cm plegado»),
         # dos líneas un poco más arriba para no pisar los subtítulos.
         dos = " · " in linea["callout"]
-        pegar(img, encajar(linea["callout"].replace(" · ", "\n"), 64 if dos else 72, W * 0.8),
-              W * 0.5, H * (Y_ROTULO - 0.01 if dos else Y_ROTULO))
+        pegar(img, encajar(linea["callout"].replace(" · ", "\n"), 58 if dos else 64, W * 0.8),
+              W * 0.5, H * Y_ROTULO)
     if linea.get("centro"):
         pegar(img, encajar(linea["centro"].capitalize(), 84, W * 0.9), W * 0.5, H * Y_ROTULO)
     # Subtítulo pop-up de 3 palabras, a la altura del POV BOF (68 %).
@@ -150,11 +194,11 @@ for i, linea in enumerate(g["lineas"]):
     for k, (clip, hasta) in enumerate(tramos):
         trozo = dur * hasta - previo + (0.1 if k == len(tramos) - 1 else 0.0)
         previo = dur * hasta
-        ini = desde.get(clip.name, linea.get("desde", 0.0) if k == 0 else 0.0)
-        largo = min(LIMITE.get(clip.name, 99.0), float(subprocess.check_output(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(clip)]).strip()))
-        if ini + trozo > largo - 0.1:
-            ini = max(0.0, largo - 0.1 - trozo)
+        v_ini, v_fin = VENTANA.get(clip.name, (0.0, float(subprocess.check_output(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(clip)]).strip())))
+        ini = desde.get(clip.name, max(v_ini, linea.get("desde", 0.0) if k == 0 else 0.0))
+        if ini + trozo > v_fin - 0.1:
+            ini = max(v_ini, v_fin - 0.1 - trozo)
         desde[clip.name] = ini + trozo
         entradas_v.append((clip, ini, trozo))
     capas = []

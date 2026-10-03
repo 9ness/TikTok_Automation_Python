@@ -5,38 +5,35 @@
   {
    "q": "a",
    "t": "Yo uso el paraguas de toda la vida, el que hay en todas las casas.",
-   "clip": "t2_idle.mp4",
-   "desde": 0
+   "clip": "f_cerrado.mp4"
   },
   {
    "q": "b",
    "t": "Y yo me he pasado al plegable automático.",
-   "clip": "t2_idle.mp4"
+   "clip": "f_cerrado.mp4"
   },
   {
    "q": "ab",
    "t": "¿Cuál será mejor?",
-   "clip": "t2_idle.mp4"
+   "clip": "f_cerrado.mp4"
   },
   {
    "q": "a",
    "t": "Para abrir el mío, lo normal: a mano, como todo el mundo.",
-   "clip": "t2_rival.mp4",
-   "desde": 0
+   "clip": "t2_rival.mp4"
   },
   {
    "q": "b",
    "t": "¡El mío, con un botón! Se abre solo y se cierra solo.",
    "callout": "Se abre y se cierra solo",
-   "clip": "t2_idle.mp4",
-   "clip2": "t_nuestro.mp4",
+   "clip": "r_idle2.mp4",
+   "clip2": "f_abierto2.mp4",
    "corte": 0.42
   },
   {
    "q": "a",
    "t": "Ya, pero con viento el mío se da la vuelta y se dobla entero.",
-   "clip": "t_viento.mp4",
-   "desde": 0
+   "clip": "t_viento.mp4"
   },
   {
    "q": "b",
@@ -56,7 +53,7 @@
    "callout": "Anilla para colgar",
    "tramos": [
     [
-     "t2_idleb.mp4",
+     "r_idleb2.mp4",
      0.33
     ],
     [
@@ -68,15 +65,14 @@
   {
    "q": "a",
    "t": "Ya, pero será enano, ¿no?",
-   "clip": "i_risa.mp4",
-   "desde": 0
+   "clip": "r_risa2.mp4"
   },
   {
    "q": "b",
    "t": "Abierto mide más de un metro, ¡y plegado se queda en treinta y ocho centímetros!",
    "callout": "105 cm abierto · 38 cm plegado",
-   "clip": "t_nuestro.mp4",
-   "clip2": "t2_idleb.mp4",
+   "clip": "f_abierto1.mp4",
+   "clip2": "r_risa2.mp4",
    "corte": 0.38
   },
   {
@@ -87,16 +83,15 @@
   {
    "q": "b",
    "t": "El precio no te lo digo: míralo tú mismo aquí abajo, porque te va a sorprender.",
-   "clip": "t2_nuestro.mp4",
-   "desde": 0
+   "clip": "f_abierto2.mp4"
   },
   {
    "q": "b",
    "t": "Te lo voy a intentar dejar en el carrito naranja con tus cupones, pero no puedo asegurarte que siga disponible cuando veas el vídeo.",
    "cta": true,
-   "clip": "t_nuestro.mp4",
-   "clip2": "t2_nuestro.mp4",
-   "corte": 0.65
+   "clip": "f_abierto1.mp4",
+   "clip2": "t_nuestro.mp4",
+   "corte": 0.57
   }
  ]
 }
