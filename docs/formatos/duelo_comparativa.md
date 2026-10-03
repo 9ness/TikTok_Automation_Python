@@ -84,8 +84,8 @@ creador real: cara cuando habla, recortes al producto cuando demuestra.
 
 ## Prototipo del paraguas (3 oct 2026)
 
-Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v9_pantalla_completa.mp4`
-(45 s). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
+Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v10.mp4`
+(45 s; la v9 sin insertos ni zonas seguras). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
 con el navegador del VPS; `voces.py` y `montaje3.py` dentro del contenedor de la
 API, en `/app/temp_work/duelo` (NO en `/tmp`: un despliegue lo borra, y nos
 pasó a mitad de render).
@@ -112,6 +112,17 @@ pasó a mitad de render).
    más de un metro — y plegado 38 cm» = al revés), `LIMITE` por clip para no
    usar el tramo donde se deforma, limitador de audio y la flecha del POV.
 
+6. **Variedad**: no repetir el mismo clip del banco en todas las frases. Para
+   lo que el plano compartido no puede enseñar sin riesgo (la anilla), un
+   INSERTO de ~2 s en primer plano (`p_I_anilla`: colgado de la mochila, como
+   la foto del producto) y vuelta al banco (`tramos` en el guion); un primer
+   plano del rival (`p_I_rival`) y un tercer reposo (`p_I_risa`).
+7. **Zonas seguras de TikTok** (medidas en los virales de referencia): títulos
+   centrados al ~10 % (más arriba los tapa el buscador), bandera debajo
+   (~17 %), dato al 60 % encima de los subtítulos (68 %); nada por debajo del
+   ~78 % (descripción) ni pegado a la derecha (botones). En el cierre, solo la
+   flecha: ningún texto de «mira el precio abajo».
+
 ### Los fallos (y la regla que dejan)
 
 | Fallo | Regla |
@@ -127,6 +138,8 @@ pasó a mitad de render).
 | Rótulos cortados | Encoger hasta caber (`encajar`), y subtítulos a dos líneas antes que diminutos |
 | La bandera tapaba el mango del rival | Con la cámara inclinada arriba hay cuerpos: títulos lo más arriba y la bandera en el hueco entre los dos |
 | 5 clips tirados por cambiar de encuadre después | Decidir el encuadre (y enseñarlo) ANTES de generar clips |
+| Títulos al 6 %: debajo del buscador de TikTok; datos al 83 %: debajo de la descripción | Posiciones de los virales de referencia (paso 7) |
+| El mismo clip del banco en 5-6 frases | Insertos de primer plano y un reposo más (paso 6) |
 | Planos «quietos» (mesa, perchero) en GenAI inventan manos u objetos; start ≠ end frame saca una segunda mano | Plano compartido con gente moviéndose; inicio = fin |
 
 **GenAI Pro vs Kling 2.5 (Magnific)** en «se abre solo» con la mano: los dos

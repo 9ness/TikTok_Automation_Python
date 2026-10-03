@@ -47,19 +47,29 @@
   {
    "q": "a",
    "t": "¿Y luego qué? Yo voy cargando con él mojado en la mano.",
-   "clip": "t2_rival.mp4"
+   "clip": "i_rival.mp4",
+   "desde": 3.6
   },
   {
    "q": "b",
    "t": "El mío tiene una anilla: lo cuelgas de la mochila y te olvidas.",
    "callout": "Anilla para colgar",
-   "clip": "t2_idleb.mp4",
-   "desde": 0
+   "tramos": [
+    [
+     "t2_idleb.mp4",
+     0.33
+    ],
+    [
+     "i_anilla.mp4",
+     1.0
+    ]
+   ]
   },
   {
    "q": "a",
    "t": "Ya, pero será enano, ¿no?",
-   "clip": "t2_idleb.mp4"
+   "clip": "i_risa.mp4",
+   "desde": 0
   },
   {
    "q": "b",
@@ -72,12 +82,11 @@
   {
    "q": "a",
    "t": "Bueno, algo tan completo costará un dineral, ¿no?",
-   "clip": "t2_idle.mp4"
+   "clip": "i_risa.mp4"
   },
   {
    "q": "b",
    "t": "El precio no te lo digo: míralo tú mismo aquí abajo, porque te va a sorprender.",
-   "centro": "MIRA EL PRECIO ABAJO",
    "clip": "t2_nuestro.mp4",
    "desde": 0
   },

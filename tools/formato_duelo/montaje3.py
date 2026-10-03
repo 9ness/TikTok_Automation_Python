@@ -20,7 +20,11 @@ NARANJA = (255, 106, 0, 255)
 # Al hablar y reír la boca baja hasta el 4 % y la barbilla al 6 %: fuera un 8 %
 # (y lo mismo repartido en los lados, para seguir en 9:16).
 RECORTE_ARRIBA = 0.08
-Y_ROTULO = 0.83   # rótulos sobre el suelo, por debajo de los subtítulos (68 %)
+Y_TITULOS = 0.105
+Y_BANDERA = 0.175
+# Zona segura de TikTok: abajo (desde ~78 %) va la descripción y a la derecha
+# los botones. El dato va en UNA línea encima de los subtítulos (68 %).
+Y_ROTULO = 0.60
 # Hasta dónde vale cada clip (revisado fotograma a fotograma): a partir de ahí
 # el generador deforma el paraguas.
 LIMITE = {"t2_nuestro.mp4": 6.6}
@@ -74,16 +78,21 @@ def capa(linea: dict, sub: str) -> Image.Image:
     lado = linea["q"]
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     # Títulos fijos arriba, como la referencia.
-    # Arriba están los cuerpos y los mangos: títulos lo más arriba posible y la
-    # bandera en el hueco entre los dos, encima del VS (no tapa ningún paraguas).
-    pegar(img, texto_cursiva(g["titulo_a"].replace(" ", "\n", 1), 62), W * 0.24, 120)
-    pegar(img, texto_cursiva("VS", 60), W * 0.5, 175)
-    pegar(img, texto_cursiva(g["titulo_b"].replace(" ", "\n", 1), 62), W * 0.76, 120)
-    pegar(img, bandera_es(84, 56), W * 0.5, 88)
+    # Posiciones medidas en los virales de referencia: títulos centrados al
+    # ~10 % (más arriba los tapa el buscador de TikTok) y la bandera debajo, en
+    # el hueco entre los dos (así no tapa ningún paraguas).
+    pegar(img, texto_cursiva(g["titulo_a"].replace(" ", "\n", 1), 60), W * 0.25, H * Y_TITULOS)
+    pegar(img, texto_cursiva("VS", 56), W * 0.5, H * Y_TITULOS)
+    pegar(img, texto_cursiva(g["titulo_b"].replace(" ", "\n", 1), 60), W * 0.75, H * Y_TITULOS)
+    pegar(img, bandera_es(105, 70), W * 0.5, H * Y_BANDERA)
     d = ImageDraw.Draw(img)
     # Dato de la ronda, en cursiva sobre el lado del nuestro.
     if linea.get("callout"):
-        pegar(img, encajar(linea["callout"].replace(" · ", "\n"), 80, W * 0.9), W * 0.5, H * Y_ROTULO)
+        # Una línea; si es un dato doble («105 cm abierto · 38 cm plegado»),
+        # dos líneas un poco más arriba para no pisar los subtítulos.
+        dos = " · " in linea["callout"]
+        pegar(img, encajar(linea["callout"].replace(" · ", "\n"), 64 if dos else 72, W * 0.8),
+              W * 0.5, H * (Y_ROTULO - 0.01 if dos else Y_ROTULO))
     if linea.get("centro"):
         pegar(img, encajar(linea["centro"].capitalize(), 84, W * 0.9), W * 0.5, H * Y_ROTULO)
     # Subtítulo pop-up de 3 palabras, a la altura del POV BOF (68 %).
@@ -91,11 +100,11 @@ def capa(linea: dict, sub: str) -> Image.Image:
         # Tamaño fijo como el POV BOF; si no cabe, a dos líneas (no encoger).
         t = sub.upper(); tam = 72
         fnt = fuente(BLACK, tam)
-        if d.textlength(t, font=fnt) > W * 0.78 and " " in t:
+        if d.textlength(t, font=fnt) > W * 0.70 and " " in t:
             pal = t.split()
             mitad = min(range(1, len(pal)), key=lambda k: abs(len(" ".join(pal[:k])) - len(" ".join(pal[k:]))))
             t = " ".join(pal[:mitad]) + "\n" + " ".join(pal[mitad:])
-        while max(d.textlength(x, font=fnt) for x in t.split("\n")) > W * 0.86 and tam > 50:
+        while max(d.textlength(x, font=fnt) for x in t.split("\n")) > W * 0.76 and tam > 50:
             tam -= 4; fnt = fuente(BLACK, tam)
         borde = NARANJA if lado == "b" else ((255, 196, 0, 255) if lado == "ab" else (0, 0, 0, 255))
         d.multiline_text((W / 2, int(0.68 * H)), t, font=fnt, fill="white", anchor="mm", align="center",
@@ -128,48 +137,46 @@ for i, linea in enumerate(g["lineas"]):
     mp3 = D / f"l{i:02d}.mp3"
     dur = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                          "-of", "csv=p=0", str(mp3)]).strip()) + 0.15
-    clip = media / linea["clip"]
-    corte = dur * linea["corte"] if linea.get("clip2") else dur
-    # Cada clip sigue por donde iba; si no queda bastante, se coge el último
-    # tramo que quepa (los clips empiezan y acaban en el mismo fotograma).
-    ini = desde.get(clip.name, linea.get("desde", 0.0))
-    largo = min(LIMITE.get(clip.name, 99.0), float(subprocess.check_output(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(clip)]).strip()))
-    if ini + corte > largo - 0.1:
-        ini = max(0.0, largo - 0.1 - corte)
-    desde[clip.name] = ini + corte
+    # Tramos de vídeo de la frase: [(clip, fracción en que acaba)]. «clip2» +
+    # «corte» es el atajo de dos; «tramos» deja meter un inserto en medio.
+    if linea.get("tramos"):
+        tramos = [(media / c, float(h)) for c, h in linea["tramos"]]
+    elif linea.get("clip2"):
+        tramos = [(media / linea["clip"], linea["corte"]), (media / linea["clip2"], 1.0)]
+    else:
+        tramos = [(media / linea["clip"], 1.0)]
+    entradas_v: list[tuple[Path, float, float]] = []  # (clip, inicio, duración)
+    previo = 0.0
+    for k, (clip, hasta) in enumerate(tramos):
+        trozo = dur * hasta - previo + (0.1 if k == len(tramos) - 1 else 0.0)
+        previo = dur * hasta
+        ini = desde.get(clip.name, linea.get("desde", 0.0) if k == 0 else 0.0)
+        largo = min(LIMITE.get(clip.name, 99.0), float(subprocess.check_output(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(clip)]).strip()))
+        if ini + trozo > largo - 0.1:
+            ini = max(0.0, largo - 0.1 - trozo)
+        desde[clip.name] = ini + trozo
+        entradas_v.append((clip, ini, trozo))
     capas = []
     for k, (txt, a, b) in enumerate(trozos(linea["t"], mp3, dur)):
         png = D / f"x{i:02d}_{k:02d}.png"
         capa(linea, txt).save(png)
         capas.append((png, a, b))
-    # Segundo clip en la misma frase («se abre solo»: corte de cerrado a
-    # abierto, sin que el generador tenga que transformar el paraguas).
-    args = ["ffmpeg", "-v", "error", "-y", "-ss", f"{ini:.2f}", "-t", f"{corte:.3f}", "-i", str(clip)]
-    if linea.get("clip2"):
-        clip2 = media / linea["clip2"]
-        ini2 = desde.get(clip2.name, 0.0)
-        largo2 = LIMITE.get(clip2.name, 7.9)
-        if ini2 + dur - corte > largo2 - 0.1:
-            ini2 = max(0.0, largo2 - 0.1 - (dur - corte))
-        desde[clip2.name] = ini2 + dur - corte
-        args += ["-ss", f"{ini2:.2f}", "-t", f"{dur - corte + 0.1:.3f}", "-i", str(clip2)]
-    n_v = 2 if linea.get("clip2") else 1
+    args = ["ffmpeg", "-v", "error", "-y"]
+    for clip, ini, trozo in entradas_v:
+        args += ["-ss", f"{ini:.2f}", "-t", f"{trozo:.3f}", "-i", str(clip)]
+    n_v = len(entradas_v)
     for png, _, _ in capas:
         args += ["-i", str(png)]
     args += ["-i", str(mp3)]
-    fil = []
-    if n_v == 2:
-        fil.append("[0:v]fps=30,setsar=1,settb=1/30[c0];[1:v]fps=30,setsar=1,settb=1/30[c1];"
-                   "[c0][c1]concat=n=2:v=1:a=0[src]")
-    else:
-        fil.append("[0:v]fps=30,setsar=1[src]")
+    fil = [f"[{k}:v]fps=30,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,settb=1/30[c{k}]"
+           for k in range(n_v)]
+    fil.append("".join(f"[c{k}]" for k in range(n_v)) + f"concat=n={n_v}:v=1:a=0[src]")
     fil.append(f"[src]crop=iw*{1 - RECORTE_ARRIBA}:ih*{1 - RECORTE_ARRIBA}:iw*{RECORTE_ARRIBA / 2}:ih*{RECORTE_ARRIBA},"
                f"scale={W}:{H}:flags=lanczos,unsharp=5:5:0.5,setsar=1[v0]")
     ult = "v0"
-    for k, (_, a, b) in enumerate(capas):
+    for k, (_, a, b) in enumerate(capas):  # las capas van detrás de los vídeos
         fil.append(f"[{ult}][{n_v + k}:v]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k + 1}]")
-    # (las capas empiezan después de los vídeos de entrada)
         ult = f"v{k + 1}"
     # Limitador: la mezcla de las dos voces a la vez pasaba de 0 dBFS.
     fil.append(f"[{n_v + len(capas)}:a]apad=pad_dur=0.15,aresample=44100,"
@@ -180,7 +187,7 @@ for i, linea in enumerate(g["lineas"]):
              "-c:a", "aac", "-b:a", "128k", str(mp4)]
     subprocess.run(args, check=True)
     partes.append(mp4)
-    print(i, linea["q"], f"{dur:.1f}s", clip.name, f"desde {ini:.1f}")
+    print(i, linea["q"], f"{dur:.1f}s", " + ".join(f"{c.name}@{a:.1f}" for c, a, _ in entradas_v))
 (D / "lista3.txt").write_text("".join(f"file '{p}'\n" for p in partes))
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(D / "lista3.txt"),
                 "-c", "copy", str(D / "duelo_sin_flecha.mp4")], check=True)
