@@ -62,6 +62,14 @@ y su hueco lo ocupa el siguiente. No se borra nada del nicho. «Ver los N
 quitados» los lista con «Devolver». Se guarda por usuario en
 `viralizacion:mis_tandas:ocultos:<usuario>`. MCP: `marcar_tanda(id, quitar=True)`.
 
+## Tanda completada
+
+Botón «✓ Tanda completada» en la cabecera (pide confirmación): marca SUBIDOS
+todos los que quedaban en la tanda (`POST /api/v1/mis-tandas/completar
+{ids}`), cada uno en su nicho y en el contador del día. La tanda pasa a «ya
+subidas» y la siguiente queda la primera. Lo que no se vaya a subir se quita
+antes con 👁‍🗨. Un agente no lo usa salvo que el operador lo pida.
+
 ## Descargas
 
 Cada fila baja su vídeo con un enlace normal (como el POV BOF Largo): se

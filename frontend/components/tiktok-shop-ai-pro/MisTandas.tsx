@@ -9,6 +9,7 @@ import { bajarEnOrden, nombreDescarga } from "@/lib/descargas";
 import {
   buildFotoTandaUrl,
   buildVideoTandaUrl,
+  useCompletarTanda,
   useMarcarTanda,
   useMisTandas,
   useOcultarTanda,
@@ -128,6 +129,9 @@ export function MisTandas() {
   const [aOcultar, setAOcultar] = useState<string | null>(null);
   const [verOcultos, setVerOcultos] = useState(false);
   const ocultar = useOcultarTanda();
+  const completar = useCompletarTanda();
+  // Pide un segundo toque antes de marcar toda la tanda.
+  const [aCompletar, setACompletar] = useState<number | null>(null);
   const listaOcultos = useOcultosTandas(verOcultos);
   const [progreso, setProgreso] = useState("");
   const [abierta, setAbierta] = useState<number | null>(null);
@@ -390,6 +394,35 @@ export function MisTandas() {
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-stretch gap-1">
+                    {t.abierta ? (
+                      <button
+                        type="button"
+                        disabled={completar.isPending}
+                        onClick={() => {
+                          const pendientes = t.items.filter((v) => !v.uploaded).map((v) => v.id);
+                          if (aCompletar === t.numero) {
+                            completar.mutate(pendientes);
+                            setACompletar(null);
+                          } else setACompletar(t.numero);
+                        }}
+                        onBlur={() => setACompletar((x) => (x === t.numero ? null : x))}
+                        title="Marca como subidos todos los que quedan en esta tanda y pasa a la siguiente"
+                        className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50 ${
+                          aCompletar === t.numero
+                            ? "border-emerald-500 bg-emerald-500/20 text-emerald-500"
+                            : "border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10"
+                        }`}
+                      >
+                        {completar.isPending && aCompletar === null ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Check className="h-3 w-3" />
+                        )}
+                        {aCompletar === t.numero
+                          ? `¿Marcar ${t.items.filter((v) => !v.uploaded).length} subidos?`
+                          : "Tanda completada"}
+                      </button>
+                    ) : null}
                     {(
                       [
                         [false, "Todos", t.items.filter((v) => !(v.sin_stock && !v.uploaded)).length],

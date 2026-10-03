@@ -74,6 +74,30 @@ def set_estado(
         raise _error(e) from e
 
 
+class CompletarRequest(BaseModel):
+    """Los vídeos de una tanda que quedan por marcar."""
+
+    ids: list[str]
+
+
+@router.post("/completar")
+def completar(
+    body: CompletarRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """«Tanda completada»: marca SUBIDOS todos los que se pasen (lo que quedaba
+    por subir de esa tanda). Uno a uno por `servicio.marcar`, así cada vídeo
+    escribe en su nicho y cuenta en el contador del día igual que su botón."""
+    hechos, fallos = [], []
+    for id_ in body.ids[:50]:
+        try:
+            servicio.marcar(usuario, id_, uploaded=True)
+            hechos.append(id_)
+        except Exception as e:  # noqa: BLE001
+            fallos.append({"id": id_, "error": str(e)})
+    return {"ok": not fallos, "marcados": hechos, "fallos": fallos}
+
+
 class OcultarRequest(BaseModel):
     id: str
     oculto: bool = True

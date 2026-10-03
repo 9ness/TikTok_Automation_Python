@@ -114,6 +114,24 @@ export function useOcultarTanda() {
   });
 }
 
+/** «Tanda completada»: marca subido lo que quedaba de la tanda y relee, así
+ *  la siguiente pasa a ser la primera. */
+export function useCompletarTanda() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean; marcados: string[]; fallos: { id: string; error: string }[] }, Error, string[]>({
+    mutationFn: (ids) => api.post(`${ROOT}/completar`, { ids }),
+    onSuccess: (r) => {
+      if (r.fallos.length) toast.error(`${r.marcados.length} marcados · ${r.fallos.length} fallaron`);
+      else toast.success(`Tanda completada: ${r.marcados.length} vídeo(s) marcados como subidos`);
+      void qc.invalidateQueries({ queryKey: misTandasKeys.all });
+      void qc.invalidateQueries({ queryKey: ["nicho-ropa"], refetchType: "none" });
+      void qc.invalidateQueries({ queryKey: ["nicho-pov-bof"], refetchType: "none" });
+      void qc.invalidateQueries({ queryKey: ["pov-bof-largo"], refetchType: "none" });
+    },
+    onError: (e) => toast.error(`No se pudo completar: ${e.message}`),
+  });
+}
+
 /** Releer los nichos ya (lo nuevo que hayan montado los agentes). */
 export function useRecargarTandas() {
   const qc = useQueryClient();
