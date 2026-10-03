@@ -1,0 +1,124 @@
+{
+ "titulo_a": "Paraguas Tradicional",
+ "titulo_b": "Paraguas Automático",
+ "lineas": [
+  {
+   "q": "a",
+   "t": "Yo uso el paraguas de toda la vida, el que hay en todas las casas.",
+   "img_a": "r1.png",
+   "img_b": "n1a.png",
+   "clip": "idle_b.mp4",
+   "desde": 0
+  },
+  {
+   "q": "b",
+   "t": "Y yo me he pasado al plegable automático.",
+   "img": "nuestro",
+   "img_a": "r1.png",
+   "img_b": "n1a.png",
+   "clip": "idle_b.mp4"
+  },
+  {
+   "q": "ab",
+   "t": "¿Cuál será mejor?",
+   "img": "nuestro",
+   "img_a": "r1.png",
+   "img_b": "n1a.png",
+   "clip": "idle_b.mp4"
+  },
+  {
+   "q": "a",
+   "t": "Para abrir el mío, lo normal: a mano, como todo el mundo.",
+   "img_a": "r1.png",
+   "img_b": "n1a.png",
+   "clip": "rival_b.mp4",
+   "desde": 0
+  },
+  {
+   "q": "b",
+   "t": "¡El mío, con un botón! Se abre solo y se cierra solo.",
+   "callout": "Se abre y se cierra solo",
+   "img": "c4",
+   "img_a": "r1.png",
+   "img_b": "abrir.mp4",
+   "clip": "nuestro_b.mp4",
+   "desde": 1.0
+  },
+  {
+   "q": "a",
+   "t": "Ya, pero con viento el mío se da la vuelta y se dobla entero.",
+   "img_a": "r2.png",
+   "img_b": "n2.png",
+   "clip": "viento_b.mp4",
+   "desde": 0
+  },
+  {
+   "q": "b",
+   "t": "¡El mío está hecho a prueba de viento!",
+   "callout": "A prueba de viento",
+   "img": "c3",
+   "img_a": "r2.png",
+   "img_b": "viento.mp4",
+   "clip": "viento_b.mp4"
+  },
+  {
+   "q": "a",
+   "t": "¿Y luego qué? Yo voy cargando con él mojado en la mano.",
+   "img_a": "r2.png",
+   "img_b": "n2.png",
+   "clip": "idle_b.mp4"
+  },
+  {
+   "q": "b",
+   "t": "El mío tiene una anilla: lo cuelgas de la mochila y te olvidas.",
+   "callout": "Anilla para colgar",
+   "img": "c2",
+   "img_a": "r1.png",
+   "img_b": "mochila.mp4",
+   "clip": "corto_b.mp4",
+   "desde": 0
+  },
+  {
+   "q": "a",
+   "t": "Ya, pero será enano, ¿no?",
+   "img_a": "r1.png",
+   "img_b": "n4.png",
+   "clip": "corto_b.mp4"
+  },
+  {
+   "q": "b",
+   "t": "Abierto mide más de un metro, ¡y plegado se queda en treinta y ocho centímetros!",
+   "callout": "105 cm abierto · 38 cm plegado",
+   "img": "c1",
+   "img_a": "r1.png",
+   "img_b": "n4.png",
+   "clip": "corto_b.mp4"
+  },
+  {
+   "q": "a",
+   "t": "Bueno, algo tan completo costará un dineral, ¿no?",
+   "img_a": "r1.png",
+   "img_b": "n5.png",
+   "clip": "idle_b.mp4"
+  },
+  {
+   "q": "b",
+   "t": "El precio no te lo digo: míralo tú mismo aquí abajo, porque te va a sorprender.",
+   "centro": "MIRA EL PRECIO ABAJO",
+   "img": "c5",
+   "img_a": "r1.png",
+   "img_b": "n5.png",
+   "clip": "nuestro_b.mp4",
+   "desde": 3.6
+  },
+  {
+   "q": "b",
+   "t": "Te lo voy a intentar dejar en el carrito naranja con tus cupones, pero no puedo asegurarte que siga disponible cuando veas el vídeo.",
+   "cta": true,
+   "img": "nuestro",
+   "img_a": "r1.png",
+   "img_b": "n5.png",
+   "clip": "viento_b.mp4"
+  }
+ ]
+}

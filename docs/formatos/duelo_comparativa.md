@@ -81,3 +81,37 @@ creador real: cara cuando habla, recortes al producto cuando demuestra.
 2. Montaje «duelo»: pantalla partida + rótulo VS con banderas + callouts por
    ronda + giro de precio + flecha CTA, con la voz de Fish marcando los cortes.
 3. (Solo B/C) paso de sincronía de labios.
+
+## Prototipo del paraguas (3 oct 2026) — lo que ha funcionado
+
+Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v6_banco.mp4`.
+Scripts y prompts: `tools/formato_duelo/` (se ejecutan dentro del contenedor de
+la API: Fish + Whisper + PIL; los de generación, con el navegador del VPS).
+
+- **UN plano compartido** (los dos «clones» en el mismo banco, cámara fija) y
+  no pantalla partida: es lo que hace la referencia. Imagen base en Flow con la
+  foto del rival y las del producto como ingredientes; corregir detalles
+  (color del mango) EDITANDO la imagen buena («cambia solo…»), no regenerando.
+- **Sin caras**: se genera cortado a la barbilla y el montaje recorta un 11 %
+  por arriba → no hay bocas que sincronizar. Pedir «desde el cuello» en el
+  prompt sacó cuerpos decapitados con la calle detrás: NO.
+- **Todo vídeo, los dos lados moviéndose siempre** (el operador: fotos con
+  zoom = «poco movimiento» para TikTok). 5 clips de GenAI Pro desde la misma
+  imagen: reposo charlando, rival abriendo a mano, el nuestro abriéndose solo,
+  viento (desde una variante editada con los dos abiertos) y «enseñar lo
+  corto». Un clip sigue por donde iba entre frases.
+- Textos como la referencia: títulos en cursiva blanca con sombra ENCIMA del
+  vídeo («Paraguas Tradicional 🇪🇸 VS Paraguas Automático»; sin bandera
+  asiática: el producto no es de allí), datos en cursiva con borde naranja,
+  subtítulos pop-up de 3 palabras al 68 % (como el Largo): blanco/negro el
+  rival, blanco/naranja el nuestro, amarillo cuando hablan los dos.
+- Voces: Fish con `[excited]` delante (no se lee; sube tono y ritmo) + atempo
+  1,06; la frase «¿Cuál será mejor?» con las dos voces mezcladas.
+
+**GenAI Pro vs Kling 2.5 (Magnific)** en «se abre solo» desde POV con la mano:
+los dos fallan igual (el mango cambia de forma al abrirse; GenAI además sacó
+una segunda mano con start+end frame). Kling es más lento (~10 min y uno a
+la vez en ilimitado) y más tosco. En el plano compartido del banco GenAI lo
+hizo bien a la primera. Planos «quietos» (mesa, perchero) en GenAI inventan
+manos u objetos: evitarlos. Coste del prototipo: ~14 créditos GenAI y ~20
+imágenes de Flow.
