@@ -577,7 +577,7 @@ async def marcar(ctx: Context, menu: str, catalogo: str, carpeta: str, producto:
 @_herramienta(structured_output=False)
 async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) -> str:
     """«Mis tandas» del usuario del token: los vídeos YA MONTADOS de POV BOF,
-    POV BOF Largo y Moda Mujer · Multimodo, de diez en diez y en el orden en
+    POV BOF Largo y Moda Mujer (Multimodo y Aleatorios), de diez en diez y en el orden en
     que toca publicarlos (cada tanda abierta lleva `fecha` y `temporada`).
     Es solo una vista: NO se sube nada aquí — lo que montas en su nicho aparece
     solo al final de la cola (`fresco=True` para verlo ya). Por defecto solo

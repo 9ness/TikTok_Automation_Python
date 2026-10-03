@@ -53,8 +53,31 @@ def _mezclar(a: list[dict], b: list[dict]) -> list[dict]:
     return salida + a[i:] + b[j:]
 
 
-def _ordenar(usuario: str, pov: list[dict], mm: list[dict]) -> list[dict]:
-    por_id = {f["id"]: f for f in pov + mm}
+def _intercalar(ids: list[str], por_id: dict[str, dict], nuevos: list[str]) -> list[str]:
+    """Mete `nuevos` (los de Aleatorios) repartidos entre lo PENDIENTE: uno
+    cada `ALEA_CADA`, a partir de las primeras `ALEA_SIN_TOCAR` tandas
+    abiertas (el operador puede tenerlas ya bajadas). Lo subido no cuenta ni
+    se mueve. Si no hay sitio, al final."""
+    if not nuevos:
+        return ids
+    salida: list[str] = []
+    cola = list(nuevos)
+    pendientes = 0
+    saltar = config.ALEA_SIN_TOCAR * config.POR_TANDA
+    for i in ids:
+        salida.append(i)
+        f = por_id.get(i)
+        if not f or f["uploaded"]:
+            continue
+        pendientes += 1
+        if cola and pendientes > saltar and (pendientes - saltar) % config.ALEA_CADA == 0:
+            salida.append(cola.pop(0))
+    return salida + cola
+
+
+def _ordenar(usuario: str, pov: list[dict], mm: list[dict], alea: list[dict] | None = None) -> list[dict]:
+    alea = alea or []
+    por_id = {f["id"]: f for f in pov + mm + alea}
     r = _redis()
     clave = config.ORDEN_KEY.format(usuario=usuario or "ness")
     guardado = (r.get_json(clave) or {}).get("claves") or [] if r.is_available() else []
@@ -62,12 +85,18 @@ def _ordenar(usuario: str, pov: list[dict], mm: list[dict]) -> list[dict]:
     nuevos_pov = sorted((f for f in pov if f["id"] not in conocidos), key=_clave_orden)
     nuevos_mm = [f for f in mm if f["id"] not in conocidos]
     nuevos = _mezclar(nuevos_pov, nuevos_mm)
-    if nuevos and r.is_available():
-        r.set_json(clave, {"claves": guardado + [f["id"] for f in nuevos],
-                           "updated_at": time.time()})
+    # Los de Aleatorios ya subidos van con el resto (por fecha); los
+    # pendientes se intercalan en lo que queda por publicar.
+    nuevos_alea = [f for f in alea if f["id"] not in conocidos]
+    alea_subidos = sorted((f for f in nuevos_alea if f["uploaded"]), key=_clave_orden)
+    alea_pend = sorted((f for f in nuevos_alea if not f["uploaded"]), key=_clave_orden)
+    nuevos = _mezclar(alea_subidos, nuevos) if alea_subidos else nuevos
+    ids = _intercalar(guardado + [f["id"] for f in nuevos], por_id, [f["id"] for f in alea_pend])
+    if (nuevos or alea_pend) and r.is_available():
+        r.set_json(clave, {"claves": ids, "updated_at": time.time()})
     # Lo que ya no existe (vídeo borrado) no sale, pero conserva su puesto
     # guardado por si vuelve.
-    return [por_id[i] for i in guardado if i in por_id] + nuevos
+    return [por_id[i] for i in ids if i in por_id]
 
 
 def filas(usuario: str, fresco: bool = False) -> list[dict]:
@@ -77,8 +106,8 @@ def filas(usuario: str, fresco: bool = False) -> list[dict]:
         c = _cache.get(usuario)
         if c and not fresco and ahora - c[0] < config.CACHE_S:
             return c[1]
-    pov, mm = fuentes.todas(usuario)
-    ordenadas = _ordenar(usuario, pov, mm)
+    pov, mm, alea = fuentes.todas(usuario)
+    ordenadas = _ordenar(usuario, pov, mm, alea)
     with _cerrojo:
         _cache[usuario] = (time.time(), ordenadas)
     return ordenadas
@@ -354,6 +383,8 @@ def _partes(id_: str) -> list[str]:
         return p
     if p[0] == "mm" and len(p) == 3:
         return p
+    if p[0] == "alea" and len(p) == 4:
+        return p
     raise ErrorTanda(f"Vídeo desconocido: {id_!r}")
 
 
@@ -418,7 +449,9 @@ def marcar(
         if uploaded is not None:
             _cuota(f"pov_bof_largo|{fuente}|{carpeta}|{prod}", usuario, bool(uploaded))
     else:
-        _, carpeta, prod = p
+        carpeta, prod = p[1], p[2]
+        if p[0] == "alea" and rehacer is not None:
+            raise ErrorTanda("Moda Mujer · Aleatorios no tiene «rehacer»: se rehace desde su pantalla.")
         from src.api.routers.nicho_ropa import prendas
         from src.api.schemas.nicho_ropa.models import PrendaEstadoRequest
 
@@ -456,6 +489,11 @@ def marcar(
                 elif "sin_stock" in cambios and p[0] in ("pov", "largo") and f["nicho"] in ("pov", "largo") \
                         and f["source"] == p[1] and f["carpeta"] == p[2] and f["producto"] == p[3]:
                     f["sin_stock"] = cambios["sin_stock"]
+                elif p[0] in ("mm", "alea") and f["nicho"] in ("mm", "alea") \
+                        and f["carpeta"] == p[1] and f["producto"] == p[2]:
+                    # Moda Mujer: subido y sin stock son del PRODUCTO (el
+                    # mismo producto con vídeo de multimodo y de Aleatorios).
+                    f.update({k: v for k, v in cambios.items() if k in ("uploaded", "uploaded_at", "sin_stock")})
     return {"ok": True, "id": id_, **cambios}
 
 
@@ -567,7 +605,7 @@ def _precalentar(usuario: str, lista: list[dict]) -> None:
 
         threading.Thread(target=_fotos, daemon=True).start()
     pendientes = [f for f in lista if f["nicho"] in ("pov", "largo") and f["id"] not in _calentando]
-    mm = [f["video_path"] for f in lista if f["nicho"] == "mm" and f["video_path"]]
+    mm = [f["video_path"] for f in lista if f["nicho"] in ("mm", "alea") and f["video_path"]]
     if mm:
         try:
             from src.api.routers.nicho_ropa import prendas
@@ -595,8 +633,8 @@ def _precalentar(usuario: str, lista: list[dict]) -> None:
 def video(usuario: str, id_: str) -> tuple[Path, str]:
     """(fichero, nombre). Para el multimodo se usa su propio endpoint."""
     f = _fila_de(usuario, id_)
-    if f["nicho"] == "mm":
-        raise ErrorTanda("Los vídeos del multimodo se sirven desde su nicho.")
+    if f["nicho"] in ("mm", "alea"):
+        raise ErrorTanda("Los vídeos de Moda Mujer se sirven desde su nicho.")
     p = _copia_local(f, usuario)
     if not p or not p.is_file():
         raise ErrorTanda(f"El vídeo ya no está en {f['video_path']} (¿borrado de Drive?).", status=404)
@@ -604,7 +642,7 @@ def video(usuario: str, id_: str) -> tuple[Path, str]:
 
 
 def _clave_foto(f: dict) -> str:
-    if f["nicho"] == "mm":
+    if f["nicho"] in ("mm", "alea"):
         return f"mm|{f['carpeta']}|{f['producto']}"
     return f"pov|{f['source']}|{f['carpeta']}|{f['producto']}"
 
@@ -627,7 +665,7 @@ def _resolver_fotos(lista: list[dict]) -> dict[str, str]:
     vistas: set[tuple] = set()
     for f in faltan:
         try:
-            if f["nicho"] == "mm":
+            if f["nicho"] in ("mm", "alea"):
                 from src.nicho_ropa.services import prendas_web
 
                 fid = prendas_web.foto_limpia_id(f["carpeta"], f["producto"]) or ""

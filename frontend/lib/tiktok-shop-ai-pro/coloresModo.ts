@@ -17,12 +17,14 @@ export const COLOR_NICHO: Record<string, string> = {
   pov: "bg-sky-500/25 text-sky-700 dark:text-sky-300",
   largo: "bg-violet-500/25 text-violet-700 dark:text-violet-300",
   mm: "bg-pink-500/25 text-pink-700 dark:text-pink-300",
+  alea: "bg-rose-500/25 text-rose-700 dark:text-rose-300",
 };
 
 export const NOMBRE_NICHO: Record<string, string> = {
   pov: "POV BOF",
   largo: "POV Largo",
   mm: "Moda Mujer",
+  alea: "Moda Aleatorios",
 };
 
 /** Estilos de guion del POV BOF Largo. */
@@ -48,11 +50,18 @@ const FAMILIAS_MM: [string, string, string][] = [
   ["mm_bolso", "👜 Bolsos", "bg-lime-500/15 text-lime-700 dark:text-lime-300"],
 ];
 
+/** Modos de Moda Mujer · Aleatorios (los que hablan). */
+const MODOS_ALEA: Record<string, string> = {
+  tienda_colores: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+  calle_dividido: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+};
+
 const NEUTRO = "bg-muted text-muted-foreground";
 
 export function colorModo(nicho: string, modo: string): string {
   if (nicho === "largo") return ESTILOS_LARGO[modo] ?? NEUTRO;
   if (nicho === "mm") return FAMILIAS_MM.find(([p]) => modo.startsWith(p))?.[2] ?? NEUTRO;
+  if (nicho === "alea") return MODOS_ALEA[modo] ?? NEUTRO;
   return NEUTRO;
 }
 
@@ -60,6 +69,7 @@ export function colorModo(nicho: string, modo: string): string {
 export function familiaModo(nicho: string, modo: string, modoLabel: string) {
   if (nicho === "pov") return { clave: "pov", label: "POV BOF", color: COLOR_NICHO.pov ?? NEUTRO };
   if (nicho === "largo") return { clave: `largo|${modo}`, label: `Largo · ${modoLabel}`, color: colorModo(nicho, modo) };
+  if (nicho === "alea") return { clave: `alea|${modo}`, label: modoLabel || modo, color: colorModo(nicho, modo) };
   const f = FAMILIAS_MM.find(([p]) => modo.startsWith(p));
   return f
     ? { clave: `mm|${f[1]}`, label: f[1], color: f[2] }

@@ -30,7 +30,15 @@ NICHOS: dict[str, dict[str, str]] = {
     "pov": {"label": "POV BOF", "hashtags": "nicho-pov-bof", "pantalla": "/tiktok-shop-ai-pro/nicho-pov-bof"},
     "largo": {"label": "POV BOF Largo", "hashtags": "pov-bof-largo", "pantalla": "/tiktok-shop-ai-pro/pov-bof-largo"},
     "mm": {"label": "Multimodo", "hashtags": "nicho-ropa-mujer", "pantalla": "/tiktok-shop-ai-pro/moda-mujer-multimodo"},
+    "alea": {"label": "Moda Mujer · Aleatorios", "hashtags": "nicho-ropa-mujer", "pantalla": "/tiktok-shop-ai-pro/nicho-ropa-mujer"},
 }
+
+# Los de Moda Mujer · Aleatorios (hablan: Tienda Colores, Calle Dividido) se
+# INTERCALAN con el resto en vez de ir todos al final: uno cada tantos
+# pendientes (5 → dos por tanda de diez). Las primeras tandas abiertas no se
+# tocan: el operador puede haberlas bajado ya.
+ALEA_CADA = 5
+ALEA_SIN_TOCAR = 2  # tandas abiertas que se dejan como están
 
 ORDEN_KEY = "mis_tandas:orden:{usuario}"
 FOTO_KEY = "mis_tandas:fotos"

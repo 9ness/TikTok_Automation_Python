@@ -209,6 +209,50 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
     return salida
 
 
+def videos_aleatorios(carpetas: list[str], usuario: str = "") -> list[dict]:
+    """Los vídeos de Moda Mujer · Aleatorios (Tienda Colores, Calle Dividido…):
+    todo modo con vídeo que NO es del multimodo. Uno por producto Y modo —un
+    mismo producto puede tener varios—. Para «Mis tandas»."""
+    from src.nicho_ropa import config
+
+    r = get_nicho_ropa_redis()
+    if not r.is_available() or not carpetas:
+        return []
+    docs = r.mget_json([_key(c) for c in carpetas])
+    mios = (
+        r.mget_json([_key(_ambito(c, usuario)) for c in carpetas])
+        if not _es_historico(usuario) else docs
+    )
+    salida: list[dict] = []
+    for slug, doc, mio in zip(carpetas, docs, mios):
+        productos = (doc or {}).get("productos") or {}
+        personales = (mio or {}).get("productos") or {}
+        for pid in set(productos) | set(personales):
+            vista = {k: v for k, v in (productos.get(pid) or {}).items() if k not in PERSONALES}
+            vista.update(personales.get(pid) or {})
+            for modo in (vista.get("modos") or {}):
+                if config.es_multimodo(modo) or modo not in config.MODOS:
+                    continue
+                v = video_de(vista, modo)
+                if not v["video_path"]:
+                    continue
+                salida.append({
+                    "carpeta": slug, "producto": str(pid), "modo": modo,
+                    "titulo": str(vista.get("titulo") or ""),
+                    "tienda": str(vista.get("tienda") or ""),
+                    "titulo_tiktok_completo": str(vista.get("titulo_tiktok_completo") or ""),
+                    "product_url": str(vista.get("product_url") or ""),
+                    "uploaded": bool(vista.get("uploaded")),
+                    "uploaded_at": int(vista.get("uploaded_at") or 0),
+                    "caption": str(vista.get("caption") or ""),
+                    "emojis": str(vista.get("emojis") or ""),
+                    "sin_stock": bool(vista.get("sin_stock")),
+                    **v,
+                })
+    salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))
+    return salida
+
+
 def _key_orden_multimodo(usuario: str) -> str:
     return f"multimodo:orden:{usuario or USUARIO_HISTORICO}"
 

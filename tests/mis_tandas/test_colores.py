@@ -48,3 +48,10 @@ def test_cada_nicho_de_mis_tandas_tiene_color():
 def test_estilo_viral_tiene_color():
     claves = set(re.findall(r"^\s*(\w+):", _bloque("ESTILOS_LARGO"), re.M))
     assert "viral" in claves
+
+
+def test_cada_modo_de_aleatorios_con_video_tiene_color():
+    """Los modos de Moda Mujer · Aleatorios que salen en Mis tandas."""
+    claves = set(re.findall(r"^\s*(\w+):", _bloque("MODOS_ALEA"), re.M))
+    for modo in ("tienda_colores", "calle_dividido"):
+        assert modo in claves, f"Modo de Aleatorios sin color en coloresModo.ts: {modo}"

@@ -7,7 +7,8 @@
 ## Qué es (y qué NO es)
 
 Es la lista de **vídeos ya montados** del usuario, de **todos sus nichos**
-(POV BOF, POV BOF Largo en cualquiera de sus modos, Moda Mujer · Multimodo),
+(POV BOF, POV BOF Largo en cualquiera de sus modos, Moda Mujer · Multimodo y
+Moda Mujer · Aleatorios —Tienda Colores, Calle Dividido…—),
 de **diez en diez** y en el orden en que toca publicarlos. Cada tanda abierta
 lleva una **fecha orientativa** (una tanda al día; si hoy ya hay 8 subidos,
 empieza mañana) y su **época** («🍂 Otoño», «🎃 Halloween», «❄️ Invierno ·
@@ -40,11 +41,11 @@ Por eso puede haber tandas de menos de 10 al final (lo que espera su fecha).
 Mis tandas no guarda estados propios. Cada botón escribe en el documento del
 NICHO del vídeo:
 
-| Botón | POV BOF | POV BOF Largo | Multimodo |
+| Botón | POV BOF | POV BOF Largo | Multimodo y Aleatorios |
 |---|---|---|---|
 | ✓ Subido | `uploaded` del POV (y la cuota del día) | `uploaded` del Largo **en el modo del vídeo** | `/multimodo/subido` |
 | 🚫 Sin stock | textos del POV (es del PRODUCTO: lo ven todos) | textos del POV | `/multimodo/sin-stock` |
-| 🔁 Rehacer | — (el POV corto no tiene) | `rehacer` + nota | `/multimodo/rehacer` |
+| 🔁 Rehacer | — (el POV corto no tiene) | `rehacer` + nota | `/multimodo/rehacer` (Aleatorios: no tiene) |
 
 Marcar en Mis tandas = marcar en la pantalla del nicho, y al revés. `para_rehacer(menu)`
 sigue sacando lo marcado para rehacer, se marque donde se marque.
@@ -110,3 +111,15 @@ UGC (Nicho General), BOF Cinematográfico, Cuenta Piloto, Ropa con Personas,
 los otros modos de Moda Mujer y Ropa Hombre: o no guardan «subido» por
 usuario o no tienen fecha de montaje. Si el operador los quiere aquí, se
 añade un lector en `src/mis_tandas/fuentes.py`.
+
+## Moda Mujer · Aleatorios (id `alea|carpeta|producto|modo`)
+
+Los vídeos de los modos de Moda Mujer que **no** son del multimodo (los que
+hablan: Tienda Colores, Calle Dividido…). Uno por producto y modo. El
+«subido» y el «sin stock» son del **producto** (los mismos campos que el
+multimodo): si un producto tiene vídeo en los dos, al marcar uno queda el
+otro, y el reparto los separa 7 días como a cualquier producto repetido.
+Al aparecer se **intercalan** en lo pendiente, uno cada `ALEA_CADA` (5),
+sin tocar las `ALEA_SIN_TOCAR` (2) primeras tandas abiertas, que el operador
+puede tener ya bajadas.
+

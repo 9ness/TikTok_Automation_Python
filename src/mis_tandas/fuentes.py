@@ -10,6 +10,8 @@ dice a qué documento escribir cuando se pulsa un botón:
 - `pov|<fuente>|<carpeta>|<producto>`
 - `largo|<fuente>|<carpeta>|<producto>|<modo>`   (modo vacío = el de siempre)
 - `mm|<carpeta>|<producto>`
+- `alea|<carpeta>|<producto>|<modo>`   (Moda Mujer · Aleatorios: el modo va
+  en el id porque un producto puede tener vídeo de varios modos)
 """
 
 from __future__ import annotations
@@ -286,6 +288,62 @@ def multimodo(usuario: str) -> list[dict]:
     return filas
 
 
+# ---------------------------------------------------------------------------
+# Moda Mujer · Aleatorios (Tienda Colores, Calle Dividido…): los que hablan
+# ---------------------------------------------------------------------------
+def _carpetas_mujer(rr) -> list[str]:
+    from src.nicho_ropa import config as ropa_config
+
+    return sorted({
+        k[len("productos:"):] for k in _keys(rr, "productos:*")
+        if ":u:" not in k and ropa_config.sexo_de_carpeta(k[len("productos:"):]) == "mujer"
+    })
+
+
+def aleatorios(usuario: str) -> list[dict]:
+    """Uno por producto y modo. El «subido» y el «sin stock» son del PRODUCTO
+    (los mismos campos que el multimodo): si el mismo producto tiene vídeo en
+    los dos, al marcar uno queda el otro."""
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+    from src.nicho_ropa import config as ropa_config
+    from src.nicho_ropa.repos import product_repo as ropa_repo
+    from src.nicho_ropa.repos.redis_base import get_nicho_ropa_redis
+
+    rr = get_nicho_ropa_redis()
+    if not rr.is_available():
+        return []
+    videos = ropa_repo.videos_aleatorios(_carpetas_mujer(rr), usuario)
+    if not videos:
+        return []
+    try:
+        indice = pov_repo.urls_index()
+    except Exception:  # noqa: BLE001
+        indice = None
+    filas: list[dict] = []
+    for v in videos:
+        modo = v["modo"]
+        url = ""
+        if indice is not None:
+            try:
+                url = pov_repo.url_de(v, indice) or ""
+            except Exception:  # noqa: BLE001
+                url = ""
+        filas.append(_fila(
+            id=SEP.join(("alea", v["carpeta"], str(v["producto"]), modo)), nicho="alea",
+            modo=modo, modo_label=ropa_config.MODOS.get(modo, {}).get("label", modo),
+            carpeta=v["carpeta"], carpeta_label=ropa_config.carpeta_label(v["carpeta"]),
+            **_catalogo_ropa(v["carpeta"], ropa_config.carpeta_label(v["carpeta"])),
+            producto=str(v["producto"]), **_textos(v), product_url=url or str(v.get("product_url") or ""),
+            uploaded=bool(v.get("uploaded")), uploaded_at=_num(v.get("uploaded_at")),
+            video_path=str(v.get("video_path") or ""),
+            video_listo_at=_num(v.get("video_listo_at")),
+            orden_at=_num(v.get("primer_listo_at") or v.get("video_listo_at")),
+            flecha=bool(v.get("flecha")), formato=modo,
+            musica=ropa_config.musica_de(modo, f"{v['carpeta']}/{v['producto']}") or None,
+        ))
+    return filas
+
+
 def _catalogo_ropa(slug: str, etiqueta: str) -> dict:
     """`mujer_zapatos_web__Carpeta_1` → catálogo `mujer_zapatos_web`, con su
     etiqueta («👠 Mujer zapatos») y la carpeta sola («Carpeta_1»)."""
@@ -295,9 +353,10 @@ def _catalogo_ropa(slug: str, etiqueta: str) -> dict:
             "carpeta_corta": carpeta or slug.split("__", 1)[-1]}
 
 
-def todas(usuario: str) -> tuple[list[dict], list[dict]]:
-    """(POV + Largo, Multimodo). Los dos en paralelo: son Redis distintos."""
-    with ThreadPoolExecutor(max_workers=2) as ex:
+def todas(usuario: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """(POV + Largo, Multimodo, Aleatorios), en paralelo."""
+    with ThreadPoolExecutor(max_workers=3) as ex:
         f1 = ex.submit(pov_y_largo, usuario)
         f2 = ex.submit(multimodo, usuario)
-        return f1.result(), f2.result()
+        f3 = ex.submit(aleatorios, usuario)
+        return f1.result(), f2.result(), f3.result()

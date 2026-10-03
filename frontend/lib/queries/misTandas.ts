@@ -11,7 +11,7 @@ const ROOT = "/api/v1/mis-tandas";
  *  escribe cada botón (ver `src/mis_tandas/fuentes.py`). */
 export interface VideoTanda {
   id: string;
-  nicho: "pov" | "largo" | "mm";
+  nicho: "pov" | "largo" | "mm" | "alea";
   nicho_label: string;
   hashtags_nicho: string;
   pantalla: string;
@@ -167,8 +167,19 @@ function aplicar(d: MisTandasResponse | undefined, c: Cambio, producto?: VideoTa
       }
       // «Sin stock» es del PRODUCTO: el mismo producto con vídeo de POV y de
       // Largo se marca en los dos.
+      // Moda Mujer (multimodo y Aleatorios): subido y sin stock son del
+      // PRODUCTO; si tiene vídeo en los dos, se marcan los dos.
+      const moda = (n: string) => n === "mm" || n === "alea";
+      if (producto && moda(producto.nicho) && moda(v.nicho) &&
+          v.carpeta === producto.carpeta && v.producto === producto.producto) {
+        return {
+          ...v,
+          ...(c.uploaded !== undefined ? { uploaded: c.uploaded } : {}),
+          ...(c.sin_stock !== undefined ? { sin_stock: c.sin_stock } : {}),
+        };
+      }
       if (
-        c.sin_stock !== undefined && producto && producto.nicho !== "mm" && v.nicho !== "mm" &&
+        c.sin_stock !== undefined && producto && !moda(producto.nicho) && !moda(v.nicho) &&
         v.source === producto.source && v.carpeta === producto.carpeta && v.producto === producto.producto
       ) {
         return { ...v, sin_stock: c.sin_stock };
@@ -227,7 +238,7 @@ function conApiKey(path: string): string {
 
 /** El vídeo. Los del multimodo los sirve su nicho; el resto, este router. */
 export function buildVideoTandaUrl(v: VideoTanda, descargar = false): string {
-  if (v.nicho === "mm") {
+  if (v.nicho === "mm" || v.nicho === "alea") {
     return conApiKey(
       `/api/v1/nicho-ropa/video?producto=${encodeURIComponent(v.producto)}` +
         `&carpeta=${encodeURIComponent(v.carpeta)}&v=${v.video_listo_at}` +

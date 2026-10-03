@@ -139,3 +139,24 @@ def test_mismo_producto_separado_una_semana(redis, monkeypatch):
     fechas = [t["fecha"] for t in d["tandas"] for i in t["items"] if i["titulo"] == "Lámpara"]
     a, b = (dt.date.fromisoformat(x) for x in fechas)
     assert (b - a).days >= 7
+
+
+def test_aleatorios_se_intercalan_sin_tocar_las_primeras_tandas():
+    from src.mis_tandas import config, servicio
+
+    def f(i, up=False):
+        return {"id": i, "uploaded": up}
+
+    # 5 subidos + 40 pendientes del multimodo; 4 de Aleatorios nuevos.
+    ids = [f"s{i}" for i in range(5)] + [f"p{i}" for i in range(40)]
+    por_id = {i: f(i, up=i.startswith("s")) for i in ids}
+    nuevos = ["a1", "a2", "a3", "a4"]
+    salida = servicio._intercalar(ids, por_id, nuevos)
+    assert sorted(salida) == sorted(ids + nuevos)
+    saltar = config.ALEA_SIN_TOCAR * config.POR_TANDA
+    # Nada nuevo dentro de las primeras tandas abiertas.
+    primeros = [i for i in salida if not i.startswith("s")][:saltar]
+    assert not any(i.startswith("a") for i in primeros)
+    # Después, uno cada ALEA_CADA pendientes.
+    pos = [salida.index(a) for a in nuevos]
+    assert all(b - a == config.ALEA_CADA + 1 for a, b in zip(pos, pos[1:]))
