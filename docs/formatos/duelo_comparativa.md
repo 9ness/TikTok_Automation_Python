@@ -130,7 +130,7 @@ pasó a mitad de render).
 
 9. **Gancho** (`gancho` en el guion): 1,7 s del momento más visual (el rojo
    dado la vuelta) sin voz, con la pregunta en grande («¿Cuál aguanta esto?»).
-10. **Sonido** (`sfx/`, hechos con ffmpeg): calle mojada siempre debajo, lluvia
+10. **Sonido** (`sfx.sh <dir>/media/sfx`, hechos con ffmpeg): calle mojada siempre debajo, lluvia
     solo donde llueve, golpe de viento y «pop» en cada rótulo azul.
 11. **Planos de charla «recién ha parado de llover»** (suelo mojado, sin lluvia):
     si llueve y los dos tienen el paraguas cerrado, no tiene sentido.
