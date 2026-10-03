@@ -199,6 +199,8 @@ for i, linea in enumerate(g["lineas"]):
         ini = desde.get(clip.name, max(v_ini, linea.get("desde", 0.0) if k == 0 else 0.0))
         if ini + trozo > v_fin - 0.1:
             ini = max(v_ini, v_fin - 0.1 - trozo)
+        if ini + trozo > v_fin + 0.05:
+            print(f"AVISO línea {i}: {clip.name} necesita {trozo:.1f}s y su tramo válido acaba en {v_fin}")
         desde[clip.name] = ini + trozo
         entradas_v.append((clip, ini, trozo))
     capas = []

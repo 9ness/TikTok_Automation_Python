@@ -12,7 +12,7 @@ from src.nicho_pov_bof_largo.services import voz
 D = Path(sys.argv[1])
 g = json.loads((D / "guion_paraguas.json").read_text())
 voces = {v["label"]: v for v in c.VOCES["hombre"]}
-VOZ = {"a": voces["Amigo con Humor"], "b": voces["Joven Conversador Relajado"]}
+VOZ = {"a": voces["Amigo con Humor"], "b": voces["Chico"]}  # «b»: elegida por ness (3 oct)
 for i, linea in enumerate(g["lineas"]):
     mp3 = D / f"l{i:02d}.mp3"
     if mp3.exists():

@@ -15,7 +15,7 @@
   {
    "q": "ab",
    "t": "¿Cuál será mejor?",
-   "clip": "f_cerrado.mp4"
+   "clip": "r_idle2.mp4"
   },
   {
    "q": "a",
@@ -83,7 +83,16 @@
   {
    "q": "b",
    "t": "El precio no te lo digo: míralo tú mismo aquí abajo, porque te va a sorprender.",
-   "clip": "f_abierto2.mp4"
+   "tramos": [
+    [
+     "t2_nuestro.mp4",
+     0.4
+    ],
+    [
+     "f_abierto2.mp4",
+     1.0
+    ]
+   ]
   },
   {
    "q": "b",
@@ -91,7 +100,7 @@
    "cta": true,
    "clip": "f_abierto1.mp4",
    "clip2": "t_nuestro.mp4",
-   "corte": 0.57
+   "corte": 0.4
   }
  ]
 }

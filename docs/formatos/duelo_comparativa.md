@@ -84,7 +84,7 @@ creador real: cara cuando habla, recortes al producto cuando demuestra.
 
 ## Prototipo del paraguas (3 oct 2026)
 
-Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v11.mp4`
+Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v12_voz_chico.mp4`
 (45 s). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
 con el navegador del VPS; `voces.py` y `montaje3.py` dentro del contenedor de la
 API, en `/app/temp_work/duelo` (NO en `/tmp`: un despliegue lo borra, y nos
