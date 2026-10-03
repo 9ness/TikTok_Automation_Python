@@ -37,6 +37,9 @@ VENTANA = {
     # y sale un mango de gancho en el nuestro hasta el 5,3; s_abC, el rival suelta
     # el suyo hasta el 4,9.
     "b_boton.mp4": (2.45, 3.9), "s_ab2.mp4": (5.3, 7.9), "s_abC.mp4": (4.9, 8.0),
+    # b_boton2: el paraguas cogido BIEN (mango abajo): se abre entero; desde
+    # 1,3 s el pulgar pulsa al decir «botón» y a los 3,3 s está abierto.
+    "b_boton2.mp4": (1.3, 7.9),
 }
 
 

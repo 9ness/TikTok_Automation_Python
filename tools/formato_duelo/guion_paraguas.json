@@ -26,16 +26,7 @@
    "q": "b",
    "t": "¡El mío, con un botón! Se abre solo y se cierra solo.",
    "callout": "Se abre y se cierra solo",
-   "tramos": [
-    [
-     "b_boton.mp4",
-     0.4
-    ],
-    [
-     "s_ab2.mp4",
-     1.0
-    ]
-   ]
+   "clip": "b_boton2.mp4"
   },
   {
    "q": "a",
