@@ -181,7 +181,8 @@ def _clave_producto(f: dict) -> str:
     return f"{f['nicho']}|{f['source']}|{f['carpeta']}|{f['producto']}"
 
 
-def _repartir(lista: list[dict], dia: dt.date, por_dia: int) -> list[tuple[list[dict], dt.date | None]]:
+def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
+              previos: dict[str, dt.date] | None = None) -> list[tuple[list[dict], dt.date | None]]:
     """Reparte en tandas de `POR_TANDA` respetando el ORDEN fijo, salvo dos
     cosas que obligan a esperar (sin bloquear a los demás):
 
@@ -190,11 +191,12 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int) -> list[tuple[list[
       `SEPARACION_MISMO_PRODUCTO` días.
 
     Lo subido no espera nunca (ya está publicado) y una tanda solo con subidos
-    no gasta día. Devuelve [(vídeos, fecha o None si está cerrada)].
+    no gasta día. `previos`: producto → día en que ya va en una tanda fija.
+    Devuelve [(vídeos, fecha o None si está cerrada)].
     """
     n = config.POR_TANDA
     sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO)
-    ultimo: dict[str, dt.date] = {}
+    ultimo: dict[str, dt.date] = dict(previos or {})
     for f in lista:
         if f["uploaded"] and f["uploaded_at"]:
             d = dt.datetime.fromtimestamp(f["uploaded_at"], _TZ).date()
@@ -300,16 +302,39 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int) -> list[tuple[list[
     return salida
 
 
+def _fijas(usuario: str) -> list[dict]:
+    r = _redis()
+    if not r.is_available():
+        return []
+    return list((r.get_json(config.FIJAS_KEY.format(usuario=usuario)) or {}).get("tandas") or [])
+
+
+def _guardar_fijas(usuario: str, fijas: list[dict]) -> None:
+    r = _redis()
+    if not r.is_available():
+        return
+    # Las completadas viejas sobran: se recuerdan las últimas, las abiertas todas.
+    cerradas = [i for i, t in enumerate(fijas) if t.get("completada_at")]
+    quitar = set(cerradas[:-config.FIJAS_GUARDAR]) if len(cerradas) > config.FIJAS_GUARDAR else set()
+    fijas = [t for i, t in enumerate(fijas) if i not in quitar]
+    r.set_json(config.FIJAS_KEY.format(usuario=usuario), {"tandas": fijas, "updated_at": time.time()})
+
+
 def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos: bool = False) -> dict:
     """Las tandas ABIERTAS con sus vídeos y, de las cerradas, solo cuántas hay
-    (con `todas`, también sus vídeos). Lo pendiente sin stock no ocupa sitio:
-    sale aparte en `esperando_stock` hasta que vuelva."""
+    (con `todas`, también sus vídeos).
+
+    Las tandas que se enseñan quedan FIJADAS (`FIJAS_KEY`): las primeras
+    `FIJAR_ABIERTAS` abiertas y toda tanda llena. Un vídeo no sale nunca de su
+    tanda (subido y sin stock se quedan con su marca) salvo si se rehace, y
+    una tanda solo se cierra con «Tanda completada». Lo que aún no está en
+    ninguna se reparte con `_repartir`; ahí lo pendiente sin stock no ocupa
+    sitio: sale aparte en `esperando_stock` hasta que vuelva."""
     usuario = usuario or "ness"
     escondidos = ocultos(usuario)
     completa = filas(usuario, fresco=fresco)
     lista = [f for f in completa if f["id"] not in escondidos]
-    sin_stock = [f for f in lista if f["sin_stock"] and not f["uploaded"]]
-    publicables = [f for f in lista if not (f["sin_stock"] and not f["uploaded"])]
+    por_id = {f["id"]: f for f in lista}
 
     dia = dt.datetime.now(_TZ).date()
     hoy = sum(
@@ -320,6 +345,92 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     por_dia = max(1, config.TANDAS_DIA.get(usuario, 1))
     if hoy >= config.SUBIDAS_DIA_HECHO * por_dia:
         dia += dt.timedelta(days=1)
+    hueco = {"fecha": dia, "usados": 0}
+
+    def siguiente_dia(minimo: dt.date | None = None) -> dt.date:
+        if hueco["usados"] >= por_dia:
+            hueco["fecha"] += dt.timedelta(days=1)
+            hueco["usados"] = 0
+        if minimo and minimo > hueco["fecha"]:
+            hueco["fecha"], hueco["usados"] = minimo, 0
+        hueco["usados"] += 1
+        return hueco["fecha"]
+
+    # 1) Las fijas, tal cual se guardaron. Un vídeo NUNCA sale de su tanda
+    #    (subido y sin stock se quedan con su marca), salvo uno marcado para
+    #    rehacer que ya se ha vuelto a montar: ese va a una tanda nueva.
+    todos = {f["id"]: f for f in completa}
+    fijas = _fijas(usuario)
+    cambio = False
+    for t in fijas:
+        if t.get("completada_at"):
+            continue
+        listo = t.setdefault("listo", {})
+        marcados = set(t.get("rehacer") or [])
+        quedan = []
+        for i in t.get("ids", []):
+            f = todos.get(i)
+            if f is None:  # ya no se lee (borrado en el nicho): se guarda igual
+                quedan.append(i)
+                continue
+            if f["rehacer"] and i not in marcados:
+                marcados.add(i)
+                cambio = True
+            if i not in listo:
+                listo[i] = f["video_listo_at"]
+                cambio = True
+            elif i in marcados and not f["rehacer"] and f["video_listo_at"] > listo[i] + 1:
+                marcados.discard(i)
+                listo.pop(i, None)
+                cambio = True
+                continue  # rehecho: fuera, se reparte de nuevo
+            quedan.append(i)
+        if quedan != t.get("ids"):
+            t["ids"] = quedan
+        t["rehacer"] = sorted(marcados)
+
+    grupos: list[tuple[list[dict], dt.date | None, bool]] = []  # (vídeos, fecha, cerrada)
+    previos: dict[str, dt.date] = {}
+    for t in fijas:
+        items = [por_id[i] for i in t.get("ids", []) if i in por_id]
+        if not items:
+            continue
+        # Solo «Tanda completada» cierra una tanda fija: toda subida sigue a la vista.
+        cerrada = bool(t.get("completada_at"))
+        fecha = None
+        if not cerrada:
+            desde = [d for d in (_desde(f) for f in items if not _cerrado(f)) if d]
+            fecha = siguiente_dia(max(desde) if desde else None)
+            for f in items:
+                if not _cerrado(f):
+                    c = _clave_producto(f)
+                    previos[c] = max(previos.get(c, fecha), fecha)
+        grupos.append((items, fecha, cerrada))
+
+    # 2) El resto se reparte detrás de las fijas. Se fijan las primeras
+    #    abiertas y toda tanda llena; una a medio llenar al final se sigue
+    #    llenando con lo que se monte.
+    en_fijas = {i for t in fijas for i in t.get("ids", [])}
+    resto = [f for f in lista if f["id"] not in en_fijas]
+    sin_stock = [f for f in resto if f["sin_stock"] and not f["uploaded"]]
+    publicables = [f for f in resto if not (f["sin_stock"] and not f["uploaded"])]
+    if hueco["usados"] >= por_dia:
+        hueco["fecha"] += dt.timedelta(days=1)
+    abiertas_fijas = sum(1 for _, _, c in grupos if not c)
+    historicas: list[tuple[list[dict], dt.date | None, bool]] = []
+    nuevas: list[tuple[list[dict], dt.date | None, bool]] = []
+    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos):
+        if all(f["uploaded"] for f in grupo):
+            historicas.append((grupo, None, True))
+            continue
+        if abiertas_fijas < config.FIJAR_ABIERTAS or len(grupo) >= config.POR_TANDA:
+            fijas.append({"ids": [f["id"] for f in grupo], "creada": time.time(),
+                          "listo": {f["id"]: f["video_listo_at"] for f in grupo}})
+            abiertas_fijas += 1
+            cambio = True
+        nuevas.append((grupo, fecha, False))
+    if cambio:
+        _guardar_fijas(usuario, fijas)
 
     from src.nicho_ropa import config as ropa_config
 
@@ -327,13 +438,13 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     abiertas_vistas = 0
     cerradas = 0
     precalentar: list[dict] = []
-    for i, (grupo, fecha) in enumerate(_repartir(publicables, dia, por_dia)):
-        abierta = not all(f["uploaded"] for f in grupo)
+    for i, (grupo, fecha, cerrada) in enumerate(historicas + grupos + nuevas):
+        abierta = not cerrada
         t = {
             "numero": i + 1,
             "total": len(grupo),
             "subidos": sum(1 for f in grupo if f["uploaded"]),
-            "sin_stock": 0,
+            "sin_stock": sum(1 for f in grupo if f["sin_stock"] and not f["uploaded"]),
             "rehacer": sum(1 for f in grupo if f["rehacer"] and not f["uploaded"]),
             "abierta": abierta,
             "nichos": sorted({f["nicho"] for f in grupo}),
@@ -342,7 +453,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
             t["fecha"] = fecha.isoformat()
             t["temporada"] = ropa_config.etiqueta_temporada(fecha)
             if abiertas_vistas < config.PRECALENTAR_TANDAS:
-                precalentar += [f for f in grupo if not f["uploaded"]]
+                precalentar += [f for f in grupo if not _cerrado(f)]
             abiertas_vistas += 1
         else:
             cerradas += 1
@@ -355,7 +466,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         "por_tanda": config.POR_TANDA,
         "total": len(lista),
         "subidos": sum(1 for f in lista if f["uploaded"]),
-        "sin_stock": len(sin_stock),
+        "sin_stock": sum(1 for f in lista if f["sin_stock"] and not f["uploaded"]),
         "subidos_hoy": hoy,
         "cerradas": cerradas,
         "abiertas": abiertas_vistas,
@@ -364,6 +475,30 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         "esperando_stock": [_publica(f) for f in sin_stock],
         "tandas": salida,
     }
+
+
+def completar(usuario: str, ids: list[str]) -> dict:
+    """«Tanda completada»: CIERRA la tanda (la siguiente pasa a ser la primera)
+    sin marcar nada. Lo que no se subió se queda sin subir, en esa tanda."""
+    usuario = usuario or "ness"
+    pedidos = {i for i in ids if i}
+    if not pedidos:
+        raise ErrorTanda("Sin vídeos.")
+    for i in pedidos:
+        _partes(i)
+    r = _redis()
+    if not r.is_available():
+        raise ErrorTanda("Redis no está disponible.", status=503)
+    fijas = _fijas(usuario)
+    tanda = next((t for t in fijas if pedidos & set(t.get("ids", []))), None)
+    if tanda is None:  # una tanda que aún no estaba fijada: se fija ya cerrada
+        tanda = {"ids": sorted(pedidos), "creada": time.time()}
+        fijas.append(tanda)
+    tanda["completada_at"] = time.time()
+    _guardar_fijas(usuario, fijas)
+    por_id = {f["id"]: f for f in filas(usuario)}
+    sin_subir = sum(1 for i in tanda["ids"] if i in por_id and not _cerrado(por_id[i]))
+    return {"ok": True, "cerrada": len(tanda["ids"]), "sin_subir": sin_subir}
 
 
 # ---------------------------------------------------------------------------

@@ -213,7 +213,7 @@ export function MisTandas() {
                 : "border-border/60 text-muted-foreground hover:text-foreground"
             }`}
           >
-            {verCerradas ? "Ocultar" : "Ver"} las {datos.cerradas} tandas ya subidas
+            {verCerradas ? "Ocultar" : "Ver"} las {datos.cerradas} tandas cerradas
           </button>
         ) : null}
         {datos?.ocultos ? (
@@ -399,14 +399,13 @@ export function MisTandas() {
                         type="button"
                         disabled={completar.isPending}
                         onClick={() => {
-                          const pendientes = t.items.filter((v) => !v.uploaded).map((v) => v.id);
                           if (aCompletar === t.numero) {
-                            completar.mutate(pendientes);
+                            completar.mutate(t.items.map((v) => v.id));
                             setACompletar(null);
                           } else setACompletar(t.numero);
                         }}
                         onBlur={() => setACompletar((x) => (x === t.numero ? null : x))}
-                        title="Marca como subidos todos los que quedan en esta tanda y pasa a la siguiente"
+                        title="Da la tanda por terminada y pasa a la siguiente. No marca nada como subido"
                         className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50 ${
                           aCompletar === t.numero
                             ? "border-emerald-500 bg-emerald-500/20 text-emerald-500"
@@ -419,7 +418,9 @@ export function MisTandas() {
                           <Check className="h-3 w-3" />
                         )}
                         {aCompletar === t.numero
-                          ? `¿Marcar ${t.items.filter((v) => !v.uploaded).length} subidos?`
+                          ? t.items.some((v) => !v.uploaded && !v.sin_stock)
+                            ? `¿Cerrar? ${t.items.filter((v) => !v.uploaded && !v.sin_stock).length} sin subir`
+                            : "¿Cerrar la tanda?"
                           : "Tanda completada"}
                       </button>
                     ) : null}

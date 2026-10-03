@@ -545,6 +545,7 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] (3/10/2026) **Mis tandas — dos errores del operador**: (1) «Tanda completada» marcaba SUBIDOS los vídeos sin subir → ahora solo cierra la tanda; (2) marcar sin stock/subido metía un vídeo de la tanda siguiente en la actual → las tandas vistas quedan fijadas (`mis_tandas:fijas:<u>`): solo sale un vídeo rehecho (a una tanda nueva) y solo «Tanda completada» cierra.
 
 - [x] (2/10/2026) **Menú «Mis tandas»** (`/tiktok-shop-ai-pro/mis-tandas`, primero del menú para los tres): lo montado en POV BOF, Largo y Multimodo de diez en diez con fecha y época; subido/sin stock/rehacer escriben en el nicho. MCP `mis_tandas` + `marcar_tanda`, guía `mis-tandas.md`.
 

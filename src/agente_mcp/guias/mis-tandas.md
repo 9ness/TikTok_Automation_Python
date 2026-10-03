@@ -31,8 +31,17 @@ ajustan sin bloquear a los demás:
 - **El mismo producto no sale dos veces en menos de 7 días**
   (`SEPARACION_MISMO_PRODUCTO`): otro modo del Largo, la copia de Q4… El
   segundo espera. Cuenta también lo ya subido.
-- **Lo pendiente sin stock no ocupa sitio**: sale en «⏳ Esperando stock» y al
-  quitarle el 🚫 vuelve a la siguiente tanda que le toque.
+- **Las tandas que se enseñan quedan FIJADAS** (`mis_tandas:fijas:<usuario>`:
+  las dos primeras abiertas y toda tanda llena). Un vídeo **no sale nunca** de
+  su tanda: subido o sin stock se queda en su sitio con su marca y NO entra uno
+  de la siguiente (el operador ya la ha bajado). Lo nuevo va siempre detrás.
+- **Única excepción: rehacer.** Marcado para rehacer sigue en su tanda (con
+  🔁); cuando se vuelve a montar (sube su `video_listo_at`) sale de ella y
+  entra en una tanda nueva.
+- **Una tanda solo se cierra con «Tanda completada»**: aunque esté toda subida
+  sigue a la vista hasta que el operador la complete.
+- **Lo que aún no está en ninguna tanda y está sin stock no ocupa sitio**: sale
+  en «⏳ Esperando stock» y, al quitarle el 🚫, entra en la siguiente que toque.
 
 Por eso puede haber tandas de menos de 10 al final (lo que espera su fecha).
 
@@ -65,11 +74,12 @@ quitados» los lista con «Devolver». Se guarda por usuario en
 
 ## Tanda completada
 
-Botón «✓ Tanda completada» en la cabecera (pide confirmación): marca SUBIDOS
-todos los que quedaban en la tanda (`POST /api/v1/mis-tandas/completar
-{ids}`), cada uno en su nicho y en el contador del día. La tanda pasa a «ya
-subidas» y la siguiente queda la primera. Lo que no se vaya a subir se quita
-antes con 👁‍🗨. Un agente no lo usa salvo que el operador lo pida.
+Botón «✓ Tanda completada» en la cabecera (pide confirmación): CIERRA la tanda
+y la siguiente queda la primera (`POST /api/v1/mis-tandas/completar {ids}`
+con TODOS los de la tanda). **No marca nada como subido**: lo que no se subió
+se queda sin subir dentro de esa tanda («Ver las N tandas cerradas»), y ahí
+sigue teniendo su botón Subido. Un agente no lo usa salvo que el operador lo
+pida.
 
 ## Descargas
 

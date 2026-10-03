@@ -160,3 +160,66 @@ def test_aleatorios_se_intercalan_sin_tocar_las_primeras_tandas():
     # Después, uno cada ALEA_CADA pendientes.
     pos = [salida.index(a) for a in nuevos]
     assert all(b - a == config.ALEA_CADA + 1 for a, b in zip(pos, pos[1:]))
+
+
+def test_tanda_fijada_no_se_mueve_al_marcar(redis, monkeypatch):
+    """Marcar sin stock o subido NO mete un vídeo de la tanda siguiente."""
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(25)]
+    _sin_precalentar(monkeypatch, lista)
+    antes = servicio.tandas("ness")
+    primera = [x["id"] for x in antes["tandas"][0]["items"]]
+    segunda = [x["id"] for x in antes["tandas"][1]["items"]]
+    lista[2]["sin_stock"] = True
+    lista[5]["uploaded"], lista[5]["uploaded_at"] = True, 1.0
+    despues = servicio.tandas("ness")
+    assert [x["id"] for x in despues["tandas"][0]["items"]] == primera
+    assert [x["id"] for x in despues["tandas"][1]["items"]] == segunda
+    assert despues["tandas"][0]["sin_stock"] == 1 and despues["esperando_stock"] == []
+    assert despues["abiertas"] == 3
+    # Un vídeo nuevo va detrás de las fijas, no dentro.
+    lista.append(fila("pov|s|c|99", orden_at=99))
+    otra = servicio.tandas("ness")
+    assert "pov|s|c|99" not in primera + [x["id"] for x in otra["tandas"][1]["items"]]
+
+
+def test_completar_cierra_sin_marcar_subido(redis, monkeypatch):
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(20)]
+    _sin_precalentar(monkeypatch, lista)
+    d = servicio.tandas("ness")
+    ids = [x["id"] for x in d["tandas"][0]["items"]]
+    lista[0]["uploaded"], lista[0]["uploaded_at"] = True, 1.0
+    r = servicio.completar("ness", ids)
+    assert r["sin_subir"] == 9
+    assert not any(f["uploaded"] for f in lista[1:])  # nada marcado
+    d2 = servicio.tandas("ness")
+    assert d2["cerradas"] == 1 and d2["tandas"][0]["items"][0]["id"] == "pov|s|c|10"
+    todas = servicio.tandas("ness", todas=True)["tandas"]
+    assert [x["id"] for x in todas[0]["items"]] == ids  # lo no subido sigue en su tanda
+
+
+def test_toda_subida_sigue_a_la_vista_hasta_completarla(redis, monkeypatch):
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(10)]
+    _sin_precalentar(monkeypatch, lista)
+    servicio.tandas("ness")
+    for f in lista:
+        f["uploaded"], f["uploaded_at"] = True, 1.0
+    d = servicio.tandas("ness")
+    assert d["abiertas"] == 1 and len(d["tandas"][0]["items"]) == 10
+    servicio.completar("ness", [f["id"] for f in lista])
+    assert servicio.tandas("ness")["abiertas"] == 0
+
+
+def test_rehecho_pasa_a_una_tanda_nueva(redis, monkeypatch):
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(15)]
+    for f in lista:
+        f["video_listo_at"] = 100.0
+    _sin_precalentar(monkeypatch, lista)
+    servicio.tandas("ness")
+    lista[4]["rehacer"] = True  # marcado: sigue en su tanda
+    d = servicio.tandas("ness")
+    assert "pov|s|c|4" in [x["id"] for x in d["tandas"][0]["items"]]
+    lista[4]["rehacer"], lista[4]["video_listo_at"] = False, 500.0  # rehecho
+    d = servicio.tandas("ness")
+    assert "pov|s|c|4" not in [x["id"] for x in d["tandas"][0]["items"]]
+    assert len(d["tandas"][0]["items"]) == 9
+    assert "pov|s|c|4" in [x["id"] for t in d["tandas"][1:] for x in t["items"]]

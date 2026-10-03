@@ -118,15 +118,15 @@ export function useOcultarTanda() {
  *  la siguiente pasa a ser la primera. */
 export function useCompletarTanda() {
   const qc = useQueryClient();
-  return useMutation<{ ok: boolean; marcados: string[]; fallos: { id: string; error: string }[] }, Error, string[]>({
+  return useMutation<{ ok: boolean; cerrada: number; sin_subir: number }, Error, string[]>({
     mutationFn: (ids) => api.post(`${ROOT}/completar`, { ids }),
     onSuccess: (r) => {
-      if (r.fallos.length) toast.error(`${r.marcados.length} marcados · ${r.fallos.length} fallaron`);
-      else toast.success(`Tanda completada: ${r.marcados.length} vídeo(s) marcados como subidos`);
+      toast.success(
+        r.sin_subir
+          ? `Tanda completada (${r.sin_subir} sin subir: siguen sin marcar)`
+          : "Tanda completada",
+      );
       void qc.invalidateQueries({ queryKey: misTandasKeys.all });
-      void qc.invalidateQueries({ queryKey: ["nicho-ropa"], refetchType: "none" });
-      void qc.invalidateQueries({ queryKey: ["nicho-pov-bof"], refetchType: "none" });
-      void qc.invalidateQueries({ queryKey: ["pov-bof-largo"], refetchType: "none" });
     },
     onError: (e) => toast.error(`No se pudo completar: ${e.message}`),
   });

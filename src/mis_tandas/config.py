@@ -43,6 +43,13 @@ ALEA_SIN_TOCAR = 2  # tandas abiertas que se dejan como están
 ORDEN_KEY = "mis_tandas:orden:{usuario}"
 FOTO_KEY = "mis_tandas:fotos"
 OCULTOS_KEY = "mis_tandas:ocultos:{usuario}"
+# Tandas FIJADAS: en cuanto una tanda se enseña (de las primeras abiertas, o
+# llena) se guardan sus vídeos y ya no cambia: marcar subido o sin stock no
+# mete otro vídeo de la siguiente (el operador ya la ha bajado). Solo sale de
+# ella un vídeo rehecho, y solo «Tanda completada» la cierra.
+FIJAS_KEY = "mis_tandas:fijas:{usuario}"
+FIJAR_ABIERTAS = 2   # tandas abiertas que se fijan (la de hoy y la siguiente)
+FIJAS_GUARDAR = 60   # completadas que se recuerdan
 
 
 def cache_dir() -> str:

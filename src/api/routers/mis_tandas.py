@@ -75,7 +75,7 @@ def set_estado(
 
 
 class CompletarRequest(BaseModel):
-    """Los vídeos de una tanda que quedan por marcar."""
+    """Los vídeos de la tanda que se da por terminada (todos)."""
 
     ids: list[str]
 
@@ -85,17 +85,12 @@ def completar(
     body: CompletarRequest,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """«Tanda completada»: marca SUBIDOS todos los que se pasen (lo que quedaba
-    por subir de esa tanda). Uno a uno por `servicio.marcar`, así cada vídeo
-    escribe en su nicho y cuenta en el contador del día igual que su botón."""
-    hechos, fallos = [], []
-    for id_ in body.ids[:50]:
-        try:
-            servicio.marcar(usuario, id_, uploaded=True)
-            hechos.append(id_)
-        except Exception as e:  # noqa: BLE001
-            fallos.append({"id": id_, "error": str(e)})
-    return {"ok": not fallos, "marcados": hechos, "fallos": fallos}
+    """«Tanda completada»: cierra la tanda de esos vídeos (todos los de la
+    tanda) y pasa a la siguiente. NO marca nada como subido."""
+    try:
+        return servicio.completar(usuario, body.ids[:50])
+    except servicio.ErrorTanda as e:
+        raise _error(e) from e
 
 
 class OcultarRequest(BaseModel):
