@@ -84,7 +84,7 @@ creador real: cara cuando habla, recortes al producto cuando demuestra.
 
 ## Prototipo del paraguas (3 oct 2026)
 
-Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v14.mp4`
+Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v13.mp4`
 (45 s). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
 con el navegador del VPS; `voces.py` y `montaje3.py` dentro del contenedor de la
 API, en `/app/temp_work/duelo` (NO en `/tmp`: un despliegue lo borra, y nos
@@ -153,7 +153,7 @@ pasó a mitad de render).
 | Títulos al 6 %: debajo del buscador de TikTok; datos al 83 %: debajo de la descripción | Posiciones de los virales de referencia (paso 7) |
 | El mismo clip del banco en 5-6 frases | Insertos de primer plano y un reposo más (paso 6) |
 | El paraguas del rival «flota»: suelta las manos y se queda de pie solo entre las rodillas. Veo IGNORA «never lets go» | Usar solo el tramo en que lo agarra (`VENTANA` por clip en `montaje3.py`) y generar los clips nuevos con un fotograma de INICIO = FIN sacado de un momento en que ya lo agarra con las dos manos «como un bastón» (`g_f_*.txt`): así sale bien los 8 s |
-| «Pulsar el botón y que se abra» (inserto): Veo abría el paraguas por el lado del MANGO, que desaparecía, y la mano acababa cogiendo la tela | Era la IMAGEN: el paraguas estaba cogido al revés (mango arriba). Editada con el mango ABAJO en el puño y la tela hacia arriba (`p_S_boton3`), Veo lo abre entero a la primera sin deformar nada (`k_boton.txt`). Kling 2.5 con la misma imagen: lo abre despacio y a medias, peor |
+| «Pulsar el botón y que se abra» (inserto): Veo abría el paraguas por el lado del MANGO, que desaparecía, y la mano acababa cogiendo la tela | Era la IMAGEN: el paraguas estaba cogido al revés (mango arriba). Editada con el mango ABAJO en el puño y la tela hacia arriba (`p_S_boton3`), Veo lo abre entero a la primera sin deformar nada (`k_boton.txt`)… pero ness lo DESCARTÓ: con el muelle de la vara a la vista y la tela saliendo de golpe parece que el paraguas se ha roto. Se publica la v13 (solo el arranque de la apertura). Kling 2.5 con la misma imagen: lento y a medias, peor. Si se reintenta: pedir que la vara no se vea (telescópica, tapada por la tela) y una apertura suave |
 | Veo pone algo de lluvia aunque el prompt diga «no rain falling» | Se nota poco con el suelo mojado; quitarla del todo exigiría editar la base y aun así no está garantizado |
 | Bandera en una comparativa de TIPOS de producto | Sin bandera: solo si el título compara países («Paraguas español vs coreano») |
 | Datos con el mismo naranja que los subtítulos: no se distinguen | Rótulo de dato blanco con brillo azul (el color del producto) en caja azul marino, en el centro de la pantalla |
