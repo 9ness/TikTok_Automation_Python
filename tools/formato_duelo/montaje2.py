@@ -68,9 +68,6 @@ def capa(linea: dict, sub: str) -> Image.Image:
         pegar(img, texto_cursiva(linea["callout"].replace(" · ", "\n"), 76, borde=NARANJA), W * 0.73, 600)
     if linea.get("centro"):
         pegar(img, texto_cursiva(linea["centro"].title(), 84, borde=NARANJA), W * 0.5, 980)
-    if linea.get("cta"):
-        d.polygon([(W * 0.5 - 70, 1540), (W * 0.5 + 70, 1540), (W * 0.5, 1660)], fill=(230, 30, 40, 255))
-        d.rectangle([W * 0.5 - 28, 1440, W * 0.5 + 28, 1545], fill=(230, 30, 40, 255))
     # Subtítulo pop-up de 3 palabras, a la altura del POV BOF (68 %).
     if sub:
         t = sub.upper(); tam = 72
@@ -141,5 +138,15 @@ for i, linea in enumerate(g["lineas"]):
     print(i, linea["q"], f"{dur:.1f}s", clip.name, f"desde {ini:.1f}")
 (D / "lista2.txt").write_text("".join(f"file '{p}'\n" for p in partes))
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(D / "lista2.txt"),
-                "-c", "copy", "-map_metadata", "-1", str(D / "duelo_final2.mp4")], check=True)
+                "-c", "copy", str(D / "duelo_sin_flecha.mp4")], check=True)
+# La flecha al carrito de SIEMPRE (la de los editores del POV BOF: una de sus
+# animaciones al azar, en su sitio, cuando la voz dice «carrito»).
+from src.nicho_pov_bof.pipeline import video_editor as pov  # noqa: E402
+
+trabajo = D / "flecha"; trabajo.mkdir(exist_ok=True)
+con_flecha = pov._overlay_arrow(D / "duelo_sin_flecha.mp4", D / "duelo_sin_flecha.mp4", trabajo,
+                                trabajo / "con_flecha.mp4", print, con_audio=True)
+subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(con_flecha), "-c", "copy", "-map_metadata", "-1",
+                str(D / "duelo_final2.mp4")], check=True)
+pov.limpiar_metadatos(D / "duelo_final2.mp4", print)
 print("OK", D / "duelo_final2.mp4")
