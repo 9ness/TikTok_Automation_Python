@@ -32,6 +32,11 @@ VENTANA = {
     "r_idleb2.mp4": (4.5, 7.9), "r_idle2.mp4": (0.5, 3.2), "f_cerrado.mp4": (0.0, 7.9),
     "t_nuestro.mp4": (0.5, 5.5), "t2_nuestro.mp4": (4.5, 6.6), "f_abierto1.mp4": (3.0, 7.9),
     "f_abierto2.mp4": (1.5, 7.9),
+    # v13 (sin lluvia): el botón solo hasta que arranca a abrirse (después el
+    # mango desaparece y la mano coge la tela); s_ab2, el rival suelta el suyo
+    # y sale un mango de gancho en el nuestro hasta el 5,3; s_abC, el rival suelta
+    # el suyo hasta el 4,9.
+    "b_boton.mp4": (2.45, 3.9), "s_ab2.mp4": (5.3, 7.9), "s_abC.mp4": (4.9, 8.0),
 }
 
 
@@ -156,6 +161,19 @@ def capa(linea: dict, sub: str) -> Image.Image:
     return img
 
 
+def capa_gancho(texto: str) -> Image.Image:
+    """Títulos de siempre + la pregunta del gancho, grande, en el centro."""
+    img = capa({"q": "ab"}, "")
+    d = ImageDraw.Draw(img)
+    t = texto.upper(); tam = 104
+    fnt = fuente(BLACK, tam)
+    while d.textlength(t, font=fnt) > W * 0.82 and tam > 60:
+        tam -= 4; fnt = fuente(BLACK, tam)
+    d.text((W / 2, H * 0.47), t, font=fnt, fill=(255, 214, 0, 255), anchor="mm",
+           stroke_width=max(8, tam // 9), stroke_fill=(0, 0, 0, 255))
+    return img
+
+
 def trozos(texto: str, mp3: Path, dur: float):
     from src.subtitles import transcribe
 
@@ -177,7 +195,29 @@ def trozos(texto: str, mp3: Path, dur: float):
 media = D / "media"
 desde: dict[str, float] = {}
 partes = []
+# --- Gancho: 1-2 s del momento más visual (el viento), sin voz, con la
+# pregunta en grande. Lo que más retiene en los 3 primeros segundos.
+inicio: dict[int, float] = {}
+t_acum = 0.0
+if g.get("gancho"):
+    gh = g["gancho"]
+    png = D / "x_gancho.png"
+    capa_gancho(gh["texto"]).save(png)
+    mp4 = D / "y_gancho.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{gh['desde']:.2f}", "-t", f"{gh['dur'] + 0.1:.2f}",
+                    "-i", str(media / gh["clip"]), "-i", str(png), "-f", "lavfi", "-t", f"{gh['dur']:.2f}",
+                    "-i", "anullsrc=r=44100:cl=mono", "-filter_complex",
+                    f"[0:v]fps=30,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,"
+                    f"crop=iw*{1 - RECORTE_ARRIBA}:ih*{1 - RECORTE_ARRIBA}:iw*{RECORTE_ARRIBA / 2}:ih*{RECORTE_ARRIBA},"
+                    f"scale={W}:{H}:flags=lanczos,unsharp=5:5:0.5,setsar=1[b];[b][1:v]overlay=0:0[v]",
+                    "-map", "[v]", "-map", "2:a", "-t", f"{gh['dur']:.2f}", "-c:v", "libx264", "-preset", "veryfast",
+                    "-crf", "19", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", str(mp4)], check=True)
+    partes.append(mp4)
+    t_acum = gh["dur"]
+    desde[gh["clip"]] = gh["desde"] + gh["dur"]  # el viento sigue desde aquí, sin repetir
 for i, linea in enumerate(g["lineas"]):
+    if linea.get("omitir"):
+        continue
     mp3 = D / f"l{i:02d}.mp3"
     dur = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                                          "-of", "csv=p=0", str(mp3)]).strip()) + 0.15
@@ -233,10 +273,55 @@ for i, linea in enumerate(g["lineas"]):
              "-c:a", "aac", "-b:a", "128k", str(mp4)]
     subprocess.run(args, check=True)
     partes.append(mp4)
+    inicio[i] = t_acum
+    t_acum += dur
     print(i, linea["q"], f"{dur:.1f}s", " + ".join(f"{c.name}@{a:.1f}" for c, a, _ in entradas_v))
 (D / "lista3.txt").write_text("".join(f"file '{p}'\n" for p in partes))
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(D / "lista3.txt"),
-                "-c", "copy", str(D / "duelo_sin_flecha.mp4")], check=True)
+                "-c", "copy", str(D / "duelo_solo_voz.mp4")], check=True)
+
+# --- Sonido: calle mojada de fondo siempre; lluvia donde llueve (gancho,
+# viento, primeros planos mojados); golpe de viento al darse la vuelta el
+# rojo; «pop» al salir cada rótulo azul. Debajo de la voz, nunca encima.
+SFX = media / "sfx"
+total = t_acum
+eventos: list[tuple[str, float, float, float]] = []  # (fichero, inicio, duración, volumen)
+eventos.append(("calle.wav", 0.0, total, 0.35))
+lluvia_en = [(0.0, g["gancho"]["dur"])] if g.get("gancho") else []
+if g.get("gancho"):
+    eventos.append(("viento.wav", 0.0, 2.2, 0.9))
+for i, linea in enumerate(g["lineas"]):
+    if i not in inicio:
+        continue
+    a = inicio[i]
+    dur_l = (inicio.get(i + 1) or inicio.get(i + 2) or total) - a
+    if "viento" in linea.get("clip", "") or linea.get("clip", "").startswith("i_"):
+        lluvia_en.append((a, dur_l))
+    if linea.get("clip") == "t_viento.mp4" and linea.get("q") == "a":
+        eventos.append(("viento.wav", a + 0.2, 2.2, 0.8))
+    previo_h = 0.0
+    for c, hasta in linea.get("tramos", []):  # insertos mojados dentro de la frase
+        if c.startswith("i_"):
+            lluvia_en.append((a + previo_h * dur_l, (hasta - previo_h) * dur_l))
+        previo_h = hasta
+    if linea.get("callout"):
+        eventos.append(("pop.wav", a + 0.03, 0.25, 0.55))
+for a, du in lluvia_en:
+    eventos.append(("lluvia.wav", a, du, 1.6))
+args = ["ffmpeg", "-v", "error", "-y", "-i", str(D / "duelo_solo_voz.mp4")]
+fil, etq = [], []
+for k, (f, a, du, vol) in enumerate(eventos):
+    args += ["-i", str(SFX / f)]
+    fade = min(0.25, du / 3)
+    fil.append(f"[{k + 1}:a]atrim=0:{du:.3f},asetpts=PTS-STARTPTS,aresample=44100,"
+               f"afade=t=in:d={fade:.2f},afade=t=out:st={max(0.0, du - fade):.2f}:d={fade:.2f},"
+               f"volume={vol},adelay={int(a * 1000)}:all=1[e{k}]")
+    etq.append(f"[e{k}]")
+fil.append(f"[0:a]{''.join(etq)}amix=inputs={len(etq) + 1}:duration=first:normalize=0,"
+           f"alimiter=limit=0.89:level=disabled[a]")
+args += ["-filter_complex", ";".join(fil), "-map", "0:v", "-map", "[a]", "-c:v", "copy",
+         "-c:a", "aac", "-b:a", "160k", str(D / "duelo_sin_flecha.mp4")]
+subprocess.run(args, check=True)
 # La flecha al carrito de SIEMPRE (la de los editores del POV BOF: una de sus
 # animaciones al azar, en su sitio, cuando la voz dice «carrito»).
 from src.nicho_pov_bof.pipeline import video_editor as pov  # noqa: E402

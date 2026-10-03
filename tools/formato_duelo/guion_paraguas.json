@@ -5,30 +5,37 @@
   {
    "q": "a",
    "t": "Yo uso el paraguas de toda la vida, el que hay en todas las casas.",
-   "clip": "f_cerrado.mp4"
+   "clip": "s_cer1.mp4"
   },
   {
    "q": "b",
    "t": "Y yo me he pasado al plegable automático.",
-   "clip": "f_cerrado.mp4"
+   "clip": "s_cer1.mp4"
   },
   {
    "q": "ab",
    "t": "¿Cuál será mejor?",
-   "clip": "r_idle2.mp4"
+   "clip": "s_cer1.mp4"
   },
   {
    "q": "a",
    "t": "Para abrir el mío, lo normal: a mano, como todo el mundo.",
-   "clip": "t2_rival.mp4"
+   "clip": "s_rival.mp4"
   },
   {
    "q": "b",
    "t": "¡El mío, con un botón! Se abre solo y se cierra solo.",
    "callout": "Se abre y se cierra solo",
-   "clip": "r_idle2.mp4",
-   "clip2": "f_abierto2.mp4",
-   "corte": 0.42
+   "tramos": [
+    [
+     "b_boton.mp4",
+     0.4
+    ],
+    [
+     "s_ab2.mp4",
+     1.0
+    ]
+   ]
   },
   {
    "q": "a",
@@ -53,7 +60,7 @@
    "callout": "Anilla para colgar",
    "tramos": [
     [
-     "r_idleb2.mp4",
+     "s_cer2.mp4",
      0.33
     ],
     [
@@ -65,31 +72,39 @@
   {
    "q": "a",
    "t": "Ya, pero será enano, ¿no?",
-   "clip": "r_risa2.mp4"
+   "clip": "r_risa2.mp4",
+   "omitir": true
   },
   {
    "q": "b",
    "t": "Abierto mide más de un metro, ¡y plegado se queda en treinta y ocho centímetros!",
    "callout": "105 cm abierto · 38 cm plegado",
-   "clip": "f_abierto1.mp4",
-   "clip2": "r_risa2.mp4",
-   "corte": 0.38
+   "tramos": [
+    [
+     "s_ab1.mp4",
+     0.38
+    ],
+    [
+     "s_cer2.mp4",
+     1.0
+    ]
+   ]
   },
   {
    "q": "a",
    "t": "Bueno, algo tan completo costará un dineral, ¿no?",
-   "clip": "i_risa.mp4"
+   "clip": "s_cer2.mp4"
   },
   {
    "q": "b",
    "t": "El precio no te lo digo: míralo tú mismo aquí abajo, porque te va a sorprender.",
    "tramos": [
     [
-     "t2_nuestro.mp4",
-     0.4
+     "s_cer2.mp4",
+     0.3
     ],
     [
-     "f_abierto2.mp4",
+     "s_ab1.mp4",
      1.0
     ]
    ]
@@ -98,9 +113,26 @@
    "q": "b",
    "t": "Te lo voy a intentar dejar en el carrito naranja con tus cupones, pero no puedo asegurarte que siga disponible cuando veas el vídeo.",
    "cta": true,
-   "clip": "f_abierto1.mp4",
-   "clip2": "t_nuestro.mp4",
-   "corte": 0.4
+   "tramos": [
+    [
+     "s_ab1.mp4",
+     0.44
+    ],
+    [
+     "s_ab2.mp4",
+     0.58
+    ],
+    [
+     "s_abC.mp4",
+     1.0
+    ]
+   ]
   }
- ]
+ ],
+ "gancho": {
+  "texto": "¿Cuál aguanta esto?",
+  "clip": "t_viento.mp4",
+  "desde": 0.0,
+  "dur": 1.7
+ }
 }
