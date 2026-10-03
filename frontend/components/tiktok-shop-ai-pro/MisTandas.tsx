@@ -27,6 +27,7 @@ import {
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
+import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 
 /** Lo que más se repite al revisar un vídeo antes de subirlo, sea del nicho
  *  que sea: cada uno es una posible sanción. */
@@ -430,6 +431,7 @@ export function MisTandas() {
                               <span className="break-words">
                                 {v.carpeta_corta} · P{v.producto}
                               </span>
+                              <MontadoEl ts={v.video_listo_at} />
                               {v.desde ? (
                                 <span
                                   title="Su carpeta no se publica antes de este día"
