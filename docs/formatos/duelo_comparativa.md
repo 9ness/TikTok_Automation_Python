@@ -82,36 +82,61 @@ creador real: cara cuando habla, recortes al producto cuando demuestra.
    ronda + giro de precio + flecha CTA, con la voz de Fish marcando los cortes.
 3. (Solo B/C) paso de sincronía de labios.
 
-## Prototipo del paraguas (3 oct 2026) — lo que ha funcionado
+## Prototipo del paraguas (3 oct 2026)
 
-Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v6_banco.mp4`.
-Scripts y prompts: `tools/formato_duelo/` (se ejecutan dentro del contenedor de
-la API: Fish + Whisper + PIL; los de generación, con el navegador del VPS).
+Resultado: `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/paraguas_automatico/duelo_paraguas_v9_pantalla_completa.mp4`
+(45 s). Scripts y prompts: `tools/formato_duelo/` — `flowgen.py`/`genaigen.py`
+con el navegador del VPS; `voces.py` y `montaje3.py` dentro del contenedor de la
+API, en `/app/temp_work/duelo` (NO en `/tmp`: un despliegue lo borra, y nos
+pasó a mitad de render).
 
-- **UN plano compartido** (los dos «clones» en el mismo banco, cámara fija) y
-  no pantalla partida: es lo que hace la referencia. Imagen base en Flow con la
-  foto del rival y las del producto como ingredientes; corregir detalles
-  (color del mango) EDITANDO la imagen buena («cambia solo…»), no regenerando.
-- **Sin caras**: se genera cortado a la barbilla y el montaje recorta un 11 %
-  por arriba → no hay bocas que sincronizar. Pedir «desde el cuello» en el
-  prompt sacó cuerpos decapitados con la calle detrás: NO.
-- **Todo vídeo, los dos lados moviéndose siempre** (el operador: fotos con
-  zoom = «poco movimiento» para TikTok). 5 clips de GenAI Pro desde la misma
-  imagen: reposo charlando, rival abriendo a mano, el nuestro abriéndose solo,
-  viento (desde una variante editada con los dos abiertos) y «enseñar lo
-  corto». Un clip sigue por donde iba entre frases.
-- Textos como la referencia: títulos en cursiva blanca con sombra ENCIMA del
-  vídeo («Paraguas Tradicional 🇪🇸 VS Paraguas Automático»; sin bandera
-  asiática: el producto no es de allí), datos en cursiva con borde naranja,
-  subtítulos pop-up de 3 palabras al 68 % (como el Largo): blanco/negro el
-  rival, blanco/naranja el nuestro, amarillo cuando hablan los dos.
-- Voces: Fish con `[excited]` delante (no se lee; sube tono y ritmo) + atempo
-  1,06; la frase «¿Cuál será mejor?» con las dos voces mezcladas.
+### Cómo se hace (la receta que ha salido)
 
-**GenAI Pro vs Kling 2.5 (Magnific)** en «se abre solo» desde POV con la mano:
-los dos fallan igual (el mango cambia de forma al abrirse; GenAI además sacó
-una segunda mano con start+end frame). Kling es más lento (~10 min y uno a
-la vez en ilimitado) y más tosco. En el plano compartido del banco GenAI lo
-hizo bien a la primera. Planos «quietos» (mesa, perchero) en GenAI inventan
-manos u objetos: evitarlos. Coste del prototipo: ~14 créditos GenAI y ~20
-imágenes de Flow.
+1. **Imagen base en Flow, plano compartido** (los dos en el mismo banco, con
+   hueco entre ellos): foto del rival + fotos del producto como ingredientes.
+2. **Las caras fuera del plano desde la imagen, no recortando el vídeo**: se
+   EDITA la base buena con «el fotógrafo inclinó el móvil hacia abajo: el borde
+   de arriba pasa justo bajo la barbilla y abajo queda más suelo»
+   (`prompts/p_T1.txt`). Sale natural, a pantalla completa, y el suelo de abajo
+   es sitio limpio para subtítulos (68 %), datos (83 %) y flecha.
+3. **Cada estado del producto, una edición de esa misma base** (nunca
+   regenerar): cerrado TUMBADO en el regazo (`p_T2`), abierto de lado como un
+   escudo copiando la postura de otra imagen buena (`p_TD2`, 2 referencias),
+   viento (`p_TC` + `p_TC2`).
+4. **Clips de 8 s en GenAI Pro (Veo, Frames) con inicio = fin** en esa imagen y
+   un «FRAMING LOCK» (cámara fija, las cabezas nunca entran) en el prompt.
+5. **Montaje** (`montaje3.py`): recorte del 8 % de arriba (al hablar y reír la
+   boca baja hasta el 4 % y la barbilla al 6 %), un clip sigue por donde iba
+   entre frases, `clip2` + `corte` para cambiar de estado DENTRO de una frase
+   («¡con un botón! — se abre solo» = corte de cerrado a abierto; «abierto mide
+   más de un metro — y plegado 38 cm» = al revés), `LIMITE` por clip para no
+   usar el tramo donde se deforma, limitador de audio y la flecha del POV.
+
+### Los fallos (y la regla que dejan)
+
+| Fallo | Regla |
+|---|---|
+| **El paraguas compacto CRECE** (cerrado y en vertical, Veo lo convierte en uno largo hasta el suelo con mango en J, aun con inicio = fin). Es sanción por producto incoherente | Lo pequeño, en una postura donde no pueda «crecer»: tumbado en el regazo y que el prompt no le pida tocarlo («the small closed navy object… NEVER moves»). Revisar 16 fotogramas por clip midiendo el producto contra el muslo |
+| Levantarlo por la anilla: +35 % de largo y luego vertical | No pedir que se mueva el producto pequeño; la anilla se ENSEÑA en el regazo y lo dice el rótulo |
+| El mango de anilla se ve como gancho en J cuando la mano lo suelta | «His hand GRIPS THE HANDLE THE WHOLE TIME» |
+| Recortar la cara en el montaje (11 %, 32 %…) dejaba bocas o perdía los brazos; el difuminado arriba no gustó | Encuadre de cámara inclinada desde la imagen (paso 2). Pedir «crop at nose / neck down» saca cuerpos decapitados |
+| Encuadre cerrado: los dos muy cerca | El abierto (los dos enteros) es el que gusta |
+| El toldo abierto salía cortado o colgando de la mano al revés | Copiar la postura de otra imagen buena como 2.ª referencia |
+| El rojo «dado la vuelta» sujeto por la punta | Decir dónde está la mano y hacia dónde va la vara |
+| Pico de audio > 0 dBFS con las dos voces a la vez | `alimiter=limit=0.89` (−0,8 dB) |
+| Rótulos cortados | Encoger hasta caber (`encajar`), y subtítulos a dos líneas antes que diminutos |
+| La bandera tapaba el mango del rival | Con la cámara inclinada arriba hay cuerpos: títulos lo más arriba y la bandera en el hueco entre los dos |
+| 5 clips tirados por cambiar de encuadre después | Decidir el encuadre (y enseñarlo) ANTES de generar clips |
+| Planos «quietos» (mesa, perchero) en GenAI inventan manos u objetos; start ≠ end frame saca una segunda mano | Plano compartido con gente moviéndose; inicio = fin |
+
+**GenAI Pro vs Kling 2.5 (Magnific)** en «se abre solo» con la mano: los dos
+deforman el mango al abrirse; Kling es más lento (~10 min, uno a la vez) y más
+tosco. Por eso la apertura no se genera: es un corte.
+
+**Coste del prototipo entero**: ~28 créditos de GenAI (14 en esta última vuelta:
+5 tirados por el encuadre, 3 con el compacto creciendo, 6 buenos) y ~30
+imágenes de Flow. Uno nuevo con esta receta: 3-4 imágenes y 6-7 clips.
+
+**Pendiente si se sigue**: dura 45 s y las referencias 75-85 s (más rondas =
+más clips); convertirlo en formato de la app (guion por IA desde la ficha +
+`montaje3.py` como pipeline).
