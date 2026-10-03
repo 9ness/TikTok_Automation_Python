@@ -47,6 +47,21 @@ function fechaCorta(iso: string): string {
   return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }).replace(".", "");
 }
 
+/** «Carpeta_30» → «Carpeta 30». */
+function nombreCarpeta(c: string): string {
+  return (c || "").replace(/_/g, " ").trim();
+}
+
+/** Qué carpetas lleva la tanda, con cuántos vídeos de cada una. */
+function resumenCarpetas(items: VideoTanda[]) {
+  const vistas = new Map<string, number>();
+  for (const v of items) {
+    const k = `${v.catalogo_label} · ${nombreCarpeta(v.carpeta_corta)}`;
+    vistas.set(k, (vistas.get(k) ?? 0) + 1);
+  }
+  return [...vistas.entries()];
+}
+
 /** Qué lleva la tanda: un chip por nicho+modo con cuántos vídeos, en el
  *  color de ese modo. */
 function resumenModos(items: VideoTanda[]) {
@@ -235,7 +250,7 @@ export function MisTandas() {
                   <span className="min-w-0 flex-1 break-words">
                     {v.titulo || `Producto ${v.producto}`}{" "}
                     <span className="text-[10px] text-muted-foreground">
-                      · {v.catalogo_label} · {v.carpeta_corta} · P{v.producto}
+                      · {v.catalogo_label} · {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
                     </span>
                   </span>
                   <button
@@ -275,7 +290,7 @@ export function MisTandas() {
                 <span className="min-w-0 flex-1 break-words">
                   {v.titulo || `Producto ${v.producto}`}{" "}
                   <span className="text-[10px] text-muted-foreground">
-                    · {v.catalogo_label} · {v.carpeta_corta} · P{v.producto}
+                    · {v.catalogo_label} · {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
                   </span>
                 </span>
                 {v.product_url ? (
@@ -359,6 +374,14 @@ export function MisTandas() {
                           🚫 {t.sin_stock}
                         </span>
                       ) : null}
+                      {resumenCarpetas(t.items).map(([k, n]) => (
+                        <span
+                          key={k}
+                          className="rounded-full border border-border/60 px-1.5 py-px text-[9px] font-semibold text-muted-foreground"
+                        >
+                          📁 {k} · {n}
+                        </span>
+                      ))}
                       {t.rehacer ? (
                         <span className="rounded-full bg-orange-500/15 px-1.5 py-px text-[9px] font-semibold text-orange-500">
                           🔁 {t.rehacer}
@@ -428,8 +451,8 @@ export function MisTandas() {
                               <span className={`rounded border px-1.5 py-px text-[9px] font-semibold ${colorCatalogo(v.catalogo)}`}>
                                 {v.catalogo_label || v.catalogo}
                               </span>
-                              <span className="break-words">
-                                {v.carpeta_corta} · P{v.producto}
+                              <span className="rounded bg-muted px-1.5 py-px text-[9px] font-semibold text-foreground">
+                                📁 {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
                               </span>
                               <MontadoEl ts={v.video_listo_at} />
                               {v.desde ? (
