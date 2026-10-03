@@ -51,6 +51,22 @@ Cara con sincronía SOLO en el gancho y en el giro del precio (~10-15 s →
 ~1,5-2,5 $) y el resto como A (manos + producto + voz). Es como editaría un
 creador real: cara cuando habla, recortes al producto cuando demuestra.
 
+## Decisiones de ness (3 oct 2026)
+- **Ni precio ni número de ventas** en la voz ni en pantalla. En su lugar, «el
+  precio no te lo digo, míralo tú mismo abajo» con un rótulo «MIRA EL PRECIO
+  ABAJO».
+- **Cierre de Venta Inversa** (`nicho_pov_bof_largo.config.CTAS_INVERSA`): «Te lo
+  voy a intentar dejar en el carrito naranja con tus cupones, pero no puedo
+  asegurarte que siga disponible cuando veas el vídeo.» + flecha al carrito.
+- **Subtítulos «pop-up» de 3 palabras**, como el POV BOF, con los tiempos de
+  Whisper.
+- Hacen falta **más fotos del producto** (galería, vídeo del vendedor, reseñas)
+  para enseñar cada gesto sin que la IA lo invente. Carpeta por producto:
+  `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/<producto>/fotos/`. TikTok pone
+  captcha a la ficha desde el VPS: las saca el operador del móvil.
+- Borrador (animatic) gratis antes de gastar créditos: `_clases/referencias/
+  comparativas/borradores/` (v2 = sin precio, CTA inversa, subtítulos pop-up).
+
 ## Lo que NO se copia (sanción o mentira)
 - **Marcas del rival** («AirPods», «HTC»): «el que usa todo el mundo», «el de
   siempre».
