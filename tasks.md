@@ -1,3 +1,7 @@
+## 💡 Idea: modo «Me han estafado» (variante de Venta Inversa) — analizar (3 oct 2026)
+
+- [ ] Gancho «Me han estafado / voy a devolver este producto» → «y no es porque…» + las ventajas reales (como la venta inversa: «no es porque sea 100 % original, ni porque el sabor sea espléndido…») → giro final: «…sino porque lo compré mucho más caro y ahora lo veo mucho más barato» → CTA «revisa si tienes cupones y si sigue disponible en el carrito naranja». Analizar como cuarto/quinto estilo del Largo (prompt propio + `CTAS_INVERSA`), con cuidado: no afirmar precios ni rebajas que la ficha no muestre (el «más barato» tiene que ser verdad o ir sin cifras) y no desacreditar al vendedor (es el producto que vendemos).
+
 ## 🧰 Herramientas disponibles cuando hagan falta
 
 - [ ] **MarkItDown** (Microsoft, gratis, `pip install 'markitdown[all]'`): pasa `.docx`, `.xlsx`, `.pptx`, PDF, HTML y transcripciones de YouTube/audio a Markdown. Instalarlo en el VPS el día que llegue un documento del curso que haya que meter en el repo como `.md`. Usar el CLI (`markitdown fichero.docx > fichero.md`), NO su servidor MCP. No sirve para vídeo sin audio.
