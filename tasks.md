@@ -518,6 +518,11 @@ paisajes **por tandas** (grupos de ~8 y luego concatenar) en vez de un solo
 recorta los audios largos en vez de tocar el render.
 
 ### Pendiente de aclarar antes de empezar
+
+## 🗄️ Redis local de la fábrica (corte hecho el 4/10/2026)
+- [ ] **~11/10/2026: borrar de Upstash las claves viejas de la fábrica** (`tiktok_shop:`, `nicho_*`, `cuotas:`, `viralizacion:`, `tiktokCR:`, `plantillas:`), que ya viven en el Redis local (`deploy/redis-rest/README.md`). Antes, comprobar que la factura de Upstash ha bajado y que nada las echa de menos. Mientras sigan, si hubiera que volver a Upstash: copiar al revés (local → Upstash) ANTES de quitar `FABRICA_REDIS_REST_URL`, o se perdería lo escrito desde el corte.
+- [ ] Mirar la factura de Upstash a final de mes: antes ~8 €/mes (~4,4 M comandos). Esperado: lo de Master Picks + apps pequeñas.
+- [ ] Opcional (Master Picks): cookie firmada «no baneado» de 5-10 min en `frontend/proxy.ts` para no hacer un HGET `betai:users` en cada visita (propuesta en su sesión, no implementada).
 - ~~Dónde está el material~~ → localizado (ver tabla de EEUU arriba).
 - **Cuál de los 4 vídeos de paisajes de EEUU** se trocea. Por tamaño, el de
   2.9 GB (*MOST STUNNING 8K HDR*) es el que menos disco pide; el de 5.9 GB
