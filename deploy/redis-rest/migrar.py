@@ -1,7 +1,11 @@
-"""Copia las claves de la FÁBRICA de Upstash al Redis local (vía redis-rest).
+"""Copia las claves de la FÁBRICA de un Redis REST a otro (Upstash ⇄ local ⇄ otro).
 
-python migrar.py <url_local> <token_local> [--solo-faltan] [--simular]
-Lee el Upstash de UPSTASH_SHARED_REST_URL/_TOKEN (o UPSTASH_REDIS_REST_*).
+python migrar.py <url_destino> <token_destino> [--solo-faltan] [--simular]
+    origen = Upstash (UPSTASH_SHARED_REST_URL/_TOKEN, o UPSTASH_REDIS_REST_*)
+python migrar.py <url_destino> <token_destino> --desde <url_origen> <token_origen>
+    cualquier origen: p. ej. del Redis local (http://redis-rest:8080) a un Upstash
+    o Redis gestionado nuevo, para sacar la fábrica del VPS. Ambos lados hablan la
+    API REST de Upstash (un Redis cualquiera, con deploy/redis-rest delante).
 
 Solo los prefijos de la fábrica (MOVER). Lo compartido con otras apps se queda
 en Upstash: editor_auto/nebulabs (nebulabs-media), betai* y user_push_tokens
@@ -16,8 +20,12 @@ import requests
 
 MOVER = ("tiktok_shop", "nicho_", "cuotas", "viralizacion", "tiktokCR", "plantillas", "cuenta_piloto")
 
-up_url = (os.getenv("UPSTASH_SHARED_REST_URL") or os.environ["UPSTASH_REDIS_REST_URL"]).rstrip("/")
-up_tok = os.getenv("UPSTASH_SHARED_REST_TOKEN") or os.environ["UPSTASH_REDIS_REST_TOKEN"]
+if "--desde" in sys.argv:
+    _i = sys.argv.index("--desde")
+    up_url, up_tok = sys.argv[_i + 1].rstrip("/"), sys.argv[_i + 2]
+else:
+    up_url = (os.getenv("UPSTASH_SHARED_REST_URL") or os.environ["UPSTASH_REDIS_REST_URL"]).rstrip("/")
+    up_tok = os.getenv("UPSTASH_SHARED_REST_TOKEN") or os.environ["UPSTASH_REDIS_REST_TOKEN"]
 lo_url, lo_tok = sys.argv[1].rstrip("/"), sys.argv[2]
 SOLO_FALTAN = "--solo-faltan" in sys.argv
 SIMULAR = "--simular" in sys.argv
