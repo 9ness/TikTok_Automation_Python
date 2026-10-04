@@ -62,6 +62,15 @@ services:
       # El archivo JSON real lo coloca el operador en `secrets/google-sa.json`
       # del host (no se sube a git — está en .gitignore).
       GOOGLE_SA_KEY_PATH: "/app/secrets/google-sa.json"
+      # Redis: la fábrica usa el Redis LOCAL (servicios `redis` + `redis-rest`,
+      # misma API REST que Upstash) cuando el .env trae FABRICA_REDIS_REST_URL /
+      # _TOKEN; sin ellas, sigue en Upstash (interruptor y vuelta atrás). Lo que
+      # comparte con otras apps (Editor Auto ↔ nebulabs-media en Vercel,
+      # Pronósticos ← Master Picks) va SIEMPRE a Upstash por UPSTASH_SHARED_*.
+      UPSTASH_SHARED_REST_URL: ${UPSTASH_REDIS_REST_URL}
+      UPSTASH_SHARED_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
+      UPSTASH_REDIS_REST_URL: ${FABRICA_REDIS_REST_URL:-${UPSTASH_REDIS_REST_URL}}
+      UPSTASH_REDIS_REST_TOKEN: ${FABRICA_REDIS_REST_TOKEN:-${UPSTASH_REDIS_REST_TOKEN}}
     volumes:
       # Aquí vive la COLA (queue_state.json). En el VPS apunta al disco extra
       # (`API_TEMP_PATH` en .env, ver deploy/SERVER_ACCESS.md › "Disco
@@ -123,6 +132,43 @@ services:
       retries: 3
       start_period: 30s
 
+  # Redis local de la fábrica (antes Upstash, que cobra por comando). Datos en el
+  # disco extra (REDIS_DATA_PATH), AOF cada segundo + RDB; copia diaria al Drive
+  # (deploy/redis-rest/backup_redis.sh). Sin puertos al host.
+  redis:
+    image: redis:7-alpine
+    container_name: tiktok-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec",
+              "--save", "900", "1", "--save", "300", "100",
+              "--maxmemory", "1gb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - ${REDIS_DATA_PATH:-redis_data}:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # La API REST de Upstash sobre ese Redis: la fábrica no cambia sus clientes.
+  redis-rest:
+    build:
+      context: ./deploy/redis-rest
+    image: tiktok-redis-rest:latest
+    container_name: tiktok-redis-rest
+    restart: unless-stopped
+    environment:
+      REST_TOKEN: ${FABRICA_REDIS_REST_TOKEN:-sin-configurar}
+      REDIS_URL: "redis://redis:6379/0"
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    expose:
+      - "8080"
+
   web:
     build:
       context: ./frontend
@@ -179,6 +225,7 @@ volumes:
   api_temp:
   caddy_data:
   caddy_config:
+  redis_data:
 
 networks:
   app-network:

@@ -29,8 +29,11 @@ class EditorRedis:
     """
 
     def __init__(self) -> None:
-        self.url = (os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
-        self.token = os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
+        # SIEMPRE el Upstash compartido: nebulabs-media (Vercel) lee y escribe
+        # aquí (`editor_auto:settings:*`, `nebulabs:user:*`). El resto de la
+        # fábrica puede ir al Redis local (ver docker-compose.yml).
+        self.url = (os.getenv("UPSTASH_SHARED_REST_URL") or os.getenv("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
+        self.token = os.getenv("UPSTASH_SHARED_REST_TOKEN") or os.getenv("UPSTASH_REDIS_REST_TOKEN") or ""
         self.prefix = redis_prefix()
 
     def is_available(self) -> bool:

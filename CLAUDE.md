@@ -649,6 +649,13 @@ GOOGLE_GEMINI_KEY=...                # legacy compartido con CR
 # Upstash Redis (Pronósticos prefijo `betai:`, TikTok Shop prefijo `tiktok_shop:`)
 UPSTASH_REDIS_REST_URL=https://xxxxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=AX...
+# Redis LOCAL de la fábrica (VPS, oct 2026): servicios `redis` + `redis-rest`
+# (API REST de Upstash, deploy/redis-rest/). Interruptor: con FABRICA_REDIS_REST_URL
+# la fábrica usa el local; Editor Auto (↔ nebulabs-media) y Pronósticos (← Master
+# Picks) siguen SIEMPRE en Upstash vía UPSTASH_SHARED_* (los pone docker-compose).
+# FABRICA_REDIS_REST_URL=http://redis-rest:8080
+# FABRICA_REDIS_REST_TOKEN=...
+# REDIS_DATA_PATH=/mnt/HC_Volume_106974679/redis-data
 REDIS_PREFIX=betai:                  # default — solo afecta a Pronósticos
 
 # APIs stock Pronósticos (opcionales)

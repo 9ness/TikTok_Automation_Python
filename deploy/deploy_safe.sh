@@ -382,6 +382,17 @@ if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
     fi
 fi
 
+# Redis local de la fábrica (+ su API REST). `up -d` no hace nada si ya están
+# en marcha; con cambios en deploy/redis-rest se reconstruye. Va ANTES de la
+# api: con el interruptor FABRICA_REDIS_* puesto, la api los necesita.
+if command -v docker >/dev/null 2>&1 && grep -q "redis-rest:" "${APP_DIR}/docker-compose.yml" 2>/dev/null; then
+    if echo "$CHANGED_FILES" | grep -q "^deploy/redis-rest/"; then
+        dc up -d --build redis redis-rest || echo "[deploy_safe] ⚠️ redis/redis-rest no arrancaron"
+    else
+        dc up -d redis redis-rest || echo "[deploy_safe] ⚠️ redis/redis-rest no arrancaron"
+    fi
+fi
+
 if [[ "$NEEDS_API_REBUILD" == "true" ]]; then
     echo "[deploy_safe] 🐳 cambios en API/deps detectados — rebuild api…"
     write_status "running" "\"started_at\":${START_TS},\"target_sha\":\"${NEW_SHA:0:7}\",\"previous_sha\":\"${LOCAL_SHA:0:7}\",\"stage\":\"docker_build_api\""

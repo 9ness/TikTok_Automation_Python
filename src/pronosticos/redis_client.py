@@ -18,8 +18,11 @@ load_dotenv(find_dotenv())
 
 class UpstashRedis:
     def __init__(self, url: str | None = None, token: str | None = None, prefix: str | None = None):
-        self.url = (url or os.environ.get("UPSTASH_REDIS_REST_URL", "")).rstrip("/")
-        self.token = token or os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+        # `betai:*` lo escribe Master Picks en Upstash: siempre el compartido.
+        self.url = (url or os.environ.get("UPSTASH_SHARED_REST_URL")
+                    or os.environ.get("UPSTASH_REDIS_REST_URL", "")).rstrip("/")
+        self.token = (token or os.environ.get("UPSTASH_SHARED_REST_TOKEN")
+                      or os.environ.get("UPSTASH_REDIS_REST_TOKEN", ""))
         self.prefix = prefix if prefix is not None else os.environ.get("REDIS_PREFIX", "betai:")
         if not self.url or not self.token:
             raise EnvironmentError(
