@@ -48,6 +48,17 @@ def _cache_get(key: str) -> Any | None:
 
 def _cache_put(key: str, payload: Any) -> None:
     _CACHE[key] = (time.monotonic() + config.LISTING_TTL_S, payload)
+    _ULTIMO[key] = payload
+
+
+# Lo último que se sirvió de cada clave, aunque haya vencido: con eso se sirve
+# en el acto y se refresca por detrás SIN volver a leer Redis (Upstash cobra
+# por comando). Redis solo hace falta en frío, tras reiniciar la API.
+_ULTIMO: dict[str, Any] = {}
+# Cuándo se escribió por última vez cada clave en Redis (para no reescribir lo
+# mismo cada pocos minutos).
+_ESCRITO_AT: dict[str, float] = {}
+_REESCRIBIR_IGUAL_S = 3600.0
 
 
 # ------------------------------------------------------------------
@@ -88,11 +99,17 @@ def _redis_cache_get(key: str) -> tuple[Any, float] | None:
     return doc["payload"], edad
 
 
-def _redis_cache_put(key: str, payload: Any) -> None:
+def _redis_cache_put(key: str, payload: Any, *, previo: Any = None) -> None:
+    """Guarda en Redis. Si el listado es igual al anterior y la copia de Redis
+    es reciente, no reescribe (sería un comando pagado para nada)."""
+    if (previo is not None and previo == payload
+            and time.time() - _ESCRITO_AT.get(key, 0) < _REESCRIBIR_IGUAL_S):
+        return
     try:
         r = get_nicho_pov_bof_redis()
         if r.is_available():
             r.set_json(f"cache:{key}", {"at": time.time(), "payload": payload})
+            _ESCRITO_AT[key] = time.time()
     except Exception:
         pass
 
@@ -106,9 +123,10 @@ def _refrescar_en_segundo_plano(key: str, cargar: Callable[[], Any]) -> None:
 
     def _tarea() -> None:
         try:
+            previo = _ULTIMO.get(key)
             payload = cargar()
             _cache_put(key, payload)
-            _redis_cache_put(key, payload)
+            _redis_cache_put(key, payload, previo=previo)
         except Exception:
             # Si falla se conserva lo que hubiera: es preferible una lista
             # de hace un rato a un error en pantalla.
@@ -133,6 +151,9 @@ def _cacheado_sin_esperar(key: str, cargar: Callable[[], Any], sino: Any) -> Any
     en_memoria = _cache_get(key)
     if en_memoria is not None:
         return en_memoria
+    if key in _ULTIMO:  # vencido en memoria: se sirve y se refresca por detrás
+        _refrescar_en_segundo_plano(key, cargar)
+        return _ULTIMO[key]
     en_redis = _redis_cache_get(key)
     if en_redis is not None:
         payload, edad = en_redis
@@ -160,6 +181,9 @@ def _listar_cacheado(key: str, cargar: Callable[[], Any], *, refresh: bool) -> A
     en_memoria = _cache_get(key)
     if en_memoria is not None:
         return en_memoria
+    if key in _ULTIMO:  # vencido en memoria: se sirve y se refresca por detrás
+        _refrescar_en_segundo_plano(key, cargar)
+        return _ULTIMO[key]
 
     en_redis = _redis_cache_get(key)
     if en_redis is not None:

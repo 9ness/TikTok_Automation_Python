@@ -77,6 +77,34 @@ class EditorRedis:
             print(f"[EditorRedis] POST {path} error: {e}")
             return None
 
+    def _cmd(self, args: list[str], *, timeout: float = 10) -> Any:
+        """Un comando cualquiera por POST al endpoint raíz (cuerpo JSON)."""
+        if not self.is_available():
+            return None
+        try:
+            r = requests.post(self.url, headers=self._headers("application/json"),
+                              data=json.dumps(args), timeout=timeout)
+            r.raise_for_status()
+            return r.json().get("result")
+        except Exception as e:
+            print(f"[EditorRedis] {args[0]} error: {e}")
+            return None
+
+    def mget_json(self, keys: list[str]) -> list[dict | None]:
+        """Varias claves JSON en UN comando (Upstash cobra por comando, no por clave)."""
+        if not keys:
+            return []
+        raw = self._cmd(["MGET", *[self._full_key(k) for k in keys]])
+        if not isinstance(raw, list):
+            return [self.get_json(k) for k in keys]  # Redis caído o error: como antes
+        out: list[dict | None] = []
+        for v in raw:
+            try:
+                out.append(json.loads(v) if isinstance(v, str) else v)
+            except json.JSONDecodeError:
+                out.append(None)
+        return out
+
     def get_json(self, key: str) -> dict | None:
         raw = self._get(f"get/{self._enc(self._full_key(key))}")
         if raw is None:

@@ -40,7 +40,7 @@ _EXTS = (".jpg", ".jpeg", ".png", ".webp")
 # Drive montado son decenas de segundos y se pagaban después de CADA foto
 # subida o quemada. El TTL solo cubre el caso de tocar el Drive a mano.
 # Mismo patrón que `nicho_pov_bof.services.mis_productos`.
-_TTL_S = 600.0
+_TTL_S = 1200.0
 # `{nombre_sin_extension: (ruta, mtime)}`. El mtime va DENTRO del índice: la
 # tarjeta lo necesita para poder cachear la foto en el móvil, y pedirlo con un
 # `stat()` por foto eran cuatro llamadas al mount por producto — 23 segundos en
@@ -116,8 +116,9 @@ def _olvidar(tipo: str, usuario: str, nombre: str) -> None:
 
 
 # Cada cuánto se repasa el Drive para tener el índice listo antes de que lo
-# pidan. Menos que `_TTL_S` a propósito: así nunca se encuentra vencido.
-_REFRESCO_S = 300.0
+# pidan. Menos que `_TTL_S` a propósito: así nunca se encuentra vencido. 15 min
+# (no 5): cada pasada consulta Redis y Upstash cobra por comando.
+_REFRESCO_S = 900.0
 
 
 def precalentar(usuario: str = "ness") -> int:

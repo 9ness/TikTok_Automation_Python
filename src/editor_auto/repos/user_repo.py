@@ -2,9 +2,26 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 from src.editor_auto.models import EditorUser
 
 from .redis_base import EditorRedis, get_editor_redis
+
+
+# La lista de usuarios la piden cada pocos segundos el vigilante de `entrada/`
+# (cada 30 s), el contador de carpetas del menú y el barrido de borradores. En
+# Upstash cada comando se paga, así que se guarda en memoria un rato y se tira al
+# guardar o borrar un usuario (la API es un solo proceso: ver Dockerfile.api).
+_LISTA_TTL_S = 300.0
+_lista_cache: dict[str, tuple[float, list[EditorUser]]] = {}
+_lista_lock = threading.Lock()
+
+
+def _invalidar_lista() -> None:
+    with _lista_lock:
+        _lista_cache.clear()
 
 
 class UserRepo:
@@ -20,6 +37,7 @@ class UserRepo:
         return f"user:{uid}"
 
     def save(self, user: EditorUser) -> EditorUser:
+        _invalidar_lista()
         user.touch()
         self.r.set_json(self._key(user.id), user.model_dump())
         self.r.sadd(self.INDEX_KEY, user.id)
@@ -32,6 +50,7 @@ class UserRepo:
                 f"{self.ACCOUNT_EMAIL_INDEX}{user.account_email.strip().lower()}",
                 user.id,
             )
+        _invalidar_lista()
         return user
 
     def get_by_account_email(self, email: str) -> EditorUser | None:
@@ -59,18 +78,33 @@ class UserRepo:
         return self.get(uid)
 
     def list_all(self, include_deleted: bool = False) -> list[EditorUser]:
-        ids = self.r.smembers(self.INDEX_KEY)
-        users: list[EditorUser] = []
-        for i in ids:
-            u = self.get(i)
-            if u is None:
-                continue
-            if u.deleted and not include_deleted:
-                continue
-            users.append(u)
-        return sorted(users, key=lambda u: u.created_at, reverse=True)
+        clave = getattr(self.r, "prefix", "") or ""
+        with _lista_lock:
+            hit = _lista_cache.get(clave)
+        if hit and time.time() - hit[0] < _LISTA_TTL_S:
+            todos = hit[1]
+        else:
+            ids = sorted(self.r.smembers(self.INDEX_KEY))
+            mget = getattr(self.r, "mget_json", None)
+            claves = [self._key(i) for i in ids]
+            datos = (mget(claves) if mget else [self.r.get_json(k) for k in claves]) if ids else []
+            todos = []
+            for i, data in zip(ids, datos):
+                if not data:
+                    continue
+                try:
+                    todos.append(EditorUser.model_validate(data))
+                except Exception as e:
+                    print(f"[editor_auto.UserRepo] decode error {i}: {e}")
+            todos.sort(key=lambda u: u.created_at, reverse=True)
+            if ids and len(todos) == len(ids):  # no cachear un resultado roto
+                with _lista_lock:
+                    _lista_cache[clave] = (time.time(), todos)
+        users = [u.model_copy(deep=True) for u in todos if include_deleted or not u.deleted]
+        return users
 
     def delete(self, user_id: str, *, hard: bool = False) -> bool:
+        _invalidar_lista()
         u = self.get(user_id)
         if u is None:
             return False
