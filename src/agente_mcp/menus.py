@@ -229,6 +229,25 @@ async def para_rehacer(m: Menu, api: Interno) -> list[dict]:
                                 "producto": p.get("producto"),
                                 "titulo": " ".join(str(p.get("titulo") or "").split()),
                                 "nota": str(p.get("rehacer_nota") or "").strip()})
+    if m.tipo == "largo":
+        # El listado de cada carpeta solo enseña el modo ACTIVO del catálogo,
+        # y lo marcado en otro modo (p. ej. Q4 en «precio» con el catálogo en
+        # «dolor») se quedaba fuera. «Mis tandas» lee todos los modos.
+        vistos = {(o["catalogo"], o["carpeta"], str(o["producto"])) for o in out}
+        try:
+            d = await api.get("/api/v1/mis-tandas", todas="true")
+        except Exception:  # noqa: BLE001 — sin Mis tandas, lo de siempre
+            d = {}
+        for t in d.get("tandas", []):
+            for v in t.get("items", []):
+                clave = (v.get("source"), v.get("carpeta"), str(v.get("producto")))
+                if v.get("nicho") != "largo" or not v.get("rehacer") or clave in vistos:
+                    continue
+                vistos.add(clave)
+                out.append({"catalogo": clave[0], "carpeta": clave[1], "producto": clave[2],
+                            "modo": v.get("modo"), "tanda": t.get("numero"),
+                            "titulo": " ".join(str(v.get("titulo") or "").split()),
+                            "nota": str(v.get("rehacer_nota") or "").strip()})
     return out
 
 
