@@ -237,6 +237,16 @@ Sale de ~55 productos (5 carpetas de Inventario en «dolor» + 5 de Tareas en
 - **Una imagen por clip, cada una en un sitio distinto** (cocina / salón,
   taller / suelo junto a un enchufe…), no dos clips de la misma imagen: el
   vídeo parece otro plano en vez de repetirse.
+- **El producto IDÉNTICO en todos los clips** (oct 2026, cinco vídeos a rehacer
+  de golpe). Si cada imagen sale solo de la foto limpia, el generador inventa
+  detalles distintos en cada una: un tapón transparente donde era negro, un
+  botón que desaparece, tiradores negros en un clip y dorados en otro, un
+  cepillo con otra cabeza. Haz la **imagen del clip 1**, revísala contra la ficha
+  y, para los demás clips, adjunta en Flow la foto limpia **y esa imagen** con la
+  frase «la segunda imagen es el MISMO producto: idéntico (forma, piezas,
+  botones, colores, detalles); solo cambian el sitio, el encuadre y la luz».
+  Antes de subir, pon las 3 imágenes una al lado de otra y compáralas pieza a
+  pieza.
 - **Cada imagen, según lo que dice la voz en ESE clip** (oct 2026). El plan
   trae `dice_la_voz_en_este_clip` en cada imagen: con 3 clips o más la voz se
   reparte a partes iguales, así que el tramo es casi exacto. Si nombra una
