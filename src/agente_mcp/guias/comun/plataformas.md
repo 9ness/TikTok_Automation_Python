@@ -44,7 +44,11 @@ mismo proyecto: se satura y se congela.
 
 1. Modo de **crear imagen**, modelo **Nano Banana 2**, formato **9:16
    vertical** (3:4 en Creativos Pro). **1 resultado por prompt** (no 2 ni 4:
-   gasta el doble y no hace falta).
+   gasta el doble y no hace falta). **Compruébalo cada vez que se reinicie
+   el navegador**: Flow vuelve a 4:3 horizontal y las imágenes salen
+   apaisadas (1200×896); un clip hecho desde una imagen apaisada sale con
+   bandas negras y hay que tirarlo (oct 2026, 4 créditos de GenAI Pro).
+   Mira el tamaño de lo que bajas: vertical es 768×1376.
 2. **Adjunta** las fotos que diga la guía del menú (normalmente la foto
    limpia del producto; en Marca Personal, también el personaje).
 3. Pega el prompt de imagen de la app y genera.
