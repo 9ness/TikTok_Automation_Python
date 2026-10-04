@@ -33,6 +33,42 @@ navegador off       # apagar (libera 1-2 GB de RAM)
 Chrome compiten por la RAM (8 GB). Con jobs `running` en la cola de montaje o
 menos de ~2,5 GB disponibles, espera o no lo enciendas.
 
+## 2b. Varios agentes a la vez (el navegador es COMPARTIDO)
+
+Lo usan a la vez los agentes de vídeo (tandas largas en Flow / GenAI Pro /
+Magnific) y los asistentes personales (`consultas-nestor`, `consultas-ana`), que
+entran un momento a buscar algo. Se puede trabajar en paralelo **cada uno en SU
+pestaña**: `cdp.py` trae al frente su pestaña antes de cada orden, así que las
+órdenes de dos agentes se intercalan sin pisarse. Nadie tiene que esperar a que
+otro acabe sus 20 vídeos. Lo que SÍ rompe el trabajo del otro:
+
+- **`navegador off`** o cerrar Chrome **si hay pestañas que no son tuyas**
+  (`cdp.py tabs`). Si quedan otras, solo cierras la tuya.
+- **Cerrar o navegar una pestaña ajena.** El `<sub>` de `cdp.py` coge la PRIMERA
+  pestaña cuya URL lo contenga: usa el dominio entero y único de la tuya
+  (`www.pccomponentes.com`, no `google` — `google` atrapa `flow.google.com`).
+  Antes de `goto`/`close`, `cdp.py tabs` y comprueba que esa URL es la tuya.
+- **Cerrar la ÚLTIMA pestaña** apaga Chrome: si la tuya es la única, usa
+  `navegador off` (nadie más lo está usando).
+- **Gastar la RAM**: una pestaña tuya a la vez, ciérrala al acabar.
+- **Modales y descargas**: no cambies ajustes de Chrome ni cierres diálogos de
+  otras pestañas.
+
+**Registro de turnos** — `/home/nebulabsai/navegador_turnos.log`, una línea al
+entrar y otra al salir (así el otro agente sabe que esa pestaña es tuya):
+
+```bash
+echo "$(date '+%F %T') ENTRA <agente> · <dominio de su pestaña> · <para qué>" >> ~/navegador_turnos.log
+echo "$(date '+%F %T') SALE  <agente> · <dominio>" >> ~/navegador_turnos.log
+tail -5 ~/navegador_turnos.log   # antes de empezar: ¿quién está dentro?
+```
+
+Si vas a hacer algo que pueda molestar a otro (encender o apagar Chrome, una
+descarga grande, abrir el Space de Magnific con poca RAM), **avísale**: los
+agentes del VPS se ven entre sí (`ListAgents` / `SendMessage`). Un mensaje corto
+(«entro 2 min en una pestaña de amazon.es, no toco las tuyas») y sigue; no hace
+falta esperar respuesta para una consulta rápida.
+
 ## 3. Controlarlo (`cdp.py`)
 
 Playwright conectado al Chrome que ya está abierto (**nunca** lances otro Chrome:
