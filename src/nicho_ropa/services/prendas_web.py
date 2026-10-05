@@ -101,7 +101,7 @@ def carpetas_del_operador() -> list[tuple[str, str]]:
 # y el montaje funcionan sin una línea extra. Lo único propio de aquí es que
 # el género forma parte del slug, así que lo que subes en mujer se queda en
 # mujer.
-_PREFIJO_CARPETA = {"muestras": "Muestras", "tareas": "Tareas"}
+_PREFIJO_CARPETA = {"muestras": "Muestras", "tareas": "Tareas", "temporada": "Temporada"}
 
 
 def _prefijo(genero: str) -> str:

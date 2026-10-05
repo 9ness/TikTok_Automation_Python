@@ -82,6 +82,7 @@ const CATALOGOS: [string, string][] = [
   ["mujer_accesorios", "border-lime-500/60 text-lime-700 dark:text-lime-300"],
   ["mujer_muestras", "border-slate-400/70 text-slate-600 dark:text-slate-300"],
   ["mujer_tareas", "border-stone-400/70 text-stone-600 dark:text-stone-300"],
+  ["mujer_temporada", "border-red-500/70 text-red-600 dark:text-red-400"],
   ["mujer", "border-pink-500/60 text-pink-700 dark:text-pink-300"],
   ["inventario_general", "border-blue-500/60 text-blue-700 dark:text-blue-300"],
   ["productos_web", "border-cyan-500/60 text-cyan-700 dark:text-cyan-300"],

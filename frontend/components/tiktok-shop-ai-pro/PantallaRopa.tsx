@@ -132,6 +132,7 @@ function AltaMiPrenda({
       : [
           ["mujer_muestras", "👗 Mujer · muestras"],
           ["mujer_tareas", "👗 Mujer · tareas"],
+          ["mujer_temporada", "🎄 Mujer · temporada"],
         ];
   // Al cambiar de sexo arriba, el catálogo elegido es del otro inventario.
   useEffect(() => {
@@ -291,6 +292,7 @@ const CATALOGOS_ROPA = [
   { clave: "web", label: "📦 Inventario" },
   { clave: "muestras", label: "🎁 Muestras" },
   { clave: "tareas", label: "💼 Tareas" },
+  { clave: "temporada", label: "🎄 Temporada" },
 ] as const;
 
 /** En el Multimodo entran además los zapatos y los accesorios de su web:
@@ -301,6 +303,7 @@ const CATALOGOS_MULTIMODO = [
   { clave: "accesorios", label: "👜 Accesorios" },
   { clave: "muestras", label: "🎁 Muestras" },
   { clave: "tareas", label: "💼 Tareas" },
+  { clave: "temporada", label: "🎄 Temporada" },
 ] as const;
 
 /** A qué catálogo pertenece una carpeta, por su prefijo
@@ -309,6 +312,7 @@ function catalogoDe(slug: string): string {
   const genero = slug.split("__")[0] ?? "";
   if (genero.endsWith("_muestras")) return "muestras";
   if (genero.endsWith("_tareas")) return "tareas";
+  if (genero.endsWith("_temporada")) return "temporada";
   if (genero.endsWith("_zapatos_web")) return "zapatos";
   if (genero.endsWith("_accesorios_web")) return "accesorios";
   return "web";

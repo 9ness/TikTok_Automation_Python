@@ -2326,6 +2326,7 @@ function ProductoCard({
             >
               <option value="mujer_muestras">👗 mujer · muestras</option>
               <option value="mujer_tareas">👗 mujer · tareas</option>
+              <option value="mujer_temporada">🎄 mujer · temporada</option>
               <option value="hombre_muestras">👔 hombre · muestras</option>
               <option value="hombre_tareas">👔 hombre · tareas</option>
             </select>

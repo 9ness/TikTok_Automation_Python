@@ -89,7 +89,7 @@ def catalogo_de_genero(genero: str) -> str:
     """`web` / `zapatos` / `accesorios` / `muestras` / `tareas`."""
     if genero in CATALOGO_DE_GENERO:
         return CATALOGO_DE_GENERO[genero]
-    for sufijo in ("muestras", "tareas"):
+    for sufijo in ("muestras", "tareas", "temporada"):
         if genero.endswith(f"_{sufijo}"):
             return sufijo
     return "web"
@@ -109,6 +109,9 @@ PRENDAS_WEB_ROOT = (
 GENEROS_OPERADOR: dict[str, str] = {
     "mujer_muestras": "👗 Mujer · muestras",
     "mujer_tareas": "👗 Mujer · tareas",
+    # Prendas y accesorios de TEMPORADA (oct 2026): lo más vendido del Q4
+    # anterior según EchoTik, para Ana. Mismo funcionamiento que muestras.
+    "mujer_temporada": "🎄 Mujer · temporada",
     "hombre_muestras": "👔 Hombre · muestras",
     "hombre_tareas": "👔 Hombre · tareas",
 }

@@ -107,7 +107,7 @@ MENUS: dict[str, Menu] = {
     ]
 }
 
-CATALOGOS_ROPA = ("web", "muestras", "tareas", "zapatos", "accesorios")
+CATALOGOS_ROPA = ("web", "muestras", "tareas", "temporada", "zapatos", "accesorios")
 
 
 def menu(clave: str) -> Menu:
