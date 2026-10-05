@@ -554,13 +554,16 @@ BLANCO_FONT_SIZE = 42
 # Y no reusa el gancho/CTA de siempre: el estilo nuevo no es el mismo texto
 # pintado de otro color, es OTRO texto. En los POV de 20s nuevos las tres
 # líneas son una frase seguida que termina en el nombre del producto —
-#     Revisa tu cupón descuento
+#     Revisa si tienes cupones
 #     para mejorar aún más el precio de
 #     Escritorio L HomeVibe
 # — sin emojis y sin mayúsculas. Los emojis de "🎟️ CUPÓN DESCUENTO 🎟️" son
 # justo lo que delata que el rótulo va montado, y encima cantan sobre un
 # bloque que ya no tiene ni color ni destello.
-_BLANCO_GANCHO = "Revisa tu cupón descuento"
+# Era «Revisa tu cupón descuento»: afirma que hay cupón y eso no se puede
+# comprobar en la ficha (Néstor, 6 oct 2026, con la cuenta en CRH crítico).
+# Misma longitud a propósito: el bloque encoge la letra si una línea no cabe.
+_BLANCO_GANCHO = "Revisa si tienes cupones"
 _BLANCO_CTA = "para mejorar aún más el precio de"
 # Lo ÚNICO con color del estilo: el nombre del producto lleva CONTORNO de
 # color (`_linea_plana` en modo "contorno"), del tono de la paleta que ya se
