@@ -245,7 +245,8 @@ La cuota de Claude es compartida entre todas las sesiones del VPS y se acaba
 a media tanda. Cuando pasa, un vigilante (`scripts/relevo_codex.py`, timer
 `relevo-codex`) avisa a Néstor por Telegram, y **él elige** con un botón si
 sigue otro agente (hoy Codex) o se espera. Nadie sigue tu trabajo solo: lo
-decide él.
+decide él. Y cuando Claude vuelve a tener cuota, el vigilante le avisa
+de que ya puede decirte «sigue» (si el relevo ha parado).
 
 Para que el que siga sepa por dónde vas, **todo agente de vídeo lleva un
 `RELEVO.md`** en su bandeja: `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/RELEVO.md`

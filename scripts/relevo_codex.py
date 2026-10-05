@@ -5,6 +5,11 @@
     relevo_codex.py lanzar <sesion> <motor>   → lo llama el bot al pulsar el botón
     relevo_codex.py estado         → relevos en marcha
 
+Y de vuelta: cuando pasa la hora a la que vuelve la cuota de Claude, el relevo
+ha parado y el agente sigue parado, avisa UNA vez de que ya se le puede decir
+«sigue» (una sesión de Claude no se reanuda desde aquí: se pisaría con la
+que está abierta).
+
 Nada arranca solo: `vigilar` solo detecta y manda por Telegram (bot de Néstor)
 un mensaje con botones — un respaldo por cada uno instalado (hoy Codex) y
 «Esperar». El bot (`~/asistentes-telegram/bot.py › on_relevo`) llama a `lanzar`
@@ -24,6 +29,7 @@ de aquí).
 """
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import re
@@ -106,6 +112,21 @@ def _resetea(ev: dict) -> str:
     return m.group(1).strip() if m else "en unas horas"
 
 
+def _ts_vuelve(vuelve: str) -> float:
+    """«5:10pm (UTC)» → timestamp de la próxima vez que sea esa hora. Sin hora: 5 h."""
+    h = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)", vuelve or "", re.I)
+    if not h:
+        return time.time() + 5 * 3600
+    hora = int(h.group(1)) % 12 + (12 if h.group(3).lower() == "pm" else 0)
+    g = time.gmtime()
+    ts = calendar.timegm((g.tm_year, g.tm_mon, g.tm_mday, hora, int(h.group(2) or 0), 0))
+    return ts if ts > time.time() - 3600 else ts + 86400
+
+
+def _quien(p: dict) -> str:
+    return f"el agente de {p['usuario']} ({Path(p['relevo']).parent.name})"
+
+
 def _relevo_de(jsonl: Path) -> tuple[Path, str] | None:
     ultimo = None
     with jsonl.open(errors="replace") as f:
@@ -155,8 +176,10 @@ def vigilar() -> None:
                      f"Claude (vuelve: {vuelve}). No tiene RELEVO.md, así que nadie puede seguirle.")
             continue
         ruta, usuario = relevo
-        e["pendientes"][sesion[:8]] = {"sesion": sesion, "relevo": str(ruta),
-                                       "usuario": usuario, "vuelve": vuelve}
+        p = {"sesion": sesion, "relevo": str(ruta), "usuario": usuario,
+             "vuelve": vuelve, "vuelve_ts": _ts_vuelve(vuelve)}
+        e["pendientes"][sesion[:8]] = p
+        e.setdefault("vuelta", {})[sesion] = p
         _guardar(e)
         botones = [[{"text": f"🔁 Seguir con {n}", "callback_data": f"relevo|{sesion[:8]}|{m}"}]
                    for m, n in MOTORES.items()]
@@ -164,6 +187,21 @@ def vigilar() -> None:
                          "callback_data": f"relevo|{sesion[:8]}|esperar"}])
         telegram(f"⏸️ El agente de {usuario} ({ruta.parent.name}) se ha quedado sin cuota de "
                  f"Claude (vuelve: {vuelve}). ¿Sigue otro con su RELEVO.md?", botones)
+    avisar_vuelta(e)
+
+
+def avisar_vuelta(e: dict) -> None:
+    """Claude ya tiene cuota: avisa de que se le puede decir «sigue» al agente."""
+    for sesion, p in list(e.get("vuelta", {}).items()):
+        if time.time() < p.get("vuelve_ts", 0) or lock_activo(Path(p["relevo"])):
+            continue
+        e["vuelta"].pop(sesion)
+        _guardar(e)
+        ev = _ultima_entrada(TRANSCRIPCIONES / f"{sesion}.jsonl")
+        if ev and not _es_limite(ev):
+            continue  # ya lo ha retomado alguien
+        telegram(f"✅ Claude ya tiene cuota otra vez. Escríbele «sigue» a {_quien(p)}: "
+                 "relee su RELEVO.md y continúa desde ahí.")
 
 
 # ----------------------------------------------------------------- lanzar
@@ -204,7 +242,8 @@ def lanzar(corta: str, motor: str) -> str:
     if not p:
         return "Ese aviso ya no está pendiente."
     if motor not in MOTORES:
-        return f"⏳ Vale, el agente de {p['usuario']} espera a Claude ({p['vuelve']})."
+        return (f"⏳ Vale, el agente de {p['usuario']} espera a Claude ({p['vuelve']}). "
+                "Te aviso cuando puedas decirle «sigue».")
     ruta = Path(p["relevo"])
     if lock_activo(ruta):
         return "Ya hay un relevo trabajando en ese RELEVO.md."
@@ -234,8 +273,11 @@ def _correr(motor: str, p: dict) -> None:
     finally:
         lock.unlink(missing_ok=True)
     resumen = final.read_text().strip()[-600:] if final.exists() else ""
+    vuelta = ("Claude ya tiene cuota: te aviso enseguida para que le digas «sigue»."
+              if time.time() >= p.get("vuelve_ts", 0) else
+              f"Claude vuelve a las {p['vuelve']}: entonces te aviso para que le digas «sigue».")
     telegram(f"{'✅' if rc == 0 else '⚠️'} {MOTORES[motor]} ha parado el relevo de "
-             f"{p['usuario']}. " + (resumen or f"Sin resumen (log: {base.name})."))
+             f"{p['usuario']}. " + (resumen or f"Sin resumen (log: {base.name}).") + "\n\n" + vuelta)
 
 
 def estado() -> None:
