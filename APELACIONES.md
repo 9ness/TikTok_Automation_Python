@@ -56,7 +56,7 @@ no se apela: se rehace el vídeo.
 | (curso) | Producto con ficha en inglés | contenido en español y ficha en parte en inglés | ✅ aprobada |
 | 28/9/2026 | MIKOMIKA espejo maquillaje LED (Inventario · Carpeta_28 · p7) | es un espejo: refleja la habitación y la mano (6 pruebas, sin fotogramas del clip 1) | ❌ rechazada 28/9 |
 | 27/9/2026 | FUFFI mini teléfono (Tareas Productos 8 · p1) | móvil normal al lado para comparar tamaño (7 pruebas) | ❌ rechazada 28/9 (respuesta genérica) |
-| 2/10/2026 | Multimodo (Ana) · botas altas Vintage (Zapatos C3 · p6) — «contenido estático» -4 | vídeo real: piernas que se cruzan y mano; el rótulo de temporada fijo 10 s + cámara quieta lo hizo parecer foto con texto (movimiento medido 3,3) | ⏳ pendiente |
+| 2/10/2026 | Multimodo (Ana) · botas altas Vintage (Zapatos C3 · p6) — «contenido estático» -4 | vídeo real: piernas que se cruzan y mano; el rótulo de temporada fijo 10 s + cámara quieta lo hizo parecer foto con texto (movimiento medido 3,3) | ✅ aprobada (retirada, 4 puntos devueltos, 5/10/2026) |
 | 2/10/2026 | Multimodo (Ana) · bolso ZS BAG Vintage, versión antigua sin mano | NO se apela: bolso quieto, sin mano y texto metido en la imagen | — |
 | 29/9/2026 | Botas de fútbol SAIBI (Tareas Productos 9 · p10) — sanción -4 «contenido estático / slideshow» | vídeo real con movimiento de mano, voz y subtítulos; el detector lo confundió con imagen fija (escena parecida a las fotos de la ficha) | ✅ aprobada (4 puntos devueltos) |
 
