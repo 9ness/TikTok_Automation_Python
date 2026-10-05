@@ -859,9 +859,9 @@ async def marcar_carpeta(c: Ctx, completada: bool | None, pendiente: bool | None
 async def borrar_productos(c: Ctx, productos: list[str] | None) -> dict:
     """Borra productos de un catálogo propio (Muestras / Tareas) o la carpeta
     entera (`productos=None`). Fotos + todo lo guardado en los nichos."""
-    if c.catalogo not in ("mis_productos", "tareas_productos"):
+    if c.catalogo not in ("mis_productos", "tareas_productos", "temporada_q4"):
         raise ErrorApp("Solo se borra en los catálogos propios: mis_productos (Muestras) "
-                       "o tareas_productos (Tareas). Los del curso no se tocan.")
+                       "o tareas_productos (Tareas) o temporada_q4. Los del curso no se tocan.")
     body: dict = {"source": c.catalogo, "carpeta": c.carpeta}
     if productos is not None:
         body["productos"] = [str(p) for p in productos]

@@ -80,6 +80,15 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "tareas_productos",
         "propia": "1",
     },
+    # Productos de TEMPORADA (Halloween, Black Friday, Navidad) sacados del
+    # ranking de ventas de EchoTik del Q4 anterior y de lo que despega ahora,
+    # filtrando lo saturado (5 oct 2026). Catálogo del operador como los dos
+    # de arriba: mismas carpetas de diez y mismo convenio de nombres.
+    "temporada_q4": {
+        "label": "🎄 Temporada Q4",
+        "folder": "temporada_q4",
+        "propia": "1",
+    },
     # Los productos de la web del curso, importados por ZIP. También "propia"
     # (vive en el Drive montado) y con el mismo convenio de nombres, así que
     # todo lo de después funciona sin nada especial.
@@ -121,6 +130,7 @@ SOURCES: dict[str, dict[str, str]] = {
 # de 200 imposible de mirar.
 MIS_PRODUCTOS_POR_CARPETA = 10
 MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
+TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/temporada_q4"
 TAREAS_PRODUCTOS_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/tareas_productos"
 )
@@ -131,6 +141,7 @@ TAREAS_PRODUCTOS_ROOT = (
 CATALOGOS_OPERADOR: dict[str, dict[str, str]] = {
     "mis_productos": {"root": MIS_PRODUCTOS_ROOT, "prefijo": "Mis Productos"},
     "tareas_productos": {"root": TAREAS_PRODUCTOS_ROOT, "prefijo": "Tareas Productos"},
+    "temporada_q4": {"root": TEMPORADA_Q4_ROOT, "prefijo": "Temporada Q4"},
 }
 
 

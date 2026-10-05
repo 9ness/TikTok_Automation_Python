@@ -1578,7 +1578,7 @@ export default function PovBofLargoPage() {
 /** Alta de productos PROPIOS (fuente "Mis productos"). Reusa el endpoint del
  *  POV BOF: crea el producto en el Drive compartido, así que sirve a los dos. */
 /** Los dos catálogos del operador: muestras gratuitas y tareas pagadas. */
-const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
+const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos", "temporada_q4"];
 
 
 

@@ -1766,7 +1766,7 @@ const TOOLS: { key: ToolKey; label: string }[] = [
  *  una MUESTRA gratuita o porque es una TAREA pagada, y eso no se trabaja
  *  igual; por dentro son idénticos (mismas carpetas de diez, mismo convenio de
  *  nombres) y se puede mover de uno a otro. */
-const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos"];
+const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos", "temporada_q4"];
 
 /** Los que entran por ZIP de la web del curso: el de la web vieja y el
  *  "Inventario General" de la nueva (`ttshopaiproapp.com`). Van separados a
@@ -1787,6 +1787,7 @@ function nombreCarpeta(nombre: string): string {
 const NOMBRE_CATALOGO: Record<string, string> = {
   mis_productos: "Muestras productos",
   tareas_productos: "Tareas Productos",
+  temporada_q4: "Temporada Q4",
 };
 
 /** El otro catálogo del operador: a donde se mueve desde este. */
