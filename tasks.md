@@ -18,10 +18,10 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 - [ ] Si sale bien: estilo «Replicar viral» en el POV BOF Largo (Gemini analiza el vídeo → plan de escenas + guion adaptado → prompts de los 2 clips + guion para Fish).
 - [ ] Carruseles virales (ej. lámpara de olas de @alexdeals_, refs en `TIKTOK_SHOP_AI_PRO/_clases/referencias/` del Drive): solo en cuentas fuera de estado crítico de CRH (@pisadaviva ~120 el 19/09), pocos al día.
 
-## 🚦 Semáforo + subida automática a TikTok (6 oct 2026)
+## 🚦 Semáforo + subida automática a TikTok (5 oct 2026)
 - [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
-- [x] Revisar las tandas abiertas de ness y poner el semáforo (6 oct: 19 vídeos → 6 🟢, 13 🟡, 0 🔴).
-- [x] **No afirmar cupones** (6 oct 2026): SOLO el rótulo blanco del formato nuevo pasa de «Revisa tu cupón descuento» a «Revisa si tienes cupones» (`video_editor._BLANCO_GANCHO`, misma longitud). «CUPÓN DESCUENTO / APROVECHA AHORA» y la voz («aplica tus cupones») se quedan: decisión de Néstor, van en cientos de vídeos.
+- [x] Revisar las tandas abiertas de ness y poner el semáforo (5 oct: 19 vídeos → 6 🟢, 13 🟡, 0 🔴).
+- [x] **No afirmar cupones** (5 oct 2026): SOLO el rótulo blanco del formato nuevo pasa de «Revisa tu cupón descuento» a «Revisa si tienes cupones» (`video_editor._BLANCO_GANCHO`, misma longitud). «CUPÓN DESCUENTO / APROVECHA AHORA» y la voz («aplica tus cupones») se quedan: decisión de Néstor, van en cientos de vídeos.
 - [ ] Subida automática desde el móvil (adb + scrcpy, `/mnt/HC_Volume_106974679/asistentes/juego/pantalla.py`):
       SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
       comprobar vídeo → adjuntar vídeo → caption → publicar.

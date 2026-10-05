@@ -561,7 +561,7 @@ BLANCO_FONT_SIZE = 42
 # justo lo que delata que el rótulo va montado, y encima cantan sobre un
 # bloque que ya no tiene ni color ni destello.
 # Era «Revisa tu cupón descuento»: afirma que hay cupón y eso no se puede
-# comprobar en la ficha (Néstor, 6 oct 2026, con la cuenta en CRH crítico).
+# comprobar en la ficha (Néstor, 5 oct 2026, con la cuenta en CRH crítico).
 # Misma longitud a propósito: el bloque encoge la letra si una línea no cabe.
 _BLANCO_GANCHO = "Revisa si tienes cupones"
 _BLANCO_CTA = "para mejorar aún más el precio de"
