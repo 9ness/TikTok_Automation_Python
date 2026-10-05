@@ -18,6 +18,11 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 - [ ] Si sale bien: estilo «Replicar viral» en el POV BOF Largo (Gemini analiza el vídeo → plan de escenas + guion adaptado → prompts de los 2 clips + guion para Fish).
 - [ ] Carruseles virales (ej. lámpara de olas de @alexdeals_, refs en `TIKTOK_SHOP_AI_PRO/_clases/referencias/` del Drive): solo en cuentas fuera de estado crítico de CRH (@pisadaviva ~120 el 19/09), pocos al día.
 
+## 🔁 Respaldo si se acaba la cuota de Claude (5 oct 2026)
+- Bots de Telegram: al agotarse, botones «Codex / Esperar» (`~/asistentes-telegram/bot.py › RESPALDOS`). Agentes de vídeo: `scripts/relevo_codex.py` (timer `relevo-codex`) avisa con botones; guía README › 8 (`RELEVO.md`).
+- [ ] **OpenCode** como segundo respaldo cuando esté instalado: `preguntar_opencode` + entrada en `RESPALDOS` (bot) y en `MOTORES`/`_comando` (relevo).
+- [ ] Primeras veces con Codex: que Néstor revise sus vídeos antes de publicar.
+
 ## 🚦 Semáforo + subida automática a TikTok (5 oct 2026)
 - [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
 - [x] Revisar las tandas abiertas de ness y poner el semáforo (5 oct: 19 vídeos → 6 🟢, 13 🟡, 0 🔴).
