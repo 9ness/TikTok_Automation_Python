@@ -302,7 +302,7 @@ ZIP que publica la web del curso —carpetas de diez, y el ZIP trae la
 convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y los **dos catálogos
 del operador**: «Muestras productos» (`mis_productos`, el slug es el viejo para
 no migrar lo ya guardado) y «Tareas Productos» (`tareas_productos`) — muestra
-gratuita o tarea pagada, que no se trabajan igual. Los sube él (foto limpia +
+gratuita o tarea pagada, que no se trabajan igual — más «🎄 Temporada Q4» (`temporada_q4`, oct 2026: lo más vendido del Q4 anterior según EchoTik, sin saturar; ficha generada con los datos de EchoTik porque la web de TikTok pide captcha). Los sube él (foto limpia +
 ficha), viven en su Drive (`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/<slug>/`) en
 carpetas de 10, y un producto se puede mover de uno a otro con sus fotos y sus
 datos (`mis_productos.mover_producto`). Las fotos se guardan con el MISMO

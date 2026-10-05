@@ -26,6 +26,11 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
       SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
       comprobar vídeo → adjuntar vídeo → caption → publicar.
 
+## 🎄 Temporada Q4 — productos de temporada (5 oct 2026)
+- [x] Catálogo `temporada_q4` con 15 productos (Q4 2025 vendidos y hoy sin saturar), encargo pasado al agente del POV BOF Largo (2 versiones × 3 clips, ~90 clips: confirmar créditos).
+- [ ] Ropa/accesorios para Ana (Moda Mujer): zapatillas de casa de pelo, guantes térmicos con gorro, calcetines de invierno, zapatillas interiores, gorro-braga — fotos y URL en Drive `TIKTOK_SHOP_AI_PRO/Investigacion/Q4_2025_productos/`. Falta darlos de alta en su catálogo.
+- [ ] Más productos: el ranking DIARIO de EchoTik (`/product/ranklist`, rank_type=1, region=ES) da 10 que venden YA por llamada; los puestos 50-200 están menos saturados. La cuenta del 5 oct (plan gratis = 50 llamadas/mes) tiene ~6. Otra cuenta o plan de pago.
+
 ## 📦 Mis tandas — siguientes pasos (2 oct 2026)
 
 - [ ] Añadir lectores para UGC (Nicho General), BOF Cine, Cuenta Piloto y los otros modos de Moda Mujer / Ropa Hombre si se quieren ahí (`src/mis_tandas/fuentes.py`). Hoy entran POV BOF, POV BOF Largo (todos los modos) y Multimodo.
