@@ -69,6 +69,11 @@ class EstiloMof10(BaseModel):
     # Colores mínimos que necesita una prenda para este formato (0 = da
     # igual). El de la tienda pide tres: con menos no hay gancho.
     minimo_variantes: int = 0
+    # Los de 20 s con voz de Fish (dos clips mudos + guion locutado por la
+    # app). Sin estos dos campos el modelo los quitaba de la respuesta y la
+    # pantalla y el MCP trataban esos formatos como mudos de 8 s.
+    fish: bool = False
+    segundos_clip: int = 0
 
 
 class ModoRopa(BaseModel):
