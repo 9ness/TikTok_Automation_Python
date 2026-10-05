@@ -21,7 +21,12 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 ## 🚦 Semáforo + subida automática a TikTok (6 oct 2026)
 - [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
 - [x] Revisar las tandas abiertas de ness y poner el semáforo (6 oct: 19 vídeos → 6 🟢, 13 🟡, 0 🔴).
-- [ ] Decidir si se quita «Revisa tu cupón descuento…» / «CUPÓN DESCUENTO» del texto quemado (la nota de la sanción dice no quemar cupones que la ficha no tenga).
+- [ ] **No afirmar cupones** (Néstor, 6 oct 2026: «no se puede confirmar nada»). En los SIGUIENTES guiones y montajes, el texto y la voz
+      sugieren, no afirman: «Revisa si tienes cupones de descuento…» en vez de «Revisa tu cupón descuento…», y en la voz
+      «mira si tienes cupones» en vez de «aplica tus cupones». Dónde tocar:
+      · texto quemado: `nicho_pov_bof/pipeline/video_editor.py` `_BLANCO_GANCHO` (y valorar `_GANCHO_TEXTO` «CUPÓN DESCUENTO» del estilo precio, que dictó el mentor el 30/7);
+      · voz: `nicho_pov_bof_largo/config.py` (`CTA_CUPONES`, escalera `ctas_posibles` — cuidado: están medidas en caracteres para la ventana 15-16 s, y `ajustar_cta` reconoce los cierres viejos por literal, que hay que seguir reconociendo), `prompts/guion.md`, `prompts/guion_epico.md`, `nicho_pov_bof/prompts/guion_producto.md`, `replicar_viral/prompts/replicar.md`;
+      · `texto_arriesgado()` debería marcar «tu cupón» / «aplica tus cupones» como afirmación.
 - [ ] Subida automática desde el móvil (adb + scrcpy, `/mnt/HC_Volume_106974679/asistentes/juego/pantalla.py`):
       SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
       comprobar vídeo → adjuntar vídeo → caption → publicar.
