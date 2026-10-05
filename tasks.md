@@ -20,7 +20,8 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 
 ## 🚦 Semáforo + subida automática a TikTok (6 oct 2026)
 - [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
-- [ ] Revisar las tandas abiertas de ness y poner el semáforo (agente).
+- [x] Revisar las tandas abiertas de ness y poner el semáforo (6 oct: 19 vídeos → 6 🟢, 13 🟡, 0 🔴).
+- [ ] Decidir si se quita «Revisa tu cupón descuento…» / «CUPÓN DESCUENTO» del texto quemado (la nota de la sanción dice no quemar cupones que la ficha no tenga).
 - [ ] Subida automática desde el móvil (adb + scrcpy, `/mnt/HC_Volume_106974679/asistentes/juego/pantalla.py`):
       SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
       comprobar vídeo → adjuntar vídeo → caption → publicar.
