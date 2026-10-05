@@ -15,7 +15,7 @@ TANDAS_DIA: dict[str, int] = {"ness": 1, "ana": 1, "mauro": 1}
 
 # El mismo producto (otro modo del Largo, la copia de Q4…) no se publica dos
 # veces en menos de estos días: el segundo espera.
-SEPARACION_MISMO_PRODUCTO = 7
+SEPARACION_MISMO_PRODUCTO = 5  # 5 oct 2026: dos versiones por producto (los dos mejores modos), 5 días entre ellas
 
 # Cuánto vale la lista ya leída (por usuario y proceso). Los botones la
 # corrigen en el sitio, así que esto solo decide cada cuánto se ven los vídeos

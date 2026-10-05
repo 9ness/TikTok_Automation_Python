@@ -28,9 +28,11 @@ ajustan sin bloquear a los demás:
   Inversa 6 oct, Productos Q4 28 oct). Nada se pone en una tanda anterior, y en
   cuanto llega su día **tiene prioridad** sobre lo normal (caduca). Calendario:
   `docs/CALENDARIO_POV_BOF_LARGO.md`.
-- **El mismo producto no sale dos veces en menos de 7 días**
+- **El mismo producto no sale dos veces en menos de 5 días**
   (`SEPARACION_MISMO_PRODUCTO`): otro modo del Largo, la copia de Q4… El
-  segundo espera. Cuenta también lo ya subido.
+  segundo espera. Cuenta también lo ya subido. Desde oct 2026 cada producto
+  lleva DOS versiones (los dos modos del Largo que mejor le encajen, de 3
+  clips): la segunda sale a los 5 días.
 - **Las tandas que se enseñan quedan FIJADAS** (`mis_tandas:fijas:<usuario>`:
   las dos primeras abiertas y toda tanda llena). Un vídeo **no sale nunca** de
   su tanda: subido o sin stock se queda en su sitio con su marca y NO entra uno

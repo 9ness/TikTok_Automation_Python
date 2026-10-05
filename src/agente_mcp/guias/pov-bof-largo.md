@@ -25,6 +25,16 @@ tarjeta**.
 - **Plataforma del clip**: Flow, GenAI Pro o Magnific (las tres valen porque
   el clip va mudo).
 
+## Dos versiones por producto (oct 2026)
+
+Néstor sube ~20 vídeos al día y el inventario no da para uno por producto. Por
+defecto, cada producto lleva **DOS vídeos de 3 clips**, con los **dos modos
+que mejor le encajen** de los cuatro (dolor, precio, épico, venta inversa):
+elige por el producto (¿se ve un dolor claro? ¿hay un dato fuerte para la
+venta inversa? ¿un golpe visual para el épico?) y dilo en el informe. «Mis
+tandas» separa las dos versiones 5 días solas (`SEPARACION_MISMO_PRODUCTO`).
+Lo que manda el operador en cada encargo va por delante de esto.
+
 ## Paso a paso
 
 ### 0. Situarte

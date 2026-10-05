@@ -130,7 +130,9 @@ def test_fecha_minima_espera_sin_bloquear(redis, monkeypatch):
     assert d["tandas"][0]["fecha"] == hoy.isoformat() and len(d["tandas"][0]["items"]) == 10
 
 
-def test_mismo_producto_separado_una_semana(redis, monkeypatch):
+def test_mismo_producto_separado(redis, monkeypatch):
+    from src.mis_tandas import config
+
     lista = [fila("largo|s|c|1|", "largo", titulo="Lámpara", orden_at=1),
              fila("largo|s|c|1|dolor", "largo", titulo="Lámpara", orden_at=2)]
     lista += [fila(f"pov|s|c|{i}", orden_at=10 + i) for i in range(30)]
@@ -138,7 +140,7 @@ def test_mismo_producto_separado_una_semana(redis, monkeypatch):
     d = servicio.tandas("mauro")
     fechas = [t["fecha"] for t in d["tandas"] for i in t["items"] if i["titulo"] == "Lámpara"]
     a, b = (dt.date.fromisoformat(x) for x in fechas)
-    assert (b - a).days >= 7
+    assert (b - a).days >= config.SEPARACION_MISMO_PRODUCTO
 
 
 def test_aleatorios_se_intercalan_sin_tocar_las_primeras_tandas():
