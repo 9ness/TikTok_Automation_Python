@@ -376,7 +376,11 @@ def dir_operador(source: str) -> Path:
 
     from src.nicho_pov_bof.services.audio_bank import mount_root
 
-    meta = CATALOGOS_OPERADOR.get(source) or CATALOGOS_OPERADOR["mis_productos"]
+    meta = CATALOGOS_OPERADOR.get(source)
+    if meta is None:
+        # Antes caía en silencio en «Muestras»: con un despliegue a medias, el
+        # alta de un catálogo nuevo acabó dentro de las muestras (5 oct 2026).
+        raise ValueError(f"{source!r} no es un catálogo del operador")
     raiz = mount_root()
     destino = (
         raiz / meta["root"] if raiz
