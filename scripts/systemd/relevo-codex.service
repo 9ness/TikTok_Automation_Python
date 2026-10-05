@@ -1,0 +1,7 @@
+[Unit]
+Description=Aviso por Telegram si un agente de vídeo se queda sin cuota de Claude (relevo solo si Néstor lo elige)
+
+[Service]
+Type=oneshot
+User=nebulabsai
+ExecStart=/usr/bin/python3 /home/nebulabsai/proyectos/TikTok_Automation_Python/scripts/relevo_codex.py vigilar

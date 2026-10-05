@@ -238,3 +238,37 @@ en `frontend/lib/tiktok-shop-ai-pro/coloresModo.ts` (un color que no use otro
 modo del mismo nicho; formatos de una misma familia, el mismo). El test
 `tests/mis_tandas/test_colores.py` falla si falta. Un nicho nuevo en Mis
 tandas necesita además su lector en `src/mis_tandas/fuentes.py`.
+
+## 8. Relevo: `RELEVO.md` por si te quedas sin cuota
+
+La cuota de Claude es compartida entre todas las sesiones del VPS y se acaba
+a media tanda. Cuando pasa, un vigilante (`scripts/relevo_codex.py`, timer
+`relevo-codex`) avisa a Néstor por Telegram, y **él elige** con un botón si
+sigue otro agente (hoy Codex) o se espera. Nadie sigue tu trabajo solo: lo
+decide él.
+
+Para que el que siga sepa por dónde vas, **todo agente de vídeo lleva un
+`RELEVO.md`** en su bandeja: `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/RELEVO.md`
+(en el VPS, `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/…`). Créalo al empezar y
+**actualízalo al terminar cada producto** (y antes de algo largo). Escríbelo con
+tu herramienta de editar ficheros: el vigilante encuentra tu RELEVO en tu
+transcripción. Lo que tiene que decir, corto:
+
+- **Lo lleva:** Claude (sesión «<título>») · **Actualizado:** fecha y hora UTC.
+- **Encargo:** qué te pidió Néstor, con catálogo, carpetas y productos.
+- **Autorizado:** qué «sí» ha dado Néstor (cuántas imágenes y clips, y dónde).
+  El relevo solo gasta eso.
+- **Hecho / en curso / falta:** por producto (`TQ4 1 #3: clips subidos, falta
+  montar`), con el modo de cada vídeo.
+- **Créditos:** gastados y lo que queda en cada plataforma.
+- **Ojo:** lo que no es obvio (fotos raras, precios dudosos, pestañas abiertas
+  del navegador).
+
+**Claude y el relevo NUNCA a la vez** en el mismo producto ni en la misma
+pestaña. Mientras trabaja el relevo hay un `RELEVO.lock` al lado del
+RELEVO.md (con su pid). Al volver de un corte de cuota, **antes de tocar nada**:
+1. Si existe `RELEVO.lock` y su pid vive (`ps -p <pid>`), no sigas: avisa a
+   Néstor y espera a que termine el producto.
+2. Si no, relee tu RELEVO.md: el relevo puede haber avanzado. Sigue desde lo
+   que diga, no desde lo que recuerdes. Revisa con la misma exigencia lo que
+   haya hecho él antes de dar semáforo.
