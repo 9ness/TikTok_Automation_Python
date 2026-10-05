@@ -141,9 +141,13 @@ círculo junto al título:
   sale otro producto, o el nombre/subtítulos no corresponden. Marca «rehacer»
   solo, con el motivo como nota.
 
-Cómo revisar: descarga el MP4 (`descargar`), saca 4-6 fotogramas repartidos
-(los dos clips) y compáralos lado a lado con la foto limpia del producto
-(la del menú de su nicho) y con el título. En la duda entre dos colores, el
+Cómo revisar, en dos pasadas: (1) descarga el MP4 (`descargar`), saca 6
+fotogramas repartidos y compáralos lado a lado con la foto limpia del producto
+(la del menú de su nicho) y con el título — eso decide ámbar/rojo; (2) ANTES
+de poner un **verde**, revisión densa: un fotograma cada 0,5 s en rejilla
+(`ffmpeg -vf "fps=2,scale=-2:300,tile=8x3"`) buscando lo que dura medio
+segundo: manos deformes, objetos que aparecen/desaparecen, el producto que
+cambia en el corte entre clips, texto raro. El verde se sube sin mirar. En la duda entre dos colores, el
 más prudente. Escribe siempre el motivo en una frase («taza lisa, igual en
 los dos clips» · «champú con texto en el bote» · «el clip 2 la pinta roja»).
 El color vale para ESE montaje: si se rehace, vuelve a «sin revisar».
