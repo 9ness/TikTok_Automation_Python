@@ -21,6 +21,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
+from src.nicho_pov_bof.services import photo_pairing
 from src.nicho_ropa import config
 
 _EXTS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -274,6 +275,7 @@ def listar_fotos_como_drive(slug: str) -> list[dict]:
                 "name": f.name,
                 "size": f.stat().st_size,
                 "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",
+                "rol": photo_pairing.rol_por_nombre(f.name),
                 "mtime": "",
             }
             for f in d.iterdir()

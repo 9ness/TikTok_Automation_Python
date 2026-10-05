@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from src.nicho_pov_bof import config
+from src.nicho_pov_bof.services import photo_pairing
 
 _EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 # El catálogo por defecto: las MUESTRAS. Este módulo lleva los dos catálogos
@@ -227,6 +228,7 @@ def guardar_producto(
                 "name": f.name,
                 "size": f.stat().st_size,
                 "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",
+                "rol": photo_pairing.rol_por_nombre(f.name),
                 "mtime": "",
             })
         listado.sort(key=lambda x: config.natural_sort_key(x["name"]))
@@ -476,6 +478,7 @@ def listar_fotos_como_drive(carpeta: str, source: str = SOURCE) -> list[dict]:
                 "name": f.name,
                 "size": f.stat().st_size,
                 "mime": "image/png" if f.suffix.lower() == ".png" else "image/jpeg",
+                "rol": photo_pairing.rol_por_nombre(f.name),
                 "mtime": "",
             }
             for f in d.iterdir()

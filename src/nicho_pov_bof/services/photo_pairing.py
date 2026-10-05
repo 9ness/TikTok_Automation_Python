@@ -46,6 +46,25 @@ CAMARA_RE = re.compile(r"^(?:img|image|photo|foto|pxl|dsc)[ _-]?(\d+)$")
 CAMARA_SALTO_MAX = 5
 
 
+def rol_por_nombre(name: str) -> str | None:
+    """`limpia` para `3.jpg`, `ficha` para `3(1).png`, None para lo demás.
+
+    SOLO vale en los catálogos del operador, donde los nombres los pone
+    nuestro código (`mis_productos.guardar_producto`, `prendas_web`): ahí el
+    nombre es la verdad y lo que se adivina por forma o peso, no. Hacía falta
+    porque la ficha GENERADA (oct 2026, Temporada Q4) es un PNG de 1080x1600
+    —cuadrada para `_is_squarish`— y pesa MENOS que la foto, así que la regla
+    del peso la daba como limpia. En el Drive del curso no se usa: allí los
+    nombres no son de fiar.
+    """
+    stem = name.rsplit(".", 1)[0].strip()
+    if re.fullmatch(r"\d+", stem):
+        return "limpia"
+    if re.fullmatch(r"\d+\(1\)", stem):
+        return "ficha"
+    return None
+
+
 def _stem_key(name: str) -> str:
     """Clave de emparejado: el número del fichero, ignorando extensión y caja.
 
@@ -203,6 +222,17 @@ def split_pair(group: list[dict]) -> dict:
         # Sin captura no se podrán extraer título ni tienda de ese producto.
         return {"clean": items[0], "titled": None, "confident": False,
                 "reason": "solo hay una foto", "extras": []}
+
+    # 0) Por nombre, si el listado lo marca (`rol`, solo catálogos del
+    # operador): `N` la limpia, `N(1)` la ficha y el resto, extras.
+    limpias = [p for p in items if p.get("rol") == "limpia"]
+    fichas = [p for p in items if p.get("rol") == "ficha"]
+    if len(limpias) == 1 and len(fichas) <= 1:
+        clean = limpias[0]
+        titled = fichas[0] if fichas else None
+        extras = [p for p in items if p not in (clean, titled)]
+        return {"clean": clean, "titled": titled, "confident": bool(titled),
+                "reason": "nombre" if titled else "sin ficha", "extras": extras}
 
     # 1) Por forma: la cuadrada es el producto.
     squarish = [p for p in items if _is_squarish(p) is True]
