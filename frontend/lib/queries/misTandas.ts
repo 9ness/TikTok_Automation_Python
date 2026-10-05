@@ -43,6 +43,17 @@ export interface VideoTanda {
   /** Primer día en que se puede publicar (carpetas especiales), o "". */
   desde: string;
   musica: { busqueda: string; alternativas: string[]; estilo: string } | null;
+  /** Revisión antes de subir (de ESTE montaje); null = sin revisar. */
+  semaforo?: SemaforoVideo | null;
+}
+
+export type ColorSemaforo = "verde" | "ambar" | "rojo";
+
+export interface SemaforoVideo {
+  color: ColorSemaforo;
+  motivo: string;
+  por?: string;
+  at?: number;
 }
 
 export interface Tanda {
@@ -55,6 +66,8 @@ export interface Tanda {
   nichos: string[];
   fecha?: string;
   temporada?: string;
+  /** Pendientes de subir por color del semáforo. */
+  semaforo?: Record<ColorSemaforo, number>;
   items: VideoTanda[];
 }
 
@@ -129,6 +142,17 @@ export function useCompletarTanda() {
       void qc.invalidateQueries({ queryKey: misTandasKeys.all });
     },
     onError: (e) => toast.error(`No se pudo completar: ${e.message}`),
+  });
+}
+
+/** Semáforo de revisión (verde/ámbar/rojo, "" lo quita). Rojo marca además
+ *  «rehacer» en el nicho, así que se relee la lista. */
+export function useSemaforoTanda() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { id: string; color: ColorSemaforo | ""; motivo?: string }>({
+    mutationFn: (body) => api.post(`${ROOT}/semaforo`, { ...body, por: "a mano" }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: misTandasKeys.all }),
+    onError: (e) => toast.error(`No se pudo: ${e.message}`),
   });
 }
 

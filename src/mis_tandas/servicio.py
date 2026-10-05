@@ -137,6 +137,49 @@ def ocultar(usuario: str, id_: str, oculto: bool = True) -> dict:
     return {"ok": True, "id": id_, "oculto": oculto, "ocultos": len(ids)}
 
 
+# ---------------------------------------------------------------------------
+# Semáforo de revisión: verde / ámbar / rojo por vídeo (ver config).
+# ---------------------------------------------------------------------------
+def semaforos(usuario: str) -> dict[str, dict]:
+    r = _redis()
+    if not r.is_available():
+        return {}
+    return (r.get_json(config.SEMAFORO_KEY.format(usuario=usuario or "ness")) or {}).get("videos") or {}
+
+
+def _semaforo_vigente(s: dict | None, f: dict) -> dict | None:
+    """El color solo vale para el montaje que se revisó."""
+    if not s or abs(float(s.get("listo_at") or 0) - float(f.get("video_listo_at") or 0)) > 1:
+        return None
+    return s
+
+
+def poner_semaforo(usuario: str, id_: str, color: str, motivo: str = "", por: str = "") -> dict:
+    """Pone (o quita, con color "") el semáforo de un vídeo. Rojo marca además
+    «rehacer» con el motivo en los nichos que lo tienen."""
+    usuario = usuario or "ness"
+    color = (color or "").strip().lower().replace("á", "a")
+    if color and color not in config.SEMAFORO_COLORES:
+        raise ErrorTanda(f"Color «{color}» no vale: verde, ambar, rojo o vacío para quitarlo.")
+    f = _fila_de(usuario, id_)
+    r = _redis()
+    if not r.is_available():
+        raise ErrorTanda("Redis no está disponible.", status=503)
+    clave = config.SEMAFORO_KEY.format(usuario=usuario)
+    doc = r.get_json(clave) or {}
+    videos = doc.get("videos") or {}
+    if color:
+        videos[id_] = {"color": color, "motivo": (motivo or "").strip()[:300], "por": (por or "").strip()[:40],
+                       "listo_at": float(f.get("video_listo_at") or 0), "at": time.time()}
+    else:
+        videos.pop(id_, None)
+    r.set_json(clave, {"videos": videos, "updated_at": time.time()})
+    rehacer = None
+    if color == "rojo" and f.get("puede_rehacer") and not f.get("rehacer"):
+        rehacer = marcar(usuario, id_, rehacer=True, rehacer_nota=f"🔴 {motivo}".strip())
+    return {"ok": True, "id": id_, "semaforo": videos.get(id_), "rehacer": bool(rehacer)}
+
+
 def _cerrado(f: dict) -> bool:
     return bool(f["uploaded"] or f["sin_stock"])
 
@@ -461,6 +504,13 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
             t["items"] = [_publica(f) for f in grupo]
             salida.append(t)
     _precalentar(usuario, precalentar)
+    sem = semaforos(usuario)
+    for t in salida:
+        for v in t.get("items", []):
+            v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
+        items = t.get("items", [])
+        t["semaforo"] = {c: sum(1 for v in items if (v.get("semaforo") or {}).get("color") == c and not v["uploaded"])
+                         for c in config.SEMAFORO_COLORES}
     return {
         "usuario": usuario,
         "por_tanda": config.POR_TANDA,

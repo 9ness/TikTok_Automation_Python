@@ -582,8 +582,9 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) ->
     Es solo una vista: NO se sube nada aquí — lo que montas en su nicho aparece
     solo al final de la cola (`fresco=True` para verlo ya). Por defecto solo
     las tandas abiertas; `todas=True` trae también las ya subidas.
-    Cada vídeo trae `id` (para `marcar_tanda`), su nicho, catálogo, carpeta y
-    producto (para ir a su menú) y `descargar`."""
+    Cada vídeo trae `id` (para `marcar_tanda` y `semaforo_tanda`), su nicho,
+    catálogo, carpeta y producto (para ir a su menú), `descargar` y `semaforo`
+    (null = sin revisar, o {color, motivo} de la revisión de ESE montaje)."""
     u = _usuario(ctx)
     params = {"todas": "true" if todas else "false", "fresco": "true" if fresco else "false"}
     d = await Interno(u).get("/api/v1/mis-tandas", **params)
@@ -624,6 +625,21 @@ async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
         body["rehacer"] = rehacer
         body["rehacer_nota"] = nota_rehacer
     return _json(await api.post("/api/v1/mis-tandas/estado", body))
+
+
+@_herramienta(structured_output=False)
+async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") -> str:
+    """Semáforo de revisión de un vídeo de «Mis tandas» (`id` sale de `mis_tandas`),
+    para que el operador sepa qué se puede subir sin riesgo de sanción:
+    `verde` = producto sencillo y vídeo sin ninguna duda (el producto se ve igual
+    que en la ficha en todos los clips, nombre y subtítulos correctos);
+    `ambar` = está bien pero el producto es complejo (texto en el envase,
+    variantes, piezas, funciones) y no compensa arriesgar; `rojo` = hay que
+    rehacerlo (marca también «rehacer» con el `motivo`). `color=""` lo quita.
+    Pon SIEMPRE el `motivo` (una frase). Criterios: guía `mis-tandas.md` › Semáforo.
+    El color vale solo para ese montaje: si el vídeo se rehace, vuelve a «sin revisar»."""
+    return _json(await Interno(_usuario(ctx)).post(
+        "/api/v1/mis-tandas/semaforo", {"id": id, "color": color, "motivo": motivo, "por": "agente"}))
 
 
 @_herramienta(structured_output=False)

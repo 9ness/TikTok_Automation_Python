@@ -18,6 +18,13 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 - [ ] Si sale bien: estilo «Replicar viral» en el POV BOF Largo (Gemini analiza el vídeo → plan de escenas + guion adaptado → prompts de los 2 clips + guion para Fish).
 - [ ] Carruseles virales (ej. lámpara de olas de @alexdeals_, refs en `TIKTOK_SHOP_AI_PRO/_clases/referencias/` del Drive): solo en cuentas fuera de estado crítico de CRH (@pisadaviva ~120 el 19/09), pocos al día.
 
+## 🚦 Semáforo + subida automática a TikTok (6 oct 2026)
+- [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
+- [ ] Revisar las tandas abiertas de ness y poner el semáforo (agente).
+- [ ] Subida automática desde el móvil (adb + scrcpy, `/mnt/HC_Volume_106974679/asistentes/juego/pantalla.py`):
+      SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
+      comprobar vídeo → adjuntar vídeo → caption → publicar.
+
 ## 📦 Mis tandas — siguientes pasos (2 oct 2026)
 
 - [ ] Añadir lectores para UGC (Nicho General), BOF Cine, Cuenta Piloto y los otros modos de Moda Mujer / Ropa Hombre si se quieren ahí (`src/mis_tandas/fuentes.py`). Hoy entran POV BOF, POV BOF Largo (todos los modos) y Multimodo.

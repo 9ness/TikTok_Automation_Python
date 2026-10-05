@@ -111,9 +111,42 @@ un nicho nuevo en Mis tandas, **asígnale color** en
 - `marcar_tanda(id, subido=…, sin_stock=…, rehacer=…, nota_rehacer=…)` —
   **solo si el operador te lo pide**. Subido es lo que ha publicado ÉL.
 
+- `semaforo_tanda(id, color, motivo)` — la revisión antes de subir (ver
+  «Semáforo»). Esto SÍ lo puedes hacer sin que te lo pidan cuando te encarguen
+  revisar una tanda: no publica nada, solo avisa al operador.
+
 Para rehacer un vídeo que el operador marcó aquí: con su `nicho`, `source`,
 `carpeta` y `producto` vas a su menú (`plan_producto`) como siempre. Al
 montarse el vídeo nuevo, se quita el «rehacer» y conserva su puesto en la tanda.
+
+## Semáforo (revisar antes de subir)
+
+Desde oct 2026 la cuenta de ness está en CRH **crítico** (140): cada sanción
+por «promoción de productos incoherente» cuesta 8-30 puntos y la deja más
+tiempo sin permisos. Por eso cada vídeo se revisa ANTES de subirlo y lleva un
+círculo junto al título:
+
+- 🟢 **verde** — se sube sin dudas. Producto SENCILLO (un objeto, sin texto
+  legible en el envase, un solo color/variante) y el vídeo lo enseña IGUAL que
+  la foto de la ficha en todos los clips: forma, color, piezas y función. El
+  nombre quemado y los subtítulos dicen lo que es.
+- 🟡 **ámbar** — el vídeo está bien pero el producto es de los que la máquina
+  de TikTok confunde: texto o marca en el envase, comida/cosmética, varias
+  piezas o accesorios, electrónica con funciones, variantes de color o talla,
+  dos productos que comparten carcasa (el caso del inflador/ventilador). No
+  compensa arriesgarlo mientras la cuenta esté en crítico.
+- 🔴 **rojo** — hay que rehacerlo: el producto cambia entre clips (tamaño,
+  color, forma, texto), no se parece a la ficha, envase con texto inventado o
+  ilegible (la sanción de los Cheetos), le falta la pieza que lo define,
+  sale otro producto, o el nombre/subtítulos no corresponden. Marca «rehacer»
+  solo, con el motivo como nota.
+
+Cómo revisar: descarga el MP4 (`descargar`), saca 4-6 fotogramas repartidos
+(los dos clips) y compáralos lado a lado con la foto limpia del producto
+(la del menú de su nicho) y con el título. En la duda entre dos colores, el
+más prudente. Escribe siempre el motivo en una frase («taza lisa, igual en
+los dos clips» · «champú con texto en el bote» · «el clip 2 la pinta roja»).
+El color vale para ESE montaje: si se rehace, vuelve a «sin revisar».
 
 ## Lo que no entra (todavía)
 

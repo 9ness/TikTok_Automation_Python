@@ -15,6 +15,8 @@ import {
   useOcultarTanda,
   useOcultosTandas,
   useRecargarTandas,
+  useSemaforoTanda,
+  type ColorSemaforo,
   type VideoTanda,
 } from "@/lib/queries/misTandas";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
@@ -41,6 +43,25 @@ const MOTIVOS = [
   "Corte brusco o clip repetido",
   "Demasiado estático",
 ];
+
+/** Semáforo de revisión antes de subir (ver guía mis-tandas.md › Semáforo). */
+const SEMAFORO: Record<ColorSemaforo, { punto: string; texto: string; nombre: string }> = {
+  verde: { punto: "bg-emerald-500", texto: "text-emerald-600 dark:text-emerald-400", nombre: "Sin dudas: se puede subir" },
+  ambar: { punto: "bg-amber-400", texto: "text-amber-600 dark:text-amber-400", nombre: "Bien, pero producto complejo: mejor no arriesgar" },
+  rojo: { punto: "bg-rose-500", texto: "text-rose-500", nombre: "Hay que rehacerlo" },
+};
+
+function PuntoSemaforo({ v }: { v: VideoTanda }) {
+  const s = v.semaforo;
+  return (
+    <span
+      title={s ? `${SEMAFORO[s.color].nombre}${s.motivo ? ` — ${s.motivo}` : ""}` : "Sin revisar"}
+      className={`mr-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full align-middle ${
+        s ? SEMAFORO[s.color].punto : "border border-muted-foreground/50"
+      }`}
+    />
+  );
+}
 
 /** «sáb 3 oct» a partir de «2026-10-03». */
 function fechaCorta(iso: string): string {
@@ -108,6 +129,7 @@ export function MisTandas() {
   const tandas = useMisTandas(verCerradas);
   const recargar = useRecargarTandas();
   const marcar = useMarcarTanda(verCerradas);
+  const semaforo = useSemaforoTanda();
   const tagsPov = useHashtags("nicho-pov-bof").data ?? [];
   const tagsLargo = useHashtags("pov-bof-largo").data ?? [];
   const tagsMm = useHashtags("nicho-ropa-mujer").data ?? [];
@@ -391,6 +413,14 @@ export function MisTandas() {
                           🔁 {t.rehacer}
                         </span>
                       ) : null}
+                      {t.semaforo && t.semaforo.verde + t.semaforo.ambar + t.semaforo.rojo > 0 ? (
+                        <span
+                          title="Revisión antes de subir (pendientes): sin dudas · producto complejo · rehacer"
+                          className="rounded-full border border-border/60 px-1.5 py-px text-[9px] font-semibold"
+                        >
+                          🟢 {t.semaforo.verde} · 🟡 {t.semaforo.ambar} · 🔴 {t.semaforo.rojo}
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-stretch gap-1">
@@ -468,7 +498,7 @@ export function MisTandas() {
                                 v.sin_stock && !v.uploaded ? "text-muted-foreground line-through" : ""
                               }`}
                             >
-                              {v.titulo || `Producto ${v.producto}`}
+                              <PuntoSemaforo v={v} /> {v.titulo || `Producto ${v.producto}`}
                             </p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
                               <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${COLOR_NICHO[v.nicho] ?? ""}`}>
@@ -500,6 +530,11 @@ export function MisTandas() {
                             </div>
                           </div>
                         </div>
+                        {v.semaforo && !v.uploaded && v.semaforo.color !== "verde" ? (
+                          <p className={`break-words pl-6 text-[10px] ${SEMAFORO[v.semaforo.color].texto}`}>
+                            {v.semaforo.color === "ambar" ? "🟡" : "🔴"} {v.semaforo.motivo || SEMAFORO[v.semaforo.color].nombre}
+                          </p>
+                        ) : null}
                         {v.sin_stock && !v.uploaded ? (
                           <p className="break-words pl-6 text-[10px] text-rose-500">
                             🚫 Sin stock: no se sube ni se baja con la tanda. Si el producto vuelve, pulsa 🚫 otra vez.
@@ -578,6 +613,26 @@ export function MisTandas() {
                               🚫
                             </button>
                           )}
+                          <span className="flex shrink-0 items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
+                            {(["verde", "ambar", "rojo"] as const).map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                disabled={semaforo.isPending}
+                                onClick={() =>
+                                  semaforo.mutate({
+                                    id: v.id,
+                                    color: v.semaforo?.color === c ? "" : c,
+                                    motivo: v.semaforo?.color === c ? "" : "marcado a mano",
+                                  })
+                                }
+                                title={v.semaforo?.color === c ? "Quitar el color" : SEMAFORO[c].nombre}
+                                className={`h-3.5 w-3.5 rounded-full ${SEMAFORO[c].punto} ${
+                                  v.semaforo?.color === c ? "ring-2 ring-foreground/60" : "opacity-30 hover:opacity-80"
+                                }`}
+                              />
+                            ))}
+                          </span>
                           <button
                             type="button"
                             disabled={!v.puede_rehacer}

@@ -74,6 +74,27 @@ def set_estado(
         raise _error(e) from e
 
 
+class SemaforoRequest(BaseModel):
+    """verde / ambar / rojo, o "" para quitarlo."""
+
+    id: str
+    color: str = ""
+    motivo: str = ""
+    por: str = ""
+
+
+@router.post("/semaforo")
+def set_semaforo(
+    body: SemaforoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Semáforo de revisión antes de subir. Rojo marca también «rehacer»."""
+    try:
+        return servicio.poner_semaforo(usuario, body.id, body.color, body.motivo, body.por)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
 class CompletarRequest(BaseModel):
     """Los vídeos de la tanda que se da por terminada (todos)."""
 

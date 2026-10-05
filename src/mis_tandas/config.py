@@ -47,6 +47,13 @@ OCULTOS_KEY = "mis_tandas:ocultos:{usuario}"
 # llena) se guardan sus vídeos y ya no cambia: marcar subido o sin stock no
 # mete otro vídeo de la siguiente (el operador ya la ha bajado). Solo sale de
 # ella un vídeo rehecho, y solo «Tanda completada» la cierra.
+# Semáforo de revisión antes de subir (oct 2026, con la cuenta en CRH crítico):
+# verde = producto sencillo y vídeo sin dudas; ámbar = está bien pero el
+# producto es complejo y no compensa el riesgo; rojo = hay que rehacerlo (marca
+# además «rehacer» con el motivo). Va atado a `video_listo_at`: si el vídeo se
+# vuelve a montar, el color viejo deja de valer y hay que revisarlo otra vez.
+SEMAFORO_KEY = "mis_tandas:semaforo:{usuario}"
+SEMAFORO_COLORES = ("verde", "ambar", "rojo")
 FIJAS_KEY = "mis_tandas:fijas:{usuario}"
 FIJAR_ABIERTAS = 2   # tandas abiertas que se fijan (la de hoy y la siguiente)
 FIJAS_GUARDAR = 60   # completadas que se recuerdan

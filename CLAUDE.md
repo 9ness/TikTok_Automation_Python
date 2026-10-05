@@ -39,7 +39,7 @@ nichos.
 
 | Función | Modo | Propósito |
 |---|---|---|
-| 📦 Mis tandas | (sin modo — no edita vídeo) | PRIMERO del menú para los tres: lo ya montado en POV BOF, POV BOF Largo y Multimodo del usuario, de 10 en 10 con fecha y época. Solo lee; subido/sin stock/rehacer escriben en el nicho de cada vídeo (`src/mis_tandas/`, guía `mis-tandas.md`) |
+| 📦 Mis tandas | (sin modo — no edita vídeo) | PRIMERO del menú para los tres: lo ya montado en POV BOF, POV BOF Largo y Multimodo del usuario, de 10 en 10 con fecha y época. Solo lee; subido/sin stock/rehacer escriben en el nicho de cada vídeo (`src/mis_tandas/`, guía `mis-tandas.md`). Semáforo 🟢🟡🔴 de revisión antes de subir por vídeo y montaje (`mis_tandas:semaforo:<usuario>`, MCP `semaforo_tanda`; rojo marca rehacer) |
 | 🔁 Replicar viral | (sin modo — solo texto) | Enlace de TikTok (lo baja tikwm) + producto del catálogo POV → Gemini ve el vídeo y devuelve guion de voz en off + prompts de 2 clips mudos de 8 s (`src/replicar_viral/`, MCP `replicar_viral`, guía `replicar-viral.md`). Se monta con el estilo `viral` del Largo (carpeta «Réplicas virales») |
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
