@@ -228,11 +228,15 @@ def render_inserto(
         tono = "eq=contrast=1.06:saturation=1.05"
     else:
         fuente = fuente or Path(_FUENTE)
-        for i, linea in enumerate(_lineas(texto)):
+        lineas = _lineas(texto)
+        # Una palabra sola más larga que la línea («ENTRETENIMIENTO») se salía
+        # por los lados a 112: la talla se ajusta a la más ancha.
+        talla = _talla_que_cabe(lineas, fuente, maximo=112, ancho=960)
+        for i, linea in enumerate(lineas):
             textos.append(
-                f"drawtext=fontfile={fuente}:text='{_texto_ffmpeg(linea)}':fontsize=112:"
+                f"drawtext=fontfile={fuente}:text='{_texto_ffmpeg(linea)}':fontsize={talla}:"
                 f"fontcolor=white:borderw=6:bordercolor=black@0.85:shadowx=0:shadowy=8:"
-                f"shadowcolor=black@0.6:x=(w-text_w)/2:y=h*0.17+{i}*132:enable='gte(t,0.08)'"
+                f"shadowcolor=black@0.6:x=(w-text_w)/2:y=h*0.17+{i}*{int(talla * 1.18)}:enable='gte(t,0.08)'"
             )
         tono = "eq=contrast=1.15:brightness=-0.03:saturation=1.05,vignette=PI/4.5"
     vf = (
