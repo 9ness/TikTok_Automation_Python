@@ -205,3 +205,9 @@ Navidad, solo un gorro navideño). Referencia para generar: `k1_cascanueces.jpg`
 `PERFIL_fondo_naranja.jpg` (el fondo claro se ve mejor en pequeño).
 Elegida: **`FOTO_PERFIL.jpg`** (fondo claro). Los trajes de héroe quedan en `trajes/`, pero
 la ropa puede cambiar según el vídeo: lo que lo identifica es la CABEZA y el gorro.
+
+**Cuenta creada (6 oct 2026): «Casca Chollos»** (cuenta piloto de ness), con
+`FOTO_PERFIL.jpg`. Voz del personaje en TODOS sus vídeos: Fish «Chico»
+(`pruebas_voz/voces_hombre/05_Chico.mp3`, la del paraguas; `voces.py` › `VOZ["b"]`).
+Pendiente: el rival (mismo cascanueces en gris/azul y serio), guardarlo como
+«Personaje» de Flow y el primer duelo con la receta del paraguas.
