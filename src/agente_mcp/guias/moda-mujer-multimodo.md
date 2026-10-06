@@ -76,9 +76,18 @@ cuestan el doble de generación.
 
 ### Cuándo elegir un 🎙️ de 20 s (y cuál)
 
-- **Solo** productos con `tipo_multimodo` = `calzado` o `botas`.
-- **Ritmo:** más o menos **1 de cada 3-4 calzados** de la tanda. Nunca dos
-  seguidos del mismo modo de 20 s: alterna POV ↔ Sentado.
+- **Preferentes** (Néstor, 5/10/2026): TikTok valora más los vídeos hablados
+  que los mudos de 10 s, así que en productos NUEVOS haz con voz **al menos la
+  mitad** de la tanda. Lo ya montado no se rehace.
+- No son solo de calzado: la voz habla del producto que sea y basta con adaptar
+  la escena con una pista en el prompt de imagen y de clip. Ya se ha hecho con
+  calcetines (pack en las manos, POV), guantes (puestos y usando el móvil, POV) y
+  medias (sentada con botines, Sentado). Lo que necesita verse de cuerpo
+  entero (abrigos, conjuntos, vestidos) se queda en los de espejo.
+- Nunca dos seguidos del mismo modo de 20 s: alterna POV ↔ Sentado.
+- **Medias con Sentado:** Kling tiende a quitar un botín para enseñar el pie
+  con la media (4 clips tirados). Pide los pies QUIETOS y apoyados y que solo se
+  mueva la mano sobre la rodilla.
 - **`mm_zapatillas_pov20`** (dos manos sujetando el calzado): zapatillas,
   zapatos planos, mocasines y botines, es decir, lo que se enseña bien en la mano. **No**
   para botas altas: no caben enteras en el plano.
