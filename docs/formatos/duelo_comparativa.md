@@ -209,5 +209,8 @@ la ropa puede cambiar según el vídeo: lo que lo identifica es la CABEZA y el g
 **Cuenta creada (6 oct 2026): «Casca Chollos»** (cuenta piloto de ness), con
 `FOTO_PERFIL.jpg`. Voz del personaje en TODOS sus vídeos: Fish «Chico»
 (`pruebas_voz/voces_hombre/05_Chico.mp3`, la del paraguas; `voces.py` › `VOZ["b"]`).
-Pendiente: el rival (mismo cascanueces en gris/azul y serio), guardarlo como
-«Personaje» de Flow y el primer duelo con la receta del paraguas.
+Rival: **«El de Siempre»** (`RIVAL_el_de_siempre.jpg`): el mismo cascanueces en gris y
+azul acero, cara seria y pulgar abajo. Los dos están guardados como **Personajes de Flow**
+(proyecto `flow.google.com/project/59441697-2cba-46b7-9a84-0a40c608421d`, sección
+«Caracteres»), con su descripción (`prompts/desc*.txt`).
+Pendiente: el primer duelo con la receta del paraguas (gasta clips: pedir el «sí»).
