@@ -36,6 +36,8 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
       SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
       comprobar vídeo → adjuntar vídeo → caption → publicar.
 
+- [ ] Moda Mujer · Aleatorios (`alea|…`, Tienda Colores/Calle Dividido) no tiene marca «rehacer»: un 🔴 se ve en Mis tandas pero no sale en `para_rehacer` (6/10: 5 rojos de Ana así). Añadirla como en `mm`.
+
 ## 🎄 Temporada Q4 — productos de temporada (5 oct 2026)
 - [x] Catálogo `temporada_q4` con 15 productos (Q4 2025 vendidos y hoy sin saturar), encargo pasado al agente del POV BOF Largo (2 versiones × 3 clips, ~90 clips: confirmar créditos).
 - [x] Ropa/accesorios para Ana: 5 en el catálogo nuevo `mujer_temporada` («🎄 Mujer · temporada 1») y encargo pasado a su agente del Multimodo (5 oct).
