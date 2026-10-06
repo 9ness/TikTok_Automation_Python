@@ -244,7 +244,8 @@ tandas necesita además su lector en `src/mis_tandas/fuentes.py`.
 La cuota de Claude es compartida entre todas las sesiones del VPS y se acaba
 a media tanda. Cuando pasa, un vigilante (`scripts/relevo_codex.py`, timer
 `relevo-codex`) avisa a Néstor por Telegram, y **él elige** con un botón si
-sigue otro agente (hoy Codex) o se espera. Nadie sigue tu trabajo solo: lo
+sigue otro agente (Codex u OpenCode, con el modelo que tenga elegido con `/model`
+en su bot) o se espera. Nadie sigue tu trabajo solo: lo
 decide él. Y cuando Claude vuelve a tener cuota, el vigilante le avisa
 de que ya puede decirte «sigue» (si el relevo ha parado).
 

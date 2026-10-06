@@ -25,7 +25,7 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 
 ## 🔁 Respaldo si se acaba la cuota de Claude (5 oct 2026)
 - Bots de Telegram: al agotarse, botones «Codex / Esperar» (`~/asistentes-telegram/bot.py › RESPALDOS`). Agentes de vídeo: `scripts/relevo_codex.py` (timer `relevo-codex`) avisa con botones; guía README › 8 (`RELEVO.md`).
-- [ ] **OpenCode** como segundo respaldo cuando esté instalado: `preguntar_opencode` + entrada en `RESPALDOS` (bot) y en `MOTORES`/`_comando` (relevo).
+- [x] OpenCode como segundo respaldo (6 oct): bots y relevo; modelo por motor con `/model` (Claude: el de la cuenta · Codex: gpt-6.1-sol · OpenCode: opencode-go/gpt-6-luna).
 - [ ] Primeras veces con Codex: que Néstor revise sus vídeos antes de publicar.
 
 ## 🚦 Semáforo + subida automática a TikTok (5 oct 2026)
@@ -575,6 +575,7 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] (6/10/2026) **Mitigar saturación de memoria del VPS**: +2 GiB de swap temporal, sin cerrar chats ni reiniciar servicios; verificados web/API y salud pública de chats. Sin cambios persistentes en fstab; carga desde el dispositivo del operador pendiente de su comprobación.
 - [x] (3/10/2026) **Mis tandas — dos errores del operador**: (1) «Tanda completada» marcaba SUBIDOS los vídeos sin subir → ahora solo cierra la tanda; (2) marcar sin stock/subido metía un vídeo de la tanda siguiente en la actual → las tandas vistas quedan fijadas (`mis_tandas:fijas:<u>`): solo sale un vídeo rehecho (a una tanda nueva) y solo «Tanda completada» cierra.
 
 - [x] (2/10/2026) **Menú «Mis tandas»** (`/tiktok-shop-ai-pro/mis-tandas`, primero del menú para los tres): lo montado en POV BOF, Largo y Multimodo de diez en diez con fecha y época; subido/sin stock/rehacer escriben en el nicho. MCP `mis_tandas` + `marcar_tanda`, guía `mis-tandas.md`.

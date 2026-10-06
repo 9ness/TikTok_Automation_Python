@@ -50,7 +50,29 @@ VENTANA_MIN = 45
 RECIENTES_H = 8
 RELEVO_RE = re.compile(r"(/[^\"'\s\\]*?/_agente/([^/\"'\s\\]+)/[^\"'\s\\]*?RELEVO\.md)")
 
-MOTORES = {"codex": "Codex (ChatGPT)"}   # OpenCode: añadir aquí y en `_comando`
+MOTORES = {"codex": "Codex (ChatGPT)", "opencode": "OpenCode"}   # uno nuevo: aquí y en `_comando`
+OPENCODE = str(HOME / ".opencode" / "bin" / "opencode")
+DEFECTO = {"codex": "gpt-6.1-sol", "opencode": "opencode-go/gpt-6-luna"}
+
+
+def _clave_opencode() -> str:
+    """La clave del plan OpenCode Go es la del bot de Nebulabs."""
+    try:
+        for linea in (HOME / "telegram-agent" / ".env").read_text().splitlines():
+            if linea.startswith("OPENCODE_GO_API_KEY="):
+                return linea.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return ""
+
+
+def _modelo(motor: str) -> str:
+    """El que Néstor eligió con /model en su bot de Telegram; si no, el de por defecto."""
+    try:
+        elegido = (json.loads((BOTS / "estado_nestor.json").read_text()).get("modelos") or {}).get(motor)
+    except (OSError, ValueError):
+        elegido = None
+    return elegido or DEFECTO[motor]
 
 
 # ----------------------------------------------------------------- utilidades
@@ -225,12 +247,24 @@ app: {usuario}.
 """
 
 
-def _comando(motor: str, p: dict, final: Path) -> list[str]:
+def _comando(motor: str, p: dict, final: Path) -> tuple[list[str], dict]:
+    """(argumentos, variables de entorno extra) para lanzar el relevo."""
     prompt = PROMPT.format(**p)
     if motor == "codex":
         return [CODEX, "exec", "--json", "--dangerously-bypass-approvals-and-sandbox",
+                "-m", _modelo("codex"),
                 "-C", str(REPO), "-c", f'mcp_servers.app.url="{_url_mcp(p["usuario"])}"',
-                "-o", str(final), prompt]
+                "-o", str(final), prompt], {}
+    if motor == "opencode":
+        # El MCP de la app va en un config aparte (se suma al global) que se
+        # borra al acabar: el token no se queda escrito.
+        cfg = final.with_suffix(".opencode.json")
+        cfg.write_text(json.dumps({"mcp": {"app": {"type": "remote", "enabled": True,
+                                                   "url": _url_mcp(p["usuario"])}}}))
+        cfg.chmod(0o600)
+        return [OPENCODE, "run", prompt, "-m", _modelo("opencode"), "--format", "json",
+                "--dir", str(REPO)], {"OPENCODE_CONFIG": str(cfg),
+                                      "OPENCODE_GO_API_KEY": _clave_opencode()}
     raise ValueError(motor)
 
 
@@ -267,11 +301,24 @@ def _correr(motor: str, p: dict) -> None:
     rc = -1
     try:
         with base.with_suffix(".jsonl").open("w") as salida:
-            rc = subprocess.run(_comando(motor, {**p, "relevo": ruta}, final),
-                                stdin=subprocess.DEVNULL, stdout=salida,
-                                stderr=subprocess.STDOUT, cwd=str(REPO)).returncode
+            args, extra = _comando(motor, {**p, "relevo": ruta}, final)
+            rc = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=salida,
+                                stderr=subprocess.STDOUT, cwd=str(REPO),
+                                env={**os.environ, **extra}).returncode
     finally:
         lock.unlink(missing_ok=True)
+        final.with_suffix(".opencode.json").unlink(missing_ok=True)
+    if motor == "opencode" and not final.exists():  # su resumen: el último texto del log
+        textos = []
+        for linea in base.with_suffix(".jsonl").read_text(errors="replace").splitlines():
+            try:
+                ev = json.loads(linea)
+            except ValueError:
+                continue
+            if ev.get("type") == "text" and (ev.get("part") or {}).get("text"):
+                textos.append(ev["part"]["text"])
+        if textos:
+            final.write_text(textos[-1])
     resumen = final.read_text().strip()[-600:] if final.exists() else ""
     vuelta = ("Claude ya tiene cuota: te aviso enseguida para que le digas «sigue»."
               if time.time() >= p.get("vuelve_ts", 0) else
