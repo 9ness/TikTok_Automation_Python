@@ -170,3 +170,26 @@ imágenes de Flow. Uno nuevo con esta receta: 3-4 imágenes y 6-7 clips.
 **Pendiente si se sigue**: dura 45 s y las referencias 75-85 s (más rondas =
 más clips); convertirlo en formato de la app (guion por IA desde la ficha +
 `montaje3.py` como pipeline).
+
+## Personaje enmascarado para una cuenta de «menos y mejor» (6 oct 2026, propuesta)
+
+Idea de ness: en la cuenta piloto que le saldrá en 2-3 semanas, pocos vídeos
+y muy currados (formato duelo y los que vengan) con un PERSONAJE fijo que dé la
+cara sin enseñarla: se reconoce, sale en la foto de perfil y no necesita
+sincronía de labios (va con voz en off, la de «Chico» de Fish del paraguas).
+
+- **Propuesta: luchador naranja.** Máscara ORIGINAL estilo lucha libre que tapa
+  toda la cara: naranja (el del carrito de TikTok Shop), contornos blancos en
+  los ojos con forma de cejas alegres, raya blanca en la frente y MALLA blanca
+  en la boca (no se ven labios → voz en off sin lip-sync). Ropa de diario
+  (sudadera azul marino y vaqueros): un vecino gracioso, no un superhéroe.
+- **El rival del duelo**: el mismo con la máscara GRIS («lo de siempre»). Es
+  el truco del clon de los virales, y el color dice quién gana sin explicarlo.
+- **Descartado**: parecidos a personajes con marca (Spiderman/Deadpool → la B
+  salió con aire de Spiderman), pasamontañas o braga de cuello (parece un
+  ladrón), casco (simpático pero rígido: no expresa nada con el cuerpo).
+- **Imágenes** (Flow, Nano Banana 2): `Drive › TIKTOK_SHOP_AI_PRO/Formato_Duelo/personaje_enmascarado/`
+  (A luchador, B héroe, C casco, duelo con A de referencia, recorte para el
+  perfil, `prompts/`). Sin referencia la máscara cambia de diseño y aparecen
+  labios: SIEMPRE con `a_luchador.jpg` como ingrediente (o como «Personaje» de
+  Flow, que deja definirlo una vez y llamarlo con @tag).
