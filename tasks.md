@@ -1,3 +1,8 @@
+## 🎙️ Multimodo de Ana: retomar con HABLADOS hacia el 12 oct 2026
+- Margen al 6/10: 98 vídeos sin subir (≈10 días a 10/día), pero solo 25 hablados. Néstor: los hablados (20 s, voz Fish) le dan más visitas; de los mudos de 10 s solo funcionan algo bolsos y botas.
+- Pendiente (tandas 18-27, imágenes ya hechas, clips parados): 54 ropa · 13 calzado mudo → pasar a 🎙️ POV/Sentado 20 s · 14 botas (se quedan en 10 s) · 8 ya en 20 s.
+- Para la ropa haría falta un modo nuevo «Espejo 20 s hablado» (dos clips frente al espejo + voz Fish). Pedir el «sí» de Néstor y un tope de créditos de Magnific (Unlimited suspendido: 280/clip) antes de generar.
+
 ## 💡 Idea: modo «Me han estafado» (variante de Venta Inversa) — analizar (3 oct 2026)
 
 - [ ] Gancho «Me han estafado / voy a devolver este producto» → «y no es porque…» + las ventajas reales (como la venta inversa: «no es porque sea 100 % original, ni porque el sabor sea espléndido…») → giro final: «…sino porque lo compré mucho más caro y ahora lo veo mucho más barato» → CTA «revisa si tienes cupones y si sigue disponible en el carrito naranja». Analizar como cuarto/quinto estilo del Largo (prompt propio + `CTAS_INVERSA`), con cuidado: no afirmar precios ni rebajas que la ficha no muestre (el «más barato» tiene que ser verdad o ir sin cifras) y no desacreditar al vendedor (es el producto que vendemos).
