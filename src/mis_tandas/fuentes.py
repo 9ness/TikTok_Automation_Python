@@ -303,7 +303,8 @@ def _carpetas_mujer(rr) -> list[str]:
 def aleatorios(usuario: str) -> list[dict]:
     """Uno por producto y modo. El «subido» y el «sin stock» son del PRODUCTO
     (los mismos campos que el multimodo): si el mismo producto tiene vídeo en
-    los dos, al marcar uno queda el otro."""
+    los dos, al marcar uno queda el otro. El «rehacer», en cambio, es de cada
+    vídeo (va en el hueco de su modo)."""
     from src.nicho_pov_bof.repos import product_repo as pov_repo
     from src.nicho_ropa import config as ropa_config
     from src.nicho_ropa.repos import product_repo as ropa_repo
@@ -335,6 +336,9 @@ def aleatorios(usuario: str) -> list[dict]:
             **_catalogo_ropa(v["carpeta"], ropa_config.carpeta_label(v["carpeta"])),
             producto=str(v["producto"]), **_textos(v), product_url=url or str(v.get("product_url") or ""),
             uploaded=bool(v.get("uploaded")), uploaded_at=_num(v.get("uploaded_at")),
+            # «Rehacer» sí es del VÍDEO (producto + modo), no del producto.
+            rehacer=bool(v.get("rehacer")), rehacer_nota=str(v.get("rehacer_nota") or ""),
+            rehecho=bool(v.get("rehecho")), puede_rehacer=True,
             video_path=str(v.get("video_path") or ""),
             video_listo_at=_num(v.get("video_listo_at")),
             orden_at=_num(v.get("primer_listo_at") or v.get("video_listo_at")),

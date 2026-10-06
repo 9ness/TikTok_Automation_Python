@@ -36,8 +36,6 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
       SOLO los 🟢, empezando por un vídeo de prueba; flujo de Néstor: URL del producto → Crear → banner de
       comprobar vídeo → adjuntar vídeo → caption → publicar.
 
-- [ ] Moda Mujer · Aleatorios (`alea|…`, Tienda Colores/Calle Dividido) no tiene marca «rehacer»: un 🔴 se ve en Mis tandas pero no sale en `para_rehacer` (6/10: 5 rojos de Ana así). Añadirla como en `mm`.
-
 ## 🎄 Temporada Q4 — productos de temporada (5 oct 2026)
 - [x] Catálogo `temporada_q4` con 15 productos (Q4 2025 vendidos y hoy sin saturar), encargo pasado al agente del POV BOF Largo (2 versiones × 3 clips, ~90 clips: confirmar créditos).
 - [x] Ropa/accesorios para Ana: 5 en el catálogo nuevo `mujer_temporada` («🎄 Mujer · temporada 1») y encargo pasado a su agente del Multimodo (5 oct).
@@ -575,6 +573,7 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] (6/10/2026) **Moda Mujer · Aleatorios con «rehacer»** en Mis tandas: es del VÍDEO (`modos.<modo>.rehacer` del doc personal de la prenda), lo marcan el botón y el 🔴 del semáforo, sale en `para_rehacer(menu="moda_mujer")` y se quita al montar el vídeo nuevo (conserva el puesto). Falta, tras desplegar, marcar los 5 rojos de Ana de Tienda Colores (Carpeta_13 · 3/4/9/10, Carpeta_14 · 5).
 - [x] (6/10/2026) **Mitigar saturación de memoria del VPS**: +2 GiB de swap temporal, sin cerrar chats ni reiniciar servicios; verificados web/API y salud pública de chats. Sin cambios persistentes en fstab; carga desde el dispositivo del operador pendiente de su comprobación.
 - [x] (3/10/2026) **Mis tandas — dos errores del operador**: (1) «Tanda completada» marcaba SUBIDOS los vídeos sin subir → ahora solo cierra la tanda; (2) marcar sin stock/subido metía un vídeo de la tanda siguiente en la actual → las tandas vistas quedan fijadas (`mis_tandas:fijas:<u>`): solo sale un vídeo rehecho (a una tanda nueva) y solo «Tanda completada» cierra.
 

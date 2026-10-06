@@ -78,6 +78,10 @@ concreto de cada modo va abajo.
 Tarjeta: «🏪 Escaparate · 📤 Subido · 💰 Vendió». Carpeta (por modo):
 «Completada» / «Pendiente».
 
+«🔁 Rehacer» se marca desde **Mis tandas** (botón o 🔴 del semáforo) y es del
+vídeo de ESE modo. `para_rehacer(menu="moda_mujer")` lo lista con `modo`,
+`tanda` y la nota; al montar el vídeo nuevo de ese modo se quita solo.
+
 ---
 
 ## Detalle por modo

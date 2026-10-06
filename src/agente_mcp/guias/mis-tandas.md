@@ -56,7 +56,7 @@ NICHO del vídeo:
 |---|---|---|---|
 | ✓ Subido | `uploaded` del POV (y la cuota del día) | `uploaded` del Largo **en el modo del vídeo** | `/multimodo/subido` |
 | 🚫 Sin stock | textos del POV (es del PRODUCTO: lo ven todos) | textos del POV | `/multimodo/sin-stock` |
-| 🔁 Rehacer | — (el POV corto no tiene) | `rehacer` + nota | `/multimodo/rehacer` (Aleatorios: no tiene) |
+| 🔁 Rehacer | — (el POV corto no tiene) | `rehacer` + nota | `/multimodo/rehacer` (Aleatorios: `rehacer` del VÍDEO, en el hueco de su modo) |
 
 Marcar en Mis tandas = marcar en la pantalla del nicho, y al revés. `para_rehacer(menu)`
 sigue sacando lo marcado para rehacer, se marque donde se marque.
@@ -141,7 +141,8 @@ círculo junto al título:
   color, forma, texto), no se parece a la ficha, envase con texto inventado o
   ilegible (la sanción de los Cheetos), le falta la pieza que lo define,
   sale otro producto, o el nombre/subtítulos no corresponden. Marca «rehacer»
-  solo, con el motivo como nota.
+  solo, con el motivo como nota (en todos menos el POV BOF corto; Aleatorios
+  incluido desde el 6/10/2026).
 
 Cómo revisar, en dos pasadas: (1) descarga el MP4 (`descargar`), saca 6
 fotogramas repartidos y compáralos lado a lado con la foto limpia del producto
@@ -168,6 +169,13 @@ hablan: Tienda Colores, Calle Dividido…). Uno por producto y modo. El
 «subido» y el «sin stock» son del **producto** (los mismos campos que el
 multimodo): si un producto tiene vídeo en los dos, al marcar uno queda el
 otro, y el reparto los separa 7 días como a cualquier producto repetido.
+El **«🔁 rehacer» es del VÍDEO** (producto + modo): va en
+`modos.<modo>.rehacer/rehacer_nota/rehecho` del documento personal de la
+prenda (`product_repo.marcar_rehacer_modo`), así que rehacer el Tienda Colores
+no toca el Calle Dividido ni el multimodo del mismo producto. Se marca con el
+botón o con un 🔴 del semáforo, sale en `para_rehacer(menu="moda_mujer")` (con
+`modo` y `tanda`) y se quita solo al montar el vídeo nuevo de ese modo
+(`guardar_video`), que conserva su puesto como en el multimodo.
 Al aparecer se **intercalan** en lo pendiente, uno cada `ALEA_CADA` (5),
 sin tocar las `ALEA_SIN_TOCAR` (2) primeras tandas abiertas, que el operador
 puede tener ya bajadas.

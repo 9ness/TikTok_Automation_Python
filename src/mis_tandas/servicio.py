@@ -636,7 +636,16 @@ def marcar(
     else:
         carpeta, prod = p[1], p[2]
         if p[0] == "alea" and rehacer is not None:
-            raise ErrorTanda("Moda Mujer · Aleatorios no tiene «rehacer»: se rehace desde su pantalla.")
+            # Del VÍDEO (producto + modo), no del producto como el del multimodo.
+            from src.nicho_ropa.repos import product_repo as ropa_repo
+
+            try:
+                r = ropa_repo.marcar_rehacer_modo(carpeta, prod, p[3], usuario,
+                                                  rehacer=bool(rehacer), nota=rehacer_nota or "")
+            except (ValueError, RuntimeError) as e:
+                raise ErrorTanda(str(e)) from e
+            cambios.update({k: r[k] for k in ("rehacer", "rehacer_nota") if k in r})
+            rehacer = None
         from src.api.routers.nicho_ropa import prendas
         from src.api.schemas.nicho_ropa.models import PrendaEstadoRequest
 

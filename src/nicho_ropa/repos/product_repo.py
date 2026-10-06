@@ -247,10 +247,49 @@ def videos_aleatorios(carpetas: list[str], usuario: str = "") -> list[dict]:
                     "caption": str(vista.get("caption") or ""),
                     "emojis": str(vista.get("emojis") or ""),
                     "sin_stock": bool(vista.get("sin_stock")),
+                    # «🔁 Rehacer» es del VÍDEO (producto + modo): vive en el
+                    # hueco del modo, no en la raíz como el del multimodo.
+                    **rehacer_de(vista, modo),
                     **v,
                 })
     salida.sort(key=lambda x: (x["video_listo_at"], x["carpeta"], x["producto"]))
     return salida
+
+
+def rehacer_de(prod: dict, modo: str) -> dict:
+    """`{rehacer, rehacer_nota, rehecho}` del vídeo de ESE modo."""
+    hueco = ((prod or {}).get("modos") or {}).get(modo) or {}
+    return {
+        "rehacer": bool(hueco.get("rehacer")),
+        "rehacer_nota": str(hueco.get("rehacer_nota") or ""),
+        "rehecho": bool(hueco.get("rehecho")),
+    }
+
+
+def marcar_rehacer_modo(
+    carpeta: str, producto: str, modo: str, usuario: str = "", *, rehacer: bool, nota: str = "",
+) -> dict:
+    """«🔁 Rehacer» del vídeo de UN modo (Moda Mujer · Aleatorios), con la
+    nota de qué falla. Va en el hueco del modo del documento personal, así que
+    el vídeo de otro modo del mismo producto no se entera. Se quita solo al
+    montar el vídeo nuevo (`guardar_video`), que lo deja como «rehecho»."""
+    from src.nicho_ropa import config
+
+    if modo not in config.MODOS or config.es_multimodo(modo):
+        raise ValueError(f"Modo {modo!r} no vale para «rehacer» por modo.")
+    campos = {"rehacer": bool(rehacer), "rehacer_at": int(time.time()) if rehacer else 0,
+              "rehacer_nota": (nota or "").strip()[:400] if rehacer else ""}
+    if rehacer:
+        campos["rehecho"] = False
+    ambito = _ambito(carpeta, usuario)
+    with _cerrojo(ambito):
+        r = _require_redis()
+        doc = r.get_json(_key(ambito)) or {}
+        prod = doc.setdefault("productos", {}).setdefault(str(producto), {})
+        prod.setdefault("modos", {}).setdefault(modo, {}).update(campos)
+        prod["updated_at"] = _now()
+        r.set_json(_key(ambito), doc)
+    return campos
 
 
 def _key_orden_multimodo(usuario: str) -> str:
@@ -377,6 +416,9 @@ def video_de(prod: dict, modo: str) -> dict:
     return {
         "video_path": guardado.get("video_path") or "",
         "video_listo_at": int(guardado.get("video_listo_at") or 0),
+        # Como en el multimodo: un vídeo rehecho conserva su puesto en las
+        # tandas (Aleatorios en «Mis tandas» ordena por esto).
+        "primer_listo_at": int(guardado.get("primer_listo_at") or guardado.get("video_listo_at") or 0),
     }
 
 
@@ -544,7 +586,13 @@ def guardar_video(
             hueco["flecha"] = bool(flecha)
         # Estaba marcado «🔁 Rehacer» y llega el vídeo nuevo: deja de estar
         # pendiente y queda como rehecho (para revisarlo antes de subirlo).
-        if prod.pop("rehacer", None):
+        # El de Aleatorios va en el hueco de su modo; el del multimodo, en la
+        # raíz, y solo lo quita un vídeo del multimodo (montar un Tienda
+        # Colores del mismo producto no rehace el del multimodo).
+        if hueco.pop("rehacer", None):
+            hueco.pop("rehacer_at", None)
+            hueco["rehecho"] = True
+        if config.es_multimodo(modo) and prod.pop("rehacer", None):
             prod.pop("rehacer_at", None)
             prod["rehecho"] = True
         # El de siempre se sigue escribiendo para el modo por defecto: hay

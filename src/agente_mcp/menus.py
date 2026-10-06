@@ -215,6 +215,20 @@ async def para_rehacer(m: Menu, api: Interno) -> list[dict]:
              "nota": str(v.get("rehacer_nota") or "").strip()}
             for t in datos.get("tandas", []) for v in t["items"] if v.get("rehacer")
         ]
+    if m.tipo == "ropa" and m.modalidad == "aleatorios" and m.sexo == "mujer":
+        # Moda Mujer · Aleatorios (Tienda Colores, Calle Dividido…): se marca
+        # en «Mis tandas» (o con un 🔴 del semáforo), vídeo a vídeo y por modo.
+        from src.nicho_ropa import config as ropa_config
+
+        d = await api.get("/api/v1/mis-tandas", todas="true")
+        return [
+            {"catalogo": ropa_config.catalogo_de_genero(v["carpeta"].split("__")[0]),
+             "carpeta": v["carpeta"], "producto": v["producto"], "modo": v.get("modo"),
+             "tanda": t.get("numero"), "titulo": " ".join(str(v.get("titulo") or "").split()),
+             "nota": str(v.get("rehacer_nota") or "").strip()}
+            for t in d.get("tandas", []) for v in t.get("items", [])
+            if v.get("nicho") == "alea" and v.get("rehacer")
+        ]
     if m.tipo not in ("pov", "largo"):
         return []
     out = []
