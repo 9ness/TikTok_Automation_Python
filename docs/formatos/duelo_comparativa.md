@@ -203,3 +203,5 @@ compra en un círculo blanco; nunca el logo de TikTok). Vale todo el año (en
 Navidad, solo un gorro navideño). Referencia para generar: `k1_cascanueces.jpg`
 (cara) y `s3_heroe.jpg` (traje). Foto de perfil: `PERFIL_fondo_claro.jpg` /
 `PERFIL_fondo_naranja.jpg` (el fondo claro se ve mejor en pequeño).
+Elegida: **`FOTO_PERFIL.jpg`** (fondo claro). Los trajes de héroe quedan en `trajes/`, pero
+la ropa puede cambiar según el vídeo: lo que lo identifica es la CABEZA y el gorro.
