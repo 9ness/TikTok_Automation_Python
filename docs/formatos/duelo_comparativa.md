@@ -193,3 +193,13 @@ sincronía de labios (va con voz en off, la de «Chico» de Fish del paraguas).
   perfil, `prompts/`). Sin referencia la máscara cambia de diseño y aparecen
   labios: SIEMPRE con `a_luchador.jpg` como ingrediente (o como «Personaje» de
   Flow, que deja definirlo una vez y llamarlo con @tag).
+
+**Actualización 6 oct 2026 — elegido el CASCANUECES SUPERHÉROE (K1 → S1-S5).** ness
+descartó luchador, cara de pantalla y los navideños puros. El personaje: cabeza
+de cascanueces estilo juguete de diseño (naranja y blanco, sonrisa pintada
+cerrada, bigote blanco, mejillas sonrosadas) con gorro de lana naranja, y traje
+de héroe naranja y blanco con capa corta y un EMBLEMA PROPIO (bolsa de la
+compra en un círculo blanco; nunca el logo de TikTok). Vale todo el año (en
+Navidad, solo un gorro navideño). Referencia para generar: `k1_cascanueces.jpg`
+(cara) y `s3_heroe.jpg` (traje). Foto de perfil: `PERFIL_fondo_claro.jpg` /
+`PERFIL_fondo_naranja.jpg` (el fondo claro se ve mejor en pequeño).
