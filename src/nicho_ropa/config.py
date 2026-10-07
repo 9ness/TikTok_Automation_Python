@@ -396,7 +396,76 @@ MODOS: dict[str, dict] = {
         "modalidad": "multimodo",
         "tipo": "bolso",
     },
+    # Los hablados de ropa de Moda Mujer · Aleatorios, traídos al multimodo
+    # (oct 2026): GenAI Pro tiene Omni 1.1 a 1 crédito el clip y los vídeos
+    # que hablan le dan más visitas a la cuenta que los mudos. Mismo estilo
+    # (prompts, guion y montaje) que el de aleatorios; lo único que cambia es
+    # `personaje_fijo`: en vez de una chica al azar, el personaje de la
+    # cuenta (se antepone NOTA_PERSONAJE_FIJO y se pide adjuntarlo).
+    "mm_habla_espejo": {
+        "desc": "Frente al espejo HABLANDO de la prenda que lleva (voz en el clip).",
+        "label": "🎙️ Espejo Hablado 10s",
+        "estilo_mof10": "espejo",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
+    "mm_habla_selfie": {
+        "desc": "Selfie con el móvil en la mano, hablando a cámara con la prenda puesta.",
+        "label": "🎙️ Selfie Hablado 10s",
+        "estilo_mof10": "movil",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
+    "mm_habla_calle_1": {
+        "desc": "En la calle alguien la para y le pregunta por su outfit (diálogo del curso).",
+        "label": "🎙️ Situación Real 1 10s",
+        "estilo_mof10": "real_1",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
+    "mm_habla_calle_2": {
+        "desc": "Como Situación Real 1, sentados en una terraza; habla primero el grupo.",
+        "label": "🎙️ Situación Real 2 10s",
+        "estilo_mof10": "real_2",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
+    "mm_habla_dividido": {
+        "desc": "En la calle hablando sola a cámara de cuerpo entero: DOS clips (frente y espaldas), 15s.",
+        "label": "🎙️ Calle Dividido 15s",
+        "estilo_mof10": "calle_dividido",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
+    "mm_habla_colores": {
+        "desc": "En una tienda nombra los colores y la prenda cambia en cada uno: DOS clips, 15s. Solo prendas con 3+ colores.",
+        "label": "🎙️ Tienda Colores 15s",
+        "estilo_mof10": "tienda_colores",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
 }
+
+
+def personaje_fijo_del_modo(modo: str) -> bool:
+    """Si en ESE modo va el personaje de la cuenta. Es del estilo (los de marca
+    personal) o del modo (los hablados de aleatorios traídos al multimodo,
+    que comparten estilo con los de chica al azar)."""
+    meta = MODOS.get(modo) or {}
+    estilo = ESTILOS_MOF10.get(meta.get("estilo_mof10", "")) or {}
+    return bool(meta.get("personaje_fijo") or estilo.get("personaje_fijo"))
 MODO_DEFECTO = "espejo"
 
 # La vista de TODO el multimodo: no es un formato que se grabe, es "el vídeo
@@ -1410,6 +1479,7 @@ def modos_de(sexo: str, modalidad: str = MODALIDAD_DEFECTO) -> list[dict]:
             "tipo": meta.get("tipo", ""),
             "personaje": bool(
                 (ESTILOS_MOF10.get(meta["estilo_mof10"]) or {}).get("personaje")
+                or meta.get("personaje_fijo")
             ),
             # Si el clip sale HABLADO. Los dos de camiseta no: su paso 2 es
             # solo movimiento, así que no gastan voz del generador —que es lo
@@ -2294,7 +2364,12 @@ def prompts_mof10(
         else:
             imagen = _con_sexo(meta["imagen"], sexo, SEXOS_MOF10)
             guion = _con_sexo(meta["guion"], sexo, SEXOS_MOF10)
-        if meta.get("personaje_fijo"):
+        # El personaje de la cuenta: por el estilo (marca personal) o por el
+        # modo (los hablados de aleatorios traídos al multimodo).
+        con_personaje = bool(meta.get("personaje")) or (
+            bool(modo) and modo in MODOS and personaje_fijo_del_modo(modo))
+        if meta.get("personaje_fijo") or (
+                bool(modo) and modo in MODOS and personaje_fijo_del_modo(modo)):
             imagen = NOTA_PERSONAJE_FIJO + imagen
         if (TEXTO_MARCA.get(clave) or {}).get("quitar_de_imagen"):
             imagen = sin_texto_en_imagen(imagen)
@@ -2351,7 +2426,7 @@ def prompts_mof10(
             # como ingrediente en vez de como frame inicial, y si el clip
             # sale hablado. Van con el prompt para que la pantalla los pinte
             # al lado del botón de copiar y no haya que recordarlos.
-            "personaje": bool(meta.get("personaje")),
+            "personaje": con_personaje,
             "ingrediente": bool(meta.get("ingrediente")),
             "voz": bool(meta.get("voz", True)),
             # El guion lo escribe la app (punto de dolor) y lo locuta Fish: el

@@ -113,10 +113,11 @@ def test_plan_largo_pide_una_imagen_por_clip_segun_lo_que_dice_la_voz():
     assert set(plan["clips"][0]["plataformas"]) == {menus.FLOW, menus.GENAIPRO, menus.MAGNIFIC}
 
 
-def test_plataformas_si_habla_solo_flow():
-    assert menus._plataformas(True, False, 8) == [menus.FLOW]
-    assert menus._plataformas(False, True, 8) == [menus.FLOW]  # ingredientes
-    assert menus.GENAIPRO not in menus._plataformas(False, False, 10)  # GenAI Pro llega a 8 s
+def test_plataformas_omni_de_genai_pro_primero():
+    # Omni 1.1 de GenAI Pro (oct 2026) habla, admite ingredientes y hace 10 s.
+    assert menus._plataformas(True, False, 10) == [menus.GENAIPRO, menus.FLOW]
+    assert menus._plataformas(False, True, 8) == [menus.GENAIPRO, menus.FLOW]  # ingredientes
+    assert menus._plataformas(False, False, 10)[0] == menus.GENAIPRO
 
 
 # ---------------------------------------------------------------------------

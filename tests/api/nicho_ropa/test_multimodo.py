@@ -11,8 +11,26 @@ class TestFormatos:
             assert len(estilos) == 1, modo
             e = estilos[0]
             assert e["imagen"].strip() and e["guion"].strip(), modo
+            if modo.startswith("mm_habla_"):
+                continue
             assert e["voz"] is False, modo
             assert not config.modo_habla(modo), modo
+
+    def test_los_hablados_hablan_y_llevan_el_personaje_de_la_cuenta(self):
+        hablados = [m for m in config.modos_multimodo() if m.startswith("mm_habla_")]
+        assert len(hablados) == 6
+        for modo in hablados:
+            e = config.prompts_mof10("mujer", False, modo)[0]
+            assert config.modo_habla(modo), modo
+            assert e["personaje"] is True, modo
+            assert e["imagen"].startswith("IMPORTANT — CHARACTER OVERRIDE"), modo
+            assert config.MODOS[modo]["tipo"] == "ropa", modo
+
+    def test_el_de_aleatorios_sigue_con_chica_al_azar(self):
+        # Comparten estilo con los hablados del multimodo: el override es del modo.
+        for modo in ("espejo", "camara", "calle_dividido", "tienda_colores"):
+            e = config.prompts_mof10("mujer", False, modo)[0]
+            assert not e["imagen"].startswith("IMPORTANT — CHARACTER OVERRIDE"), modo
 
     def test_la_vista_de_todos_no_tiene_prompts(self):
         assert config.prompts_mof10("mujer", False, config.MODO_MULTI) == []
@@ -157,8 +175,8 @@ class TestTemporada:
 class TestMusica:
     def test_cada_formato_trae_su_busqueda(self):
         for modo in config.modos_multimodo():
-            if config.lleva_fish(modo):
-                # Los de 20s hablan (voz de Fish): sin música que buscar.
+            if config.lleva_fish(modo) or config.modo_habla(modo):
+                # Los que hablan (Fish o voz del clip): sin música que buscar.
                 assert config.musica_de(modo, "c/1") == {}, modo
                 continue
             m = config.musica_de(modo, "c/1")

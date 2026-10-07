@@ -26,6 +26,12 @@ la app al montar: un guion de **punto de dolor** escrito para ese producto
 subtítulos). Sin música: habla. Si Omni/Kling mete voz en el clip, da igual:
 se descarta.
 
+**Y seis formatos HABLADOS de ropa** (`mm_habla_*`, desde 7/10/2026): los de
+Moda Mujer · Aleatorios que hablan, pero con **la chica de la cuenta** (se
+adjunta el personaje y el prompt lleva el CHARACTER OVERRIDE). Aquí la voz va
+**dentro del clip** (Omni locuta), el montaje la conserva y le pone subtítulos.
+Ver «🎙️ Hablados de ropa» abajo.
+
 ## Flecha CTA al final (prueba, decides tú)
 
 El multimodo sale SIN flecha al carrito, que es lo normal en este nicho. Se
@@ -105,6 +111,37 @@ cuestan el doble de generación.
 
 Si el `tipo_multimodo` no cuadra con lo que ves en la foto (el título engaña),
 manda la foto.
+
+### 🎙️ Hablados de ropa (`mm_habla_*`) — PRIORIDAD para ropa
+
+Néstor (oct 2026): los vídeos que hablan le dan **más visitas** que los mudos
+de 10 s; de los mudos solo funcionan algo bolsos y botas. Así que para
+**ropa**, elige primero un hablado y deja los mudos para variar.
+
+| Formato (`modo`) | Dura | Clips | Imagen en el clip | Para qué prenda |
+|---|---|---|---|---|
+| `mm_habla_colores` · Tienda Colores | 15 s | 2 | clip 1 **INGREDIENTES** (fotos de color + imagen_1), clip 2 FRAME | Solo prendas con **3+ colores** (`minimo_variantes`). Pantalones, faldas, jerséis… |
+| `mm_habla_dividido` · Calle Dividido | 15 s | 2 | FRAME INICIAL (imagen_1 / imagen_2) | Cualquier prenda que luzca de cuerpo entero |
+| `mm_habla_calle_1` · Situación Real 1 | 10 s | 1 | FRAME INICIAL | Outfit completo: alguien la para y le pregunta por su ropa |
+| `mm_habla_espejo` · Espejo Hablado | 10 s | 1 | FRAME INICIAL | Cualquier prenda |
+| `mm_habla_selfie` · Selfie Hablado | 10 s | 1 | FRAME INICIAL | Partes de arriba (se ve de cintura arriba) |
+| `mm_habla_calle_2` · Situación Real 2 | 10 s | 1 | FRAME INICIAL | Como Situación Real 1, en una terraza |
+
+- Orden de preferencia en Q4: **Tienda Colores** (si tiene colores) →
+  **Calle Dividido** → **Situación Real 1** → Espejo/Selfie → Situación Real 2.
+  Alterna: no dos seguidos del mismo.
+- **Dónde:** GenAI Pro · **Omni 1.1** · 9:16 · 1080p · 10 s · **con marca de
+  agua** (1 crédito; la quita el montaje). Frames para los de FRAME INICIAL;
+  **Ingredients** (1–3 imágenes) para el clip 1 de Tienda Colores: con 4+
+  colores no cabe y va a Flow. Ver [`comun/plataformas.md`](comun/plataformas.md).
+- **Sube el MP4 TAL CUAL** sale de GenAI Pro (sin recodificar ni quitar el
+  audio): el montaje reconoce la firma de Omni para quitar la marca de agua y
+  CONSERVA la voz del clip.
+- El guion (lo que dice) lo escribe la app: `preparar_carpeta(…, modo="mm_habla_…")`
+  antes de pedir el plan. Revisa en el clip que diga ESO (no otra cosa) y que
+  la prenda no cambie al hablar.
+- Imágenes: Flow · Nano Banana 2, adjuntando **personaje + foto limpia** (el
+  plan lo pide). En los de dos imágenes, la segunda va en el MISMO chat.
 
 ## El personaje
 

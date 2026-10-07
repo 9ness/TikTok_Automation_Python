@@ -48,6 +48,7 @@ const FAMILIAS_MM: [string, string, string][] = [
   ["mm_zapatos", "👠 Zapatos", "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"],
   ["mm_botas", "🍂 Botas", "bg-orange-500/15 text-orange-700 dark:text-orange-300"],
   ["mm_bolso", "👜 Bolsos", "bg-lime-500/15 text-lime-700 dark:text-lime-300"],
+  ["mm_habla", "🎙️ Hablados", "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"],
 ];
 
 /** Modos de Moda Mujer · Aleatorios (los que hablan). */

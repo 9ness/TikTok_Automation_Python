@@ -73,11 +73,15 @@ MENUS: dict[str, Menu] = {
                 "mm_botas_1", "mm_botas_2", "mm_botas_largas_1", "mm_botas_largas_2",
                 "mm_bolso_1", "mm_bolso_2", "mm_bolso_3",
                 "mm_zapatillas_pov20", "mm_zapatillas_sentado20",
+                "mm_habla_espejo", "mm_habla_selfie", "mm_habla_calle_1", "mm_habla_calle_2",
+                "mm_habla_dividido", "mm_habla_colores",
             ),
             notas=(
-                "Formatos MUDOS de 10 s y dos de 20 s con voz (mm_zapatillas_pov20 / "
-                "mm_zapatillas_sentado20: DOS clips mudos de 10 s y la app pone la voz de "
-                "Fish con guion de punto de dolor); en CADA producto eliges el que le va según su "
+                "Formatos MUDOS de 10 s, dos de 20 s con voz de Fish (mm_zapatillas_pov20 / "
+                "mm_zapatillas_sentado20: DOS clips mudos de 10 s y la app pone la voz con "
+                "guion de punto de dolor) y seis HABLADOS de ropa (mm_habla_*: la chica de la "
+                "cuenta habla DENTRO del clip; Omni 1.1 en GenAI Pro, 1 crédito); PRIORIZA los "
+                "hablados (dan más visitas); en CADA producto eliges el que le va según su "
                 "`tipo_multimodo` (ropa/camiseta/calzado/botas/bolso; gafas se saltan) y "
                 "alternas para no repetir. Catálogos web (ropa) | zapatos | accesorios. "
                 "`modo=multimodo` es solo la vista de todos (listar carpetas, progreso); "
@@ -520,9 +524,12 @@ def _dice(bloque: str) -> str:
 
 
 def _plataformas(habla: bool, ingrediente: bool, seg: int) -> list[str]:
+    # Omni 1.1 de GenAI Pro (oct 2026): habla, admite frames e ingredientes
+    # (1-3 imágenes) y hace 10 s a 1 crédito con marca de agua, que quita el
+    # montaje. Va primero: Flow cuesta 15 puntos el clip de 10 s.
     if habla or ingrediente:
-        return [FLOW]
-    return [FLOW, MAGNIFIC] + ([GENAIPRO] if seg <= 8 else [])
+        return [GENAIPRO, FLOW]
+    return [GENAIPRO, FLOW, MAGNIFIC]
 
 
 async def plan(c: Ctx, prod: str) -> dict:
@@ -718,7 +725,10 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
                 "clip": i + 1, "archivo": f"clip_{i + 1}.mp4", "prompt": txt,
                 "imagen": "TODAS las imagen_color_* + imagen_1.png (la del color puesto, la ÚLTIMA)" if i == 0 else "imagen_2.png",
                 "como_entra_la_imagen": "INGREDIENTES" if i == 0 else "FRAME INICIAL",
-                "segundos": 8, "habla": True, "plataformas": [FLOW],
+                "segundos": 8, "habla": True,
+                # Omni 1.1 de GenAI Pro admite como mucho 3 ingredientes: con
+                # 4 colores o más, el clip 1 solo cabe en Flow.
+                "plataformas": ([GENAIPRO, FLOW] if i > 0 or len(colores) <= 3 else [FLOW]),
             })
         return
 
