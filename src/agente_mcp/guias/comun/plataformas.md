@@ -97,8 +97,18 @@ Ajustes, siempre los mismos:
   audio del clip se descarta al montar, así que pide en el prompt que el clip
   sea sin voz/diálogo para no gastar intentos en eso.
 - Lo demás (imagen de inicio, prompt del vídeo, frase del producto,
-  prohibiciones) igual que con Veo, abajo. La primera vez comprueba si deja
-  imagen de inicio y fin (modo Frames) y apúntalo aquí.
+  prohibiciones) igual que con Veo, abajo.
+- **Visto en el panel (7/10/2026):** Omni 1.1 tiene los tres modos de Veo.
+  **Frames** = «Start frame» obligatorio + «End frame» opcional (la imagen
+  como FRAME INICIAL). **Ingredients** = **1–3 imágenes de referencia** (sirve
+  para los formatos que piden INGREDIENTES; Tienda Colores cabe con 3 colores
+  como mucho). **Text** = solo prompt. Duración 4/6/8/10 s, 360p/720p/1080p,
+  1–4 vídeos por petición. El coste sale junto a «Generate video»: con
+  Watermark · 10 s · 1080p · 1 vídeo marca **1 credit** (sin marca, 3).
+  Al entrar sale un aviso «Video & image models» que se cierra con «Got it».
+  La URL `…/video-image-ai?ws=video&mode=frames&model=omni` abre ya en Omni ·
+  Frames, pero los ajustes vuelven a los de por defecto (No watermark · 8 s ·
+  720p): ponlos cada vez.
 
 ### Veo (antiguo)
 
