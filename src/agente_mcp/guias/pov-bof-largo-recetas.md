@@ -141,6 +141,11 @@ imágenes → «Add N» (1413,652) → Run (888,132). **Tandas de ≤5.**
 
 ## 5. Emparejar clip ↔ imagen y revisar (scripts)
 
+> **Con Omni 1.1 (GenAI Pro) esto NO vale** (7/10/2026): su primer fotograma se
+> parece poco a la imagen de inicio y el emparejado por fotograma falla. Además la
+> galería de GenAI Pro mezcla los Omni de OTRAS sesiones/agentes. Asígnalos
+> mirándolos (producto y escena) y súbelos sin reencodear (`encoder=Google`).
+
 Los clips bajados no traen nombre. Se emparejan por el **primer fotograma** contra
 las imágenes de entrada (error cuadrático en 36×64 grises; < ~60 = mío; miles = de
 otro). Snippets mínimos (en `~/work/` del VPS):
