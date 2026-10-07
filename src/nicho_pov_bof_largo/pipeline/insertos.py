@@ -127,8 +127,22 @@ def localizar(palabras: list[dict], golpes: list[dict]) -> list[tuple[float, flo
                     break
                 if sc > mejor[0]:
                     mejor = (sc, i)
-            if mejor[1] >= 0 and mejor[0] >= 0.6:
-                fin_i = mejor[1] + len(cola) - 1
+            fin_i = mejor[1] + len(cola) - 1 if mejor[1] >= 0 and mejor[0] >= 0.6 else -1
+            if fin_i < 0:
+                # Whisper también JUNTA palabras («app y mando» → «apimando»):
+                # palabra a palabra no casa nada. Se compara la cola pegada
+                # con ventanas pegadas de 1 a n+1 palabras.
+                objetivo = "".join(cola)
+                for i in range(desde, len(toks)):
+                    for k in range(1, len(cola) + 2):
+                        if i + k > len(toks):
+                            break
+                        if SequenceMatcher(None, objetivo, "".join(toks[i:i + k])).ratio() >= 0.75:
+                            fin_i = i + k - 1
+                            break
+                    if fin_i >= 0:
+                        break
+            if fin_i >= 0:
                 if fin_i + 1 < len(palabras):
                     hallado = (float(palabras[fin_i]["end"]), float(palabras[fin_i + 1]["start"]))
                     desde = fin_i + 1

@@ -84,6 +84,14 @@ def test_localiza_aunque_whisper_oiga_mal():
     assert insertos.localizar(palabras, golpes) == [(1.4, 1.74)]
 
 
+def test_localiza_aunque_whisper_junte_palabras():
+    # Épico Octubre 31: «va con app y mando.» se oyó «va con apimando».
+    palabras = [_w("y", 8.16, 8.4), _w("va", 8.46, 8.56), _w("con", 8.56, 8.7),
+                _w("apimando", 8.7, 9.3), _w("han", 9.46, 9.56)]
+    golpes = [{"tras": "Es RGB y va con app y mando.", "texto": "X", "escena": ""}]
+    assert insertos.localizar(palabras, golpes) == [(9.3, 9.46)]
+
+
 def test_sonidos_por_video_y_boom_en_blanco(tmp_path):
     for n in (*config.SONIDOS_OSCURO, config.SONIDO_BLANCO):
         (tmp_path / n).write_bytes(b"x")
