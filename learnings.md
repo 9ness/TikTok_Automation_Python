@@ -1076,3 +1076,4 @@
 - 2026-10-07 · Ropa hablada sin guion guardado (Situación Real, diálogo cerrado): `texto_subs = SUBS_DE_LO_OIDO` → `_subtitular` usa las palabras que oye Whisper. Espejo/Selfie/Situación Real 1-2 llevan ya `subtitulos` y `flecha`.
 - 2026-10-07 · Dos agentes en el mismo menú compartían RELEVO.md → cada sesión el suyo (subcarpeta con su nombre si el del menú lo lleva otra); el vigilante busca con rglob.
 - 2026-10-07 · Épico Octubre 31: el inserto «APP Y MANDO» no entraba porque Whisper oyó «apimando» (junta palabras) → `insertos.localizar` compara también la cola del golpe pegada contra ventanas pegadas de 1..n+1 palabras (ratio ≥0.75).
+- 2026-10-07 · Mis tandas: un «rehacer» remontado se quedaba atrapado si su tanda se había completado antes (el bucle saltaba las cerradas) → ahora sale también de las cerradas y se reparte de nuevo.

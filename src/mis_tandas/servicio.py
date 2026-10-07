@@ -406,10 +406,23 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     fijas = _fijas(usuario)
     cambio = False
     for t in fijas:
-        if t.get("completada_at"):
-            continue
         listo = t.setdefault("listo", {})
         marcados = set(t.get("rehacer") or [])
+        if t.get("completada_at"):
+            # Cerrar la tanda no puede atrapar un rehacer: en cuanto se vuelve
+            # a montar sale y se reparte de nuevo, como en una abierta.
+            fuera = {
+                i for i in marcados
+                if (f := todos.get(i)) and not f["rehacer"] and not f["uploaded"]
+                and i in listo and f["video_listo_at"] > listo[i] + 1
+            }
+            if fuera:
+                t["ids"] = [i for i in t.get("ids", []) if i not in fuera]
+                t["rehacer"] = sorted(marcados - fuera)
+                for i in fuera:
+                    listo.pop(i, None)
+                cambio = True
+            continue
         quedan = []
         for i in t.get("ids", []):
             f = todos.get(i)

@@ -225,3 +225,21 @@ def test_rehecho_pasa_a_una_tanda_nueva(redis, monkeypatch):
     assert "pov|s|c|4" not in [x["id"] for x in d["tandas"][0]["items"]]
     assert len(d["tandas"][0]["items"]) == 9
     assert "pov|s|c|4" in [x["id"] for t in d["tandas"][1:] for x in t["items"]]
+
+
+def test_rehecho_sale_aunque_su_tanda_este_cerrada(redis, monkeypatch):
+    # 7/10: Foco LED y Proyector marcados para rehacer y la tanda completada
+    # antes de remontarlos → se quedaban atrapados en la cerrada.
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(15)]
+    for f in lista:
+        f["video_listo_at"] = 100.0
+    _sin_precalentar(monkeypatch, lista)
+    servicio.tandas("ness")
+    lista[4]["rehacer"] = True
+    d = servicio.tandas("ness")
+    servicio.completar("ness", [x["id"] for x in d["tandas"][0]["items"]])
+    lista[4]["rehacer"], lista[4]["video_listo_at"] = False, 500.0  # rehecho
+    d = servicio.tandas("ness")
+    assert "pov|s|c|4" in [x["id"] for t in d["tandas"] for x in t["items"]]
+    todas = servicio.tandas("ness", todas=True)["tandas"]
+    assert "pov|s|c|4" not in [x["id"] for x in todas[0]["items"]]
