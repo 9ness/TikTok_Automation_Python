@@ -112,14 +112,18 @@ def _font_path(name: str = "Montserrat-ExtraBold.ttf") -> str:
 # ---------------------------------------------------------------------------
 # Paso 2 — Normalizar resolución/fps
 # ---------------------------------------------------------------------------
-def _normalize_resolution(video_in: Path, out_path: Path, on_log: OnLog) -> Path:
+def _normalize_resolution(video_in: Path, out_path: Path, on_log: OnLog,
+                          encuadre: tuple | None = None) -> Path:
     """Cover-fit (escala cubriendo el frame + recorte) a 1080x1920 @ 30fps.
 
     El recorte se lleva además la ampliación anti-marca-de-agua
     (`config.filtro_encuadre`): los clips de 8s de GenAI Pro traen la marca de
     Veo en una esquina y con un 5% de más deja de salir en el vídeo.
     """
-    vf = config.filtro_encuadre()
+    zoom, esquina = encuadre if encuadre else config.encuadre_marca([video_in])
+    if zoom:
+        on_log(f"  · encuadre anti-marca de Omni: x{zoom} ({esquina})")
+    vf = config.filtro_encuadre(zoom=zoom, esquina=esquina)
     _run([
         "ffmpeg", "-y", "-v", "error", "-i", str(video_in),
         "-vf", vf, "-an",
@@ -1929,6 +1933,10 @@ def build_video(
     # rótulo: es de donde sale el color de la marca, que en el vídeo no se
     # puede medir (medio encuadre es la mano y la encimera).
     foto_producto: "Path | None" = None,
+    # (zoom, esquina) del recorte anti-marca. None = se mira el propio
+    # `raw_video` (`config.encuadre_marca`); quien pega varios clips antes de
+    # llamar aquí lo calcula con los ORIGINALES, que el pegado pierde la firma.
+    encuadre: tuple | None = None,
     on_log: OnLog = _noop,
     on_progress: OnProgress = _noop_progress,
 ) -> Path:
@@ -1957,7 +1965,7 @@ def build_video(
     # marca de agua para Veo3; dejó de ponerla (2026-07) y Kling nunca la
     # puso, así que el paso solo re-encodeaba el vídeo para nada.
     on_log("[1/5] Normalizando a 1080x1920 @ 30fps…")
-    normalized = _normalize_resolution(raw_video, work_dir / "01_normalized.mp4", on_log)
+    normalized = _normalize_resolution(raw_video, work_dir / "01_normalized.mp4", on_log, encuadre)
     on_progress(0.28, "Normalizado")
 
     # 3) Cuadrar duración con el audio (módulo ya existente, tal cual)

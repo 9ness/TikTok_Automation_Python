@@ -321,7 +321,8 @@ def _montar_en(
     """
     # Mismo encuadre que el resto de nichos, con la ampliación que se come la
     # marca de agua del generador.
-    vf = pov_config.filtro_encuadre()
+    zoom, esquina = pov_config.encuadre_marca([video_in])
+    vf = pov_config.filtro_encuadre(zoom=zoom, esquina=esquina)
     # El grado va PEGADO al encuadre: es un filtro más de la misma pasada, así
     # que no cuesta una recodificación extra.
     if modo and config.lleva_grado(modo):

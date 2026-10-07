@@ -9,19 +9,20 @@ abierta en el navegador). Luego el clip vuelve a la app para que lo edite.
 | Qué | Dónde | Notas |
 |---|---|---|
 | **Todas las imágenes** | **Google Flow** · modelo Nano Banana 2 · 9:16 | Salvo Creativos Pro, que va en 3:4 |
-| Clip que **habla** (la voz va dentro del clip) | **Google Flow** · modelo Omni | Único que locuta. 8 s o 10 s |
-| Clip **mudo** (la voz la pone la app, o va sin voz) | **Google Flow**, **GenAI Pro** o **Magnific** | Pregunta cuál. Ver tabla de abajo |
+| Clip que **habla** (la voz va dentro del clip) | **GenAI Pro · Omni 1.1** (o Google Flow · Omni) | Omni locuta. 10 s |
+| Clip **mudo** (la voz la pone la app, o va sin voz) | **GenAI Pro · Omni 1.1** (preferente), Google Flow o Magnific | Ver tabla de abajo |
 
 | Plataforma | Voz | Duración | Calidad | Coste |
 |---|---|---|---|---|
 | Google Flow (Omni) | ✅ | 8 s o 10 s | 720p → reescalar a 1080p | 12 créditos (8 s) · 15 créditos (10 s) |
-| GenAI Pro | ❌ | hasta 8 s | 1080p | lo que marque su web |
+| **GenAI Pro · Omni 1.1** (desde 7/10/2026) | ✅ | **10 s** | **1080p** (1080×1920) | **1 crédito con marca de agua** (3 sin ella: NO) |
+| GenAI Pro · Veo (antiguo) | ❌ | hasta 8 s | 720p | 1 crédito |
 | Magnific (spaces) | ❌ | 8 s o 10 s | la del space | lo que marque su web |
 
 Qué menú admite qué:
 
-- **POV BOF, POV BOF Largo**: la voz la pone la app → cualquiera de las tres.
-- **Moda (formatos hablados), UGC**: la voz va en el clip → **solo Flow**.
+- **POV BOF, POV BOF Largo**: la voz la pone la app → Omni 1.1 de GenAI Pro (o cualquiera).
+- **Moda (formatos hablados), UGC**: la voz va en el clip → Omni (GenAI Pro o Flow).
 - **Moda (formatos mudos 🔇), Marca Personal**: cualquiera de las tres.
 
 ---
@@ -78,6 +79,28 @@ mismo proyecto: se satura y se congela.
 ---
 
 ## GenAI Pro — `https://genaipro.io/video-image-ai`
+
+### Omni 1.1 — lo de ahora (desde 7/10/2026)
+
+Ajustes, siempre los mismos:
+
+- Modelo **Omni 1.1** · **Portrait 9:16** · **1080p** · **10 s** · **CON marca
+  de agua** (1 crédito; sin marca son 3 y no compensa).
+- **La marca de agua la quita la app sola al montar**: es una estrellita
+  abajo a la derecha y el montaje reconoce los clips de Omni (vienen firmados
+  `encoder=Google`) y amplía un 14% recortando por abajo. **No la tapes ni la
+  recortes tú, y sube el MP4 TAL CUAL lo da GenAI Pro** (si lo reencodeas o
+  recortas, pierde la firma y la estrella se queda en el vídeo).
+- 10 s por clip aunque el guion sea de 8 s por clip: la voz manda y el clip se
+  recorta a ella; sobra material, no falta.
+- Omni habla: en los menús donde la voz la pone la app (POV BOF, Largo) el
+  audio del clip se descarta al montar, así que pide en el prompt que el clip
+  sea sin voz/diálogo para no gastar intentos en eso.
+- Lo demás (imagen de inicio, prompt del vídeo, frase del producto,
+  prohibiciones) igual que con Veo, abajo. La primera vez comprueba si deja
+  imagen de inicio y fin (modo Frames) y apúntalo aquí.
+
+### Veo (antiguo)
 
 Solo vídeo, **mudo**. Ajustes, siempre los mismos:
 

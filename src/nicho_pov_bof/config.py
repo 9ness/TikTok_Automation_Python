@@ -663,6 +663,41 @@ ZOOM_MARCA_AGUA = float(os.getenv("ZOOM_MARCA_AGUA", "1.07"))
 # empieza a poner la marca más adentro y no llega con un recorte simétrico.
 ESQUINA_MARCA_AGUA = os.getenv("ESQUINA_MARCA_AGUA", "centro")
 
+# Omni 1.1 de GenAI Pro (oct 2026), a 1 crédito, trae la estrella de Gemini
+# abajo a la derecha y MÁS ADENTRO que la de Veo: ~72 px centrada en
+# (900, 1740) de 1080x1920, a ~145 px de los bordes. El 7% centrado no llega:
+# ampliando un 14% y tirando solo lo de ABAJO (la ventana se queda arriba)
+# sale entera con ~23 px de margen, y de paso también la de Veo. Lo que se
+# pierde es la franja de abajo, que es donde van subtítulos y botones de TikTok.
+# Se reconoce sola: Omni firma el MP4 con `encoder=Google`; Veo de GenAI Pro
+# llega remuxado (`Lavf`) y Magnific/Kling tampoco dice Google.
+ZOOM_MARCA_OMNI = float(os.getenv("ZOOM_MARCA_OMNI", "1.14"))
+ESQUINA_MARCA_OMNI = os.getenv("ESQUINA_MARCA_OMNI", "abajo")
+
+
+def es_clip_omni(path) -> bool:
+    """¿El clip sale tal cual de Omni (firma `encoder=Google`)?"""
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format_tags=encoder",
+             "-of", "default=nw=1:nk=1", str(path)],
+            capture_output=True, text=True, timeout=30,
+        ).stdout
+    except Exception:  # noqa: BLE001 — sin ffprobe, el encuadre de siempre
+        return False
+    return "google" in out.lower()
+
+
+def encuadre_marca(clips) -> tuple[float | None, str]:
+    """(zoom, esquina) para `filtro_encuadre`: el de Omni si ALGÚN clip lo es
+    (el vídeo se encuadra entero después de pegar los clips, y el de Omni
+    también se lleva la marca de Veo); si no, el de siempre."""
+    if any(es_clip_omni(c) for c in clips):
+        return ZOOM_MARCA_OMNI, ESQUINA_MARCA_OMNI
+    return None, ""
+
 
 def _par(n: float) -> int:
     """Redondea a entero par: los códecs no tragan dimensiones impares."""

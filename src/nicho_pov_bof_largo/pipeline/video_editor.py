@@ -379,6 +379,11 @@ def montar(
     work_dir.mkdir(parents=True, exist_ok=True)
 
     on_progress(0.02, f"🔗 Cuadrando y uniendo {len(clips)} clips…")
+    # El recorte anti-marca se decide con los clips ORIGINALES: al pegarlos
+    # se pierde la firma que dice si alguno es de Omni.
+    from src.nicho_pov_bof import config as pov_config
+
+    encuadre = pov_config.encuadre_marca([Path(c) for c in clips])
     pegado = _concatenar_cuadrado(
         [Path(c) for c in clips], Path(audio_path), work_dir, on_log,
     )
@@ -403,6 +408,7 @@ def montar(
         estilo_texto=estilo_texto,
         foto_producto=foto_producto,
         semilla=semilla or Path(output_path).stem,
+        encuadre=encuadre,
         on_log=on_log,
         on_progress=_progreso,
     )
