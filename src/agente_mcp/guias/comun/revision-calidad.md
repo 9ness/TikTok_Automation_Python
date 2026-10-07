@@ -15,6 +15,12 @@ del producto** (las dos se ven en la app al pulsar la miniatura de la
 tarjeta). Si algo falla: **rechazar**, moverlo a `RECHAZADAS/` con el motivo y
 repetir (hasta el máximo que acordaste con el operador).
 
+> **Lo que más importa son las IMÁGENES** (Néstor, 7/10/2026): si las 2-3
+> imágenes de un vídeo enseñan el producto IGUAL que la foto real y entre sí,
+> los clips salen bien casi solos. Antes de lanzar un solo clip, ponlas lado a
+> lado con la foto limpia y no sigas hasta que no haya ninguna diferencia en
+> el producto. En electrónica, pantallas apagadas y nada encendido.
+
 ## Imagen generada — rechazar si…
 
 **El producto**

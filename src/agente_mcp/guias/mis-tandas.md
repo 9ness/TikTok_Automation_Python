@@ -155,6 +155,13 @@ más prudente. Escribe siempre el motivo en una frase («taza lisa, igual en
 los dos clips» · «champú con texto en el bote» · «el clip 2 la pinta roja»).
 El color vale para ESE montaje: si se rehace, vuelve a «sin revisar».
 
+**Que la mano roce o toque el producto NO es motivo de ámbar** (Néstor,
+7/10/2026): solo cuenta si el producto se deforma, cambia o hace algo
+físicamente raro. Lo que sí es ámbar sin dudar: **electrónica que se enciende
+sola** — pantallas encendidas, números que cambian, luces de colores, apps en
+el móvil — porque no sabemos si el producto hace eso. Mejor evitarlo desde la
+imagen: pide la pantalla APAGADA y que no se encienda nada.
+
 ## Lo que no entra (todavía)
 
 UGC (Nicho General), BOF Cinematográfico, Cuenta Piloto, Ropa con Personas,
