@@ -232,6 +232,11 @@ def _silencio_final(
     return max(0.0, min(hueco, tope))
 
 
+# Para los formatos de diálogo cerrado (Situación Real): no hay guion por
+# prenda guardado, así que se subtitula lo que Whisper OYE en el clip.
+SUBS_DE_LO_OIDO = "<<lo que se oye>>"
+
+
 def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
     """Quema los subtítulos de lo que dice el clip, sobre el propio fichero.
 
@@ -249,6 +254,8 @@ def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
 
     work = video.parent / f"subs_{video.stem}"
     work.mkdir(parents=True, exist_ok=True)
+    if texto == SUBS_DE_LO_OIDO:
+        texto = ""
     palabras = _transcribir_voz(video, work, on_log)
     if not palabras:
         on_log("[nicho_ropa] sin transcripción — el vídeo se queda sin subtítulos")

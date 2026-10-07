@@ -2296,7 +2296,10 @@ def run_nicho_ropa_video(job: Job, on_log: OnLog, on_progress: OnProgress) -> st
     if ropa_config.lleva_subtitulos(modo) and conservar_audio:
         texto_subs = str(product_repo.guion_de(prod, modo).get("dice") or "")
         if not texto_subs:
-            on_log("[nicho_ropa] sin guion guardado: el vídeo sale sin subtítulos")
+            # Diálogo cerrado del curso (Situación Real) o guion no guardado:
+            # se subtitula lo que se oye en el clip.
+            on_log("[nicho_ropa] sin guion guardado: subtítulos de lo que se oye")
+            texto_subs = video_editor.SUBS_DE_LO_OIDO
 
     on_progress(0.4, "🎬 Encuadrando a 9:16…")
     salida = _salida_ropa(carpeta, producto, titulo, modo, quien)

@@ -1868,6 +1868,10 @@ ESTILOS_MOF10: dict[str, dict] = {
     "espejo": {
         "label": "Frente al espejo · cuerpo entero",
         "voz": True,
+        # Habla: subtítulos de lo que dice (anti-sanción, AGENTS.md) y flecha
+        # al carrito al final (oct 2026, al traerlos al multimodo).
+        "subtitulos": True,
+        "flecha": True,
         "duraciones": True,
         "por_sexo": {
             "hombre": (
@@ -1886,6 +1890,10 @@ ESTILOS_MOF10: dict[str, dict] = {
     "movil": {
         "label": "BOF Selfie · brazo estirado",
         "voz": True,
+        # Habla: subtítulos de lo que dice (anti-sanción, AGENTS.md) y flecha
+        # al carrito al final (oct 2026, al traerlos al multimodo).
+        "subtitulos": True,
+        "flecha": True,
         "duraciones": True,
         "por_sexo": {
             "hombre": (
@@ -2039,6 +2047,10 @@ ESTILOS_MOF10: dict[str, dict] = {
         "duraciones": False,
         "label": "Situación Real 1 · le paran por la calle",
         "voz": True,
+        # Habla: subtítulos de lo que dice (anti-sanción, AGENTS.md) y flecha
+        # al carrito al final (oct 2026, al traerlos al multimodo).
+        "subtitulos": True,
+        "flecha": True,
         "por_sexo": {
             "hombre": (
                 "prompt_mof10_real_1_imagen.md",
@@ -2059,6 +2071,10 @@ ESTILOS_MOF10: dict[str, dict] = {
         "duraciones": False,
         "label": "Situación Real 2 · le reciben en una terraza",
         "voz": True,
+        # Habla: subtítulos de lo que dice (anti-sanción, AGENTS.md) y flecha
+        # al carrito al final (oct 2026, al traerlos al multimodo).
+        "subtitulos": True,
+        "flecha": True,
         "por_sexo": {
             "hombre": (
                 # Comparte la IMAGEN con Real 1 —es el mismo texto en su web,
