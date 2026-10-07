@@ -137,6 +137,12 @@ de 10 s; de los mudos solo funcionan algo bolsos y botas. Así que para
 - **Sube el MP4 TAL CUAL** sale de GenAI Pro (sin recodificar ni quitar el
   audio): el montaje reconoce la firma de Omni para quitar la marca de agua y
   CONSERVA la voz del clip.
+- **Misma voz en los dos clips** (Calle Dividido y Tienda Colores): Omni
+  pone la voz en CADA clip por separado y puede salir otra mujer. Los prompts
+  ya llevan la misma descripción de voz, pero antes de subir **escucha los
+  dos clips** (o compara su tono con Whisper/ffmpeg): si el clip 2 suena a
+  otra persona, repítelo. Dos voces distintas en un vídeo se notan y el
+  operador no lo quiere.
 - El guion (lo que dice) lo escribe la app: `preparar_carpeta(…, modo="mm_habla_…")`
   antes de pedir el plan. Revisa en el clip que diga ESO (no otra cosa) y que
   la prenda no cambie al hablar.
