@@ -28,6 +28,9 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 - [x] OpenCode como segundo respaldo (6 oct): bots y relevo; modelo por motor con `/model` (Claude: el de la cuenta · Codex: gpt-6.1-sol · OpenCode: opencode-go/gpt-6-luna).
 - [ ] Primeras veces con Codex: que Néstor revise sus vídeos antes de publicar.
 
+## 🌐 UGC (Nicho General)
+- [ ] La web del curso tiene un gancho nuevo «UGC Desde 0 Gancho Acción»; la app solo tiene dolor y general (`GANCHOS`). Añadirlo (prompt de la web + opción en la app, MCP y guía). Aviso de 09, 7/10/2026.
+
 ## 🚦 Semáforo + subida automática a TikTok (5 oct 2026)
 - [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
 - [x] Revisar las tandas abiertas de ness y poner el semáforo (5 oct: 19 vídeos → 6 🟢, 13 🟡, 0 🔴).

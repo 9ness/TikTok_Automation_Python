@@ -675,19 +675,23 @@ ZOOM_MARCA_OMNI = float(os.getenv("ZOOM_MARCA_OMNI", "1.14"))
 ESQUINA_MARCA_OMNI = os.getenv("ESQUINA_MARCA_OMNI", "abajo")
 
 
+MARCA_OMNI = "marca:omni"   # comentario que deja quien PEGA clips de Omni
+
+
 def es_clip_omni(path) -> bool:
-    """¿El clip sale tal cual de Omni (firma `encoder=Google`)?"""
+    """¿El clip sale de Omni? Firma `encoder=Google` del original, o el
+    comentario `MARCA_OMNI` que deja quien pega varios clips (se pierde la firma)."""
     import subprocess
 
     try:
         out = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format_tags=encoder",
+            ["ffprobe", "-v", "error", "-show_entries", "format_tags=encoder,comment",
              "-of", "default=nw=1:nk=1", str(path)],
             capture_output=True, text=True, timeout=30,
         ).stdout
     except Exception:  # noqa: BLE001 — sin ffprobe, el encuadre de siempre
         return False
-    return "google" in out.lower()
+    return "google" in out.lower() or MARCA_OMNI in out
 
 
 def encuadre_marca(clips) -> tuple[float | None, str]:
