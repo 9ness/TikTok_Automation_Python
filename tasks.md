@@ -29,7 +29,7 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 - [ ] Primeras veces con Codex: que Néstor revise sus vídeos antes de publicar.
 
 ## 🌐 UGC (Nicho General)
-- [ ] La web del curso tiene un gancho nuevo «UGC Desde 0 Gancho Acción»; la app solo tiene dolor y general (`GANCHOS`). Añadirlo (prompt de la web + opción en la app, MCP y guía). Aviso de 09, 7/10/2026.
+- [ ] La web del curso tiene un gancho nuevo «UGC Desde 0 Gancho Acción»; la app solo tiene dolor y general (`GANCHOS`). NO se añade por ahora (decisión de ness, 7/10): como mucho servirá para el contenido currado de Casca Chollos; retomarlo entonces.
 
 ## 🚦 Semáforo + subida automática a TikTok (5 oct 2026)
 - [x] Semáforo verde/ámbar/rojo por vídeo en Mis tandas (API, pantalla, MCP `semaforo_tanda`, guía).
