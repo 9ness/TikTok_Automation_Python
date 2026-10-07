@@ -329,7 +329,7 @@ def _correr(motor: str, p: dict) -> None:
 
 def estado() -> None:
     raiz = HOME / "gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente"
-    for relevo in raiz.glob("*/*/RELEVO.md"):
+    for relevo in sorted(raiz.rglob("RELEVO.md")):
         pid = lock_activo(relevo)
         print((f"🔁 relevo pid {pid} · " if pid else "· ") + str(relevo))
 

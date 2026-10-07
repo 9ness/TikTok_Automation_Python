@@ -251,7 +251,10 @@ de que ya puede decirte «sigue» (si el relevo ha parado).
 
 Para que el que siga sepa por dónde vas, **todo agente de vídeo lleva un
 `RELEVO.md`** en su bandeja: `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/RELEVO.md`
-(en el VPS, `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/…`). Créalo al empezar y
+(en el VPS, `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/…`). **Cada sesión tiene el
+suyo y nunca escribe en el de otra:** si al empezar ese RELEVO.md ya «lo lleva»
+otra sesión (porque hay dos agentes en el mismo menú), el tuyo va en una
+subcarpeta con el nombre de tu sesión: `…/<menú>/<tu-sesión>/RELEVO.md`. Créalo al empezar y
 **actualízalo al terminar cada producto** (y antes de algo largo). Escríbelo con
 tu herramienta de editar ficheros: el vigilante encuentra tu RELEVO en tu
 transcripción. Lo que tiene que decir, corto:
