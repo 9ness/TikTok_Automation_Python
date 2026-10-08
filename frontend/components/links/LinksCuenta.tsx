@@ -51,6 +51,17 @@ function normaliza(t: string): string {
   return t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+/** ¿Texto oscuro encima de este color? (luminancia relativa, WCAG). */
+function esColorClaro(hex: string): boolean {
+  const m = hex.replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return false;
+  const [r = 0, g = 0, b = 0] = m.slice(1).map((h) => {
+    const c = parseInt(h, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4;
+}
+
 function iniciales(nombre: string): string {
   return nombre
     .split(/[\s_]+/)
@@ -108,9 +119,23 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
 
   const texto = claro ? "text-stone-900" : "text-white";
   const textoSuave = claro ? "text-stone-600" : "text-white/65";
+  // Con foto de fondo, tarjeta casi opaca: el título se tiene que leer igual
+  // pase por encima de lo que pase.
   const tarjeta = claro
-    ? "bg-white/80 border-stone-900/10 shadow-sm"
-    : "bg-white/[0.06] border-white/10";
+    ? "bg-white/90 border-stone-900/10 shadow-sm backdrop-blur-sm"
+    : datos?.fondo
+      ? "bg-black/60 border-white/15 backdrop-blur-sm"
+      : "bg-white/[0.06] border-white/10";
+  // Texto encima del acento (franja y botones): oscuro si el acento es claro.
+  const sobreAcento = esColorClaro(tema.acento) ? "text-stone-950" : "text-white";
+  // Todo texto que caiga sobre la foto de fondo va sobre este panel: el fondo
+  // va lleno de objetos y, sin él, el texto se perdía en algunas zonas.
+  const panel = datos?.fondo
+    ? claro
+      ? "bg-white/75 backdrop-blur-sm"
+      : "bg-black/45 backdrop-blur-sm"
+    : "";
+  const textoPanel = claro ? "text-stone-700" : "text-white/85";
   const nombre = datos?.cuenta ?? "";
   const conBuscador = (datos?.productos.length ?? 0) > MIN_BUSCADOR;
 
@@ -160,15 +185,26 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
               </span>
             )}
           </div>
-          <h1 className="mt-3 break-words text-2xl font-extrabold tracking-tight sm:text-3xl">
-            {nombre || (error ? "" : " ")}
-          </h1>
-          {datos && <p className={`mt-1 text-sm ${textoSuave}`}>{tema.lema}</p>}
+          {/* Panel translúcido: el fondo de la marca va lleno de objetos y el
+              texto encima no se leía. */}
+          <div
+            className={`mt-3 rounded-2xl px-4 py-2 ${panel}`}
+          >
+            <h1 className="break-words text-2xl font-extrabold tracking-tight sm:text-3xl">
+              {nombre || (error ? "" : " ")}
+            </h1>
+            {datos && <p className={`mt-0.5 text-sm font-medium ${textoPanel}`}>{tema.lema}</p>}
+          </div>
         </header>
 
         {datos?.banner && (
-          <div className="mb-5 overflow-hidden rounded-xl bg-[var(--acento)] px-4 py-2.5 text-center text-sm font-bold text-white shadow-[0_8px_24px_-12px_var(--acento)]">
-            <span className="animate-pulse">{datos.banner}</span>
+          <div className="relative mb-5 rounded-xl">
+            {/* El latido va en el halo, no en el texto: con `animate-pulse` sobre
+                el texto, la mitad del tiempo se leía a medio apagar. */}
+            <div className="absolute inset-0 animate-pulse rounded-xl bg-[var(--acento)] blur-md" />
+            <div className={`relative rounded-xl bg-[var(--acento)] px-4 py-2.5 text-center text-sm font-bold ${sobreAcento}`}>
+              {datos.banner}
+            </div>
           </div>
         )}
 
@@ -198,7 +234,9 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
           </div>
         )}
 
-        {error && <p className={`py-16 text-center text-sm ${textoSuave}`}>{error}</p>}
+        {error && (
+          <p className={`mx-auto my-12 w-fit rounded-xl px-4 py-3 text-center text-sm ${panel} ${textoPanel}`}>{error}</p>
+        )}
 
         {!datos && !error && (
           <div className="space-y-3">
@@ -209,7 +247,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
         )}
 
         {datos && visibles.length === 0 && (
-          <p className={`py-16 text-center text-sm ${textoSuave}`}>
+          <p className={`mx-auto my-12 w-fit rounded-xl px-4 py-3 text-center text-sm font-medium ${panel} ${textoPanel}`}>
             {busca ? `Nada con «${busca}». Prueba con otra palabra.` : "Muy pronto, los productos de mis vídeos aquí."}
           </p>
         )}
@@ -238,7 +276,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 break-words text-sm font-semibold leading-snug">{p.titulo}</p>
-                    <span className="mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--acento)] px-3 py-1.5 text-xs font-bold text-white">
+                    <span className={`mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--acento)] px-3 py-1.5 text-xs font-bold ${sobreAcento}`}>
                       Ver oferta{p.tienda ? ` en ${NOMBRE_TIENDA[p.tienda]}` : ""}
                       <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
                     </span>
@@ -250,7 +288,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
         )}
 
         {datos?.aviso_amazon && (
-          <footer className={`mt-10 border-t pt-4 text-center text-[11px] leading-relaxed ${claro ? "border-stone-900/10" : "border-white/10"} ${textoSuave}`}>
+          <footer className={`mt-10 rounded-xl px-3 py-3 text-center text-[11px] leading-relaxed ${panel || `border-t ${claro ? "border-stone-900/10" : "border-white/10"}`} ${panel ? textoPanel : textoSuave}`}>
             {datos.aviso_amazon}
           </footer>
         )}
