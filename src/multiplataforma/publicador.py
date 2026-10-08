@@ -30,7 +30,7 @@ from src.multiplataforma.clients.pinterest import PinterestClient
 from src.multiplataforma.clients.threads import ThreadsClient
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, publicaciones_repo
-from src.multiplataforma.services import ingesta, video_url
+from src.multiplataforma.services import ingesta, tandas, video_url
 
 
 def _noop(_: str) -> None:
@@ -83,6 +83,13 @@ def publicar_una(pub: Publicacion, *, ahora: float, dry_run: bool = False, http:
     if not cuenta.activa:
         informe["omitida"] = f"la cuenta {pub.cuenta!r} está desactivada"
         return informe
+
+    # producto_ref sin enlace: el enlace puede haberse guardado después de
+    # encolar (enlaces_repo). Se rellena y se rehacen los textos.
+    if tandas.rellenar_enlace(pub):
+        informe["enlace_rellenado"] = pub.enlace
+        if not dry_run:
+            publicaciones_repo.guardar(pub)
 
     for plat in pub.plataformas:
         estado = pub.estado.get(plat, config.ESTADO_PENDIENTE)

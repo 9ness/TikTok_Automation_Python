@@ -112,11 +112,20 @@ def _publicacion(cuenta: CuentaDestino, video: Path, tipo: str, programada_en: f
     plataformas = [p for p in (meta.get("plataformas") or config.PLATAFORMAS) if p in config.PLATAFORMAS]
     enlace = enlaces.resolver(asin=str(meta.get("asin") or ""), enlace=str(meta.get("enlace") or ""),
                               amazon_tag=cuenta.afiliado_amazon_tag)
-    t = textos.construir(titulo=str(meta.get("titulo") or ""), caption=str(meta.get("caption") or ""),
-                         enlace=enlace, hashtags=meta.get("hashtags") or [], plataformas=plataformas)
+    producto_ref = str(meta.get("producto_ref") or "")
+    if not enlace and producto_ref:
+        # El enlace del producto guardado por el agente (enlaces_repo).
+        from src.multiplataforma.repos import enlaces_repo
+
+        enlace = enlaces_repo.enlace_de(cuenta.slug, producto_ref)
+    caption = str(meta.get("caption") or "")
+    hashtags = [str(h) for h in (meta.get("hashtags") or [])]
+    t = textos.construir(titulo=str(meta.get("titulo") or ""), caption=caption,
+                         enlace=enlace, hashtags=hashtags, plataformas=plataformas)
     return Publicacion(
-        cuenta=cuenta.slug, video_path=str(video), tipo=tipo, producto_ref=str(meta.get("producto_ref") or ""),
-        titulo=t["titulo_pin"], textos=t["textos"], comentario=t["comentario"], enlace=enlace,
+        cuenta=cuenta.slug, video_path=str(video), tipo=tipo, producto_ref=producto_ref,
+        titulo=t["titulo_pin"], caption=caption, hashtags=hashtags,
+        textos=t["textos"], comentario=t["comentario"], enlace=enlace,
         plataformas=plataformas or list(config.PLATAFORMAS), programada_en=programada_en,
         trial_graduation=str(meta.get("trial_graduation") or "MANUAL").upper(), origen=ORIGEN,
     )

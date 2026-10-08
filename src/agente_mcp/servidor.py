@@ -57,6 +57,10 @@ de un carrusel de fotos: `replicar_carrusel` → fotos en Flow → `subir_imagen
 → `descargar_carrusel` (ZIP con el texto quemado); el producto puede darse de
 alta ahí mismo con `producto_carrusel`, y los carruseles listos salen en
 `mis_tandas(fotos=True)`.
+Resubir lo montado a Instagram/Facebook/Threads/Pinterest con enlace de
+afiliado (SHEIN/Amazon): `guia("multiplataforma")` → `productos_sin_enlace` →
+`guardar_enlace` → `encolar_tandas` → `cola_multiplataforma`. Esos enlaces
+NUNCA van a TikTok (allí va el carrito de TikTok Shop).
 Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
 antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
 prometer nunca ofertas que la ficha no tenga.
@@ -131,14 +135,17 @@ def _leer_guia(ruta: str) -> str:
 def guia(menu: str = "") -> str:
     """Las instrucciones. Sin `menu`: reglas generales + cómo se maneja la app,
     las plataformas (Flow, GenAI Pro, Magnific) y la revisión de calidad.
-    Con `menu` (ver `menus`): el paso a paso de ese menú. Léelas antes de trabajar."""
+    Con `menu` (ver `menus`): el paso a paso de ese menú. `menu="multiplataforma"`:
+    enlaces de afiliado y resubida a IG/FB/Threads/Pinterest. Léelas antes de trabajar."""
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
             "README.md", "comun/app.md", "comun/plataformas.md", "comun/revision-calidad.md",
             "comun/campanas.md"))
+    if menu == "multiplataforma":  # no es un menú de vídeo: solo guía + herramientas
+        return _leer_guia("multiplataforma.md")
     m = menus.MENUS.get(menu)
     if not m:
-        raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}.")
+        raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}, multiplataforma.")
     return _leer_guia(f"{m.guia}.md")
 
 
@@ -863,6 +870,117 @@ async def borrar_productos(ctx: Context, catalogo: str, carpeta: str,
         raise ErrorApp("Borrar no se deshace. Repite con confirmar=True si el operador lo ha pedido.")
     c = await _ctx(ctx, "pov_bof", catalogo, carpeta)
     return _json({"ok": True, **(await menus.borrar_productos(c, productos))})
+
+
+# ---------------------------------------------------------------------------
+# Multiplataforma: enlaces de afiliado por producto y resubida de Mis tandas
+# a IG/FB/Threads/Pinterest (guía `multiplataforma.md`). Endpoints de admin:
+# hace falta el token de un administrador (ness).
+# ---------------------------------------------------------------------------
+_MP = "/api/v1/multiplataforma"
+
+
+def _cuenta_mp(cuenta: str) -> str:
+    from urllib.parse import quote
+
+    cuenta = (cuenta or "").strip().lower()
+    if not cuenta:
+        raise ErrorApp("Falta `cuenta` (ama_shop, viva_shop… ver `cuentas_multiplataforma`).")
+    return quote(cuenta, safe="")
+
+
+@_herramienta(structured_output=False)
+async def cuentas_multiplataforma(ctx: Context) -> str:
+    """Cuentas del publicador multiplataforma (IG/FB/Threads/Pinterest): slug,
+    nombre, dueño (de quién son los vídeos de Mis tandas que se resuben),
+    tag de Amazon, ritmo y horas. Sin tokens."""
+    return _json(await Interno(_usuario(ctx)).get(f"{_MP}/cuentas"))
+
+
+@_herramienta(structured_output=False)
+async def productos_sin_enlace(ctx: Context, cuenta: str, todos: bool = False) -> str:
+    """Productos con vídeo montado del DUEÑO de la `cuenta` (lo de su Mis
+    tandas), uno por producto, que aún no tienen enlace de afiliado
+    (`todos=True`: también los que ya lo tienen o están en `sin_equivalente`).
+    Cada uno trae `producto_key` (para `guardar_enlace`), título, tienda,
+    `product_url` (ficha de TikTok), nº de vídeos, cuántos subidos a TikTok
+    (`subidos_tiktok`: primero los que tienen más), cuántos ya en la cola
+    multiplataforma y `foto` (descárgala o pásala a `ver(url=…)` para comparar
+    con el candidato de SHEIN/Amazon)."""
+    u = _usuario(ctx)
+    d = await Interno(u).get(f"{_MP}/cuentas/{_cuenta_mp(cuenta)}/productos",
+                             sin_enlace="false" if todos else "true")
+    for p in d.get("productos", []):
+        p["foto"] = archivos.enlace_interno(u, p.get("foto", ""))
+        p.pop("fila_id", None)
+    return _json(d)
+
+
+@_herramienta(structured_output=False)
+async def guardar_enlace(ctx: Context, cuenta: str, producto_key: str, shein: str = "",
+                         asin: str = "", nota: str = "", foto_url: str = "",
+                         titulo: str = "", borrar: bool = False) -> str:
+    """Guarda el enlace de afiliado de UN producto (`producto_key` de
+    `productos_sin_enlace`) para la `cuenta`. Vale para todos sus vídeos.
+    - SHEIN (ama_shop): `shein` = el enlace que da el panel de afiliados, TAL
+      CUAL (`https://onelink.shein.com/...`). Nada de acortadores.
+    - Amazon (viva_shop): `asin` (10 caracteres); el enlace se construye con
+      el tag de la cuenta.
+    - Si NO hay un producto de verdad parecido (mismo tipo, forma y color):
+      `shein="sin_equivalente"` (o `asin=`) y en `nota` el porqué.
+    `nota`: qué has comparado (una frase). `foto_url` (opcional, https): foto
+    del producto de SHEIN/Amazon para la página pública. `titulo` (opcional):
+    nombre corto para la página /links. `borrar=True` quita el enlace."""
+    api = Interno(_usuario(ctx))
+    ruta = f"{_MP}/cuentas/{_cuenta_mp(cuenta)}/enlaces/{producto_key.strip()}"
+    if borrar:
+        return _json(await api.delete(ruta))
+    return _json(await api.put(ruta, {"shein": shein, "asin": asin, "nota": nota,
+                                      "foto_url": foto_url, "titulo": titulo}))
+
+
+@_herramienta(structured_output=False)
+async def encolar_tandas(ctx: Context, cuenta: str, incluir_no_subidos: bool = False,
+                         limite: int = 0) -> str:
+    """Encola en el publicador multiplataforma los vídeos de Mis tandas del
+    dueño de la `cuenta` cuyo producto YA tiene enlace y que aún no están en
+    la cola (idempotente: repetirlo no duplica). Por defecto solo los ya
+    subidos a TikTok; `incluir_no_subidos=True` mete también los pendientes.
+    `limite` > 0 encola como mucho esos. Se programan con el ritmo y las horas
+    «producto» de la cuenta, tras lo ya programado. Devuelve lo encolado y
+    cuántos se han saltado y por qué (`sin_enlace`, `no_subidos`,
+    `ya_encolados`, `ruta_no_valida`)."""
+    return _json(await Interno(_usuario(ctx)).post(
+        f"{_MP}/cuentas/{_cuenta_mp(cuenta)}/encolar-tandas",
+        incluir_no_subidos="true" if incluir_no_subidos else "false", limite=str(max(0, limite))))
+
+
+@_herramienta(structured_output=False)
+async def cola_multiplataforma(ctx: Context, cuenta: str = "", todas: bool = False,
+                               limite: int = 50) -> str:
+    """Estado de la cola del publicador: por publicación, cuenta, título,
+    enlace, cuándo sale (`programada_en`, hora de Madrid) y estado POR
+    plataforma (pendiente / simulado = sin token aún / publicado / error /
+    fallido). `todas=True` incluye las ya terminadas. Filtra por `cuenta`."""
+    import datetime as dt
+    import zoneinfo
+
+    d = await Interno(_usuario(ctx)).get(f"{_MP}/cola", todas="true" if todas else "false",
+                                         limite=str(max(1, min(500, limite if not cuenta else 500))))
+    tz = zoneinfo.ZoneInfo("Europe/Madrid")
+    pubs = [p for p in d.get("publicaciones", []) if not cuenta or p.get("cuenta") == cuenta.strip().lower()]
+    resumen: dict[str, int] = {}
+    salida = []
+    for p in pubs[: max(1, limite)]:
+        for est in (p.get("estado") or {}).values():
+            resumen[est] = resumen.get(est, 0) + 1
+        salida.append({
+            "id": p.get("id"), "cuenta": p.get("cuenta"), "tipo": p.get("tipo"),
+            "titulo": p.get("titulo"), "enlace": p.get("enlace"), "producto_key": p.get("producto_ref"),
+            "programada": dt.datetime.fromtimestamp(float(p.get("programada_en") or 0), tz).strftime("%Y-%m-%d %H:%M"),
+            "estado": p.get("estado"), "errores": p.get("errores") or {},
+        })
+    return _json({"total": len(pubs), "estados_por_plataforma": resumen, "publicaciones": salida})
 
 
 # ---------------------------------------------------------------------------

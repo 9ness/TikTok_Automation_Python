@@ -428,6 +428,9 @@ _PREFIJOS_PRO = (
     # Guías y conexión del MCP de agentes. El MCP en sí (/api/mcp/<token>) va
     # sin cookie y actúa como el usuario del token, con SUS permisos.
     "/api/v1/agente",
+    # Página PÚBLICA de enlaces de afiliado (/links/<cuenta>): sin auth, pero
+    # quien la abra con sesión de `pro` (Ana) no debe recibir un 403.
+    "/api/v1/multiplataforma/links/",
     "/api/v1/auth",
     "/api/v1/health",
     "/ws/queue",

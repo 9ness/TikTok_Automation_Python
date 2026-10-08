@@ -103,6 +103,14 @@ class Interno:
         r = await self._pedir("POST", ruta, json=body or {}, params=params)
         return r.json() if r.content else {}
 
+    async def put(self, ruta: str, body: dict | None = None, **params: Any) -> Any:
+        r = await self._pedir("PUT", ruta, json=body or {}, params=params)
+        return r.json() if r.content else {}
+
+    async def delete(self, ruta: str, **params: Any) -> Any:
+        r = await self._pedir("DELETE", ruta, params=params)
+        return r.json() if r.content else {}
+
     async def post_form(
         self, ruta: str, datos: dict[str, Any], fichero: tuple[str, bytes, str],
     ) -> Any:

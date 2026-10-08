@@ -488,7 +488,7 @@ Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
 
 ### Multiplataforma — publicar fuera de TikTok (oct 2026)
 
-[`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/TIKTOK_SHOP_AI_PRO/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
+[`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/TIKTOK_SHOP_AI_PRO/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Enlace por producto (`enlaces:<slug>`) y resubida de Mis tandas del dueño de la cuenta, SOLO por MCP (guía `multiplataforma.md`); página pública sin login `/links/<cuenta>` para la bio. Enlaces NUNCA en TikTok. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
 
 ### Mi menú — la sidebar, por usuario
 

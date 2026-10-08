@@ -88,6 +88,10 @@ class Publicacion:
     tipo: str = "producto"  # producto | prueba_viral
     producto_ref: str = ""  # ref opcional al producto del nicho de origen
     titulo: str = ""
+    # Texto base (sin enlace) para poder rehacer `textos` si el enlace llega
+    # después (producto_ref sin enlace → se rellena desde enlaces_repo).
+    caption: str = ""
+    hashtags: list[str] = field(default_factory=list)
     textos: dict[str, str] = field(default_factory=dict)
     comentario: str = ""  # primer comentario de Facebook (lleva el enlace)
     enlace: str = ""
@@ -96,7 +100,7 @@ class Publicacion:
     estado: dict[str, str] = field(default_factory=dict)
     programada_en: float = field(default_factory=time.time)
     trial_graduation: str = "MANUAL"  # solo IG prueba_viral: MANUAL | SS_PERFORMANCE
-    origen: str = ""  # "ingesta" = vino de la carpeta del Drive (se mueve a publicados/)
+    origen: str = ""  # "ingesta" = vino de la carpeta del Drive (se mueve a publicados/); "tandas" = de Mis tandas
     resultados: dict[str, dict] = field(default_factory=dict)
     errores: dict[str, str] = field(default_factory=dict)
     intentos: dict[str, int] = field(default_factory=dict)

@@ -53,6 +53,12 @@ def todas(limite: int = 100) -> list[Publicacion]:
     return sorted(pubs, key=lambda p: p.programada_en, reverse=True)[:limite]
 
 
+def de_cuenta(slug: str) -> list[Publicacion]:
+    """Todas (histórico incluido) de una cuenta, sin límite."""
+    r = redis_base.get_redis()
+    return [p for p in (get(i) for i in r.smembers(_TODAS)) if p and p.cuenta == slug]
+
+
 def vencidas(ahora: float) -> list[Publicacion]:
     return [p for p in pendientes() if p.programada_en <= ahora]
 

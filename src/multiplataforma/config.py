@@ -75,7 +75,8 @@ EXTENSIONES_SERVIBLES = (".mp4", ".mov", ".jpg", ".jpeg", ".png")
 # Ruta COMPLETA desde la raíz del mount (como `DRIVE_UPLOAD_ROOT` del resto
 # del Programa 4). Por cuenta: `<raíz>/<slug>/{viralizacion,producto}/` y,
 # dentro de cada una, `publicados/` con lo ya subido a todas las plataformas.
-DRIVE_SUBDIR = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Multiplataforma"
+AI_PRO_SUBDIR = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO"
+DRIVE_SUBDIR = f"{AI_PRO_SUBDIR}/Multiplataforma"
 CARPETAS_INGESTA: dict[str, str] = {"viralizacion": "prueba_viral", "producto": "producto"}
 CARPETA_PUBLICADOS = "publicados"
 EXTENSIONES_INGESTA = (".mp4", ".mov")
@@ -106,6 +107,14 @@ def raices_servibles() -> list[Path]:
     tmp = os.getenv("API_TEMP_ROOT", "").strip()
     if tmp:
         raices.append(Path(tmp))
+    # Los vídeos que lista «Mis tandas» (POV BOF, Largo, Moda Mujer…) viven en
+    # el árbol del Programa 4 del Drive montado: se sirven de ahí, nunca de
+    # fuera (y solo con token firmado y extensión de vídeo/imagen).
+    from src.nicho_pov_bof.services.audio_bank import mount_root
+
+    raiz = mount_root()
+    if raiz:
+        raices.append(raiz / AI_PRO_SUBDIR)
     return raices
 
 

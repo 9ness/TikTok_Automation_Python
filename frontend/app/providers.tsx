@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Toaster } from "sonner";
 
@@ -18,6 +19,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { useTheme } from "next-themes";
 import { useMenuPrefs } from "@/lib/queries/uiMenu";
 import { medirDialogo } from "@/lib/chivato";
+import { esRutaPublica } from "@/lib/rutasPublicas";
 import { avisarModalAbierto, esAppNativa } from "@/lib/subidaNativa";
 
 /** Rellena la caché con lo último que vio ESTA persona.
@@ -187,6 +189,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
+
+  // En las rutas públicas (`/links/<cuenta>`) no hay sesión: nada de cola,
+  // WebSocket ni preferencias del usuario (serían 401 y conexiones de más).
+  const publica = esRutaPublica(usePathname());
+
+  if (publica) {
+    return (
+      <QueryClientProvider client={client}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </QueryClientProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={client}>

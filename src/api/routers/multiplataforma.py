@@ -15,15 +15,15 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_current_user, get_web_user
 from src.api.exceptions import APIError
 from src.multiplataforma import config, publicador
 from src.multiplataforma.models import CuentaDestino, Publicacion
-from src.multiplataforma.repos import cuentas_repo, publicaciones_repo
-from src.multiplataforma.services import enlaces, ingesta, textos, video_url
+from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo
+from src.multiplataforma.services import enlaces, ingesta, tandas, textos, video_url
 
 router = APIRouter(
     prefix="/api/v1/multiplataforma",
@@ -131,13 +131,16 @@ def encolar(body: PublicacionIn) -> dict:
         raise APIError("video_path tiene que ser .mp4 o .mov", status_code=400)
     try:
         enlace = enlaces.resolver(asin=body.asin, enlace=body.enlace, amazon_tag=cuenta.afiliado_amazon_tag)
+        if not enlace and body.producto_ref:
+            enlace = enlaces_repo.enlace_de(cuenta.slug, body.producto_ref)
         t = textos.construir(titulo=body.titulo, caption=body.caption, enlace=enlace,
                              hashtags=body.hashtags, plataformas=body.plataformas)
     except enlaces.EnlaceInvalido as e:
         raise APIError(str(e), status_code=400) from e
     pub = Publicacion(
         cuenta=cuenta.slug, video_path=body.video_path, tipo=body.tipo, producto_ref=body.producto_ref,
-        titulo=t["titulo_pin"], textos={**t["textos"], **body.textos}, comentario=t["comentario"],
+        titulo=t["titulo_pin"], caption=body.caption, hashtags=list(body.hashtags),
+        textos={**t["textos"], **body.textos}, comentario=t["comentario"],
         enlace=enlace, cover_url=body.cover_url, plataformas=list(body.plataformas),
         programada_en=body.programada_en or time.time(), trial_graduation=body.trial_graduation.upper(),
     )
@@ -160,6 +163,100 @@ def ver_cola(todas: Annotated[bool, Query()] = False, limite: Annotated[int, Que
 def tick(dry_run: Annotated[bool, Query()] = True, limite: Annotated[int, Query(ge=1, le=50)] = 5) -> dict:
     """Lanza un tick a mano. Por defecto en modo prueba (no guarda ni publica)."""
     return publicador.publicar_pendientes(limite=limite, dry_run=dry_run)
+
+
+# ---------------------------------------------------------------------------
+# Enlaces por producto y resubida de «Mis tandas» (services/tandas.py)
+# ---------------------------------------------------------------------------
+class EnlaceIn(BaseModel):
+    """`shein` (enlace del panel tal cual) o `asin` (Amazon con el tag de la
+    cuenta). 'sin_equivalente' en cualquiera = no hay producto parecido."""
+
+    shein: str = ""
+    asin: str = ""
+    enlace: str = ""
+    nota: str = ""
+    titulo: str = ""
+    foto_url: str = ""
+    precio: str = ""
+
+
+def _err_tandas(e: tandas.ErrorTandas) -> APIError:
+    return APIError(str(e), status_code=e.status)
+
+
+@router.get("/cuentas/{slug}/productos")
+def productos_cuenta(slug: str, sin_enlace: Annotated[bool, Query()] = False) -> dict:
+    """Productos con vídeo montado del dueño (Mis tandas), por producto."""
+    try:
+        return tandas.productos(slug, sin_enlace=sin_enlace)
+    except tandas.ErrorTandas as e:
+        raise _err_tandas(e) from e
+
+
+@router.get("/cuentas/{slug}/productos/{producto_key}/foto")
+def foto_producto(slug: str, producto_key: str, w: Annotated[int, Query(ge=48, le=1080)] = 400) -> FileResponse:
+    try:
+        c = tandas.cuenta_o_error(slug)
+        fila = next((g["fila_id"] for g in tandas.productos(slug)["productos"]
+                     if g["producto_key"] == producto_key), "")
+        p = tandas.foto_interna(c, fila, w)
+    except tandas.ErrorTandas as e:
+        raise _err_tandas(e) from e
+    return FileResponse(p, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@router.put("/cuentas/{slug}/enlaces/{producto_key}")
+def guardar_enlace(slug: str, producto_key: str, body: EnlaceIn) -> dict:
+    try:
+        return {"producto_key": producto_key,
+                "enlace": tandas.guardar_enlace(slug, producto_key, **body.model_dump())}
+    except tandas.ErrorTandas as e:
+        raise _err_tandas(e) from e
+
+
+@router.delete("/cuentas/{slug}/enlaces/{producto_key}")
+def borrar_enlace(slug: str, producto_key: str) -> dict:
+    if not cuentas_repo.get(slug):
+        raise APIError(f"No existe la cuenta {slug}", status_code=404)
+    if not enlaces_repo.borrar(slug, producto_key):
+        raise APIError("Ese producto no tenía enlace", status_code=404)
+    return {"ok": True, "producto_key": producto_key}
+
+
+@router.post("/cuentas/{slug}/encolar-tandas")
+def encolar_tandas(slug: str, incluir_no_subidos: Annotated[bool, Query()] = False,
+                   limite: Annotated[int, Query(ge=0, le=1000)] = 0) -> dict:
+    """Encola los vídeos de Mis tandas del dueño cuyo producto tiene enlace y
+    que no estén ya en la cola. Por defecto solo los ya subidos a TikTok."""
+    try:
+        return tandas.encolar(slug, incluir_no_subidos=incluir_no_subidos, limite=limite)
+    except tandas.ErrorTandas as e:
+        raise _err_tandas(e) from e
+
+
+@router_publico.get("/links/{slug}")
+def links_publicos(slug: str) -> JSONResponse:
+    """PÚBLICO (página /links/<cuenta>): nombre + productos con enlace."""
+    try:
+        datos = tandas.links_publicos(slug)
+    except tandas.ErrorTandas as e:
+        raise _err_tandas(e) from e
+    return JSONResponse(datos, headers={"Cache-Control": "public, max-age=120"})
+
+
+@router_publico.get("/links/{slug}/foto/{producto_key}")
+def links_foto(slug: str, producto_key: str, w: Annotated[int, Query(ge=96, le=800)] = 400):
+    """PÚBLICO: foto de un producto CON enlace de esa cuenta (nada más)."""
+    if not cuentas_repo.slug_valido(slug) or not enlaces_repo.key_valida(producto_key):
+        raise APIError("No existe", status_code=404)
+    try:
+        res = tandas.foto_publica(slug, producto_key, w)
+    except tandas.ErrorTandas as e:
+        raise _err_tandas(e) from e
+    if isinstance(res, str):
+        return RedirectResponse(res, status_code=302)
+    return FileResponse(res, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router_publico.get("/archivo/{token}")
