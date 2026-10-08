@@ -108,6 +108,7 @@ from src.api.routers import (
     voices_sample_router,
 )
 from src.api.websockets import queue_ws_router
+from src.api.routers.multiplataforma import router as multiplataforma_router, router_publico as multiplataforma_publico_router
 from src.api.session import usuario_de_request
 from src.api import users as _users
 
@@ -370,6 +371,8 @@ def create_app() -> FastAPI:
     app.include_router(claude_vps_router)
     app.include_router(diagnostics_router)
     app.include_router(queue_ws_router)
+    app.include_router(multiplataforma_router)
+    app.include_router(multiplataforma_publico_router)
     # MCP para agentes (Claude, ChatGPT…): rutas de ficheros/guías y el
     # protocolo en /api/mcp/<token>. Opcional: sin el paquete `mcp` no se monta.
     try:
