@@ -1,4 +1,5 @@
 ## 🎙️ Multimodo de Ana: retomar con HABLADOS hacia el 12 oct 2026
+- 8 oct (Néstor): al acabar los pendientes, Ana pasa a HABLADOS (más visitas) + Vintage bolso en el coche con música (un bolso le ha dado 6 ventas → hacerle varias versiones y buscar bolsos parecidos). Varias versiones por producto también en Ana (separación 2 días).
 - Margen al 6/10: 98 vídeos sin subir (≈10 días a 10/día), pero solo 25 hablados. Néstor: los hablados (20 s, voz Fish) le dan más visitas; de los mudos de 10 s solo funcionan algo bolsos y botas.
 - Pendiente (tandas 18-27, imágenes ya hechas, clips parados): 54 ropa · 13 calzado mudo → pasar a 🎙️ POV/Sentado 20 s · 14 botas (se quedan en 10 s) · 8 ya en 20 s.
 - Para la ropa haría falta un modo nuevo «Espejo 20 s hablado» (dos clips frente al espejo + voz Fish). Pedir el «sí» de Néstor y un tope de créditos de Magnific (Unlimited suspendido: 280/clip) antes de generar.
@@ -86,6 +87,7 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 - El 12 salió con 2 golpes de 3 (el de «8 NIVELES» no se localizó en la voz): mirar por qué si se repite.
 
 ## 🎄 Productos Q4 (ness) — pendiente (30 sep 2026)
+- 8 oct: regla Q4 de 5 vídeos/producto (10+ si >200 €) apuntada en la guía del Largo. Hoy salen 5 como mucho (original + Q4 + Épico Oct + Venta Inversa + Réplicas): falta hueco para la 6.ª en adelante (¿varias copias en Q4?) y el aviso de cuántos lleva cada producto en Mis tandas/Largo.
 
 - [ ] **Recargar OpenAI** (o esperar a que Gemini recupere cuota): sin IA no se escriben guiones ni funciona la voz «auto».
 - [x] (1/10) Hechos los **10 en modo «Precio»** que se pidieron (productos 11-20 de «Productos Q4»). Hoy los 20 salieron en «Punto de dolor» porque la tanda de «precio» no se pudo escribir sin IA. El modo es de todo el catálogo: cambiar a «precio», escribir los guiones 11-20, subir otra vez sus clips (están en la bandeja) → segundo vídeo por producto.

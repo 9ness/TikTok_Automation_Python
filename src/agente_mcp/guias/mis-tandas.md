@@ -28,11 +28,11 @@ ajustan sin bloquear a los demás:
   Inversa 6 oct, Productos Q4 28 oct). Nada se pone en una tanda anterior, y en
   cuanto llega su día **tiene prioridad** sobre lo normal (caduca). Calendario:
   `docs/CALENDARIO_POV_BOF_LARGO.md`.
-- **El mismo producto no sale dos veces en menos de 5 días**
+- **El mismo producto no sale dos veces en menos de 2 días**
   (`SEPARACION_MISMO_PRODUCTO`): otro modo del Largo, la copia de Q4… El
   segundo espera. Cuenta también lo ya subido. Desde oct 2026 cada producto
   lleva DOS versiones (los dos modos del Largo que mejor le encajen, de 3
-  clips): la segunda sale a los 5 días.
+  clips): la segunda sale a los 2 días (8 oct 2026: antes 5).
 - **Las tandas que se enseñan quedan FIJADAS** (`mis_tandas:fijas:<usuario>`:
   las dos primeras abiertas y toda tanda llena). Un vídeo **no sale nunca** de
   su tanda: subido o sin stock se queda en su sitio con su marca y NO entra uno
@@ -191,7 +191,7 @@ Los vídeos de los modos de Moda Mujer que **no** son del multimodo (los que
 hablan: Tienda Colores, Calle Dividido…). Uno por producto y modo. El
 «subido» y el «sin stock» son del **producto** (los mismos campos que el
 multimodo): si un producto tiene vídeo en los dos, al marcar uno queda el
-otro, y el reparto los separa 7 días como a cualquier producto repetido.
+otro, y el reparto los separa 2 días como a cualquier producto repetido.
 El **«🔁 rehacer» es del VÍDEO** (producto + modo): va en
 `modos.<modo>.rehacer/rehacer_nota/rehecho` del documento personal de la
 prenda (`product_repo.marcar_rehacer_modo`), así que rehacer el Tienda Colores

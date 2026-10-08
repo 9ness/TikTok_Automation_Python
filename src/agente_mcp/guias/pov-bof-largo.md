@@ -32,8 +32,39 @@ defecto, cada producto lleva **DOS vídeos de 3 clips**, con los **dos modos
 que mejor le encajen** de los cuatro (dolor, precio, épico, venta inversa):
 elige por el producto (¿se ve un dolor claro? ¿hay un dato fuerte para la
 venta inversa? ¿un golpe visual para el épico?) y dilo en el informe. «Mis
-tandas» separa las dos versiones 5 días solas (`SEPARACION_MISMO_PRODUCTO`).
+tandas» separa las versiones 2 días solas (`SEPARACION_MISMO_PRODUCTO`).
 Lo que manda el operador en cada encargo va por delante de esto.
+
+### Q4: más vídeos del mismo producto (oct–nov 2026)
+
+Para acumular contenido antes de Black Friday (agencias, 8 oct; detalle en
+[`comun/campanas.md`](comun/campanas.md)), las dos versiones son el MÍNIMO,
+no el tope:
+- **Producto prioritario: 5 vídeos distintos** antes de juzgarlo. **Más de
+  200 €: 10 o más.** Si uno empieza a vender, no saltes a otro: más vídeos
+  de ese.
+- **Cada vídeo, otro enfoque**, no el mismo con otra voz: cambia el MODO
+  (dolor, precio, épico, venta inversa, réplica viral) y, dentro del mismo
+  modo, el ángulo (problema → solución, prueba real → resultado, resultado
+  primero, otra situación de uso, responder dudas) y las ESCENAS (otro sitio,
+  otra luz, otro plano del clip 1). Dos vídeos que se parecen cuentan como uno
+  y TikTok los puede tratar como duplicado.
+- **El producto es siempre idéntico** entre versiones y clips (misma foto de
+  referencia): lo que cambia es la historia, nunca el aparato.
+- **Cómo se hacen**: cada carpeta admite UNA copia por producto (su
+  manifiesto es idempotente), así que las versiones salen de copiarlo en
+  carpetas distintas, cada una con guion, clips y vídeo nuevos sin pisar el
+  original: la carpeta del inventario (original) + **Productos Q4**
+  (`anadir_a_q4`, ver abajo) + **⚡ Épico Octubre** y **🔄 Venta Inversa**
+  (`anadir_a_q4(carpeta=…)`; fijan su modo) + **🔁 Réplicas virales**
+  (desde «Replicar viral») = 5.
+  Para 10 o más todavía no hay hueco en la app: avisa al operador. Apunta en
+  el informe qué modo y ángulo lleva cada versión para no repetir.
+- **Separación**: «Mis tandas» separa 2 días los vídeos del mismo producto
+  (`SEPARACION_MISMO_PRODUCTO`); con 5 versiones son ~8 días. Aun así,
+  **empieza ya por los prioritarios y los de más de 200 €**.
+- La regla anti-sanción no cambia: cada versión enseña EL producto enlazado y
+  no promete ofertas que la ficha no tenga.
 
 ## Paso a paso
 
