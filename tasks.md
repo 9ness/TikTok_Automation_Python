@@ -11,6 +11,31 @@
 
 - [ ] **MarkItDown** (Microsoft, gratis, `pip install 'markitdown[all]'`): pasa `.docx`, `.xlsx`, `.pptx`, PDF, HTML y transcripciones de YouTube/audio a Markdown. Instalarlo en el VPS el día que llegue un documento del curso que haya que meter en el repo como `.md`. Usar el CLI (`markitdown fichero.docx > fichero.md`), NO su servidor MCP. No sirve para vídeo sin audio.
 
+## 📤 Multiplataforma Meta + replicador de carruseles (clase 7 oct 2026)
+- [ ] (Néstor, 1.º) Cuentas: 2 páginas FB en su cuenta (Pisada Viva + moda Ana), cada una vinculada a su IG profesional; Ana admin de la suya. Pinterest y SHEIN con el correo de Ana; Amazon Afiliados de Néstor
+- [ ] Historias con enlace: SIN móvil propio. Opción A móvil en la nube (DuoPlus/VMOS ~6-12 $/mes, GeeLark ~20-30 $), 1 por cuenta IG. Opción B redroid en el VPS (gratis, pero binder es módulo sin instalar, 3 GB libres de RAM e IG detecta emulador + IP de datacenter → no recomendado). Decidir cuando las cuentas tengan tracción
+- [ ] Cuando Néstor tenga los 23+23 vídeos de Pablo Motos (salen en `VIRALIZACION/<cuenta>_<fecha>/`): moverlos a `Multiplataforma/viva_shop/viralizacion/` (Pisada Viva, Néstor) y `Multiplataforma/ama_shop/viralizacion/` (moda, Ana)
+- [ ] Timer: `docker compose exec api python scripts/multiplataforma_tick.py` cada hora (no en el host: rutas del contenedor)
+- [x] Ingesta desde carpetas Drive (8/10, 27 tests)
+- [x] Publicador `src/multiplataforma/` en modo prueba (8/10, 16 tests). Falta: tokens Meta/Pinterest, timer, frontend, MCP+guía, `_PREFIJOS_PRO` para Ana, comprobar que Caddy deja pasar `/archivo/` firmado, limitar `video_path` a Drive/temp_work
+- [ ] Publicador automático en el VPS (job cada X h): IG Reels + reel de prueba, FB `video_reels` + 1.er comentario con enlace, Threads, Pinterest v5. Ver tabla en docs/clases/2026-10-07_clase_miercoles.md
+- [ ] (Néstor) Alta SHEIN afiliados (Awin o programa propio) para la cuenta de Ana y probar si el enlace saca el contador de 24 h
+- [ ] (Néstor) App de desarrollador de Pinterest → pedir acceso Standard (sin él los pines son sandbox)
+
+
+Notas: [`docs/clases/2026-10-07_clase_miercoles.md`](docs/clases/2026-10-07_clase_miercoles.md) (§ «Qué podemos automatizar»).
+- [ ] 👤 Néstor: página de Facebook por cuenta + Instagram profesional vinculados en el Centro de cuentas; app de Meta con `instagram_content_publish`.
+- [ ] 👤 Néstor: alta en Amazon Associates (afiliados.amazon.es).
+- [ ] Menú «Multiplataforma»: los 🟢 ya subidos a TikTok → 2 reels + 1 carrusel/día por cuenta de IG (API oficial); FB y Threads salen por la vinculación. Variante de montaje sin CTA de TikTok Shop.
+- [ ] Historias de IG con sticker de enlace por adb (la API no pone el enlace).
+- [x] (8/10) Replicar carrusel viral: tikwm `images` → Gemini por diapositiva → prompts de Flow → texto con el motor de Carruseles → ZIP. `src/replicar_viral/carrusel.py`, pantalla `/tiktok-shop-ai-pro/replicar-carrusel`, bloque en Mis tandas, MCP + guía `replicar-carrusel.md`, 15 tests. Falta: probarlo con un carrusel real (tikwm + Gemini) tras desplegar; publicar en IG cuando esté el Multiplataforma.
+- [x] (8/10) Replicar carrusel 2: catálogo COMPARTIDO «🖼️ Carruseles virales» (alta con foto + ficha + URL, textos con coste, `src/replicar_viral/catalogo.py`), replicar para otro usuario (solo admin, `replica_de`), Mis tandas con pestañas Vídeos/Fotos (tandas de 10 de carruseles, ZIP, Subido; `src/mis_tandas/fotos.py`), en el menú de ness y los pro, MCP `producto_carrusel` + `mis_tandas(fotos=True)`. Falta: probar el alta con un producto real tras desplegar.
+- [ ] ~~Cuenta Piloto: 2 semanas de vídeo real antes de IA~~ — NO hace falta (8/10, Néstor): las cuentas de TikTok (POV de ness, mujer de Ana y la que sale del piloto) no tienen sanciones; esas tres son las de TikTok.
+- Decidido 8/10: IG NUEVAS o la vieja de pisadaviva, nunca la personal de Néstor. FB/Threads por el interruptor «compartir» de IG. Sin IG Shop (<1000 seguidores) se monetiza con Amazon: enlace en bio/historias en IG, en título y primer comentario en FB/Threads.
+- [ ] Versión «multiplataforma» del montaje: mismos clips, CTA sustituida con `ajustar_cta` (literal, sin Gemini, p. ej. «tienes el enlace abajo, en la descripción»), sin flecha de carrito ni rótulo de cupones, Fish vuelve a locutar.
+- [ ] Amazon: casar productos nuestros con su ASIN (agente buscando en amazon.es desde el Chrome del VPS, comparando fotos); enlace `amazon.es/dp/<ASIN>?tag=<id>-21`. La API de Amazon no se abre hasta tener ventas.
+- [ ] Q4 suplementos en Facebook (idea de Jonny: página «salud», público mayor, buen margen): sin promesas médicas (política de salud de Meta).
+
 ## 🔁 Replicar vídeos virales (clase 30 sep 2026)
 
 - [ ] 👤 **Recargar Gemini**: el 2 oct 2026 las tres claves dan 429 (PAID «prepayment credits are depleted» en AI Studio; FREE y legacy sin cuota). Sin esto fallan guiones, textos y la réplica.

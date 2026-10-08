@@ -41,6 +41,7 @@ nichos.
 |---|---|---|
 | 📦 Mis tandas | (sin modo — no edita vídeo) | PRIMERO del menú para los tres: lo ya montado en POV BOF, POV BOF Largo y Multimodo del usuario, de 10 en 10 con fecha y época. Solo lee; subido/sin stock/rehacer escriben en el nicho de cada vídeo (`src/mis_tandas/`, guía `mis-tandas.md`). Semáforo 🟢🟡🔴 de revisión antes de subir por vídeo y montaje (`mis_tandas:semaforo:<usuario>`, MCP `semaforo_tanda`; rojo marca rehacer) |
 | 🔁 Replicar viral | (sin modo — solo texto) | Enlace de TikTok (lo baja tikwm) + producto del catálogo POV → Gemini ve el vídeo y devuelve guion de voz en off + prompts de 2 clips mudos de 8 s (`src/replicar_viral/`, MCP `replicar_viral`, guía `replicar-viral.md`). Se monta con el estilo `viral` del Largo (carpeta «Réplicas virales») |
+| 🖼️ Replicar carrusel | (sin modo — solo texto) | Enlace de un carrusel de FOTOS (tikwm `images`) + producto POV → Gemini devuelve por diapositiva rol, texto adaptado y prompt de Flow; las fotos se generan a mano, se suben y se les quema el texto con el motor de Carruseles → ZIP (`src/replicar_viral/carrusel.py`, mismo Redis `replicar_viral:` con `tipo="carrusel"`, fotos en `TIKTOK_SHOP_AI_PRO/Replicar_Carrusel/`, MCP `replicar_carrusel`/`subir_imagen_carrusel`/`descargar_carrusel`, guía `replicar-carrusel.md`). Sale también en Mis tandas |
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
@@ -302,7 +303,7 @@ ZIP que publica la web del curso —carpetas de diez, y el ZIP trae la
 convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y los **dos catálogos
 del operador**: «Muestras productos» (`mis_productos`, el slug es el viejo para
 no migrar lo ya guardado) y «Tareas Productos» (`tareas_productos`) — muestra
-gratuita o tarea pagada, que no se trabajan igual — más «🎄 Temporada Q4» (`temporada_q4`, oct 2026: lo más vendido del Q4 anterior según EchoTik, sin saturar; ficha generada con los datos de EchoTik porque la web de TikTok pide captcha). Los sube él (foto limpia +
+gratuita o tarea pagada, que no se trabajan igual — más «🎄 Temporada Q4» (`temporada_q4`, oct 2026: lo más vendido del Q4 anterior según EchoTik, sin saturar; ficha generada con los datos de EchoTik porque la web de TikTok pide captcha) y «🖼️ Carruseles virales» (`carruseles_virales`, COMPARTIDO: alta desde «Replicar carrusel» con foto + ficha + URL, `src/replicar_viral/catalogo.py`). Los sube él (foto limpia +
 ficha), viven en su Drive (`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/<slug>/`) en
 carpetas de 10, y un producto se puede mover de uno a otro con sus fotos y sus
 datos (`mis_productos.mover_producto`). Las fotos se guardan con el MISMO
@@ -484,6 +485,10 @@ Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
   (`guia`), la API la sirve pública en `/api/v1/agente/guias/…` y cada
   pantalla la enlaza con «Guía IA». **Si cambias el flujo de una pantalla,
   cambia su guía.**
+
+### Multiplataforma — publicar fuera de TikTok (oct 2026)
+
+[`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/TIKTOK_SHOP_AI_PRO/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
 
 ### Mi menú — la sidebar, por usuario
 
