@@ -204,7 +204,7 @@ ponemos 5 guiones de Fish con subtítulos.
 | Threads | ✅ API propia | 250 | URL en texto (máx 5) | Tarjeta de enlace solo en posts de texto |
 | Pinterest | ✅ API v5 pin de vídeo con `link` | — | ✅ clicable en el pin | Necesita acceso Standard (vídeo del OAuth + privacidad); prohíbe automatizar sin API aprobada; enlace directo, sin acortador |
 | Amazon Afiliados | Enlace `dp/<ASIN>?tag=` | — | — | Aviso literal obligatorio; sin acortadores que oculten Amazon; precios solo de Amazon; ~3 ventas en 180 días |
-| SHEIN | Enlace de afiliado (programa propio o Awin/CJ/Admitad) | — | — | ~10-20 %, cookie 30 días, pago desde 20 $; sin mínimo oficial de seguidores; el contador «24 h» SIN CONFIRMAR (probar con enlace real) |
+| SHEIN | Enlace de afiliado (programa propio o Awin/CJ/Admitad) | — | — | ~10-20 %, cookie 30 días, pago desde 20 $; sin mínimo oficial de seguidores; contador «24 h» CONFIRMADO (8 oct, programa propio, enlace onelink tal cual abre en € en España) |
 
 Plan: un job programado en el VPS (cola de la app + timer systemd/cron cada X h) que coge vídeos ya
 montados (versión sin carrito), y publica IG reel (+prueba), FB reel + comentario con enlace,

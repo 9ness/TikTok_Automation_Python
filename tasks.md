@@ -20,7 +20,8 @@
 - [x] Ingesta desde carpetas Drive (8/10, 27 tests)
 - [x] Publicador `src/multiplataforma/` en modo prueba (8/10, 16 tests). Falta: tokens Meta/Pinterest, timer, frontend, MCP+guía, `_PREFIJOS_PRO` para Ana, comprobar que Caddy deja pasar `/archivo/` firmado, limitar `video_path` a Drive/temp_work
 - [ ] Publicador automático en el VPS (job cada X h): IG Reels + reel de prueba, FB `video_reels` + 1.er comentario con enlace, Threads, Pinterest v5. Ver tabla en docs/clases/2026-10-07_clase_miercoles.md
-- [ ] (Néstor) Alta SHEIN afiliados (Awin o programa propio) para la cuenta de Ana y probar si el enlace saca el contador de 24 h
+- [x] 8 oct: SHEIN afiliados de Ana dado de alta (programa propio, panel `m.shein.com/us/affiliate`, koc_id 4739881083). El enlace `onelink.shein.com/...` del botón «Ganar» abre en España en € y SÍ saca el contador de oferta 24 h → se usa TAL CUAL. Awin no hace falta.
+- [ ] (Ana) Vincular su TikTok en «Autorizar el retiro de comisiones» (para cobrar). Mirar el 9 oct en «Centro de Datos» que salió el clic de prueba.
 - [ ] (Néstor) App de desarrollador de Pinterest → pedir acceso Standard (sin él los pines son sandbox)
 
 
