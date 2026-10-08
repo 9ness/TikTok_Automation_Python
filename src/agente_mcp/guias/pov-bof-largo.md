@@ -143,7 +143,13 @@ producto con fondo épico, el texto grande arriba y un golpe de sonido) y sigue
 la voz. Las pausas de antes y de después se recortan solas. Patrón y pruebas:
 `_agente/ness/referencias_epico/analisis/`.
 
-Por producto, además de sus clips normales:
+> **Desde el 8/10/2026 el Épico va SIN insertos** (lo decidió el operador: el
+> guion es lo que funciona, y los insertos cuestan créditos de Magnific sin
+> viralizar más). Se hacen solo los clips normales, como en dolor o precio, y
+> el montaje arranca con ellos; `plan_producto` ya no lista golpes. Lo de abajo
+> vale solo si se vuelve a encender (`EPICO_CON_INSERTOS=1`).
+
+Por producto, además de sus clips normales (solo con insertos encendidos):
 1. `plan_producto` lista los golpes (`epico_N.png` / `epico_N.mp4`): texto en
    pantalla, frase y escena.
 2. **Imagen (Flow, Nano Banana 2, modo imagen)**: adjunta un **fotograma de TUS

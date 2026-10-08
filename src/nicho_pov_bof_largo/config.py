@@ -1005,5 +1005,13 @@ SONIDOS_OSCURO = ("golpe_clasico.wav", "sting_trailer.wav", "ritmo_tambores.wav"
 SONIDO_BLANCO = "boom_grave.wav"
 
 
+# Desde el 8/10/2026 el Épico va SIN insertos: el guion (gancho que pregunta,
+# frases cortas) es lo que funciona, y los clips de 5 s cuestan créditos de
+# Magnific sin que los vídeos viralicen más. Los golpes se siguen escribiendo y
+# guardando; con `EPICO_CON_INSERTOS=1` vuelven a pedirse y a bloquear el
+# montaje. Subidos a mano, se meten igual aunque esté apagado.
+EPICO_CON_INSERTOS = os.getenv("EPICO_CON_INSERTOS", "0").strip() == "1"
+
+
 def es_epico(estilo: str) -> bool:
     return (estilo or "").strip().lower() == "epico"

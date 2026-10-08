@@ -434,7 +434,7 @@ Tres cosas del guion que no son del curso y hay que saber:
 La IA marca `[[GOLPE: TEXTO | escena]]`, que se guardan en `golpes` y la voz no
 lee. `pipeline/insertos.py` mete tras el montaje un inserto de 1 s por golpe
 (clip de 5 s de Kling subido con `inserto=N`), con destello, texto y
-un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si el inserto es de fondo blanco), y recorta la pausa de antes y de después.
+un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si el inserto es de fondo blanco), y recorta la pausa de antes y de después. **Desde el 8/10/2026 va SIN insertos** (solo el guion): no se piden ni bloquean el montaje salvo `EPICO_CON_INSERTOS=1`.
 
 **🔄 Venta inversa** (`estilo_guion="inversa"`): «No lo compres si no quieres…»,
 prompt nuestro por ingeniería inversa de la web del curso (`prompts/guion_inversa.md`,

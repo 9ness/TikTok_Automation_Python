@@ -1725,7 +1725,8 @@ def _encolar_clip(
     puestos = [r for r in rutas if _clip_puesto(r, montado_at)]
     # Modo Épico: además, un clip por golpe del guion.
     golpes = list(prod.get("golpes") or []) if config.es_epico(_modo(source, usuario, folder)) else []
-    faltan_ins = [
+    # Sin insertos (lo de serie) no se esperan: los subidos a mano se meten igual.
+    faltan_ins = [] if not (config.EPICO_CON_INSERTOS or inserto) else [
         n for n in range(1, len(golpes) + 1)
         if not _clip_puesto(prod.get(f"inserto{n}_path"), montado_at)
     ]

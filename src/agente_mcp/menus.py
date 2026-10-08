@@ -596,7 +596,8 @@ async def plan(c: Ctx, prod: str) -> dict:
             )
         out["voz"] = "La pone la app (Fish). Por defecto «auto»: decide por la mano."
         # Modo Épico: un inserto por golpe del guion (ver guía pov-bof-largo).
-        for i, g in enumerate(p.get("golpes") or [], start=1):
+        con_insertos = t == "largo" and largo_config.EPICO_CON_INSERTOS
+        for i, g in enumerate((p.get("golpes") or []) if con_insertos else [], start=1):
             out["imagenes"].append({
                 "archivo": f"epico_{i}.png", "inserto": i,
                 "adjuntar": ["un fotograma de TUS clips de este producto (o imagen_1.png)"],

@@ -153,3 +153,41 @@ def test_replica_viral(monkeypatch):
     assert pov_config.modo_de_carpeta("Réplicas virales") == "viral"
     assert pov_config.ve_carpeta_especial("Réplicas virales", "mauro")
     assert not pov_config.ve_carpeta_especial("Épico Octubre", "mauro")
+
+
+def _encolar(monkeypatch, tmp_path, con_insertos: bool):
+    """Sube el clip 2 de un épico con dos golpes y el clip 1 ya puesto."""
+    from types import SimpleNamespace
+
+    from src.api.routers.nicho_pov_bof_largo import productos as router
+
+    c1 = tmp_path / "c1.mp4"
+    c1.write_bytes(b"x")
+    c2 = tmp_path / "c2.mp4"
+    c2.write_bytes(b"x")
+    doc = {"guion": "g", "golpes": [{"tras": "a"}, {"tras": "b"}], "clip1_path": str(c1)}
+
+    def update(*a, usuario="", **kw):
+        doc.update(kw)
+        return dict(doc)
+
+    encolados = []
+    monkeypatch.setattr(config, "EPICO_CON_INSERTOS", con_insertos)
+    monkeypatch.setattr(router.product_repo, "update_product", update)
+    monkeypatch.setattr(router.product_repo, "textos_producto", lambda *a, **k: {})
+    monkeypatch.setattr(router, "_huecos", lambda *a, **k: 2)
+    monkeypatch.setattr(router, "_modo", lambda *a, **k: "epico")
+    monkeypatch.setattr(router, "_montandose", lambda *a, **k: set())
+    queue = SimpleNamespace(enqueue=lambda *a, **k: encolados.append(k) or SimpleNamespace(id="j1"))
+    r = router._encolar_clip(queue, "s", "f", "1", 2, c2, "auto", "ness")
+    return r, encolados
+
+
+def test_epico_sin_insertos_monta_con_los_clips(monkeypatch, tmp_path):
+    r, encolados = _encolar(monkeypatch, tmp_path, con_insertos=False)
+    assert r.encolado and len(encolados) == 1
+
+
+def test_epico_con_insertos_los_espera(monkeypatch, tmp_path):
+    r, encolados = _encolar(monkeypatch, tmp_path, con_insertos=True)
+    assert not r.encolado and "inserto 1 y el 2" in r.message and not encolados
