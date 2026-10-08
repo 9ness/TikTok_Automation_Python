@@ -21,6 +21,7 @@ pasa a `<carpeta>/publicados/` (lo llama el publicador).
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import re
 import shutil
@@ -100,7 +101,15 @@ def leer_metadatos(video: Path) -> dict:
             txt = video.parent / TEXTO_CARPETA
     if not js.is_file() and txt.is_file():
         caption, hashtags = [], []
-        for linea in txt.read_text(encoding="utf-8").splitlines():
+        texto = txt.read_text(encoding="utf-8")
+        if txt.name == TEXTO_CARPETA:
+            # varias variantes separadas por una línea `---`: cada vídeo coge
+            # una fija (por su nombre) para que no salgan todos iguales
+            variantes = [v for v in re.split(r"(?m)^\s*---\s*$", texto) if v.strip()]
+            if variantes:
+                n = int(hashlib.sha1(video.name.encode()).hexdigest(), 16)
+                texto = variantes[n % len(variantes)]
+        for linea in texto.splitlines():
             s = linea.strip()
             if _URL_RE.match(s) and not meta.get("enlace"):
                 meta["enlace"] = s
