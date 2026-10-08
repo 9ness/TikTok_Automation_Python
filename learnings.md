@@ -1090,3 +1090,4 @@
 - 2026-10-08 · Página pública `/links/<cuenta>`: `LoginGate` vivía en el root layout y tapaba cualquier ruta → `MarcoApp` + `lib/rutasPublicas.ts` la saltan (y `providers` no abre WS); en el backend la ruta va en `_PREFIJOS_PRO` o un `pro` con sesión recibe 403 en una página pública.
 - 2026-10-08 · Los endpoints de multiplataforma son solo admin → las herramientas MCP de enlaces/tandas necesitan el token de ness, no el de Ana aunque la cuenta sea suya.
 - 2026-10-08 · build web falló: node:20-alpine nueva ya no tiene libc6-compat → `apk add libc6-compat || apk add gcompat` en frontend/Dockerfile
+- 2026-10-08 · esperar un deploy con `while pgrep -f deploy_safe.sh` nunca acaba: pgrep -f encuentra el propio bash de la espera → usar `pgrep -x`/`pgrep -f '^/bin/bash .*deploy/deploy_safe.sh'` o mirar el journal del webhook
