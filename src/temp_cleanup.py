@@ -14,8 +14,9 @@ CLEANUP_MARKER = ".last_cleanup"
 # mire lo que mire).
 PROTECTED_NAMES = {CLEANUP_MARKER, ".gitkeep", ".gitignore", "deploy_status.json"}
 # Las capturas de variantes y fotos por color del Nicho Ropa (`variantes/`):
-# regenerables, pero no temporales — el operador las sube a mano.
-PROTECTED_DIRS = ("variantes",)
+# regenerables, pero no temporales — el operador las sube a mano. Y las copias
+# con música de Multiplataforma: una publicación puede esperar días en la cola.
+PROTECTED_DIRS = ("variantes", "multiplataforma_musica")
 
 
 def cleanup_temp_files(temp_dir, max_age_days=3, throttle_hours=12, force=False):

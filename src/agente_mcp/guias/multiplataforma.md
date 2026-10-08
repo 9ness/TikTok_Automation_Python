@@ -66,7 +66,10 @@ encontrar ese enlace, guardarlo y encolar los vídeos.
    cola los vídeos de productos CON enlace que aún no estén (repetirlo no
    duplica). Por defecto **solo los ya subidos a TikTok**;
    `incluir_no_subidos=True` si el operador lo pide. Se reparten con el ritmo
-   y horas «producto» de la cuenta, tras lo ya programado. Mira en la
+   y horas «producto» de la cuenta, tras lo ya programado. Los vídeos MUDOS
+   (multimodo de 10 s) se encolan con música sin copyright ya mezclada, elegida
+   por su sugerencia de música (`musica` en la respuesta: «estilo/pista»); los
+   que tienen voz van tal cual. Mira en la
    respuesta lo `omitidas` (`sin_enlace`, `no_subidos`, `ya_encolados`,
    `ruta_no_valida` = el vídeo está fuera del Drive del Programa 4).
 8. **`cola_multiplataforma(cuenta)`** → qué sale y cuándo, y el estado por

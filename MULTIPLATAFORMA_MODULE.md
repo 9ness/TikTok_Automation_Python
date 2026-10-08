@@ -26,6 +26,7 @@ tests: `tests/multiplataforma/`.
 | `publicador.py` | `publicar_pendientes(ahora, limite)` — el tick (rellena el enlace desde `enlaces_repo` si la publicación tiene `producto_ref` y aún no lo tiene) |
 | `repos/enlaces_repo.py` | Enlace de afiliado POR PRODUCTO y cuenta (`enlaces:<slug>`), con `sin_equivalente` |
 | `services/tandas.py` | Productos del dueño de la cuenta desde Mis tandas, `guardar_enlace`, `encolar` (resubida idempotente) y la página pública `/links` |
+| `services/musica.py` | Música de fondo para los vídeos MUDOS de Mis tandas: estilo por la `musica.busqueda` de la fila, pista del banco `_musica/` rotando por cuenta, copia con ffmpeg (`-c:v copy`) en `temp_work/multiplataforma_musica/` |
 
 ## Ingesta desde el Drive
 
@@ -60,6 +61,41 @@ Carpetas (se crean solas al `POST /cuentas`, mkdir -p defensivo):
   `simulado` no cuenta: sin tokens no se mueve nada.
 - El tick (`scripts/multiplataforma_tick.py`) ingesta todas las cuentas
   activas antes de publicar (no con `--dry-run`; `--sin-ingesta` la salta).
+
+## Música en los vídeos mudos (Mis tandas)
+
+La API de Meta no deja elegir canción de Instagram: a los vídeos MUDOS de
+Mis tandas (multimodo de 10 s: espejo, espejo_escenas, botas, bolsos, zapatos,
+maniquí…) `tandas.encolar` les mezcla música en el fichero
+(`services/musica.py:con_musica`). Los que tienen voz no se tocan.
+
+- **Banco** en el Drive: `Multiplataforma/_musica/<estilo>/*.mp3` + `LICENCIA.md`
+  (fuente, autor y URL de cada pista) + `pistas.json`. Solo **Mixkit** (Mixkit
+  Stock Music Free License, comprobada el 8/10/2026: uso comercial y en redes
+  sin atribución; prohibido publicar la pista sola/remezclada o registrarla en
+  Content ID; reclamaciones a team@mixkit.co). Nada de Pixabay/YouTube.
+  14 estilos, 66 pistas: `lofi_otono` (neutro/fallback), `jazz_cafe`,
+  `bossa_lounge`, `country_western`, `folk_acustico`, `folk_carretera`,
+  `blues_vintage`, `retro_vintage`, `soul_funk_70s`, `pop_outfit`,
+  `house_fashion`, `dream_pop`, `rnb_suave`, `hiphop_chill`. Para añadir un
+  estilo: carpeta nueva + sus claves en `musica.ESTILOS`.
+- **Mudo** = sin pista de audio (ffprobe) o con una en silencio (< −60 dB).
+- **Estilo** por palabras clave sobre `fila["musica"]` (`busqueda` ×3,
+  `estilo` ×2, `alternativas` ×1; el orden de `ESTILOS` desempata). Nada casa
+  o el estilo no tiene carpeta → `MUSICA_ESTILO_NEUTRO`.
+- **Pista**: la siguiente del estilo tras la última usada en esa cuenta
+  (Redis `musica_ultima:<cuenta>` = `{estilo: fichero}`).
+- **Mezcla**: `loudnorm` a `MULTIPLATAFORMA_MUSICA_LUFS` (−18), fundido de
+  0,8 s / 1,5 s, empieza a los 4 s de la pista, recortada a la duración del
+  vídeo, AAC 160k, `-c:v copy`, metadatos fuera.
+- **Copia** en `temp_work/multiplataforma_musica/<cuenta>/<stem>__<hash>.mp4`
+  (+ `.json` con estilo, pista y original), volumen persistente y protegida en
+  `temp_cleanup.PROTECTED_DIRS`; los originales de Ana no se tocan. Si ya
+  existe y es más nueva que el original se reutiliza. `pub.video_path` apunta
+  a la copia; `tandas_encoladas:<slug>` sigue guardando el ORIGINAL
+  (idempotencia). La respuesta de `encolar` trae `musica: "estilo/pista"`.
+- Cualquier fallo (sin banco, ffmpeg) → log y se publica el original.
+- Overrides: `MULTIPLATAFORMA_MUSICA_DIR` (banco), `MULTIPLATAFORMA_MUSICA_TRABAJO` (copias).
 
 ## Reglas del tick
 
@@ -99,6 +135,7 @@ Carpetas (se crean solas al `POST /cuentas`, mkdir -p defensivo):
 | `ingestadas:<slug>` | SET | rutas de vídeo ya encoladas desde el Drive |
 | `enlaces:<slug>` | JSON | `{producto_key: {enlace, shein, asin, sin_equivalente, titulo, tienda, foto_url, precio, nota, fila_id, clave, actualizado}}` |
 | `tandas_encoladas:<slug>` | SET | rutas de vídeo de Mis tandas ya encoladas (idempotencia de `encolar-tandas`) |
+| `musica_ultima:<slug>` | JSON | `{estilo: fichero}` última pista usada por estilo (rotación de la música) |
 
 ## API (`/api/v1/multiplataforma`, API key)
 
@@ -152,7 +189,8 @@ solo admin).
 `PINTEREST_APP_ID`, `PINTEREST_APP_SECRET`, `PINTEREST_API_BASE` (sandbox con
 acceso Trial), `MULTIPLATAFORMA_DRY_RUN`, `MULTIPLATAFORMA_LIMITE_*`,
 `MULTIPLATAFORMA_AMAZON_DOMINIO`, `MULTIPLATAFORMA_VIDEO_URL_TTL_S`,
-`MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`.
+`MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`, `MULTIPLATAFORMA_MUSICA_DIR`,
+`MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`.
 Reutiliza `PUBLIC_BASE_URL` y `AUTH_COOKIE_KEY`. Sin cost tracking: las APIs
 de publicación son gratuitas.
 

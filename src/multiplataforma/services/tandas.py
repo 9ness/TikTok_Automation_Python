@@ -7,7 +7,8 @@ una cuenta, cada uno con el enlace de afiliado de SU producto.
 - `guardar_enlace(...)`: SHEIN tal cual (validado) o ASIN → Amazon con el tag
   de la cuenta; `sin_equivalente` si no hay nada parecido.
 - `encolar(slug)`: encola (idempotente por `video_path`) los vídeos de los
-  productos CON enlace, con el ritmo/horas `producto` de la cuenta.
+  productos CON enlace, con el ritmo/horas `producto` de la cuenta. Los MUDOS
+  van con música del banco (`services/musica.py`); el SET guarda el original.
 - `links_publicos(slug)` / `foto_publica(...)`: la página pública /links.
 
 Identidad del producto (`producto_key`): hash de `clave_producto`, que es
@@ -21,6 +22,7 @@ título (textos sin extraer) cae al sitio en el catálogo.
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 import unicodedata
 from pathlib import Path
@@ -28,7 +30,9 @@ from pathlib import Path
 from src.multiplataforma import config
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo, redis_base
-from src.multiplataforma.services import enlaces, ingesta, textos, video_url
+from src.multiplataforma.services import enlaces, ingesta, musica, textos, video_url
+
+logger = logging.getLogger(__name__)
 
 ORIGEN = "tandas"
 MAX_LINKS = 60
@@ -252,8 +256,11 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
         titulo = e.get("titulo") or f.get("titulo") or ""
         caption = f.get("caption", "")
         t = textos.construir(titulo=titulo, caption=caption, enlace=e["enlace"], plataformas=config.PLATAFORMAS)
+        # Mudos (multimodo de 10 s): copia con música del banco según su
+        # sugerencia; con voz, o si algo falla, el original tal cual.
+        mus = musica.con_musica(f["video_path"], f.get("musica"), slug, log=logger.info)
         pub = Publicacion(
-            cuenta=slug, video_path=f["video_path"], tipo=TIPO, producto_ref=k,
+            cuenta=slug, video_path=mus["path"] if mus else f["video_path"], tipo=TIPO, producto_ref=k,
             titulo=t["titulo_pin"], caption=caption, textos=t["textos"], comentario=t["comentario"],
             enlace=e["enlace"], plataformas=list(config.PLATAFORMAS), programada_en=next(reloj), origen=ORIGEN,
         )
@@ -261,7 +268,8 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
         r.sadd(_key_encoladas(slug), f["video_path"])
         ya.add(f["video_path"])
         informe["encoladas"].append({"id": pub.id, "producto_key": k, "titulo": titulo,
-                                     "programada_en": pub.programada_en, "creada": creada})
+                                     "programada_en": pub.programada_en, "creada": creada,
+                                     "musica": f"{mus['estilo']}/{mus['pista']}" if mus else ""})
     informe["total"] = len(informe["encoladas"])
     return informe
 

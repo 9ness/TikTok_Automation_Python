@@ -272,3 +272,27 @@ def fichero_marca(slug: str, tipo: str) -> Path | None:
     except OSError:
         return None
     return None
+
+
+# ── Música de fondo para los vídeos MUDOS de Mis tandas ────────────────────
+# La API de Meta no deja elegir canción de Instagram: la música se mezcla en
+# el fichero. Banco en el Drive: `Multiplataforma/_musica/<estilo>/*.mp3`
+# (Mixkit Stock Music Free License, ver `_musica/LICENCIA.md`). Las copias con
+# música van al disco local persistente (`temp_work/multiplataforma_musica/`,
+# protegido en `temp_cleanup`): los originales de Mis tandas no se tocan.
+MUSICA_SUBDIR = "_musica"
+MUSICA_ESTILO_NEUTRO = "lofi_otono"
+MUSICA_LUFS = float(os.getenv("MULTIPLATAFORMA_MUSICA_LUFS", "-18"))
+MUSICA_FADE_IN_S = 0.8
+MUSICA_FADE_OUT_S = 1.5
+MUSICA_INICIO_S = 4.0  # salta la entrada (casi muda) de la pista si da para ello
+
+
+def musica_dir() -> Path:
+    override = os.getenv("MULTIPLATAFORMA_MUSICA_DIR", "").strip()
+    return Path(override) if override else raiz_drive() / MUSICA_SUBDIR
+
+
+def musica_trabajo_dir() -> Path:
+    override = os.getenv("MULTIPLATAFORMA_MUSICA_TRABAJO", "").strip()
+    return Path(override) if override else Path.cwd() / "temp_work" / "multiplataforma_musica"
