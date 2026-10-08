@@ -134,6 +134,29 @@
 	import app
 }
 
+# Página pública de enlaces de afiliado (bio de IG/FB). SOLO `/links/<cuenta>`,
+# lo que necesita para pintarse y sus datos: la app, el login y el resto de la
+# API NO se sirven por este nombre (404). La página llama a la API con ruta
+# relativa (`lib/api.ts`), así que va contra este mismo host.
+{$DOMAIN_LINKS:links.nebulabsmedia.com} {
+	encode gzip
+	@datos path /api/v1/multiplataforma/links/*
+	handle @datos {
+		reverse_proxy api:8000
+	}
+	@pagina path /links/* /_next/* /favicon.ico /icon.png /brand/*
+	handle @pagina {
+		reverse_proxy web:3000
+	}
+	handle {
+		respond 404
+	}
+	log {
+		output stdout
+		format json
+	}
+}
+
 # NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la
 # URL pública existente del box (Tailscale Funnel / el mismo {$DOMAIN}), en la
 # ruta /api/*. No hace falta un subdominio dedicado por ahora. Si en el futuro
