@@ -317,8 +317,14 @@ def links_publicos(slug: str) -> dict:
     items.sort(key=lambda t: (t[0], t[1]), reverse=True)
     productos_ = [i[2] for i in items[:MAX_LINKS]]
     hay_amazon = any(p["tienda"] == "amazon" for p in productos_)
+    base = f"/api/v1/multiplataforma/links/{slug}/marca"
     return {
         "cuenta": c.nombre or c.slug,
+        "tema": config.tema_links(slug),
+        "banner": config.BANNER_LINKS,
+        "logo": f"{base}/logo" if config.fichero_marca(slug, "logo") else "",
+        "portada": f"{base}/portada" if config.fichero_marca(slug, "portada") else "",
+        "fondo": f"{base}/fondo" if config.fichero_marca(slug, "fondo") else "",
         "productos": productos_,
         "aviso_amazon": textos.aviso_amazon() if hay_amazon else "",
     }

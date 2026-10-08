@@ -167,3 +167,41 @@ def redis_prefix() -> str:
 
 def base_publica() -> str:
     return os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/") or "https://factory.nebulabsmedia.com"
+
+
+# ── Página pública /links/<cuenta> ─────────────────────────────────────────
+# Logo y portada de cada cuenta: `Multiplataforma/_marca/<slug>_logo.*` y
+# `<slug>_portada*.*` + `<slug>_fondo*.*` (vertical 9:16 para el móvil; las mismas imágenes del perfil de IG/FB, para que quien
+# entra desde la bio reconozca la marca). Sin fichero, la página pone iniciales.
+MARCA_SUBDIR = "_marca"
+MARCA_EXTENSIONES = (".jpg", ".jpeg", ".png", ".webp")
+
+# Colores de la página por cuenta (sacados de su logo). `claro` = fondo claro.
+TEMA_DEFAULT: dict = {"fondo": "#0b1120", "acento": "#14b8a6", "acento2": "#5eead4", "claro": False,
+                      "lema": "Lo que sale en mis vídeos, con su enlace."}
+TEMAS: dict[str, dict] = {
+    "viva_shop": {"fondo": "#0a1a4a", "acento": "#f7931e", "acento2": "#ffc72c", "claro": False,
+                  "lema": "Los chollos de mis vídeos, con su enlace 🛒"},
+    "ama_shop": {"fondo": "#f6e8de", "acento": "#c96a52", "acento2": "#4a5f94", "claro": True,
+                 "lema": "Mis prendas favoritas, con su enlace 🤍"},
+    "viva_salud": {"fondo": "#06281f", "acento": "#4ade80", "acento2": "#86efac", "claro": False,
+                   "lema": "Bienestar del día a día, con su enlace 🌿"},
+}
+# Franja de urgencia: honesta (sin inventar descuentos ni plazos).
+BANNER_LINKS = "🔥 Ofertas activas · los precios cambian a diario"
+
+
+def tema_links(slug: str) -> dict:
+    return {**TEMA_DEFAULT, **TEMAS.get(slug, {})}
+
+
+def fichero_marca(slug: str, tipo: str) -> Path | None:
+    """`tipo` = logo | portada | fondo. Primer fichero `<slug>_<tipo>*` de `_marca`."""
+    carpeta = raiz_drive() / MARCA_SUBDIR
+    try:
+        for p in sorted(carpeta.glob(f"{slug}_{tipo}*")):
+            if p.is_file() and p.suffix.lower() in MARCA_EXTENSIONES:
+                return p
+    except OSError:
+        return None
+    return None

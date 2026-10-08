@@ -245,6 +245,17 @@ def links_publicos(slug: str) -> JSONResponse:
     return JSONResponse(datos, headers={"Cache-Control": "public, max-age=120"})
 
 
+@router_publico.get("/links/{slug}/marca/{tipo}")
+def links_marca(slug: str, tipo: str) -> FileResponse:
+    """PÚBLICO: logo, portada o fondo 9:16 de la cuenta (`Multiplataforma/_marca/`)."""
+    if tipo not in ("logo", "portada", "fondo") or not cuentas_repo.slug_valido(slug):
+        raise APIError("No existe", status_code=404)
+    p = config.fichero_marca(slug, tipo)
+    if not p:
+        raise APIError("No existe", status_code=404)
+    return FileResponse(p, headers={"Cache-Control": "public, max-age=3600"})
+
+
 @router_publico.get("/links/{slug}/foto/{producto_key}")
 def links_foto(slug: str, producto_key: str, w: Annotated[int, Query(ge=96, le=800)] = 400):
     """PÚBLICO: foto de un producto CON enlace de esa cuenta (nada más)."""

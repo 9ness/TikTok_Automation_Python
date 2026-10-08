@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowUpRight, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { api } from "@/lib/api";
 
@@ -13,19 +13,57 @@ interface ProductoLink {
   tienda: "amazon" | "shein" | "";
 }
 
+interface Tema {
+  fondo: string;
+  acento: string;
+  acento2: string;
+  claro: boolean;
+  lema: string;
+}
+
 interface DatosLinks {
   cuenta: string;
+  tema?: Tema;
+  banner?: string;
+  logo?: string;
+  portada?: string;
+  /** Vertical 9:16: si está, es el fondo de toda la pantalla (móvil). */
+  fondo?: string;
   productos: ProductoLink[];
   aviso_amazon: string;
 }
 
+const TEMA_DEFAULT: Tema = {
+  fondo: "#0b1120",
+  acento: "#14b8a6",
+  acento2: "#5eead4",
+  claro: false,
+  lema: "Lo que sale en mis vídeos, con su enlace.",
+};
+
 const NOMBRE_TIENDA: Record<string, string> = { amazon: "Amazon", shein: "SHEIN" };
+
+/** Con más productos que esto aparece el buscador. */
+const MIN_BUSCADOR = 8;
 
 /** Minúsculas y sin acentos, para que «camiseta» encuentre «Camísetá». */
 function normaliza(t: string): string {
   return t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+function iniciales(nombre: string): string {
+  return nombre
+    .split(/[\s_]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+/** Página pública de enlaces: la marca de la cuenta (portada + logo + sus
+ *  colores) para que quien llega desde la bio la reconozca, una franja de
+ *  urgencia y los productos en LISTA (foto + texto + botón), que es lo que
+ *  mejor cabe en un móvil. */
 export function LinksCuenta({ cuenta }: { cuenta: string }) {
   const [datos, setDatos] = useState<DatosLinks | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,91 +98,150 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
     });
   }, [datos, busca]);
 
+  const tema = datos?.tema ?? TEMA_DEFAULT;
+  const claro = tema.claro;
+  const vars = {
+    "--fondo": tema.fondo,
+    "--acento": tema.acento,
+    "--acento2": tema.acento2,
+  } as CSSProperties;
+
+  const texto = claro ? "text-stone-900" : "text-white";
+  const textoSuave = claro ? "text-stone-600" : "text-white/65";
+  const tarjeta = claro
+    ? "bg-white/80 border-stone-900/10 shadow-sm"
+    : "bg-white/[0.06] border-white/10";
+  const nombre = datos?.cuenta ?? "";
+  const conBuscador = (datos?.productos.length ?? 0) > MIN_BUSCADOR;
+
   return (
-    <div className="min-h-[100dvh] bg-[#0d1117] text-slate-100 [color-scheme:dark]">
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-[radial-gradient(60%_100%_at_50%_0%,rgba(20,184,166,0.18),transparent)]" />
-      <main className="relative mx-auto w-full max-w-3xl px-4 pb-16 pt-[calc(2rem+env(safe-area-inset-top))]">
-        <header className="mb-5 text-center">
-          <h1 className="break-words text-2xl font-bold tracking-tight sm:text-3xl">
-            {datos?.cuenta ?? (error ? "" : " ")}
+    <div
+      style={vars}
+      className={`min-h-[100dvh] bg-[var(--fondo)] ${texto} ${claro ? "[color-scheme:light]" : "[color-scheme:dark]"}`}
+    >
+      {/* Fondo vertical de la marca: fijo detrás de todo (div fixed y no
+          `background-attachment: fixed`, que iOS ignora). */}
+      {datos?.fondo && (
+        <div className="pointer-events-none fixed inset-0 z-0">
+          {/* eslint-disable-next-line @next/next/no-img-element -- servida por la API */}
+          <img src={`${api.baseUrl}${datos.fondo}`} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--fondo)]/40 to-[var(--fondo)]/80" />
+        </div>
+      )}
+
+      {/* Portada de la marca, fundida con el fondo (solo sin fondo vertical) */}
+      <div className={`relative w-full overflow-hidden ${datos?.fondo ? "h-28 sm:h-32" : "h-40 sm:h-56"}`}>
+        {datos?.fondo ? null : datos?.portada ? (
+          // eslint-disable-next-line @next/next/no-img-element -- servida por la API
+          <img
+            src={`${api.baseUrl}${datos.portada}`}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full bg-[radial-gradient(70%_120%_at_50%_0%,var(--acento),transparent)] opacity-40" />
+        )}
+        {!datos?.fondo && (
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[var(--fondo)]" />
+        )}
+      </div>
+
+      <main className="relative z-10 mx-auto -mt-14 w-full max-w-xl px-4 pb-16 sm:-mt-16">
+        <header className="mb-5 flex flex-col items-center text-center">
+          <div
+            className="h-24 w-24 overflow-hidden rounded-full border-4 border-[var(--fondo)] bg-[var(--acento)] shadow-[0_0_0_2px_var(--acento),0_10px_30px_-8px_var(--acento)] sm:h-28 sm:w-28"
+          >
+            {datos?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element -- servida por la API
+              <img src={`${api.baseUrl}${datos.logo}`} alt={nombre} className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-2xl font-bold text-white">
+                {iniciales(nombre)}
+              </span>
+            )}
+          </div>
+          <h1 className="mt-3 break-words text-2xl font-extrabold tracking-tight sm:text-3xl">
+            {nombre || (error ? "" : " ")}
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Lo que sale en mis vídeos. Toca un producto para verlo en la tienda.
-          </p>
+          {datos && <p className={`mt-1 text-sm ${textoSuave}`}>{tema.lema}</p>}
         </header>
 
-        <div className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-5 bg-[#0d1117]/90 px-4 py-2 backdrop-blur">
-          <label className="relative block">
-            <span className="sr-only">Buscar producto</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <input
-              type="search"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Busca el producto del vídeo…"
-              className="w-full rounded-lg border border-slate-700/80 bg-slate-900/80 py-3 pl-10 pr-10 text-base text-slate-100 placeholder:text-slate-500 focus:border-teal-400/70 focus:outline-none focus:ring-2 focus:ring-teal-400/20"
-            />
-            {busca && (
-              <button
-                type="button"
-                onClick={() => setBusca("")}
-                aria-label="Borrar búsqueda"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:text-slate-100"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </label>
-        </div>
+        {datos?.banner && (
+          <div className="mb-5 overflow-hidden rounded-xl bg-[var(--acento)] px-4 py-2.5 text-center text-sm font-bold text-white shadow-[0_8px_24px_-12px_var(--acento)]">
+            <span className="animate-pulse">{datos.banner}</span>
+          </div>
+        )}
 
-        {error && <p className="py-16 text-center text-sm text-slate-400">{error}</p>}
+        {conBuscador && (
+          <div className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-4 bg-[var(--fondo)]/90 px-4 py-2 backdrop-blur">
+            <label className="relative block">
+              <span className="sr-only">Buscar producto</span>
+              <Search className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${textoSuave}`} />
+              <input
+                type="search"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Busca el producto del vídeo…"
+                className={`w-full rounded-xl border py-3 pl-10 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-[var(--acento)] ${tarjeta} ${texto} placeholder:opacity-60`}
+              />
+              {busca && (
+                <button
+                  type="button"
+                  onClick={() => setBusca("")}
+                  aria-label="Borrar búsqueda"
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 ${textoSuave}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </label>
+          </div>
+        )}
+
+        {error && <p className={`py-16 text-center text-sm ${textoSuave}`}>{error}</p>}
 
         {!datos && !error && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] animate-pulse rounded-xl bg-slate-800/60" />
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-24 animate-pulse rounded-2xl bg-white/10" />
             ))}
           </div>
         )}
 
         {datos && visibles.length === 0 && (
-          <p className="py-16 text-center text-sm text-slate-400">
-            {busca ? `Nada con «${busca}». Prueba con otra palabra.` : "Todavía no hay productos."}
+          <p className={`py-16 text-center text-sm ${textoSuave}`}>
+            {busca ? `Nada con «${busca}». Prueba con otra palabra.` : "Muy pronto, los productos de mis vídeos aquí."}
           </p>
         )}
 
         {visibles.length > 0 && (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <ul className="space-y-3">
             {visibles.map((p) => (
               <li key={p.id}>
                 <a
                   href={p.enlace}
                   target="_blank"
                   rel="nofollow sponsored noopener"
-                  className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900/70 transition hover:border-teal-400/50 hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60"
+                  className={`group flex items-center gap-3 rounded-2xl border p-2.5 transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--acento)] ${tarjeta}`}
                 >
-                  <div className="relative aspect-square w-full overflow-hidden bg-slate-800">
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-white sm:h-24 sm:w-24">
                     {/* eslint-disable-next-line @next/next/no-img-element -- foto servida por la API, sin optimizador */}
                     <img
                       src={`${api.baseUrl}${p.foto}`}
                       alt={p.titulo}
                       loading="lazy"
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+                      className="h-full w-full object-cover"
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
                       }}
                     />
                   </div>
-                  <div className="flex flex-1 items-start justify-between gap-2 p-3">
-                    <div className="min-w-0">
-                      <p className="line-clamp-2 break-words text-xs font-medium leading-snug text-slate-100 sm:text-sm">
-                        {p.titulo}
-                      </p>
-                      {p.tienda && (
-                        <p className="mt-1 text-[11px] text-slate-500">en {NOMBRE_TIENDA[p.tienda]}</p>
-                      )}
-                    </div>
-                    <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-teal-400 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 break-words text-sm font-semibold leading-snug">{p.titulo}</p>
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--acento)] px-3 py-1.5 text-xs font-bold text-white">
+                      Ver oferta{p.tienda ? ` en ${NOMBRE_TIENDA[p.tienda]}` : ""}
+                      <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
+                    </span>
                   </div>
                 </a>
               </li>
@@ -153,7 +250,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
         )}
 
         {datos?.aviso_amazon && (
-          <footer className="mt-10 border-t border-slate-800 pt-4 text-center text-[11px] leading-relaxed text-slate-500">
+          <footer className={`mt-10 border-t pt-4 text-center text-[11px] leading-relaxed ${claro ? "border-stone-900/10" : "border-white/10"} ${textoSuave}`}>
             {datos.aviso_amazon}
           </footer>
         )}
