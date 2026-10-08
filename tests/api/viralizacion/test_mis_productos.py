@@ -29,6 +29,7 @@ def raiz_temporal(tmp_path, monkeypatch: pytest.MonkeyPatch):
         "mis_productos": tmp_path / "muestras",
         "tareas_productos": tmp_path / "tareas",
         "temporada_q4": tmp_path / "temporada_q4",
+        "carruseles_virales": tmp_path / "carruseles_virales",
     }
     for d in raices.values():
         d.mkdir(parents=True, exist_ok=True)

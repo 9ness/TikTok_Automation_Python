@@ -3,6 +3,9 @@
 > Viene de la clase del 30 sep 2026 (`docs/clases/2026-09-30_clase_miercoles.md`):
 > copiar vídeos que YA venden en TikTok Shop, con un producto nuestro.
 > Código: `src/replicar_viral/`, API `/api/v1/replicar-viral/*`, MCP `replicar_viral`.
+>
+> ¿Es un **carrusel de fotos** y no un vídeo? Eso va por `replicar_carrusel`:
+> guía [`replicar-carrusel.md`](replicar-carrusel.md).
 
 ## La idea
 

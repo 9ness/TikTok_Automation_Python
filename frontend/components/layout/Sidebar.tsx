@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Captions,
   Clapperboard,
+  GalleryHorizontalEnd,
   ChevronDown,
   ChevronRight,
   Crown,
@@ -123,6 +124,7 @@ const NAV: NavGroup[] = [
       // Lo primero de todo para los tres: los vídeos ya montados de todos los
       // nichos, de diez en diez para subirlos (`src/mis_tandas/`).
       { href: "/tiktok-shop-ai-pro/mis-tandas", label: "Mis tandas", icon: ListChecks },
+      { href: "/tiktok-shop-ai-pro/replicar-carrusel", label: "Replicar carrusel", icon: GalleryHorizontalEnd },
       { href: "/tiktok-shop-ai-pro/viralizacion", label: "Viralización 1K", icon: Video },
       // La Cuenta Piloto no es un módulo del curso (no lleva número), así que
       // va suelta aquí y no en `modulos.ts`.
@@ -186,6 +188,7 @@ const BASE_AI_PRO = "/tiktok-shop-ai-pro";
 /** Lo que se usa a diario va primero; el resto sigue debajo en su orden. */
 const ORDEN_AI_PRO = [
   `${BASE_AI_PRO}/mis-tandas`,
+  `${BASE_AI_PRO}/replicar-carrusel`,
   `${BASE_AI_PRO}/viralizacion`,
   // Los cuatro que comparten catálogo, en el orden en que se trabajan.
   `${BASE_AI_PRO}/nicho-pov-bof`,
@@ -209,6 +212,8 @@ const ORDEN_AI_PRO = [
  *  (el backend corta aparte lo que no les toca, ver `_PREFIJOS_PRO`). */
 const ITEMS_PRO = [
   `${BASE_AI_PRO}/mis-tandas`,
+  // Como «Replicar viral» (MCP): sus rutas ya están en `_PREFIJOS_PRO`.
+  `${BASE_AI_PRO}/replicar-carrusel`,
   `${BASE_AI_PRO}/nicho-pov-bof`,
   `${BASE_AI_PRO}/pov-bof-largo`,
   `${BASE_AI_PRO}/nicho-ropa-mujer`,

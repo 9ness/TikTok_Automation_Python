@@ -89,6 +89,18 @@ Cada fila baja su vídeo con un enlace normal (como el POV BOF Largo): se
 pueden pedir varios a la vez. La cabecera de la tanda tiene **Todos (N)** y
 **Pendientes (M)** (solo lo que falta por subir); lo sin stock no se baja.
 
+## Fotos (pestaña aparte)
+
+La pantalla tiene dos pestañas, **🎬 Vídeos** y **🖼️ Fotos**, cada una con su
+contador `subidos/total`. En Fotos están los **carruseles replicados**
+(`replicar-carrusel.md`) del usuario, en sus PROPIAS tandas de diez
+(`src/mis_tandas/fotos.py`): no cuentan como vídeos ni para la cuota del día.
+Un carrusel entra en cuanto tiene una foto subida, en orden de creación, y
+cada tanda abierta lleva su día (hoy, mañana…). Cada tanda baja en un ZIP
+(una carpeta `NN_<producto>` por carrusel con las fotos y `caption.txt`; si ya
+hay alguno subido, solo los pendientes) y cada carrusel tiene su ZIP, su
+caption y su botón **Subido** (se guarda en la réplica: `subido`/`subido_at`).
+
 ## Colores
 
 Cada vídeo enseña su **nicho** (píldora fuerte), su **modo o estilo**
@@ -112,6 +124,10 @@ un nicho nuevo en Mis tandas, **asígnale color** en
   aún no sale: la lista se recuerda ~45 s).
 - `marcar_tanda(id, subido=…, sin_stock=…, rehacer=…, nota_rehacer=…)` —
   **solo si el operador te lo pide**. Subido es lo que ha publicado ÉL.
+- `mis_tandas(fotos=True)` — las tandas de FOTOS (carruseles): por tanda,
+  `zip` (todas) y `zip_pendientes`; por carrusel, `id`, `hechas`/`diapositivas`,
+  `subido` y su `zip`. `marcar_tanda(id, subido=True, fotos=True)` marca un
+  carrusel (solo `subido`; también **solo si te lo pide el operador**).
 
 - `semaforo_tanda(id, color, motivo)` — la revisión antes de subir (ver
   «Semáforo»). Esto SÍ lo puedes hacer sin que te lo pidan cuando te encarguen

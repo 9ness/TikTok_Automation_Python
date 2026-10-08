@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from src.api.dependencies import get_current_user, get_web_user
@@ -36,6 +36,10 @@ class EstadoRequest(BaseModel):
 
 
 def _error(e: Exception) -> APIError:
+    from src.replicar_viral.servicio import ErrorReplica
+
+    if isinstance(e, ErrorReplica):
+        return APIError(str(e), status_code=e.status)
     if isinstance(e, servicio.ErrorTanda):
         return APIError(str(e), status_code=e.status)
     if isinstance(e, RuntimeError):
@@ -162,3 +166,55 @@ def get_foto(
         media_type="image/png" if path.suffix.lower() == ".png" else "image/jpeg",
         headers={"Cache-Control": "private, max-age=86400"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Fotos: los carruseles de «Replicar carrusel» (`src/mis_tandas/fotos.py`),
+# con su propio contador y sus tandas de diez.
+# ---------------------------------------------------------------------------
+class FotoEstadoRequest(BaseModel):
+    id: str
+    subido: bool
+
+
+@router.get("/fotos")
+def get_tandas_fotos(
+    todas: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Tandas de carruseles (abiertas; con `todas`, también las cerradas)."""
+    from src.mis_tandas import fotos
+
+    try:
+        return fotos.tandas(usuario, todas=todas)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.post("/fotos/estado")
+def post_estado_foto(body: FotoEstadoRequest, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Marca (o desmarca) un carrusel como subido."""
+    from src.mis_tandas import fotos
+
+    try:
+        return fotos.marcar(usuario, body.id, body.subido)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.get("/fotos/zip")
+def get_zip_fotos(
+    tanda: Annotated[int, Query(ge=1)],
+    pendientes: Annotated[bool, Query()] = False,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> Response:
+    """Todos los carruseles de la tanda en un ZIP (una carpeta por carrusel)."""
+    from src.mis_tandas import fotos
+
+    try:
+        datos, nombre = fotos.zip_tanda(usuario, tanda, pendientes)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+    return Response(datos, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="{nombre}"',
+                             "Cache-Control": "no-store"})

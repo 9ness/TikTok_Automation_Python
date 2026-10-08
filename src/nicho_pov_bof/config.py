@@ -89,6 +89,15 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "temporada_q4",
         "propia": "1",
     },
+    # Los productos de «Replicar carrusel» (8 oct 2026): se dan de alta en esa
+    # pantalla con foto limpia + ficha + URL y se COMPARTEN entre usuarios para
+    # replicar el mismo carrusel viral en otra cuenta. Catálogo del operador
+    # como los de arriba: mismas carpetas de diez y mismo convenio de nombres.
+    "carruseles_virales": {
+        "label": "🖼️ Carruseles virales",
+        "folder": "carruseles_virales",
+        "propia": "1",
+    },
     # Los productos de la web del curso, importados por ZIP. También "propia"
     # (vive en el Drive montado) y con el mismo convenio de nombres, así que
     # todo lo de después funciona sin nada especial.
@@ -131,6 +140,9 @@ SOURCES: dict[str, dict[str, str]] = {
 MIS_PRODUCTOS_POR_CARPETA = 10
 MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
 TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/temporada_q4"
+CARRUSELES_VIRALES_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/carruseles_virales"
+)
 TAREAS_PRODUCTOS_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/tareas_productos"
 )
@@ -142,6 +154,7 @@ CATALOGOS_OPERADOR: dict[str, dict[str, str]] = {
     "mis_productos": {"root": MIS_PRODUCTOS_ROOT, "prefijo": "Mis Productos"},
     "tareas_productos": {"root": TAREAS_PRODUCTOS_ROOT, "prefijo": "Tareas Productos"},
     "temporada_q4": {"root": TEMPORADA_Q4_ROOT, "prefijo": "Temporada Q4"},
+    "carruseles_virales": {"root": CARRUSELES_VIRALES_ROOT, "prefijo": "Carruseles Virales"},
 }
 
 

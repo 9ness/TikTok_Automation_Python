@@ -91,6 +91,7 @@ const CATALOGOS: [string, string][] = [
   ["mis_productos", "border-slate-400/70 text-slate-600 dark:text-slate-300"],
   ["tareas_productos", "border-stone-400/70 text-stone-600 dark:text-stone-300"],
   ["temporada_q4", "border-red-500/70 text-red-600 dark:text-red-400"],
+  ["carruseles_virales", "border-violet-500/60 text-violet-700 dark:text-violet-300"],
   ["aleatorios", "border-zinc-400/70 text-zinc-600 dark:text-zinc-300"],
 ];
 

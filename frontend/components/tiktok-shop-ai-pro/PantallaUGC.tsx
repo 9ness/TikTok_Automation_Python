@@ -1408,4 +1408,4 @@ function BajarFotos({
 
 // Los catálogos que sube el operador. Solo ahí se pide una duración mínima: es
 // el trato por la muestra o la tarea, y los productos del curso no lo tienen.
-const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos", "temporada_q4"];
+const CATALOGOS_PROPIOS = ["mis_productos", "tareas_productos", "temporada_q4", "carruseles_virales"];

@@ -52,7 +52,11 @@ decir antes cuánto vas a lanzar y esperar el «sí». No uses `marcar` salvo qu
 Si te piden rehacer lo marcado, `para_rehacer(menu)` lo lista todo con la nota.
 Lo montado de todos los nichos, en tandas de diez para publicar, está en
 `mis_tandas` (solo lectura: lo que montes aparece ahí solo, no se sube nada).
-Para copiar la fórmula de un vídeo viral con un producto nuestro: `replicar_viral`.
+Para copiar la fórmula de un vídeo viral con un producto nuestro: `replicar_viral`;
+de un carrusel de fotos: `replicar_carrusel` → fotos en Flow → `subir_imagen_carrusel`
+→ `descargar_carrusel` (ZIP con el texto quemado); el producto puede darse de
+alta ahí mismo con `producto_carrusel`, y los carruseles listos salen en
+`mis_tandas(fotos=True)`.
 Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
 antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
 prometer nunca ofertas que la ficha no tenga.
@@ -576,7 +580,8 @@ async def marcar(ctx: Context, menu: str, catalogo: str, carpeta: str, producto:
 
 
 @_herramienta(structured_output=False)
-async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) -> str:
+async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False,
+                     fotos: bool = False) -> str:
     """«Mis tandas» del usuario del token: los vídeos YA MONTADOS de POV BOF,
     POV BOF Largo y Moda Mujer (Multimodo y Aleatorios), de diez en diez y en el orden en
     que toca publicarlos (cada tanda abierta lleva `fecha` y `temporada`).
@@ -585,8 +590,26 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) ->
     las tandas abiertas; `todas=True` trae también las ya subidas.
     Cada vídeo trae `id` (para `marcar_tanda` y `semaforo_tanda`), su nicho,
     catálogo, carpeta y producto (para ir a su menú), `descargar` y `semaforo`
-    (null = sin revisar, o {color, motivo} de la revisión de ESE montaje)."""
+    (null = sin revisar, o {color, motivo} de la revisión de ESE montaje).
+    `fotos=True`: el apartado «Fotos» — los carruseles de «Replicar carrusel»
+    con al menos una foto, en sus PROPIAS tandas de diez (contador aparte de
+    los vídeos); cada tanda trae `zip` (todos sus carruseles; `zip_pendientes`
+    si ya hay alguno subido) y cada carrusel
+    su `id` (para `marcar_tanda(..., fotos=True)`) y `zip`."""
     u = _usuario(ctx)
+    if fotos:
+        from urllib.parse import quote
+
+        d = await Interno(u).get("/api/v1/mis-tandas/fotos", todas="true" if todas else "false")
+        for t in d.get("tandas", []):
+            t["zip"] = archivos.enlace_interno(u, f"/api/v1/mis-tandas/fotos/zip?tanda={t['numero']}")
+            if t.get("subidos"):
+                t["zip_pendientes"] = archivos.enlace_interno(
+                    u, f"/api/v1/mis-tandas/fotos/zip?tanda={t['numero']}&pendientes=true")
+            for c in t.get("items", []):
+                c["zip"] = archivos.enlace_interno(
+                    u, f"/api/v1/replicar-viral/carrusel/{quote(c['id'], safe='')}/zip")
+        return _json(d)
     params = {"todas": "true" if todas else "false", "fresco": "true" if fresco else "false"}
     d = await Interno(u).get("/api/v1/mis-tandas", **params)
     from urllib.parse import quote
@@ -606,15 +629,22 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False) ->
 @_herramienta(structured_output=False)
 async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
                        sin_stock: bool | None = None, rehacer: bool | None = None,
-                       nota_rehacer: str = "", quitar: bool | None = None) -> str:
+                       nota_rehacer: str = "", quitar: bool | None = None,
+                       fotos: bool = False) -> str:
     """Botones de una fila de «Mis tandas» (`id` sale de `mis_tandas`). Escribe
     en el documento del NICHO del vídeo, así que su pantalla lo ve igual.
     SOLO si el operador te lo pide: «Subido» es lo que ha publicado él;
     «sin stock» es del producto (vale para todos los usuarios y nichos);
     «rehacer» con su nota (no existe en el POV BOF corto).
     `quitar=True` saca el vídeo de la lista (ya no se va a subir; no se borra
-    nada del nicho y su hueco lo ocupa el siguiente); `quitar=False` lo devuelve."""
+    nada del nicho y su hueco lo ocupa el siguiente); `quitar=False` lo devuelve.
+    `fotos=True`: el `id` es de un carrusel (de `mis_tandas(fotos=True)`) y
+    solo vale `subido`."""
     api = Interno(_usuario(ctx))
+    if fotos:
+        if subido is None:
+            raise ErrorApp("En un carrusel solo se marca `subido`.")
+        return _json(await api.post("/api/v1/mis-tandas/fotos/estado", {"id": id, "subido": subido}))
     if quitar is not None:
         return _json(await api.post("/api/v1/mis-tandas/ocultar", {"id": id, "oculto": quitar}))
     body: dict = {"id": id}
@@ -664,6 +694,147 @@ async def replicar_viral(ctx: Context, catalogo: str, carpeta: str, producto: st
     if not url:
         raise ErrorApp("Falta `url` (enlace de TikTok) o `archivo_id`.")
     r = await api._pedir("POST", "/api/v1/replicar-viral/analizar", data=datos)
+    return _json(r.json())
+
+
+def _enlaces_carrusel(u: str, doc: dict) -> dict:
+    """Añade a cada diapositiva sus enlaces (la del viral y la ya lista) y el
+    del ZIP: el agente los abre con `ver` o los baja para subirlos a Flow."""
+    from urllib.parse import quote
+
+    base = f"/api/v1/replicar-viral/carrusel/{quote(str(doc.get('id', '')), safe='')}"
+    for d in doc.get("diapositivas") or []:
+        n = d.get("n")
+        if d.get("tiene_original"):
+            d["original"] = archivos.enlace_interno(u, f"{base}/imagen/{n}?tipo=orig")
+        if d.get("tiene_imagen"):
+            d["descargar"] = archivos.enlace_interno(u, f"{base}/imagen/{n}?tipo=final&descargar=true")
+    if doc.get("hechas"):
+        doc["zip"] = archivos.enlace_interno(u, f"{base}/zip")
+    return doc
+
+
+@_herramienta(structured_output=False)
+async def replicar_carrusel(ctx: Context, catalogo: str = "", carpeta: str = "",
+                            producto: str = "", url: str = "", para: str = "",
+                            replica_id: str = "") -> str:
+    """Copia la FÓRMULA de un CARRUSEL de fotos viral de TikTok (`url`) con un
+    producto nuestro (catálogo/carpeta/producto del POV BOF). Gemini ve todas
+    las diapositivas y devuelve, por cada una: `rol` (gancho/problema/producto/
+    prueba/cta), `texto_original`, `texto` (el nuestro, que la app quemará),
+    `usa_foto_producto` y `prompt_imagen` (inglés, para Google Flow / Nano
+    Banana, sin texto en la imagen, en el `formato` 3:4 o 9:16 del original);
+    más `caption` y `hashtags`. Cada diapositiva trae `original` (enlace a la
+    foto del viral). Tarda ~1 min; solo texto, NO genera imágenes: las generas
+    tú en Flow y las subes con `subir_imagen_carrusel`. Guía `replicar-carrusel.md`.
+    `replica_id`: vuelve a replicar ESE carrusel (mismo viral y producto,
+    textos nuevos) sin pasar lo demás. `para`: otro usuario (ana, mauro…),
+    solo si el token es de un admin; la réplica queda en SU lista.
+    Productos que no están en ningún catálogo: dalos de alta con
+    `producto_carrusel` (catálogo `carruseles_virales`, compartido)."""
+    u = _usuario(ctx)
+    if replica_id:
+        doc = await Interno(u).post(f"/api/v1/replicar-viral/carrusel/{replica_id}/replicar",
+                                    {"para": para})
+        return _json(_enlaces_carrusel(doc.get("usuario") or u, doc))
+    if not (catalogo and carpeta and producto and url):
+        raise ErrorApp("Faltan `catalogo`, `carpeta`, `producto` y `url` (o pasa `replica_id`).")
+    r = await Interno(u)._pedir("POST", "/api/v1/replicar-viral/carrusel/analizar",
+                                data={"source": catalogo, "folder": carpeta,
+                                      "producto": producto, "url": url, "para": para})
+    doc = r.json()
+    return _json(_enlaces_carrusel(doc.get("usuario") or u, doc))
+
+
+@_herramienta(structured_output=False)
+async def subir_imagen_carrusel(ctx: Context, id: str, n: int, archivo_id: str = "",
+                                ruta_bandeja: str = "", url: str = "") -> str:
+    """Sube la foto generada en Flow para la diapositiva `n` (1, 2…) del
+    carrusel `id` (de `replicar_carrusel`). UNA fuente: `archivo_id` (subido a
+    /subir), `ruta_bandeja` o `url`. La app le quema el texto de esa
+    diapositiva (motor del nicho Carruseles). Revisa la foto ANTES de subirla
+    (producto idéntico, sin texto, sin niños). Devuelve el estado del carrusel
+    (`hechas`/`total`, y `zip` cuando hay alguna)."""
+    u = _usuario(ctx)
+    contenido, nombre = await archivos.leer_origen(u, url=url, archivo_id=archivo_id,
+                                                   ruta_bandeja=ruta_bandeja)
+    if archivos.es_video(nombre, contenido):
+        raise ErrorApp("Eso es un vídeo: aquí va la FOTO de la diapositiva.")
+    r = await Interno(u)._pedir(
+        "POST", f"/api/v1/replicar-viral/carrusel/{id}/imagen/{int(n)}",
+        files={"file": (nombre or f"{int(n):02d}.jpg", contenido, "image/jpeg")})
+    return _json(_enlaces_carrusel(u, r.json()))
+
+
+@_herramienta(structured_output=False)
+async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
+                             texto: str | None = None) -> str:
+    """Un carrusel replicado: diapositivas con su texto, si ya tienen foto,
+    `hechas`/`total`, y `zip` = enlace para bajar TODAS de golpe (con su texto
+    quemado) + caption.txt. Sin `id`: la lista de carruseles replicados.
+    Para corregir el texto de una diapositiva (se vuelve a quemar):
+    `texto_n` + `texto`. Solo si el operador lo pide o el texto incumple las
+    reglas (promesas, cupones afirmados)."""
+    u = _usuario(ctx)
+    api = Interno(u)
+    if not id:
+        return _json(await api.get("/api/v1/replicar-viral", tipo="carrusel"))
+    if texto_n and texto is not None:
+        doc = await api.post(f"/api/v1/replicar-viral/carrusel/{id}/texto/{int(texto_n)}",
+                             {"texto": texto})
+    else:
+        doc = await api.get(f"/api/v1/replicar-viral/carrusel/{id}")
+    return _json(_enlaces_carrusel(u, doc))
+
+
+async def _foto_de(u: str, valor: str, que: str) -> tuple[bytes, str]:
+    """`valor` es una url http(s), un `archivo_id` de /subir o una ruta de la bandeja."""
+    import re
+
+    if not valor:
+        raise ErrorApp(f"Falta {que}.")
+    if valor.startswith(("http://", "https://")):
+        return await archivos.leer_origen(u, url=valor)
+    if re.fullmatch(r"[a-f0-9]{16}(\.[a-z0-9]+)?", valor):
+        return await archivos.leer_origen(u, archivo_id=valor)
+    return await archivos.leer_origen(u, ruta_bandeja=valor)
+
+
+@_herramienta(structured_output=False)
+async def producto_carrusel(ctx: Context, product_url: str = "", foto_limpia: str = "",
+                            foto_ficha: str = "", carrusel_url: str = "",
+                            releer_carpeta: str = "", releer_producto: str = "") -> str:
+    """Catálogo COMPARTIDO «🖼️ Carruseles virales» (`carruseles_virales`) de
+    «Replicar carrusel». Sin argumentos: lo lista (folder, producto, titulo,
+    product_url, carrusel_url = el viral con el que se replicó; con eso se
+    llama a `replicar_carrusel`).
+    Alta: `foto_limpia` (el producto solo, fondo limpio) + `foto_ficha`
+    (captura de la ficha de TikTok Shop con título y precio) — cada una es una
+    url http(s), un `archivo_id` de /subir o una ruta de tu bandeja — +
+    `product_url` (ficha de TikTok Shop) y, si lo tienes, `carrusel_url` (el
+    carrusel viral). La app lee los textos de la ficha (una llamada de IA) y
+    guarda la URL; devuelve `aviso` si la lectura falló: reintenta con
+    `releer_carpeta` + `releer_producto`. Busca antes con `buscar` que el
+    producto no exista ya en otro catálogo."""
+    u = _usuario(ctx)
+    api = Interno(u)
+    if releer_carpeta and releer_producto:
+        return _json(await api.post("/api/v1/replicar-viral/carrusel/producto/textos",
+                                    {"folder": releer_carpeta, "producto": releer_producto}))
+    if not (product_url or foto_limpia or foto_ficha):
+        return _json(await api.get("/api/v1/replicar-viral/carrusel/catalogo"))
+    if not product_url:
+        raise ErrorApp("Falta `product_url` (la ficha del producto en TikTok Shop).")
+    limpia, n_limpia = await _foto_de(u, foto_limpia, "`foto_limpia`")
+    ficha, n_ficha = await _foto_de(u, foto_ficha, "`foto_ficha`")
+    for contenido, nombre in ((limpia, n_limpia), (ficha, n_ficha)):
+        if archivos.es_video(nombre, contenido):
+            raise ErrorApp("Eso es un vídeo: aquí van FOTOS.")
+    r = await api._pedir(
+        "POST", "/api/v1/replicar-viral/carrusel/producto",
+        data={"product_url": product_url, "carrusel_url": carrusel_url},
+        files={"foto_limpia": (n_limpia or "limpia.jpg", limpia, "image/jpeg"),
+               "foto_ficha": (n_ficha or "ficha.jpg", ficha, "image/jpeg")})
     return _json(r.json())
 
 

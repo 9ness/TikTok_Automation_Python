@@ -279,3 +279,80 @@ export function buildVideoTandaUrl(v: VideoTanda, descargar = false): string {
 export function buildFotoTandaUrl(v: VideoTanda, ancho = 96): string {
   return conApiKey(`${ROOT}/foto?id=${encodeURIComponent(v.id)}&w=${ancho}`);
 }
+
+// ---------------------------------------------------------------------------
+// Fotos: los carruseles de «Replicar carrusel» en tandas de diez, con su
+// PROPIO contador (`src/mis_tandas/fotos.py`).
+// ---------------------------------------------------------------------------
+export interface CarruselTanda {
+  id: string;
+  creado_at: number;
+  titulo: string;
+  tienda: string;
+  source: string;
+  folder: string;
+  producto: string;
+  url: string;
+  hechas: number;
+  diapositivas: number;
+  completo: boolean;
+  subido: boolean;
+  subido_at: number;
+  caption: string;
+  hashtags: string[];
+}
+
+export interface TandaFotos {
+  numero: number;
+  total: number;
+  subidos: number;
+  completos: number;
+  abierta: boolean;
+  desde: number;
+  hasta: number;
+  fecha?: string;
+  items?: CarruselTanda[];
+}
+
+export interface TandasFotosResponse {
+  usuario: string;
+  por_tanda: number;
+  total: number;
+  subidos: number;
+  completos: number;
+  abiertas: number;
+  cerradas: number;
+  tandas: TandaFotos[];
+}
+
+const fotosKeys = {
+  all: [...misTandasKeys.all, "fotos"] as const,
+  lista: (todas: boolean) => [...misTandasKeys.all, "fotos", todas] as const,
+};
+
+export function useTandasFotos(todas = false) {
+  return useQuery<TandasFotosResponse>({
+    queryKey: fotosKeys.lista(todas),
+    queryFn: () => api.get<TandasFotosResponse>(`${ROOT}/fotos${todas ? "?todas=true" : ""}`),
+    staleTime: 30_000,
+  });
+}
+
+export function useMarcarFoto() {
+  const qc = useQueryClient();
+  return useMutation<CarruselTanda, Error, { id: string; subido: boolean }>({
+    mutationFn: (v) => api.post<CarruselTanda>(`${ROOT}/fotos/estado`, v),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: fotosKeys.all });
+      qc.invalidateQueries({ queryKey: ["replicar-carrusel"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+}
+
+/** ZIP de una tanda de fotos: va en <a href>, con la API key en la query. */
+export function urlZipTandaFotos(numero: number, pendientes = false): string {
+  const key = process.env.NEXT_PUBLIC_API_KEY;
+  const path = `${ROOT}/fotos/zip?tanda=${numero}${pendientes ? "&pendientes=true" : ""}`;
+  return `${api.baseUrl}${path}${key ? `&api_key=${encodeURIComponent(key)}` : ""}`;
+}

@@ -49,8 +49,11 @@ def _redis():
 # ---------------------------------------------------------------------------
 # Vídeo de referencia
 # ---------------------------------------------------------------------------
-def descargar_tiktok(url: str, destino: Path) -> dict:
-    """Baja el vídeo SIN marca de agua con tikwm. Devuelve sus datos."""
+def consultar_tikwm(url: str) -> dict:
+    """Lo que tikwm sabe de un enlace de TikTok (vídeo o carrusel): su `data`.
+
+    Comparten esto `descargar_tiktok` (vídeo) y `carrusel.datos_carrusel`
+    (fotos): en un carrusel tikwm devuelve `images` y en `play` solo la música."""
     url = (url or "").strip()
     if "tiktok.com" not in url:
         raise ErrorReplica("Pega un enlace de TikTok (tiktok.com/…).")
@@ -58,13 +61,25 @@ def descargar_tiktok(url: str, destino: Path) -> dict:
         r = requests.get("https://www.tikwm.com/api/", params={"url": url, "hd": 1}, timeout=40)
         d = r.json()
     except Exception as e:  # noqa: BLE001
-        raise ErrorReplica(f"No se pudo consultar el vídeo: {e}", status=502) from e
-    datos = d.get("data") or {}
-    enlace = datos.get("hdplay") or datos.get("play")
-    if d.get("code") != 0 or not enlace:
-        raise ErrorReplica(f"TikTok no devolvió el vídeo ({d.get('msg') or 'sin enlace'}). Súbelo a mano.", status=502)
+        raise ErrorReplica(f"No se pudo consultar el enlace: {e}", status=502) from e
+    if d.get("code") != 0 or not isinstance(d.get("data"), dict):
+        raise ErrorReplica(f"TikTok no devolvió nada ({d.get('msg') or 'sin datos'}).", status=502)
+    return d["data"]
+
+
+def descargar_tiktok(url: str, destino: Path) -> dict:
+    """Baja el vídeo SIN marca de agua con tikwm. Devuelve sus datos."""
+    try:
+        datos = consultar_tikwm(url)
+    except ErrorReplica as e:
+        if e.status == 502:
+            raise ErrorReplica(f"{e} Súbelo a mano.", status=502) from e
+        raise
     if datos.get("images"):
-        raise ErrorReplica("Ese enlace es un carrusel de fotos, no un vídeo.")
+        raise ErrorReplica("Ese enlace es un carrusel de fotos, no un vídeo: usa «Replicar carrusel».")
+    enlace = datos.get("hdplay") or datos.get("play")
+    if not enlace:
+        raise ErrorReplica("TikTok no devolvió el vídeo (sin enlace). Súbelo a mano.", status=502)
     with requests.get(enlace, stream=True, timeout=120) as v:
         v.raise_for_status()
         with open(destino, "wb") as f:
@@ -221,18 +236,30 @@ def replicar(
             "guion_caracteres": len(guion),
             **resultado,
         }
-        r = _redis()
-        if r.is_available():
-            r.set_json(CLAVE.format(id=doc["id"]), doc)
-            indice = r.get_json(INDICE.format(usuario=usuario)) or {"ids": []}
-            indice["ids"] = [doc["id"]] + [i for i in indice.get("ids", []) if i != doc["id"]][:199]
-            r.set_json(INDICE.format(usuario=usuario), indice)
+        guardar(doc)
         return doc
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def lista(usuario: str) -> list[dict]:
+def guardar(doc: dict, *, indexar: bool = True) -> None:
+    """Guarda la réplica (vídeo o carrusel, mismo prefijo) y la pone la
+    primera del índice del usuario."""
+    r = _redis()
+    if not r.is_available():
+        return
+    r.set_json(CLAVE.format(id=doc["id"]), doc)
+    if not indexar:
+        return
+    usuario = doc.get("usuario") or "ness"
+    indice = r.get_json(INDICE.format(usuario=usuario)) or {"ids": []}
+    indice["ids"] = [doc["id"]] + [i for i in indice.get("ids", []) if i != doc["id"]][:199]
+    r.set_json(INDICE.format(usuario=usuario), indice)
+
+
+def lista(usuario: str, tipo: str = "") -> list[dict]:
+    """Resumen de las últimas réplicas. `tipo`: "video" o "carrusel" (sin él,
+    todas). Las de vídeo no llevan el campo: son las de antes del carrusel."""
     r = _redis()
     if not r.is_available():
         return []
@@ -241,11 +268,37 @@ def lista(usuario: str) -> list[dict]:
         return []
     docs = r.mget_json([CLAVE.format(id=i) for i in ids[:50]]) if hasattr(r, "mget_json") else [
         r.get_json(CLAVE.format(id=i)) for i in ids[:50]]
-    return [
-        {k: d.get(k) for k in ("id", "creado_at", "url", "referencia", "producto", "apto")}
-        | {"idea": (d.get("adaptacion") or {}).get("idea", "")}
-        for d in docs if isinstance(d, dict)
-    ]
+    salida = []
+    for d in docs:
+        if not isinstance(d, dict):
+            continue
+        t = d.get("tipo") or "video"
+        if tipo and t != tipo:
+            continue
+        fila = {k: d.get(k) for k in ("id", "creado_at", "url", "referencia", "producto", "apto")}
+        fila["tipo"] = t
+        if t == "carrusel":
+            fila["idea"] = (d.get("original") or {}).get("tema", "")
+            fila["diapositivas"] = len(d.get("diapositivas") or [])
+            fila["hechas"] = _fotos_subidas(d)
+            fila["subido"] = bool(d.get("subido"))
+            fila["replica_de"] = d.get("replica_de", "")
+        else:
+            fila["idea"] = (d.get("adaptacion") or {}).get("idea", "")
+        salida.append(fila)
+    return salida
+
+
+def _fotos_subidas(doc: dict) -> int:
+    """Cuántas diapositivas de un carrusel tienen ya su foto de Flow (un
+    `iterdir` por carrusel: el estado vive en disco, no en el documento)."""
+    try:
+        from src.replicar_viral import carrusel
+
+        base = carrusel.dir_replica(doc.get("usuario") or "ness", doc.get("id", "")) / "base"
+        return sum(1 for p in base.iterdir() if p.suffix == ".jpg") if base.is_dir() else 0
+    except Exception:  # noqa: BLE001
+        return 0
 
 
 def ver(usuario: str, id_: str) -> dict:
