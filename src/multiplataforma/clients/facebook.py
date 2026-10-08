@@ -73,7 +73,8 @@ class FacebookClient(ClienteBase):
             "POST", url,
             headers={"Authorization": f"OAuth {self.token}", "offset": "0",
                      "file_size": str(p.stat().st_size)},
-            content=self._trozos(p), timeout=config.UPLOAD_TIMEOUT_S,
+            # entero, no por trozos: con chunked rupload da 400 (pide Content-Length)
+            content=p.read_bytes(), timeout=config.UPLOAD_TIMEOUT_S,
         )
 
     def _finish(self, url: str, video_id: str, descripcion: str) -> None:

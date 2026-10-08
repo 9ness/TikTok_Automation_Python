@@ -54,7 +54,7 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
         url = video_url.url_publica(pub.video_path)
         return InstagramClient(token, **kw).publicar(
             destino, caption=texto, video_url=url, cover_url=pub.cover_url,
-            trial=pub.tipo == "prueba_viral", graduacion=pub.trial_graduation, previo=previo,
+            trial=pub.tipo == "prueba_viral" and config.IG_TRIAL_REELS, graduacion=pub.trial_graduation, previo=previo,
         )
     if plataforma == "facebook":
         return FacebookClient(token, **kw).publicar(

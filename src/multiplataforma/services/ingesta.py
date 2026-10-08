@@ -232,6 +232,8 @@ def mover_a_publicados(pub: Publicacion, log: Callable[[str], None] = _noop) -> 
     origen = Path(pub.video_path)
     if pub.origen != ORIGEN or not origen.is_file():
         return None
+    if origen.parent.name == config.CARPETA_PUBLICADOS:
+        return None  # ya movido (se volvió a pasar una publicación terminada)
     destino_dir = origen.parent / config.CARPETA_PUBLICADOS
     try:
         destino_dir.mkdir(parents=True, exist_ok=True)

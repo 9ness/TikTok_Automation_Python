@@ -1091,3 +1091,4 @@
 - 2026-10-08 · Los endpoints de multiplataforma son solo admin → las herramientas MCP de enlaces/tandas necesitan el token de ness, no el de Ana aunque la cuenta sea suya.
 - 2026-10-08 · build web falló: node:20-alpine nueva ya no tiene libc6-compat → `apk add libc6-compat || apk add gcompat` en frontend/Dockerfile
 - 2026-10-08 · esperar un deploy con `while pgrep -f deploy_safe.sh` nunca acaba: pgrep -f encuentra el propio bash de la espera → usar `pgrep -x`/`pgrep -f '^/bin/bash .*deploy/deploy_safe.sh'` o mirar el journal del webhook
+- 2026-10-08 · Multiplataforma 1.ª publicación real: rupload (FB/IG) da 400 con cuerpo chunked (generador) → mandar el fichero entero (Content-Length); IG `trial_params` → code=10/2207081 con nuestra app aunque haya instagram_content_publish → apagado (`MULTIPLATAFORMA_IG_TRIAL=1` lo vuelve); IG 2207077 = Meta no pudo bajar la video_url (la API estaba caída por un deploy).

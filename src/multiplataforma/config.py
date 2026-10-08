@@ -36,6 +36,11 @@ ESTADOS_FINALES = (ESTADO_PUBLICADO, ESTADO_FALLIDO)
 
 MAX_INTENTOS = int(os.getenv("MULTIPLATAFORMA_MAX_INTENTOS", "3"))
 
+# Reels de prueba (`trial_params`) de IG. Apagado: con nuestra app Meta lo
+# rechaza (code=10, subcode=2207081, «Application does not have permission»)
+# aunque el token tenga instagram_content_publish. =1 si algún día lo da.
+IG_TRIAL_REELS = os.getenv("MULTIPLATAFORMA_IG_TRIAL", "0") == "1"
+
 # Límites de publicación por cuenta y plataforma en 24h móviles. Los de Meta
 # son los oficiales (IG 50 posts/24h por API, Page Reels 30/24h, Threads 250);
 # Pinterest no publica un tope fijo de pines: se pone uno prudente.
