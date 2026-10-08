@@ -293,9 +293,25 @@ def _corto(titulo: str, n: int = 70) -> str:
     return t if len(t) <= n else t[: n - 1].rstrip() + "…"
 
 
+# La página pública la abre cualquiera desde la bio: se sirve de memoria unos
+# segundos para no ir a Redis y al Drive en cada visita (un pico de la API
+# dejaba la página en «cargando» en el móvil).
+_LINKS_TTL_S = 60
+_links_cache: dict[str, tuple[float, dict]] = {}
+
+
 def links_publicos(slug: str) -> dict:
     """Solo lo publicable: nombre de la cuenta y productos con enlace. Nada
-    interno (rutas, ids de Drive, filas)."""
+    interno (rutas, ids de Drive, filas). Cacheado `_LINKS_TTL_S`."""
+    hit = _links_cache.get(slug)
+    if hit and time.time() - hit[0] < _LINKS_TTL_S:
+        return hit[1]
+    datos = _links_publicos(slug)
+    _links_cache[slug] = (time.time(), datos)
+    return datos
+
+
+def _links_publicos(slug: str) -> dict:
     c = cuentas_repo.get(slug)
     if not c or not c.activa:
         raise ErrorTandas("No existe", status=404)

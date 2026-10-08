@@ -91,7 +91,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
     (async () => {
       for (let intento = 0; intento < 4 && vivo; intento++) {
         try {
-          const r = await fetch(url, { credentials: "omit", signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined });
+          const r = await fetch(url, { credentials: "omit", signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(15000) : undefined });
           if (r.status === 404) throw new Error("Esta página no existe.");
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = (await r.json()) as DatosLinks;

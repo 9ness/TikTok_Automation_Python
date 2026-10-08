@@ -18,6 +18,7 @@ Decisiones:
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 PLATAFORMAS: tuple[str, ...] = ("instagram", "facebook", "threads", "pinterest")
@@ -195,13 +196,27 @@ def tema_links(slug: str) -> dict:
     return {**TEMA_DEFAULT, **TEMAS.get(slug, {})}
 
 
+# `_marca` vive en el Drive montado y listarlo a veces tarda segundos (caché
+# de rclone fría): la página pública /links lo pedía en cada visita y en el
+# móvil se quedaba en «cargando». Se recuerda unos minutos.
+_MARCA_TTL_S = 600
+_marca_cache: dict[tuple[str, str], tuple[float, Path | None]] = {}
+
+
 def fichero_marca(slug: str, tipo: str) -> Path | None:
     """`tipo` = logo | portada | fondo. Primer fichero `<slug>_<tipo>*` de `_marca`."""
+    ahora = time.time()
+    hit = _marca_cache.get((slug, tipo))
+    if hit and ahora - hit[0] < _MARCA_TTL_S:
+        return hit[1]
     carpeta = raiz_drive() / MARCA_SUBDIR
+    encontrado: Path | None = None
     try:
         for p in sorted(carpeta.glob(f"{slug}_{tipo}*")):
             if p.is_file() and p.suffix.lower() in MARCA_EXTENSIONES:
-                return p
+                encontrado = p
+                break
     except OSError:
-        return None
-    return None
+        encontrado = None
+    _marca_cache[(slug, tipo)] = (ahora, encontrado)
+    return encontrado
