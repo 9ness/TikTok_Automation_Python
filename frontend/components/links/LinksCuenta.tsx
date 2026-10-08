@@ -84,15 +84,29 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
     let vivo = true;
     // Ruta relativa al host desde el que se abre (o la API local en dev):
     // vale servida desde cualquier dominio. Sin cookies ni API key.
-    fetch(`${api.baseUrl}/api/v1/multiplataforma/links/${encodeURIComponent(cuenta)}`, {
-      credentials: "omit",
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(r.status === 404 ? "Esta página no existe." : "No se ha podido cargar.");
-        return (await r.json()) as DatosLinks;
-      })
-      .then((d) => vivo && setDatos(d))
-      .catch((e: Error) => vivo && setError(e.message));
+    // Con tiempo máximo y reintentos: si la petición se cuelga (un reinicio
+    // del servidor, la red del navegador de Instagram), la página se quedaba
+    // para siempre en «cargando».
+    const url = `${api.baseUrl}/api/v1/multiplataforma/links/${encodeURIComponent(cuenta)}`;
+    (async () => {
+      for (let intento = 0; intento < 4 && vivo; intento++) {
+        try {
+          const r = await fetch(url, { credentials: "omit", signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(8000) : undefined });
+          if (r.status === 404) throw new Error("Esta página no existe.");
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const d = (await r.json()) as DatosLinks;
+          if (vivo) setDatos(d);
+          return;
+        } catch (e) {
+          if ((e as Error).message === "Esta página no existe.") {
+            if (vivo) setError((e as Error).message);
+            return;
+          }
+          await new Promise((res) => setTimeout(res, 1500 * (intento + 1)));
+        }
+      }
+      if (vivo) setError("No se ha podido cargar. Vuelve a abrir el enlace en un momento.");
+    })();
     return () => {
       vivo = false;
     };
