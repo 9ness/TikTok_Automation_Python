@@ -19,7 +19,8 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 # alpine necesita libc6-compat para ciertos binarios npm.
-RUN apk add --no-cache libc6-compat
+# 8 oct 2026: las alpine nuevas ya no traen libc6-compat → gcompat.
+RUN apk add --no-cache libc6-compat || apk add --no-cache gcompat
 
 COPY package.json package-lock.json* ./
 RUN npm ci
