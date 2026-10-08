@@ -80,6 +80,9 @@ def _titulo_de_nombre(video: Path) -> str:
     return t[:1].upper() + t[1:]
 
 
+TEXTO_CARPETA = "_texto.txt"
+
+
 def leer_metadatos(video: Path) -> dict:
     """Lee el `.json`/`.txt` hermano. Devuelve claves de `PublicacionIn`."""
     meta: dict = {}
@@ -90,7 +93,12 @@ def leer_metadatos(video: Path) -> dict:
         if not isinstance(d, dict):
             raise ValueError(f"{js.name}: tiene que ser un objeto JSON")
         meta.update(d)
-    elif txt.is_file():
+    else:
+        if not txt.is_file():
+            # sin .txt propio: el `_texto.txt` de la carpeta (texto común, p. ej.
+            # el de todos los virales de Pablo Motos)
+            txt = video.parent / TEXTO_CARPETA
+    if not js.is_file() and txt.is_file():
         caption, hashtags = [], []
         for linea in txt.read_text(encoding="utf-8").splitlines():
             s = linea.strip()
