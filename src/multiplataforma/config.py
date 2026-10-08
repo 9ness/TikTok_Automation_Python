@@ -18,6 +18,8 @@ Decisiones:
 from __future__ import annotations
 
 import os
+import shutil
+import threading
 import time
 from pathlib import Path
 
@@ -196,27 +198,72 @@ def tema_links(slug: str) -> dict:
     return {**TEMA_DEFAULT, **TEMAS.get(slug, {})}
 
 
-# `_marca` vive en el Drive montado y listarlo a veces tarda segundos (caché
-# de rclone fría): la página pública /links lo pedía en cada visita y en el
-# móvil se quedaba en «cargando». Se recuerda unos minutos.
+# `_marca` se SUBE al Drive (es donde el operador deja logos y fondos), pero la
+# página pública /links no lo lee de ahí: listar el mount de rclone a veces
+# tarda segundos y en el móvil la página se quedaba en «cargando». Se sirve una
+# COPIA en el disco local (`temp_work/multiplataforma_marca/`) y un hilo la
+# pone al día con el Drive cada `_MARCA_TTL_S`, sin hacer esperar a nadie.
 _MARCA_TTL_S = 600
-_marca_cache: dict[tuple[str, str], tuple[float, Path | None]] = {}
+_marca_sync = {"ultimo": 0.0, "en_curso": False}
+_marca_lock = threading.Lock()
+
+
+def _marca_local() -> Path:
+    return Path.cwd() / "temp_work" / "multiplataforma_marca"
+
+
+def sincronizar_marca() -> None:
+    """Copia al disco local lo nuevo o cambiado de `_marca` del Drive y borra
+    lo que ya no está allí."""
+    origen = raiz_drive() / MARCA_SUBDIR
+    destino = _marca_local()
+    try:
+        destino.mkdir(parents=True, exist_ok=True)
+        vistos = set()
+        for p in origen.iterdir():
+            if not p.is_file() or p.suffix.lower() not in MARCA_EXTENSIONES:
+                continue
+            vistos.add(p.name)
+            d = destino / p.name
+            st = p.stat()
+            if not d.exists() or d.stat().st_size != st.st_size or d.stat().st_mtime < st.st_mtime:
+                tmp = d.with_suffix(d.suffix + ".tmp")
+                shutil.copyfile(p, tmp)
+                os.replace(tmp, d)
+        for d in destino.iterdir():
+            if d.is_file() and d.name not in vistos:
+                d.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _sincronizar_en_hilo() -> None:
+    try:
+        sincronizar_marca()
+    finally:
+        with _marca_lock:
+            _marca_sync["ultimo"] = time.time()
+            _marca_sync["en_curso"] = False
 
 
 def fichero_marca(slug: str, tipo: str) -> Path | None:
-    """`tipo` = logo | portada | fondo. Primer fichero `<slug>_<tipo>*` de `_marca`."""
-    ahora = time.time()
-    hit = _marca_cache.get((slug, tipo))
-    if hit and ahora - hit[0] < _MARCA_TTL_S:
-        return hit[1]
-    carpeta = raiz_drive() / MARCA_SUBDIR
-    encontrado: Path | None = None
+    """`tipo` = logo | portada | fondo. Primer fichero `<slug>_<tipo>*` de la
+    copia local de `_marca` (la primera vez la hace esperando)."""
+    local = _marca_local()
+    with _marca_lock:
+        caducada = time.time() - _marca_sync["ultimo"] > _MARCA_TTL_S
+        lanzar = caducada and not _marca_sync["en_curso"]
+        if lanzar:
+            _marca_sync["en_curso"] = True
+    if lanzar:
+        if local.is_dir():
+            threading.Thread(target=_sincronizar_en_hilo, daemon=True).start()
+        else:
+            _sincronizar_en_hilo()
     try:
-        for p in sorted(carpeta.glob(f"{slug}_{tipo}*")):
+        for p in sorted(local.glob(f"{slug}_{tipo}*")):
             if p.is_file() and p.suffix.lower() in MARCA_EXTENSIONES:
-                encontrado = p
-                break
+                return p
     except OSError:
-        encontrado = None
-    _marca_cache[(slug, tipo)] = (ahora, encontrado)
-    return encontrado
+        return None
+    return None
