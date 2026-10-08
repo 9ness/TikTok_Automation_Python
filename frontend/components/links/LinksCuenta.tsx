@@ -254,8 +254,15 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
 
         {visibles.length > 0 && (
           <ul className="space-y-3">
-            {visibles.map((p) => (
-              <li key={p.id}>
+            {visibles.map((p, i) => (
+              <li key={p.id} className="relative">
+                {/* El primero es el del último vídeo publicado: el que viene a
+                    buscar casi todo el que llega desde la bio. */}
+                {i === 0 && !busca && visibles.length > 1 && (
+                  <span className={`absolute -top-2 right-3 z-10 rounded-full bg-[var(--acento2)] px-2.5 py-0.5 text-[11px] font-bold shadow ${esColorClaro(tema.acento2) ? "text-stone-950" : "text-white"}`}>
+                    🆕 Último vídeo
+                  </span>
+                )}
                 <a
                   href={p.enlace}
                   target="_blank"
@@ -288,7 +295,9 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
         )}
 
         {datos?.aviso_amazon && (
-          <footer className={`mt-10 rounded-xl px-3 py-3 text-center text-[11px] leading-relaxed ${panel || `border-t ${claro ? "border-stone-900/10" : "border-white/10"}`} ${panel ? textoPanel : textoSuave}`}>
+          // Obligatorio por el programa de afiliados, pero discreto: abajo del
+          // todo, pequeño y sin recuadro.
+          <footer className={`mt-8 px-2 text-center text-[10px] leading-snug opacity-70 ${claro ? "text-stone-700 [text-shadow:0_1px_2px_rgba(255,255,255,0.7)]" : "text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]"}`}>
             {datos.aviso_amazon}
           </footer>
         )}
