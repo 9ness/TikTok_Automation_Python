@@ -134,7 +134,8 @@
 	import app
 }
 
-# Página pública de enlaces de afiliado (bio de IG/FB). SOLO `/links/<cuenta>`,
+# Página pública de enlaces de afiliado (bio de IG/FB): `links.nebulabsmedia.com/<cuenta>`.
+# SOLO `/links/<cuenta>`,
 # lo que necesita para pintarse y sus datos: la app, el login y el resto de la
 # API NO se sirven por este nombre (404). La página llama a la API con ruta
 # relativa (`lib/api.ts`), así que va contra este mismo host.
@@ -144,6 +145,9 @@
 	handle @datos {
 		reverse_proxy api:8000
 	}
+	# Dirección corta para la bio: `/<cuenta>` → `/links/<cuenta>`.
+	@corto path_regexp corto ^/([a-z0-9_-]+)$
+	rewrite @corto /links/{re.corto.1}
 	@pagina path /links/* /_next/* /favicon.ico /icon.png /brand/*
 	handle @pagina {
 		reverse_proxy web:3000
