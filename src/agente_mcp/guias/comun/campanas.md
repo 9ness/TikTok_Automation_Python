@@ -29,6 +29,21 @@ antes de que empiece**. La app avisa 14 días antes de cada hito: el 13 oct (cam
 (Navidad). Cuando `campanas` devuelve `avisos`, díselo al operador al empezar
 y propón qué productos de la carpeta encajan mejor.
 
+## Octubre: acumular vídeos para Black Friday (agencias, 8 oct 2026)
+
+Un vídeo de octubre puede vender en noviembre, así que octubre es para
+**publicar más y probar productos**:
+- Producto prioritario: **mínimo 5 vídeos distintos** antes de juzgarlo, cada
+  uno con otro enfoque (problema → solución, prueba real → resultado,
+  resultado primero, otra situación de uso, responder dudas). Usa los estilos
+  del Largo (dolor, épico, venta inversa, réplica viral) para variar.
+- Producto de **más de 200 €**: **10 vídeos o más** antes de Black Friday
+  (es cuando bajan de verdad de precio).
+- Si un producto empieza a vender, **no saltes a otro**: más vídeos de ese con
+  hooks y escenas nuevas.
+- Demostración real: qué problema resuelve → cómo se usa → qué hace → resultado.
+  Nada de solo enseñar la caja.
+
 ## Cómo orientar un guion o un prompt
 
 - `campanas` trae `contexto_guion`: una frase con el ángulo de la campaña del

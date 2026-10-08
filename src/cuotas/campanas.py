@@ -42,8 +42,8 @@ CAMPANAS: list[dict] = [
         "inicio": "2026-10-27",
         "fin": "2026-10-31",
         "tema": "Campaña mensual de fin de mes (coincide con Halloween)",
-        "consejo": "Campaña de nivel S: sube volumen esos días con productos de buen precio "
-                   "y, si encaja, ángulo Halloween o «prepara el invierno».",
+        "consejo": "Campaña de nivel S. Octubre es para ACUMULAR vídeos para Black Friday: "
+                   "5 vídeos distintos por producto prioritario y 10+ si pasa de 200 €.",
         "guion": "Ángulo de campaña de fin de mes: buen precio y producto top de la semana.",
     },
     {
