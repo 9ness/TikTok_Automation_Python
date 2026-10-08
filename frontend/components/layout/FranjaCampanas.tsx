@@ -17,6 +17,7 @@ const COLORES: Record<string, { chip: string; celda: string; texto: string }> = 
   red: { chip: "bg-red-500/20 text-red-500", celda: "bg-red-500/45", texto: "text-red-500" },
   sky: { chip: "bg-sky-500/15 text-sky-500", celda: "bg-sky-500/35", texto: "text-sky-500" },
   emerald: { chip: "bg-emerald-500/15 text-emerald-500", celda: "bg-emerald-500/30", texto: "text-emerald-500" },
+  amber: { chip: "bg-amber-500/15 text-amber-500", celda: "bg-amber-500/30", texto: "text-amber-500" },
 };
 
 const fechaCorta = (iso: string) => {
@@ -159,6 +160,11 @@ function Detalle({ e }: { e: CampanasEstado }) {
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${col?.chip ?? ""}`}>
                   {c.emoji} {c.nombre}
                 </span>
+                {c.nivel && (
+                  <span className="rounded border border-border/60 px-1 text-[9px] font-bold">
+                    Nivel {c.nivel}
+                  </span>
+                )}
                 <span className="text-[10px] text-muted-foreground">
                   {c.inicio === c.fin
                     ? fechaCorta(c.inicio)
@@ -171,6 +177,24 @@ function Detalle({ e }: { e: CampanasEstado }) {
           );
         })}
       </ul>
+
+      {e.eventos && e.eventos.length > 0 && (
+        <ul className="flex flex-wrap gap-1">
+          {e.eventos.map((ev) => (
+            <li
+              key={ev.fecha + ev.tipo}
+              title={ev.consejo}
+              className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+            >
+              {ev.emoji} {ev.nombre} {fechaCorta(ev.fecha)} · {ev.nivel}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="break-words text-[10px] leading-relaxed text-muted-foreground">
+        Prioridad de TikTok: SS &gt; S &gt; A &gt; B.
+      </p>
 
       <p className="break-words text-[10px] leading-relaxed text-muted-foreground">
         ⚖️ {e.regla_promocion}

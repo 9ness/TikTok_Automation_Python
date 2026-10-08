@@ -5,8 +5,9 @@ tienda y de la cuenta, no de un formato de vídeo. De aquí beben la franja de l
 web (debajo del contador) y el MCP de agentes (`campanas`), para que las dos
 cosas digan lo mismo.
 
-Fuente: el calendario «BFCM + Christmas Deals» de TikTok Shop EU (11 nov – 16
-dic 2026). El año que viene se cambia la lista `CAMPANAS` y ya está: el resto
+Fuentes: el calendario «BFCM + Christmas Deals» de TikTok Shop EU (11 nov – 16
+dic 2026) y el «Calendario de campañas de España Q4» que pasó la agencia
+(Miture, 8 oct 2026), que les pone NIVEL de prioridad: SS > S > A > B. El año que viene se cambia la lista `CAMPANAS` y ya está: el resto
 se calcula.
 
 Por qué hay AVISOS y no solo fechas: un vídeo tarda días en coger tracción, así
@@ -27,13 +28,31 @@ VISIBLE_DIAS = 60
 
 _DIAS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
+# Prioridad de la campaña según TikTok (calendario Q4 de la agencia).
+NIVELES = {"SS": "máxima", "S": "alta", "A": "media", "B": "baja"}
+
 CAMPANAS: list[dict] = [
+    {
+        "id": "oct_mensual",
+        "nombre": "Campaña mensual de octubre",
+        "corto": "Campaña de octubre",
+        "emoji": "🎃",
+        "color": "amber",
+        "nivel": "S",
+        "inicio": "2026-10-27",
+        "fin": "2026-10-31",
+        "tema": "Campaña mensual de fin de mes (coincide con Halloween)",
+        "consejo": "Campaña de nivel S: sube volumen esos días con productos de buen precio "
+                   "y, si encaja, ángulo Halloween o «prepara el invierno».",
+        "guion": "Ángulo de campaña de fin de mes: buen precio y producto top de la semana.",
+    },
     {
         "id": "bf_front",
         "nombre": "Black Friday · Front Run Week",
         "corto": "Black Friday",
         "emoji": "🛒",
         "color": "rose",
+        "nivel": "SS",
         "inicio": "2026-11-11",
         "fin": "2026-11-17",
         "tema": "Semana de categorías y ranking de directos",
@@ -47,6 +66,7 @@ CAMPANAS: list[dict] = [
         "corto": "Black Friday",
         "emoji": "🎁",
         "color": "violet",
+        "nivel": "SS",
         "inicio": "2026-11-18",
         "fin": "2026-11-24",
         "tema": "Festival de marcas y ranking de directos (23-24: Live All-Star)",
@@ -59,6 +79,7 @@ CAMPANAS: list[dict] = [
         "corto": "Black Friday Peak",
         "emoji": "🔥",
         "color": "red",
+        "nivel": "SS",
         "inicio": "2026-11-25",
         "fin": "2026-11-29",
         "tema": "Live All-Star (creador + marca + subasta). Día fuerte: viernes 27",
@@ -72,6 +93,7 @@ CAMPANAS: list[dict] = [
         "corto": "Cyber Monday",
         "emoji": "🛍️",
         "color": "sky",
+        "nivel": "SS",
         "inicio": "2026-11-30",
         "fin": "2026-11-30",
         "tema": "Último día de ofertas del Black Friday",
@@ -80,10 +102,11 @@ CAMPANAS: list[dict] = [
     },
     {
         "id": "xmas",
-        "nombre": "Navidad",
+        "nombre": "Navidad · Ofertas festivas",
         "corto": "Navidad",
         "emoji": "🎄",
         "color": "emerald",
+        "nivel": "S",
         "inicio": "2026-12-01",
         "fin": "2026-12-16",
         "tema": "Campaña de Navidad (hasta el 16: llega antes de Nochebuena)",
@@ -93,11 +116,23 @@ CAMPANAS: list[dict] = [
     },
 ]
 
+# Días sueltos del calendario Q4 que NO son campaña de varios días: ofertas
+# semanales (nivel A) y días de subastas, los miércoles (nivel B). Solo en
+# octubre; en noviembre y diciembre la agencia no da fechas.
+EVENTOS: list[dict] = (
+    [{"fecha": f, "tipo": "ofertas_semanales", "nombre": "Ofertas semanales", "emoji": "🏷️",
+      "nivel": "A", "consejo": "Día de ofertas semanales: sube los productos que tengan descuento."}
+     for f in ("2026-10-11", "2026-10-18", "2026-10-25")]
+    + [{"fecha": f, "tipo": "subastas", "nombre": "Día de subastas", "emoji": "🔨",
+        "nivel": "B", "consejo": "Día de subastas (directos): prioridad baja para vídeos."}
+       for f in ("2026-10-07", "2026-10-14", "2026-10-21")]
+)
+
 # Días que el calendario oficial resalta en color (el gran día y los cambios).
 DESTACADOS = {"2026-11-19", "2026-11-27", "2026-11-30"}
 
 # Hitos de los que se avisa con antelación (el primero de cada bloque).
-HITOS = ("bf_front", "bf_peak", "cyber", "xmas")
+HITOS = ("oct_mensual", "bf_front", "bf_peak", "cyber", "xmas")
 
 # Regla fija para agentes y guiones: sale en el estado y en la guía.
 REGLA_PROMOCION = (
@@ -129,8 +164,12 @@ def campana_de(dia: date) -> dict | None:
 
 
 def _semanas() -> list[dict]:
-    """El calendario en semanas de miércoles a martes, como el oficial."""
-    ini, fin = _d(CAMPANAS[0]["inicio"]), _d(CAMPANAS[-1]["fin"])
+    """El calendario en semanas de miércoles a martes, como el oficial.
+
+    Arranca en Black Friday: la campaña de octubre va suelta en la lista.
+    """
+    ini = _d(next(c for c in CAMPANAS if c["id"] == "bf_front")["inicio"])
+    fin = _d(CAMPANAS[-1]["fin"])
     semanas: list[dict] = []
     dia = ini
     n = 1
@@ -175,6 +214,11 @@ def estado(hoy: date | None = None) -> dict:
                 f"{c['emoji']} {c['corto']} empieza en {falta} día{'s' if falta != 1 else ''} "
                 f"({_d(c['inicio']).strftime('%d/%m')}): {c['consejo']}"
             )
+    for ev in EVENTOS:
+        falta = (_d(ev["fecha"]) - hoy).days
+        if 0 <= falta <= 1:
+            cuando = "hoy" if falta == 0 else "mañana"
+            avisos.append(f"{ev['emoji']} {ev['nombre']} {cuando} (nivel {ev['nivel']}): {ev['consejo']}")
     if activa and activa["id"] == "xmas":
         quedan = (_d(activa["fin"]) - hoy).days
         if quedan <= 5:
@@ -193,6 +237,9 @@ def estado(hoy: date | None = None) -> dict:
         "avisos": avisos,
         "aviso_dias": AVISO_DIAS,
         "campanas": [_publica(c, hoy) for c in CAMPANAS],
+        "eventos": [{**ev, "dias_para": (_d(ev["fecha"]) - hoy).days}
+                    for ev in sorted(EVENTOS, key=lambda x: x["fecha"]) if _d(ev["fecha"]) >= hoy],
+        "niveles": NIVELES,
         "semanas": _semanas(),
         "regla_promocion": REGLA_PROMOCION,
     }

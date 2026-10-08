@@ -1,7 +1,8 @@
-# Campañas de TikTok Shop: Black Friday y Navidad
+# Campañas de TikTok Shop: Q4 (octubre, Black Friday y Navidad)
 
-Del **11 de noviembre al 16 de diciembre de 2026** TikTok Shop EU tiene campañas
-seguidas. Afectan a qué productos conviene sacar y a cómo se escriben los
+Del **27 de octubre al 16 de diciembre de 2026** TikTok Shop España tiene
+campañas, con un NIVEL de prioridad que pone TikTok: **SS > S > A > B**
+(calendario Q4 de la agencia, 8 oct 2026). Afectan a qué productos conviene sacar y a cómo se escriben los
 guiones. La fuente de verdad está en `src/cuotas/campanas.py`: el operador la ve
 como una franja debajo del contador de vídeos, y tú la tienes con la
 herramienta **`campanas`** del MCP (sin MCP: `GET /api/v1/cuotas/campanas`).
@@ -9,16 +10,21 @@ Consúltala; no te fíes de las fechas copiadas aquí si ha cambiado el año.
 
 | Fechas | Campaña | Qué pedir |
 |---|---|---|
-| 11–17 nov | 🛒 Black Friday · Front Run Week (vs Amazon) | Ofertas adelantadas: chollo, buen precio |
+| 27–31 oct | 🎃 Campaña mensual de octubre (**S**) | Volumen y buen precio; ángulo Halloween si encaja |
+| 11–17 nov | 🛒 Black Friday · Front Run Week (vs Amazon) — todo Black Friday es **SS** | Ofertas adelantadas: chollo, buen precio |
 | 18–24 nov | 🎁 Black Friday · Mid Week (festival de marcas; 23-24 Live All-Star) | Productos con marca y reseñas |
 | 25–29 nov | 🔥 **Black Friday Peak** (día fuerte: vie 27) | Urgencia máxima; volumen al tope diario |
 | 30 nov | 🛍️ Cyber Monday | «Hoy es el último día» |
-| 1–16 dic | 🎄 Navidad | Ángulo regalo; la última semana, «llega antes de Nochebuena» |
+| 1–16 dic | 🎄 Navidad · Ofertas festivas (**S**) | Ángulo regalo; la última semana, «llega antes de Nochebuena» |
+
+Días sueltos de octubre (`eventos` en `campanas`): **ofertas semanales** (nivel
+A) los domingos 11, 18 y 25 oct — sube lo que tenga descuento — y **días de
+subastas** (nivel B, directos) los miércoles 7, 14 y 21 oct.
 
 ## Cuándo preparar
 
 Un vídeo tarda días en coger tracción, así que **lo de una campaña se publica
-antes de que empiece**. La app avisa 14 días antes de cada hito: el 28 oct
+antes de que empiece**. La app avisa 14 días antes de cada hito: el 13 oct (campaña de octubre), el 28 oct
 (Black Friday), el 11 nov (el pico), el 16 nov (Cyber Monday) y el 17 nov
 (Navidad). Cuando `campanas` devuelve `avisos`, díselo al operador al empezar
 y propón qué productos de la carpeta encajan mejor.

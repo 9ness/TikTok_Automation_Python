@@ -14,7 +14,7 @@ def test_lejos_no_se_ve():
 def test_hoy_cuenta_atras_sin_aviso():
     e = campanas.estado(date(2026, 9, 30))
     assert e["visible"] and e["activa"] is None
-    assert e["proxima"]["id"] == "bf_front" and e["proxima"]["dias_para"] == 42
+    assert e["proxima"]["id"] == "oct_mensual" and e["proxima"]["dias_para"] == 27
     assert e["avisos"] == []
     assert campanas.contexto_guion(date(2026, 9, 30)) == ""
 
@@ -46,3 +46,12 @@ def test_se_acaba():
     e = campanas.estado(date(2026, 12, 17))
     assert e["terminado"] and not e["visible"]
     assert e["activa"] is None and e["proxima"] is None
+
+
+def test_calendario_q4_agencia():
+    e = campanas.estado(date(2026, 10, 13))
+    assert e["proxima"]["id"] == "oct_mensual" and e["proxima"]["nivel"] == "S"
+    assert any("Campaña de octubre" in a for a in e["avisos"])
+    assert any("Día de subastas mañana" in a for a in e["avisos"])
+    assert [ev["fecha"] for ev in e["eventos"]][:2] == ["2026-10-14", "2026-10-18"]
+    assert {c["id"]: c["nivel"] for c in e["campanas"]}["bf_peak"] == "SS"

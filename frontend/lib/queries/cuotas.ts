@@ -72,6 +72,8 @@ export interface Campana {
   corto: string;
   emoji: string;
   color: string;
+  /** Prioridad de TikTok: SS > S > A > B. */
+  nivel?: string;
   inicio: string;
   fin: string;
   tema: string;
@@ -92,6 +94,9 @@ export interface CampanasEstado {
   avisos: string[];
   aviso_dias: number;
   campanas: Campana[];
+  /** Días sueltos (ofertas semanales, subastas) que quedan por llegar. */
+  eventos?: { fecha: string; tipo: string; nombre: string; emoji: string; nivel: string; consejo: string; dias_para: number }[];
+  niveles?: Record<string, string>;
   semanas: {
     n: number;
     dias: { fecha: string; dia: string; campana: string | null; destacado: boolean }[];
