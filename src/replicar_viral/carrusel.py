@@ -35,7 +35,7 @@ from pathlib import Path
 
 import requests
 
-from src.replicar_viral import catalogo, servicio
+from src.replicar_viral import catalogo, musica, servicio
 from src.replicar_viral.servicio import ErrorReplica
 
 PROMPT = Path(__file__).parent / "prompts" / "replicar_carrusel.md"
@@ -113,6 +113,7 @@ def datos_carrusel(url: str) -> dict:
         "autor": (datos.get("author") or {}).get("unique_id") or "",
         "vistas": datos.get("play_count") or 0,
         "imagenes": imagenes,
+        "musica": musica.de_tikwm(datos),
     }
 
 
@@ -195,6 +196,7 @@ def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
         raise ErrorReplica("Falta el enlace del carrusel de TikTok.")
     meta = datos_carrusel(url)
     urls = meta.pop("imagenes")
+    cancion = meta.pop("musica", {})
     recortado = len(urls) > MAX_DIAPOS
     urls = urls[:MAX_DIAPOS]
 
@@ -262,6 +264,7 @@ def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
             **({"replica_de": replica_de} if replica_de else {}),
             **_normalizar(resultado if isinstance(resultado, dict) else {}, len(origs), formato),
         }
+        doc["musica"] = musica.completa({**doc, "musica": {"tiktok": cancion}}, {})
         servicio.guardar(doc)
         if source == catalogo.SOURCE:
             # El producto se acuerda del viral: así otro usuario lo replica
@@ -282,6 +285,13 @@ def ver(usuario: str, id_: str) -> dict:
     doc = servicio.ver(usuario, id_)
     if doc.get("tipo") != "carrusel":
         raise ErrorReplica("Esa réplica no es un carrusel.", status=404)
+    if "musica" not in doc:  # réplicas de antes de guardar la música: una vez y se queda
+        doc["musica"] = musica.completa(doc)
+        if doc["musica"].get("tiktok"):  # si tikwm falló, se reintenta la próxima vez
+            try:
+                servicio.guardar(doc, indexar=False)
+            except Exception:  # noqa: BLE001
+                pass
     return doc
 
 

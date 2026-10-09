@@ -79,7 +79,16 @@ original en encuadre y emoción pero en otro sitio.
    UNA A UNA y en orden (`carrusel_<producto>_<id>_01.jpg`, 02…), sin ZIP, para
    tenerlas listas en la galería (la tanda entera sí va en ZIP,
    ver `mis-tandas.md`).
-3. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
+3. **Música** (`musica` en `descargar_carrusel(id)` y en `mis_tandas(fotos=True)`):
+   - `musica.tiktok` — la canción del viral (`titulo`, `autor`, `enlace` al
+     sonido). Es la que se pone en TikTok, a mano, al publicar. Casi siempre es
+     un «original sound» de una cuenta de edits: **solo vale en TikTok**.
+   - `musica.meta` — para Instagram/Facebook/Threads: una pista Mixkit sin
+     copyright del banco de Multiplataforma (`estilo`, `pista`, `fichero`
+     relativo a `Multiplataforma/`, `url`). Fija por carrusel: úsala tal cual,
+     nunca la del viral fuera de TikTok.
+   En la web sale debajo del caption, en Replicar carrusel y en Mis tandas › Fotos.
+4. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
    hashtags, y lo marca **Subido** en Mis tandas › Fotos
    (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide).
 

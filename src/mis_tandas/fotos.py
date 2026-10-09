@@ -62,6 +62,7 @@ def _publica(d: dict) -> dict:
         "subido_at": d.get("subido_at") or 0,
         "caption": d.get("caption", ""),
         "hashtags": d.get("hashtags") or [],
+        "musica": d.get("musica") or {},
     }
 
 

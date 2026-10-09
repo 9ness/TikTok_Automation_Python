@@ -300,6 +300,7 @@ export interface CarruselTanda {
   subido_at: number;
   caption: string;
   hashtags: string[];
+  musica?: import("./replicarCarrusel").MusicaCarrusel;
 }
 
 export interface TandaFotos {

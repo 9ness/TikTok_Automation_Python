@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
+import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { useMe } from "@/lib/queries/auth";
 import { useBuscarProductos, useSources } from "@/lib/queries/nichoPovBof";
@@ -339,6 +340,7 @@ function CarruselAbierto({ doc }: { doc: CarruselReplica }) {
           <CopyChip label="Caption" text={doc.caption} siempre />
           <CopyChip label="Hashtags" text={doc.hashtags.join(" ")} />
         </div>
+        <MusicaCarrusel musica={doc.musica} />
         {!doc.completo && doc.hechas > 0 && (
           <p className="text-[10px] text-amber-400">
             Faltan {doc.total - doc.hechas} fotos: se bajan solo las que ya están.

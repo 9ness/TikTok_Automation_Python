@@ -30,6 +30,13 @@ export interface Diapositiva {
   version: number;
 }
 
+/** La música del carrusel (`src/replicar_viral/musica.py`): la del viral,
+ *  para ponerla a mano en TikTok, y una Mixkit sin copyright para Meta. */
+export interface MusicaCarrusel {
+  tiktok?: { titulo: string; autor: string; original: boolean; id: string; enlace: string };
+  meta?: { estilo: string; pista?: string; autor?: string; fichero?: string; url?: string };
+}
+
 export interface CarruselReplica {
   id: string;
   tipo: "carrusel";
@@ -51,6 +58,7 @@ export interface CarruselReplica {
   subido?: boolean;
   /** id de la réplica de la que se copió (replicar para otro usuario). */
   replica_de?: string;
+  musica?: MusicaCarrusel;
 }
 
 export interface CarruselResumen {

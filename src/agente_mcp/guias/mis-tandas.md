@@ -99,7 +99,8 @@ Un carrusel entra en cuanto tiene una foto subida, en orden de creación, y
 cada tanda abierta lleva su día (hoy, mañana…). Cada tanda baja en un ZIP
 (una carpeta `NN_<producto>` por carrusel con las fotos y `caption.txt`; si ya
 hay alguno subido, solo los pendientes) y cada carrusel tiene su botón
-«Fotos» (las baja una a una y en orden, sin ZIP), su caption y su botón **Subido** (se guarda en la réplica: `subido`/`subido_at`).
+«Fotos» (las baja una a una y en orden, sin ZIP), su música (la del viral
+para TikTok y una Mixkit sin copyright para Meta, ver `replicar-carrusel.md`), su caption y su botón **Subido** (se guarda en la réplica: `subido`/`subido_at`).
 
 ## Colores
 

@@ -5,6 +5,7 @@ import { Download, Loader2 } from "lucide-react";
 
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
 import { useMarcarFoto, useTandasFotos, urlZipTandaFotos } from "@/lib/queries/misTandas";
 import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 
@@ -157,6 +158,7 @@ export function CarruselesReplicados() {
                             {c.subido ? "✓ Subido" : "Subido"}
                           </button>
                         </div>
+                        <MusicaCarrusel musica={c.musica} />
                       </li>
                     ))}
                   </ul>
