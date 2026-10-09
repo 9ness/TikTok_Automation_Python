@@ -171,6 +171,16 @@ resuben: `ama_shop`→ana, `viva_shop`→ness).
   horas `producto` de la cuenta tras lo ya programado; repetir no duplica.
   Devuelve `omitidas` (`sin_enlace`, `no_subidos`, `ya_encolados`,
   `ruta_no_valida`). `Publicacion.origen="tandas"`, `producto_ref=producto_key`.
+- **Temporada** (`temporada` en el enlace: `verano`/`invierno`/`navidad`,
+  meses en `config.TEMPORADAS`): el enlace se guarda todo el año, pero
+  `encolar` solo publica en esos meses (`omitidas.fuera_temporada`). Una
+  tumbona o una piscina no salen en Q4.
+- **Encolado automático** (`CuentaDestino.auto_tandas` = N días, 0 = apagado):
+  el tick llama a `tandas.auto_encolar_todas` (máx. 1 vez/hora por cuenta,
+  marca `auto_tandas:<slug>`) y rellena hasta N días de vídeos `producto` en
+  cola. Así, un vídeo nuevo marcado subido a TikTok de un producto CON enlace
+  entra solo. Las dos cuentas de `ness` reparten por dónde está el enlace:
+  salud/belleza en `viva_salud`, el resto en `viva_shop`.
 - `producto_key` = sha1 de `norm(tienda)|norm(título)`[:16]: vale para todas
   las versiones del producto (modos del Largo, POV BOF, copias Q4). Si se
   reescribe el título cambia → hay que volver a guardar el enlace.

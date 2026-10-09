@@ -25,7 +25,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(RAIZ / ".env")
 
 from src.multiplataforma import publicador  # noqa: E402
-from src.multiplataforma.services import ingesta  # noqa: E402
+from src.multiplataforma.services import ingesta, tandas  # noqa: E402
 
 
 def main() -> int:
@@ -39,6 +39,8 @@ def main() -> int:
     if not args.sin_ingesta and not args.dry_run:
         # la ingesta escribe en la cola: con --dry-run no se hace
         informe["ingesta"] = ingesta.ingestar_todas(log=print)
+        # vídeos de producto recién subidos a TikTok con enlace → a la cola
+        informe["auto_tandas"] = tandas.auto_encolar_todas(log=print)
     informe["publicacion"] = publicador.publicar_pendientes(limite=args.limite, dry_run=dry, log=print)
     print(json.dumps(informe, ensure_ascii=False, indent=2, default=str))
     return 0

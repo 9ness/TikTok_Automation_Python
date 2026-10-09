@@ -55,6 +55,38 @@ LIMITES_24H: dict[str, int] = {
 # admite una sola etiqueta de tema).
 MAX_HASHTAGS: dict[str, int] = {"instagram": 5, "facebook": 3, "threads": 1, "pinterest": 5}
 
+# Hashtags de los vídeos de producto (Mis tandas) según lo que es el producto:
+# la primera fila cuyas palabras salgan en el título manda. El primero es el
+# que queda en Threads (una sola etiqueta). La tienda (SHEIN/Amazon) se añade
+# detrás en `tandas._hashtags`.
+HASHTAGS_CATEGORIA: list[tuple[tuple[str, ...], list[str]]] = [
+    (("bolso", "bandolera", "mochila"), ["bolsos", "bolso", "modamujer"]),
+    (("bota", "zapat", "sandalia", "deportiva"), ["zapatos", "zapatillas", "modamujer"]),
+    (("vestido", "falda", "camiseta", "pantal", "jersey", "chaqueta", "abrigo", "blusa", "top ",
+      "conjunto", "sudadera", "chaleco", "cardigan", "mono "), ["outfit", "moda", "modamujer"]),
+    (("serum", "crema", "spf", "antimanchas", "facial", "micelar", "retin", "cosmetic", "rellenador",
+      "maquillaje", "bronceador"), ["skincare", "belleza", "cuidadodelapiel"]),
+    (("creatina", "proteina", "whey", "colageno", "magnesio", "capsula", "vitamina", "melatonina",
+      "ashwagandha", "shilajit", "probiotic", "biotina", "inositol", "moringa", "curcuma", "matcha",
+      "gomita"), ["bienestar", "salud", "suplementos"]),
+    (("masaje", "rodillera", "depiladora", "cortapelo", "afeitadora", "secador", "alisador"),
+     ["cuidadopersonal", "bienestar", "salud"]),
+    (("cinta de correr", "bicicleta", "mancuerna", "fitness", "gimnasio", "escaladora", "vibratoria"),
+     ["fitness", "entrenamiento", "gymencasa"]),
+    (("jardin", "tumbona", "gazebo", "plantas", "camping", "paddle", "tienda de campana"),
+     ["jardin", "terraza", "airelibre"]),
+    (("taladro", "herramienta", "escalera", "clavadora"), ["bricolaje", "herramientas", "hogar"]),
+]
+# Productos de temporada: el enlace se guarda todo el año, pero `encolar` solo
+# los publica en estos meses (p. ej. tumbonas y piscinas no salen en Q4).
+TEMPORADAS: dict[str, tuple[int, ...]] = {
+    "verano": (4, 5, 6, 7, 8, 9),
+    "invierno": (10, 11, 12, 1, 2, 3),
+    "navidad": (11, 12),
+}
+HASHTAGS_DEFECTO = ["hogar", "casa", "ideasparacasa"]
+HASHTAGS_TIENDA = {"shein": ["shein", "sheinhaul"], "amazon": ["amazonfinds", "chollos"]}
+
 # Longitudes máximas de texto que aceptan las APIs.
 MAX_CHARS: dict[str, int] = {"instagram": 2200, "facebook": 2200, "threads": 500, "pinterest": 800}
 MAX_TITULO_PINTEREST = 100

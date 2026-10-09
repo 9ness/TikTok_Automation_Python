@@ -39,6 +39,9 @@ class CuentaDestino:
     # `config.ZONA_HORARIA`). Ritmo 0 = esa carpeta no se ingesta.
     ritmo: dict[str, int] = field(default_factory=lambda: dict(config.RITMO_DEFAULT))
     horas: dict[str, list[str]] = field(default_factory=lambda: {k: list(v) for k, v in config.HORAS_DEFAULT.items()})
+    # Encolado automático de Mis tandas (`tandas.auto_encolar`): días de vídeos
+    # de producto que el tick mantiene en cola. 0 = solo a mano.
+    auto_tandas: int = 0
     creada_en: float = field(default_factory=time.time)
 
     def destino(self, plataforma: str) -> str:

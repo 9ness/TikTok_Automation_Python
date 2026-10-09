@@ -61,8 +61,13 @@ encontrar ese enlace, guardarlo y encolar los vídeos.
      es lo que sale en la página pública `/links/<cuenta>`.
    - Sin equivalente: `shein="sin_equivalente"` (o `asin=`) + `nota`. Ese
      producto ya cuenta como revisado y no se encola.
+   - Producto de temporada (tumbonas, piscinas, ventiladores, paddle surf…):
+     `temporada="verano"` (o `"invierno"`, `"navidad"`). Se guarda igual, pero
+     solo se encola en sus meses.
    - Para corregir, vuelve a llamar; `borrar=True` lo quita.
-7. **`encolar_tandas(cuenta)`** cuando hayas guardado unos cuantos: mete en la
+7. Si la cuenta tiene `auto_tandas` > 0 (encolado automático), no hace falta:
+   el tick encola solo, cada hora, lo subido a TikTok con enlace. Si no,
+   **`encolar_tandas(cuenta)`** cuando hayas guardado unos cuantos: mete en la
    cola los vídeos de productos CON enlace que aún no estén (repetirlo no
    duplica). Por defecto **solo los ya subidos a TikTok**;
    `incluir_no_subidos=True` si el operador lo pide. Se reparten con el ritmo

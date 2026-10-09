@@ -165,7 +165,7 @@ def productos(slug: str, *, sin_enlace: bool = False) -> dict:
 # ---------------------------------------------------------------------------
 def guardar_enlace(slug: str, producto_key_: str, *, shein: str = "", asin: str = "",
                    enlace: str = "", nota: str = "", titulo: str = "", foto_url: str = "",
-                   precio: str = "") -> dict:
+                   precio: str = "", temporada: str | None = None) -> dict:
     """Guarda el enlace del producto. `shein`/`asin` = 'sin_equivalente' (o
     ambos vacíos con `nota`) marcan que no hay un producto parecido."""
     c = cuenta_o_error(slug)
@@ -174,6 +174,11 @@ def guardar_enlace(slug: str, producto_key_: str, *, shein: str = "", asin: str 
     shein, asin, enlace = (shein or "").strip(), (asin or "").strip(), (enlace or "").strip()
     sin = enlaces_repo.SIN_EQUIVALENTE in (shein.lower(), asin.lower(), enlace.lower())
     datos: dict = {"nota": nota.strip()}
+    if temporada is not None:  # None = no tocar la que tuviera; "" = todo el año
+        temporada = temporada.strip().lower()
+        if temporada and temporada not in config.TEMPORADAS:
+            raise ErrorTandas(f"temporada no válida: {temporada!r} (vale {sorted(config.TEMPORADAS)} o vacío)")
+        datos["temporada"] = temporada
     try:
         if sin:
             datos.update(sin_equivalente=True, enlace="", shein="", asin="", amazon="")
@@ -229,7 +234,9 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
     guardados = enlaces_repo.todos(slug)
 
     informe: dict = {"cuenta": slug, "encoladas": [], "omitidas": {"sin_enlace": 0, "no_subidos": 0,
-                                                                   "ya_encolados": 0, "ruta_no_valida": 0}}
+                                                                   "ya_encolados": 0, "ruta_no_valida": 0,
+                                                                   "fuera_temporada": 0}}
+    mes = time.localtime(ahora).tm_mon
     candidatas = []
     for f in filas(c.dueno):
         if f["video_path"] in ya:
@@ -243,6 +250,10 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
         if e.get("sin_equivalente") or not e.get("enlace"):
             informe["omitidas"]["sin_enlace"] += 1
             continue
+        temp = e.get("temporada") or ""
+        if temp and mes not in config.TEMPORADAS.get(temp, ()):
+            informe["omitidas"]["fuera_temporada"] += 1
+            continue
         if not video_url.servible(f["video_path"]) or not video_url.ruta_permitida(f["video_path"]):
             informe["omitidas"]["ruta_no_valida"] += 1
             continue
@@ -253,15 +264,19 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
 
     reloj = ingesta.huecos(ritmo, horas, max(ahora, ingesta._ultima_programada(slug, TIPO)), semilla=slug)
     for f, k, e in candidatas:
-        titulo = e.get("titulo") or f.get("titulo") or ""
-        caption = f.get("caption", "")
-        t = textos.construir(titulo=titulo, caption=caption, enlace=e["enlace"], plataformas=config.PLATAFORMAS)
+        # El título de la ficha de la tienda (SHEIN/Amazon) es largo y a veces
+        # en inglés: el texto sale del caption + emojis de la fila, en español.
+        titulo = f.get("titulo") or e.get("titulo") or ""
+        caption = " ".join(x for x in ((f.get("caption") or titulo).strip(), (f.get("emojis") or "").strip()) if x)
+        tags = _hashtags(titulo, e["enlace"])
+        t = textos.construir(titulo="", caption=caption, enlace=e["enlace"], hashtags=tags,
+                             plataformas=config.PLATAFORMAS)
         # Mudos (multimodo de 10 s): copia con música del banco según su
         # sugerencia; con voz, o si algo falla, el original tal cual.
         mus = musica.con_musica(f["video_path"], f.get("musica"), slug, log=logger.info)
         pub = Publicacion(
             cuenta=slug, video_path=mus["path"] if mus else f["video_path"], tipo=TIPO, producto_ref=k,
-            titulo=t["titulo_pin"], caption=caption, textos=t["textos"], comentario=t["comentario"],
+            titulo=titulo[: config.MAX_TITULO_PINTEREST], caption=caption, hashtags=tags, textos=t["textos"], comentario=t["comentario"],
             enlace=e["enlace"], plataformas=list(config.PLATAFORMAS), programada_en=next(reloj), origen=ORIGEN,
         )
         pub, creada = publicaciones_repo.encolar(pub)
@@ -272,6 +287,54 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
                                      "musica": f"{mus['estilo']}/{mus['pista']}" if mus else ""})
     informe["total"] = len(informe["encoladas"])
     return informe
+
+
+def _hashtags(titulo: str, enlace: str) -> list[str]:
+    """Hashtags por categoría del producto (`config.HASHTAGS_CATEGORIA`) + los de la tienda."""
+    t = f" {_norm(titulo)} "
+    tags = next((h for palabras, h in config.HASHTAGS_CATEGORIA if any(p in t for p in palabras)),
+                config.HASHTAGS_DEFECTO)
+    tienda = "shein" if enlaces.es_shein(enlace) else "amazon" if enlaces.es_amazon(enlace) else ""
+    return list(tags) + config.HASHTAGS_TIENDA.get(tienda, [])
+
+
+def auto_encolar(slug: str, *, ahora: float | None = None, cada_s: int = 3600) -> dict:
+    """Mantiene en cola `auto_tandas` días de vídeos de producto: cuando un
+    vídeo de un producto CON enlace se marca subido a TikTok, entra solo. Lo
+    llama el tick; como mucho una vez por hora y cuenta (leer Mis tandas cuesta)."""
+    c = cuenta_o_error(slug)
+    dias = int(c.auto_tandas or 0)
+    if dias <= 0:
+        return {"cuenta": slug, "total": 0, "motivo": "apagado"}
+    ahora = time.time() if ahora is None else ahora
+    r = redis_base.get_redis()
+    marca = f"auto_tandas:{slug}"
+    ultima = float((r.get_json(marca) or {}).get("at") or 0)
+    if ahora - ultima < cada_s:
+        return {"cuenta": slug, "total": 0, "motivo": "reciente"}
+    r.set_json(marca, {"at": ahora})
+    ritmo = int((c.ritmo or {}).get(TIPO, config.RITMO_DEFAULT.get(TIPO, 1))) or 1
+    en_cola = sum(1 for p in publicaciones_repo.de_cuenta(slug)
+                  if p.tipo == TIPO and p.origen == ORIGEN and not p.terminada)
+    hueco = dias * ritmo - en_cola
+    if hueco <= 0:
+        return {"cuenta": slug, "total": 0, "motivo": "cola llena", "en_cola": en_cola}
+    return encolar(slug, limite=hueco, ahora=ahora)
+
+
+def auto_encolar_todas(*, ahora: float | None = None, log=lambda _: None) -> list[dict]:
+    out = []
+    for c in cuentas_repo.listar():
+        if not (c.activa and c.dueno and c.auto_tandas):
+            continue
+        try:
+            inf = auto_encolar(c.slug, ahora=ahora)
+        except Exception as e:  # noqa: BLE001 — una cuenta rota no para el tick
+            inf = {"cuenta": c.slug, "error": str(e)}
+        if inf.get("total") or inf.get("error"):
+            log(f"[auto_tandas] {c.slug}: {inf.get('total', 0)} encoladas {inf.get('error', '')}")
+        out.append({k: inf.get(k) for k in ("cuenta", "total", "motivo", "error") if inf.get(k) is not None})
+    return out
 
 
 def rellenar_enlace(pub: Publicacion) -> bool:

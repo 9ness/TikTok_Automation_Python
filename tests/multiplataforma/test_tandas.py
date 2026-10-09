@@ -237,3 +237,43 @@ def test_mcp_tiene_las_herramientas():
                    "cuentas_multiplataforma"):
         assert callable(getattr(servidor, nombre))
     assert "NUNCA en TikTok" in servidor.guia("multiplataforma")
+
+
+def test_encolar_texto_en_espanol_con_hashtags(filas, drive, cuenta):
+    filas.append(_fila(drive, "largo|inv|C1|1|", "Vestido verde", caption="Vestido verde de verano",
+                       emojis="😍👗"))
+    k = tandas.producto_key(filas[0])
+    tandas.guardar_enlace("ama_shop", k, shein=SHEIN, titulo="Women's Long Summer Dress With Pockets")
+    inf = tandas.encolar("ama_shop", ahora=AHORA)
+    pub = publicaciones_repo.get(inf["encoladas"][0]["id"])
+    assert pub.titulo == "Vestido verde" and "Women" not in pub.textos["instagram"]
+    assert pub.textos["instagram"].startswith("Vestido verde de verano 😍👗")
+    assert "#outfit" in pub.textos["instagram"] and "#shein" in pub.textos["instagram"]
+    assert tandas._hashtags("Creatina monohidratada", "https://www.amazon.es/dp/B000000000")[:1] == ["bienestar"]
+
+
+def test_auto_encolar_mantiene_dias_en_cola(filas, drive, cuenta):
+    for i in range(1, 6):
+        filas.append(_fila(drive, f"largo|inv|C1|{i}|", f"Producto {i}", uploaded_at=float(i)))
+        tandas.guardar_enlace("ama_shop", tandas.producto_key(filas[-1]), shein=SHEIN)
+    assert tandas.auto_encolar("ama_shop", ahora=AHORA)["motivo"] == "apagado"
+    cuenta.auto_tandas = 2
+    cuentas_repo.guardar(cuenta)
+    assert tandas.auto_encolar("ama_shop", ahora=AHORA)["total"] == 2
+    # dentro de la hora no vuelve a mirar; pasada la hora, la cola ya está llena
+    assert tandas.auto_encolar("ama_shop", ahora=AHORA + 60)["motivo"] == "reciente"
+    assert tandas.auto_encolar("ama_shop", ahora=AHORA + 4000)["motivo"] == "cola llena"
+    assert [i["total"] for i in tandas.auto_encolar_todas(ahora=AHORA + 9000)] == [0]
+
+
+def test_temporada_se_guarda_pero_no_se_encola_fuera(filas, drive, cuenta):
+    filas.append(_fila(drive, "largo|inv|C1|1|", "Tumbona de playa"))
+    k = tandas.producto_key(filas[0])
+    tandas.guardar_enlace("ama_shop", k, shein=SHEIN, temporada="verano")
+    octubre = dt.datetime(2026, 10, 9, 12, tzinfo=TZ).timestamp()
+    inf = tandas.encolar("ama_shop", ahora=octubre)
+    assert inf["total"] == 0 and inf["omitidas"]["fuera_temporada"] == 1
+    junio = dt.datetime(2027, 6, 1, 12, tzinfo=TZ).timestamp()
+    assert tandas.encolar("ama_shop", ahora=junio)["total"] == 1
+    with pytest.raises(tandas.ErrorTandas):
+        tandas.guardar_enlace("ama_shop", k, shein=SHEIN, temporada="primavera")

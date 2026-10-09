@@ -44,6 +44,7 @@ class CuentaIn(BaseModel):
     afiliado_amazon_tag: str = ""
     afiliado_shein: str = ""
     activa: bool = True
+    auto_tandas: int = Field(0, ge=0, le=60)  # días de vídeos de producto que el tick mantiene en cola
     ritmo: dict[str, int] = Field(default_factory=lambda: dict(config.RITMO_DEFAULT))  # vídeos/día por tipo
     horas: dict[str, list[str]] = Field(default_factory=lambda: {k: list(v) for k, v in config.HORAS_DEFAULT.items()})
 
@@ -179,6 +180,7 @@ class EnlaceIn(BaseModel):
     titulo: str = ""
     foto_url: str = ""
     precio: str = ""
+    temporada: str | None = None  # "verano"/"invierno"/"navidad": solo se encola en esos meses; "" = todo el año
 
 
 def _err_tandas(e: tandas.ErrorTandas) -> APIError:

@@ -920,7 +920,7 @@ async def productos_sin_enlace(ctx: Context, cuenta: str, todos: bool = False) -
 @_herramienta(structured_output=False)
 async def guardar_enlace(ctx: Context, cuenta: str, producto_key: str, shein: str = "",
                          asin: str = "", nota: str = "", foto_url: str = "",
-                         titulo: str = "", borrar: bool = False) -> str:
+                         titulo: str = "", temporada: str = "", borrar: bool = False) -> str:
     """Guarda el enlace de afiliado de UN producto (`producto_key` de
     `productos_sin_enlace`) para la `cuenta`. Vale para todos sus vídeos.
     - SHEIN (ama_shop): `shein` = el enlace que da el panel de afiliados, TAL
@@ -931,13 +931,16 @@ async def guardar_enlace(ctx: Context, cuenta: str, producto_key: str, shein: st
       `shein="sin_equivalente"` (o `asin=`) y en `nota` el porqué.
     `nota`: qué has comparado (una frase). `foto_url` (opcional, https): foto
     del producto de SHEIN/Amazon para la página pública. `titulo` (opcional):
-    nombre corto para la página /links. `borrar=True` quita el enlace."""
+    nombre corto para la página /links. `temporada` ("verano", "invierno",
+    "navidad"): producto de temporada, se guarda pero solo se encola en esos
+    meses (una tumbona no sale en octubre). `borrar=True` quita el enlace."""
     api = Interno(_usuario(ctx))
     ruta = f"{_MP}/cuentas/{_cuenta_mp(cuenta)}/enlaces/{producto_key.strip()}"
     if borrar:
         return _json(await api.delete(ruta))
     return _json(await api.put(ruta, {"shein": shein, "asin": asin, "nota": nota,
-                                      "foto_url": foto_url, "titulo": titulo}))
+                                      "foto_url": foto_url, "titulo": titulo,
+                                      "temporada": temporada or None}))
 
 
 @_herramienta(structured_output=False)
