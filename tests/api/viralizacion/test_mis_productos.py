@@ -402,3 +402,30 @@ class TestCacheDeFotos:
             params={"source": "aleatorios_1", "folder": "F", "file_id": str(foto)},
         )
         assert "max-age=86400" in r.headers.get("cache-control", "")
+
+
+class TestFotosExtraPorApi:
+    """Las fotos de más (variantes, funciones) le llegan al agente: el MCP
+    cuenta cuántas hay y baja cada una por `variante=extra&n=K`."""
+
+    def _cliente(self):
+        from fastapi.testclient import TestClient
+        from src.api.main import app
+
+        return TestClient(app)
+
+    def test_cuenta_y_baja_cada_extra(self, raiz_temporal):
+        mis_productos.guardar_producto(
+            b"limpia", b"ficha", nombre_limpia="a.png", nombre_ficha="b.png",
+            extras=[(b"rojo", "c1.png"), (b"azul", "c2.png")],
+        )
+        c = self._cliente()
+        q = {"source": "mis_productos", "folder": "Mis Productos 1", "producto": "1"}
+        r = c.get("/api/v1/nicho-pov-bof/fotos-extra", params=q)
+        assert r.status_code == 200, r.text
+        assert r.json() == {"n": 2}
+        r = c.get("/api/v1/nicho-pov-bof/foto-limpia", params={**q, "variante": "extra", "n": 2})
+        assert r.status_code == 200, r.text
+        assert r.content == b"azul"
+        r = c.get("/api/v1/nicho-pov-bof/foto-limpia", params={**q, "variante": "extra", "n": 3})
+        assert r.status_code == 404, r.text

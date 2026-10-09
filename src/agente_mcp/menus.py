@@ -376,15 +376,17 @@ async def producto(c: Ctx, prod: str) -> dict:
 # ---------------------------------------------------------------------------
 # Rutas internas de ficheros (se sirven al agente por el proxy del MCP)
 # ---------------------------------------------------------------------------
-def ruta_foto(c: Ctx, prod: str, variante: str = "limpia") -> str:
+def ruta_foto(c: Ctx, prod: str, variante: str = "limpia", n: int = 0) -> str:
     from urllib.parse import urlencode
 
     if c.m.tipo == "ropa":
         if variante == "ficha":
             return ""  # Ropa no sirve la ficha por separado
         return f"{ROPA}/foto-limpia?" + urlencode({"producto": prod, "carpeta": c.carpeta})
-    return f"{POV}/foto-limpia?" + urlencode(
-        {"source": c.catalogo, "folder": c.carpeta, "producto": prod, "variante": variante})
+    q = {"source": c.catalogo, "folder": c.carpeta, "producto": prod, "variante": variante}
+    if variante == "extra":
+        q["n"] = n
+    return f"{POV}/foto-limpia?" + urlencode(q)
 
 
 def ruta_foto_color(c: Ctx, prod: str, k: int) -> str:
@@ -545,6 +547,21 @@ async def plan(c: Ctx, prod: str) -> dict:
     }
     if t != "ropa":
         out["fotos_producto"]["foto_ficha"] = ruta_foto(c, pid, "ficha")
+        # Fotos de más que subió el operador (variantes de color/sabor,
+        # funciones, otros usos): son la señal de que el producto da para MÁS
+        # de un vídeo. Qué hacer con ellas lo decide el agente (guía común).
+        try:
+            n_extra = int((await c.api.get(f"{POV}/fotos-extra", source=c.catalogo,
+                                           folder=c.carpeta, producto=pid)).get("n") or 0)
+        except Exception:  # noqa: BLE001 — sin el recuento el plan sale igual
+            n_extra = 0
+        if n_extra:
+            out["fotos_producto"]["fotos_extra"] = [ruta_foto(c, pid, "extra", k)
+                                                    for k in range(1, n_extra + 1)]
+            out["avisos"].append(
+                f"Tiene {n_extra} foto(s) extra (variantes, funciones o usos): míralas y decide "
+                "cuántos vídeos distintos dan (guía comun/fotos-extra.md)."
+            )
 
     if t in ("pov", "largo"):
         pr = await c.api.get(f"{POV}/prompts")

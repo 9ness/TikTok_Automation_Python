@@ -35,6 +35,10 @@ venta inversa? ¿un golpe visual para el épico?) y dilo en el informe. «Mis
 tandas» separa las versiones 2 días solas (`SEPARACION_MISMO_PRODUCTO`).
 Lo que manda el operador en cada encargo va por delante de esto.
 
+**Producto con fotos extra** (variantes de color/sabor, funciones): da para
+más vídeos — p. ej. una variante por modo. Criterio en
+[`comun/fotos-extra.md`](comun/fotos-extra.md).
+
 ### Q4: más vídeos del mismo producto (oct–nov 2026)
 
 Para acumular contenido antes de Black Friday (agencias, 8 oct; detalle en

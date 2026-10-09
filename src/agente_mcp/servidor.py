@@ -140,7 +140,7 @@ def guia(menu: str = "") -> str:
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
             "README.md", "comun/app.md", "comun/plataformas.md", "comun/revision-calidad.md",
-            "comun/campanas.md"))
+            "comun/campanas.md", "comun/fotos-extra.md"))
     if menu == "multiplataforma":  # no es un menú de vídeo: solo guía + herramientas
         return _leer_guia("multiplataforma.md")
     m = menus.MENUS.get(menu)
@@ -376,8 +376,12 @@ async def preparar_bandeja(ctx: Context, menu: str, catalogo: str, carpeta: str,
                     (d / nombre).write_bytes((await _bajar(c.api, ruta))[0])
                 except ErrorApp as e:
                     plan["avisos"].append(f"{nombre}: {e}")
-        for k, ruta in enumerate(plan["fotos_producto"].get("fotos_color", []), 1):
-            destino = d / f"foto_color_{k}.jpg"
+        fotos_k = [(f"foto_color_{k}.jpg", r) for k, r in
+                   enumerate(plan["fotos_producto"].get("fotos_color", []), 1)]
+        fotos_k += [(f"foto_extra_{k}.jpg", r) for k, r in
+                    enumerate(plan["fotos_producto"].get("fotos_extra", []), 1)]
+        for nombre, ruta in fotos_k:
+            destino = d / nombre
             if not destino.exists():
                 try:
                     destino.write_bytes((await _bajar(c.api, ruta))[0])
@@ -431,14 +435,21 @@ async def personaje_marca(ctx: Context) -> str:
 @_herramienta(structured_output=False)
 async def ver_producto(ctx: Context, menu: str, catalogo: str, carpeta: str, producto: str,
                        modo: str = "") -> list[Image | str]:
-    """Enseña la foto limpia y la ficha del producto: es la referencia contra la
-    que se revisa cada imagen y clip generado."""
+    """Enseña la foto limpia, la ficha y las fotos extra del producto (variantes,
+    funciones): es la referencia contra la que se revisa cada imagen y clip."""
     c = await _ctx(ctx, menu, catalogo, carpeta, modo)
     p = await menus.producto(c, producto)
     pid = str(p["producto"])
     out: list[Image | str] = [f"Producto {pid} · {p.get('titulo', '')} · {p.get('tienda', '')}"]
-    for var in ("limpia", "ficha"):
-        ruta = menus.ruta_foto(c, pid, var)
+    fotos = [(var, menus.ruta_foto(c, pid, var)) for var in ("limpia", "ficha")]
+    if c.m.tipo != "ropa":
+        try:
+            n_extra = int((await c.api.get(f"{menus.POV}/fotos-extra", source=c.catalogo,
+                                           folder=c.carpeta, producto=pid)).get("n") or 0)
+        except ErrorApp:
+            n_extra = 0
+        fotos += [(f"extra {k}", menus.ruta_foto(c, pid, "extra", k)) for k in range(1, n_extra + 1)]
+    for var, ruta in fotos:
         if not ruta:
             continue
         try:

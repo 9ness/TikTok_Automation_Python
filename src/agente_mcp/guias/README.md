@@ -37,7 +37,9 @@ los mismos en los dos casos.
 5. [`comun/campanas.md`](comun/campanas.md) — Black Friday y Navidad (11 nov
    – 16 dic): cuándo preparar contenido y cómo orientar guiones sin prometer
    ofertas que no hay. Estado en vivo con la herramienta `campanas`.
-6. La guía del **menú** que te han pedido (tabla de abajo).
+6. [`comun/fotos-extra.md`](comun/fotos-extra.md) — si el producto trae
+   fotos de más (variantes, funciones): cuántos vídeos y cómo, con criterio.
+7. La guía del **menú** que te han pedido (tabla de abajo).
 
 Si el operador trae una **sanción de TikTok Shop** de un vídeo ya publicado,
 el método para apelar (y cuándo no merece la pena) está en `APELACIONES.md`,

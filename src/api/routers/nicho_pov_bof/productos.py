@@ -5,7 +5,8 @@ automatización de los vídeos por producto.
 - GET  /api/v1/nicho-pov-bof/productos       → productos emparejados + estado
 - POST /api/v1/nicho-pov-bof/extraer-textos  → extrae título/tienda/caption con Gemini
 - GET  /api/v1/nicho-pov-bof/foto-limpia     → descarga una foto del producto
-                                              (`variante=limpia|ficha`)
+                                              (`variante=limpia|ficha|extra&n=K`)
+- GET  /api/v1/nicho-pov-bof/fotos-extra     → cuántas fotos de más tiene
 - POST /api/v1/nicho-pov-bof/video/upload    → sube el bruto (Veo3/Kling) y encola el montaje
 - POST /api/v1/nicho-pov-bof/producto/estado → marca Subido/Vendió
 - POST /api/v1/nicho-pov-bof/producto/url    → averigua la ficha de TikTok Shop (1)
@@ -745,8 +746,9 @@ def download_clean_photo(
     source: Annotated[str, Query()],
     folder: Annotated[str, Query()],
     producto: Annotated[str, Query()],
-    variante: Annotated[Literal["limpia", "ficha"], Query()] = "limpia",
+    variante: Annotated[Literal["limpia", "ficha", "extra"], Query()] = "limpia",
     w: Annotated[int | None, Query(ge=32, le=4000)] = None,
+    n: Annotated[int, Query(ge=1, le=50)] = 1,
 ) -> FileResponse:
     """Descarga una de las dos fotos del producto, con un nombre que agrupa por
     carpeta al ordenar en la galería del móvil.
@@ -778,9 +780,15 @@ def download_clean_photo(
     photos = [drive_client.probe_dimensions(p) for p in photos]
     pairs = photo_pairing.pair_folder(photos)
     pair = next((pr for pr in pairs if pr["producto"] == producto), None)
-    clean = (pair or {}).get("clean" if variante == "limpia" else "titled")
+    if variante == "extra":
+        # `n`-ésima foto de más (`3(2)`, `3(3)`…): variantes de color o sabor,
+        # funciones, usos. Las usa el agente para hacer más de un vídeo.
+        extras = (pair or {}).get("extras") or []
+        clean = extras[n - 1] if n <= len(extras) else None
+    else:
+        clean = (pair or {}).get("clean" if variante == "limpia" else "titled")
     if not clean:
-        que = "foto limpia" if variante == "limpia" else "foto de la ficha"
+        que = {"limpia": "foto limpia", "ficha": "foto de la ficha"}.get(variante, f"foto extra {n}")
         raise PhotoNotFoundError(
             f"No hay {que} para el producto {producto!r} en {folder!r}.",
             details={
@@ -801,7 +809,7 @@ def download_clean_photo(
     # lleva sufijo para que no pise a la limpia del mismo producto si se bajan
     # las dos (mismo nombre = "archivo(1)" y ya no se sabe cuál es cuál).
     folder_slug = re.sub(r"\s+", "_", folder.strip())
-    marca = "" if variante == "limpia" else "_ficha"
+    marca = {"limpia": "", "ficha": "_ficha"}.get(variante, f"_extra{n}")
     filename = f"{folder_slug}_{producto.zfill(2)}{marca}{suffix}"
 
     # Con `w` sale encogida y SIN forzar la descarga: así el mismo endpoint
@@ -824,6 +832,28 @@ def download_clean_photo(
         filename=filename,  # Starlette pone Content-Disposition: attachment
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@router.get("/fotos-extra")
+def count_extra_photos(
+    source: Annotated[str, Query()],
+    folder: Annotated[str, Query()],
+    producto: Annotated[str, Query()],
+) -> dict:
+    """Cuántas fotos de más tiene el producto (las que bajan con
+    `/foto-limpia?variante=extra&n=K`). Si hay, el producto tiene variantes o
+    funciones que dan para más de un vídeo."""
+    from src.nicho_pov_bof.services import drive_client, photo_pairing
+
+    try:
+        photos = drive_client.list_photos(source, folder)
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+    except RuntimeError as e:
+        raise APIError(f"No se pudo leer el Drive compartido: {e}", status_code=502) from e
+    pairs = photo_pairing.pair_folder([drive_client.probe_dimensions(p) for p in photos])
+    pair = next((pr for pr in pairs if pr["producto"] == producto), None)
+    return {"n": len((pair or {}).get("extras") or [])}
 
 
 # ---------------------------------------------------------------------------
