@@ -492,6 +492,12 @@ ESTILOS_GUION: dict[str, dict[str, str]] = {
     # cabecera de `guion_inversa.md`). Sin urgencia de precio y con su propio
     # cierre de disponibilidad (`CTA_INVERSA`).
     "inversa": {"label": "Venta inversa", "fichero": "guion_inversa.md"},
+    # «UGC Desde 0 · Gancho Acción» de la web del curso, pasado a POV (oct
+    # 2026, `docs/ugc_accion/`): sin dolor, arranca con el producto YA en uso
+    # y la voz le habla al espectador; cierra con la urgencia de precio y la
+    # CTA de siempre. Pide productos que se puedan USAR en plano (muebles,
+    # ropa, cocina, mascotas…): la electrónica encendida es difícil de clavar.
+    "accion": {"label": "Acción", "fichero": "guion_accion.md"},
     # «Replicar viral» (`src/replicar_viral/`): el guion NO se escribe aquí,
     # viene ya adaptado en la réplica del producto (`replica_id`). Siempre dos
     # clips de 8 s. Ver `guion_de_replica`.
@@ -624,7 +630,7 @@ ESTILOS_TEXTO = ("blanco", "clasico")
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "viral": "blanco"}
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "viral": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:
@@ -761,6 +767,10 @@ def _caracteristicas(segundos: float = 0, estilo: str = "") -> str:
             " Y empieza con una de las fórmulas de gancho que se te han dado "
             "ARRIBA: la ironía tiene que entenderse desde la primera frase."
             if es_inversa(estilo) else
+            " Y empieza con la ACCIÓN que se te ha pedido ARRIBA: el producto "
+            "ya en uso y la voz hablándole al espectador, sin dolor ni "
+            "preguntas."
+            if (estilo or "").strip().lower() == "accion" else
             " Y empieza con una de las aperturas de precio "
             "que se te han dado ARRIBA, copiada tal cual: son verbales a "
             "propósito."

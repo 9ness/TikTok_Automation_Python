@@ -255,9 +255,10 @@ async def preparar_carpeta(ctx: Context, menu: str, catalogo: str, carpeta: str,
     """El «Paso 1» de la web: lee los textos de las fichas que falten y escribe
     los guiones/escenas que falten. Devuelve un `tarea_id` para `estado`.
     POV BOF / Largo: `clip_s` (8|10) fija la duración de clip de toda la carpeta;
-    Largo: `estilo_guion` (precio|dolor|epico|inversa|viral) — cambia el modo de TODO
-    el catálogo; «epico» marca golpes con insertos de 5 s, «inversa» es la
-    venta inversa irónica y siempre son 3 clips. `rehacer=True` REESCRIBE lo
+    Largo: `estilo_guion` (precio|dolor|epico|inversa|accion|viral) — cambia el modo de
+    TODO el catálogo; «epico» marca golpes con insertos de 5 s, «inversa» es la
+    venta inversa irónica y siempre son 3 clips, «accion» arranca con el
+    producto ya en uso (gancho Acción del UGC del curso). `rehacer=True` REESCRIBE lo
     que ya está: solo si el operador lo pide. `productos` ("1,3,5") limita los
     guiones a esos productos (Moda y Largo; sin él, toda la carpeta)."""
     c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion)

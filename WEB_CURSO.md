@@ -61,7 +61,7 @@ Cómo entra en nuestra app:
 | Moda Mujer | `#prompts/mujer` | BOF Frente a Espejo 10s · BOF Selfie 10s · Situación Real 1 10s · Situación Real 2 10s · Zapatillas Vista POV 20s · Zapatillas Vista Sentado 20s · Gafas en Coche 10s · Camisetas Sarcásticas 10s · Camiseta Maniquí 10s |
 | Moda Hombre | `#prompts/hombre` | Los mismos 9 títulos |
 | Nichos POV | `#prompts/pov` | POV MOF ESP/USA 20s Gancho **Punto de Dolor** · POV MOF ESP/USA 20s Gancho **Urgencia de Precio** |
-| Nicho General | `#prompts/general` | UGC Desde 0 Gancho Punto de Dolor |
+| Nicho General | `#prompts/general` | UGC Desde 0 Gancho Punto de Dolor · UGC Desde 0 Gancho **Acción** (prompts y ejemplo en `docs/ugc_accion/`) |
 
 Cada formato es una tarjeta con vídeo de ejemplo. Al abrirla: selector de
 producto del inventario (Carpeta N · Producto M, con "Descargar fotos" y

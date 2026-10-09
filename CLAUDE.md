@@ -440,6 +440,8 @@ un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si 
 prompt nuestro por ingeniería inversa de la web del curso (`prompts/guion_inversa.md`,
 muestras en `docs/venta_inversa/`); cierre de disponibilidad (`CTAS_INVERSA`), sin precio, siempre 3 clips (`SEGUNDOS_INVERSA`).
 
+**⚡ Acción** (`estilo_guion="accion"`): el «UGC Desde 0 · Gancho Acción» del curso pasado a POV (`prompts/guion_accion.md`, original en `docs/ugc_accion/`): sin dolor, el producto ya en uso y «Mira cómo…», luego características y la CTA de precio de siempre.
+
 **🔁 Réplica viral** (`estilo_guion="viral"`, carpeta especial «Réplicas virales», de todos los usuarios): el guion y los prompts de los clips salen de la réplica (`src/replicar_viral/`, campo `replica_id`), sin IA; `POST /replica/anadir` y MCP `anadir_replica`. Siempre 2 clips.
 
 **Calendario de subidas** (qué carpeta toca cada día): [`docs/CALENDARIO_POV_BOF_LARGO.md`](docs/CALENDARIO_POV_BOF_LARGO.md).

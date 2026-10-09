@@ -36,7 +36,7 @@ Un vídeo de octubre puede vender en noviembre, así que octubre es para
 - Producto prioritario: **mínimo 5 vídeos distintos** antes de juzgarlo, cada
   uno con otro enfoque (problema → solución, prueba real → resultado,
   resultado primero, otra situación de uso, responder dudas). Usa los estilos
-  del Largo (dolor, épico, venta inversa, réplica viral) para variar.
+  del Largo (dolor, épico, venta inversa, acción, réplica viral) para variar.
 - Producto de **más de 200 €**: **10 vídeos o más** antes de Black Friday
   (es cuando bajan de verdad de precio).
 - Si un producto empieza a vender, **no saltes a otro**: más vídeos de ese con

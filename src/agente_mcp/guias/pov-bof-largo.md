@@ -29,7 +29,7 @@ tarjeta**.
 
 Néstor sube ~20 vídeos al día y el inventario no da para uno por producto. Por
 defecto, cada producto lleva **DOS vídeos de 3 clips**, con los **dos modos
-que mejor le encajen** de los cuatro (dolor, precio, épico, venta inversa):
+que mejor le encajen** de los cinco (dolor, precio, épico, venta inversa, acción):
 elige por el producto (¿se ve un dolor claro? ¿hay un dato fuerte para la
 venta inversa? ¿un golpe visual para el épico?) y dilo en el informe. «Mis
 tandas» separa las versiones 2 días solas (`SEPARACION_MISMO_PRODUCTO`).
@@ -44,7 +44,7 @@ no el tope:
   200 €: 10 o más.** Si uno empieza a vender, no saltes a otro: más vídeos
   de ese.
 - **Cada vídeo, otro enfoque**, no el mismo con otra voz: cambia el MODO
-  (dolor, precio, épico, venta inversa, réplica viral) y, dentro del mismo
+  (dolor, precio, épico, venta inversa, acción, réplica viral) y, dentro del mismo
   modo, el ángulo (problema → solución, prueba real → resultado, resultado
   primero, otra situación de uso, responder dudas) y las ESCENAS (otro sitio,
   otra luz, otro plano del clip 1). Dos vídeos que se parecen cuentan como uno
@@ -257,6 +257,25 @@ la web (`docs/venta_inversa/`).
   es la suya (`config.CTAS_INVERSA`); el recorte por precio no la toca.
 - Revisa la ironía: que se entienda que lo recomiendas, sin efectos sobre el
   cuerpo («te pone en forma») ni datos inventados (programas, niveles).
+
+## ⚡ Modo «Acción» (oct 2026)
+
+Quinto modo (`estilo_guion="accion"`), el gancho «UGC Desde 0 · Gancho Acción»
+de la web del curso pasado a POV (prompt literal y vídeo de ejemplo en
+`docs/ugc_accion/`; el nuestro en `prompts/guion_accion.md`). Pensado sobre
+todo para los productos caros (más de 200 €), que necesitan más vídeos.
+
+- Forma: gancho con el producto **YA en uso** y la voz hablándole al
+  espectador («Mira cómo…», «Fíjate en…»), **sin dolor ni preguntas** →
+  características confirmadas que siguen esa acción → urgencia de precio →
+  la CTA de siempre (escalera de cierres normal, con plazos si los cumple).
+- **Clip 1 = la acción del gancho**, con energía y desde el primer fotograma:
+  montarse, sentarse, ponérselo, abrirlo, girarlo, servir con él. **Clip 2 =**
+  una característica que se vea (de cerca o el resultado de esa acción).
+- Aquí la mano interactúa MÁS con el producto: vale, siempre que el producto
+  siga idéntico y consistente en todo el clip. Elige productos que se usen en
+  plano (muebles, ropa, calzado, cocina, mascotas, deporte); la electrónica
+  encendida sigue siendo difícil y mantiene sus reglas.
 
 ## 🎄 Productos Q4 (Black Friday y Navidad)
 
