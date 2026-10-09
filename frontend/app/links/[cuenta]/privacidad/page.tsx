@@ -55,15 +55,17 @@ function secciones(c: Cuenta): { titulo: string; texto: string }[] {
 export default function PrivacidadPage({ params }: { params: { cuenta: string } }) {
   const c = CUENTAS[params.cuenta] ?? { nombre: params.cuenta, tienda: "la tienda" };
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 text-sm text-neutral-800 sm:py-12">
-      <h1 className="mb-1 text-xl font-semibold sm:text-2xl">Política de privacidad · {c.nombre}</h1>
-      <p className="mb-6 text-xs text-neutral-500">Última actualización: 9 de octubre de 2026</p>
-      {secciones(c).map((s) => (
-        <section key={s.titulo} className="mb-5">
-          <h2 className="mb-1 font-semibold">{s.titulo}</h2>
-          <p className="break-words leading-relaxed">{s.texto}</p>
-        </section>
-      ))}
+    <main className="min-h-screen bg-white">
+      <div className="mx-auto max-w-2xl px-4 py-8 text-sm text-neutral-800 sm:py-12">
+        <h1 className="mb-1 text-xl font-semibold sm:text-2xl">Política de privacidad · {c.nombre}</h1>
+        <p className="mb-6 text-xs text-neutral-500">Última actualización: 9 de octubre de 2026</p>
+        {secciones(c).map((s) => (
+          <section key={s.titulo} className="mb-5">
+            <h2 className="mb-1 font-semibold">{s.titulo}</h2>
+            <p className="break-words leading-relaxed">{s.texto}</p>
+          </section>
+        ))}
+      </div>
     </main>
   );
 }
