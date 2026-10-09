@@ -109,6 +109,26 @@ export function urlFotoCarrusel(
 
 export { conClave };
 
+/** Baja las fotos listas de un carrusel UNA A UNA y en orden (sin ZIP), para
+ *  tenerlas ya en la galería en el orden de publicación. Va por la URL con
+ *  `descargar=true` (no por blob), que es lo que sabe bajar la APK. Pausa
+ *  entre una y otra: el navegador bloquea o desordena descargas seguidas.
+ *  Devuelve cuántas bajó. */
+export async function descargarFotosCarrusel(id: string): Promise<number> {
+  const doc = await api.get<CarruselReplica>(`${ROOT}/carrusel/${id}`);
+  const listas = doc.diapositivas.filter((d) => d.tiene_imagen).sort((a, b) => a.n - b.n);
+  for (const [i, d] of listas.entries()) {
+    if (i) await new Promise((r) => setTimeout(r, 1200));
+    const a = document.createElement("a");
+    a.href = urlFotoCarrusel(id, d.n, "final", d.version, true);
+    a.download = "";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  return listas.length;
+}
+
 export function urlZipCarrusel(id: string): string {
   return conClave(`${ROOT}/carrusel/${id}/zip`);
 }

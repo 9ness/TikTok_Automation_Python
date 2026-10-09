@@ -177,8 +177,13 @@ def carrusel_imagen(
         raise _error(e) from e
     if not p:
         raise APIError("Esa foto todavía no está.", status_code=404)
-    return FileResponse(p, media_type="image/jpeg",
-                        filename=f"diapositiva_{n:02d}.jpg" if descargar else None,
+    nombre = None
+    if descargar:  # «carrusel_<producto>_<id>_01.jpg»: en la galería quedan juntas y en orden
+        try:
+            nombre = f"{carrusel.nombre_carrusel(carrusel.ver(usuario, id_))}_{n:02d}.jpg"
+        except Exception:  # noqa: BLE001
+            nombre = f"diapositiva_{n:02d}.jpg"
+    return FileResponse(p, media_type="image/jpeg", filename=nombre,
                         headers={"Cache-Control": "private, max-age=60"})
 
 

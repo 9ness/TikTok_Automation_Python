@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Download, GalleryHorizontalEnd, Loader2, Plus, Repeat, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
@@ -14,7 +15,6 @@ import {
   type Diapositiva,
   type ProductoCarrusel,
   urlFotoCarrusel,
-  urlZipCarrusel,
   useCarrusel,
   useCarruseles,
   useCatalogoCarrusel,
@@ -331,25 +331,17 @@ function CarruselAbierto({ doc }: { doc: CarruselReplica }) {
         n={3}
         color="azul"
         titulo="Descarga el carrusel"
-        hint="Todas las fotos con su texto, en orden, más el caption. También está en Mis tandas."
+        hint="Las fotos con su texto, una a una y en orden (01, 02…). El caption, con su botón. También está en Mis tandas."
         extra={doc.completo ? "✓ completo" : `${doc.hechas}/${doc.total}`}
       >
         <div className="flex flex-wrap gap-1.5">
-          <a
-            href={doc.hechas ? urlZipCarrusel(doc.id) : undefined}
-            aria-disabled={!doc.hechas}
-            className={`flex items-center gap-1.5 rounded-lg border border-sky-500/50 px-3 py-2 text-xs font-semibold text-sky-400 ${
-              doc.hechas ? "hover:bg-sky-500/10" : "pointer-events-none opacity-40"
-            }`}
-          >
-            <Download className="h-3.5 w-3.5" /> Descargar todas
-          </a>
+          <BotonFotosEnOrden id={doc.id} disabled={!doc.hechas} className="px-3 py-2 text-xs" />
           <CopyChip label="Caption" text={doc.caption} siempre />
           <CopyChip label="Hashtags" text={doc.hashtags.join(" ")} />
         </div>
         {!doc.completo && doc.hechas > 0 && (
           <p className="text-[10px] text-amber-400">
-            Faltan {doc.total - doc.hechas} fotos: el ZIP lleva solo las que ya están.
+            Faltan {doc.total - doc.hechas} fotos: se bajan solo las que ya están.
           </p>
         )}
       </Paso>

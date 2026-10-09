@@ -14,7 +14,7 @@ Mismo carrusel, diapositiva a diapositiva: **mismo papel y misma forma de texto
 en cada foto, otro ambiente y NUESTRO producto**. La app no genera imágenes:
 escribe el texto y el prompt de cada foto; tú las generas en Google Flow y la
 app les quema el texto (el mismo estilo que el nicho Carruseles) y las da
-todas en un ZIP.
+todas en orden (en la web, una a una; por el MCP, también en ZIP).
 
 ## 1. De dónde salen
 
@@ -75,7 +75,9 @@ original en encuadre y emoción pero en otro sitio.
    misma `n` la sustituye.
 2. `descargar_carrusel(id)` → `hechas`/`total` y `zip` (todas con su texto, en
    orden, + `caption.txt`). En la web: botón «Descargar todas» en la pantalla
-   Replicar carrusel y en **Mis tandas › Fotos** (tandas de diez con su ZIP,
+   Replicar carrusel y «Fotos» en **Mis tandas › Fotos**, que bajan las fotos
+   UNA A UNA y en orden (`carrusel_<producto>_<id>_01.jpg`, 02…), sin ZIP, para
+   tenerlas listas en la galería (la tanda entera sí va en ZIP,
    ver `mis-tandas.md`).
 3. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
    hashtags, y lo marca **Subido** en Mis tandas › Fotos

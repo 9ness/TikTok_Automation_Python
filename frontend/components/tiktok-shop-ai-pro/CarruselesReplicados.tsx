@@ -6,7 +6,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { useMarcarFoto, useTandasFotos, urlZipTandaFotos } from "@/lib/queries/misTandas";
-import { urlZipCarrusel } from "@/lib/queries/replicarCarrusel";
+import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 
 /** «sáb 3 oct» a partir de «2026-10-03». */
 function fechaCorta(iso: string): string {
@@ -16,7 +16,7 @@ function fechaCorta(iso: string): string {
 
 /** Pestaña «Fotos» de Mis tandas: los carruseles de «Replicar carrusel» en
  *  tandas de diez, con su PROPIO contador (no son vídeos ni cuentan para la
- *  cuota del día). ZIP de la tanda entera o de cada carrusel, y «Subido». */
+ *  cuota del día). ZIP de la tanda entera; cada carrusel baja sus fotos una a una y en orden, y «Subido». */
 export function CarruselesReplicados() {
   const [verCerradas, setVerCerradas] = useState(false);
   const tandas = useTandasFotos(verCerradas);
@@ -128,12 +128,12 @@ export function CarruselesReplicados() {
                           </span>
                         </p>
                         <div className="flex flex-wrap items-center gap-1">
-                          <a
-                            href={urlZipCarrusel(c.id)}
-                            className="flex items-center gap-1 rounded border border-sky-500/50 px-2 py-1 text-[10px] font-semibold text-sky-400 hover:bg-sky-500/10"
-                          >
-                            <Download className="h-3 w-3" /> ZIP
-                          </a>
+                          <BotonFotosEnOrden
+                            id={c.id}
+                            disabled={!c.hechas}
+                            etiqueta="Fotos"
+                            className="rounded px-2 py-1 text-[10px]"
+                          />
                           <CopyChip
                             label="Caption"
                             text={[c.caption, c.hashtags.join(" ")].filter(Boolean).join(" ")}

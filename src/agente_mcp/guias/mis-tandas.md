@@ -98,8 +98,8 @@ contador `subidos/total`. En Fotos están los **carruseles replicados**
 Un carrusel entra en cuanto tiene una foto subida, en orden de creación, y
 cada tanda abierta lleva su día (hoy, mañana…). Cada tanda baja en un ZIP
 (una carpeta `NN_<producto>` por carrusel con las fotos y `caption.txt`; si ya
-hay alguno subido, solo los pendientes) y cada carrusel tiene su ZIP, su
-caption y su botón **Subido** (se guarda en la réplica: `subido`/`subido_at`).
+hay alguno subido, solo los pendientes) y cada carrusel tiene su botón
+«Fotos» (las baja una a una y en orden, sin ZIP), su caption y su botón **Subido** (se guarda en la réplica: `subido`/`subido_at`).
 
 ## Colores
 
