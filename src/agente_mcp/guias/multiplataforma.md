@@ -87,6 +87,20 @@ Los vídeos nuevos que se monten más adelante aparecen solos en
 siguiente `encolar_tandas` (si ya lo tiene: el enlace vale para todas las
 versiones del producto, también las copias de Productos Q4).
 
+## Carruseles de fotos (Replicar carrusel)
+
+Un carrusel con TODAS sus fotos hechas se publica en IG/FB/Threads con
+`encolar_carrusel(cuenta, carrusel_id, asin=… | shein=…, caption=…, desde="AAAA-MM-DD")`:
+- Cuenta por nicho: hogar, mascotas, accesorios → `viva_shop`; salud/belleza →
+  `viva_salud`; moda mujer → `ama_shop` (SHEIN).
+- El enlace es el MISMO producto o un parecido válido (tipo, forma, color),
+  buscado igual que arriba. Si no hay uno fiable, ese carrusel **no va a Meta**.
+- `caption` en español y sin «carrito» ni TikTok (vacío = el de la réplica
+  limpio). Sale uno al día a las 17:00 (± unos minutos), tras el último ya
+  programado de esa cuenta. Repetir la llamada no duplica.
+- IG recibe las fotos en un lienzo 4:5 (no admite 3:4 ni 9:16). La música no
+  se puede poner por API: la respuesta trae la sugerida.
+
 ## Informe al terminar
 
 Una línea por producto: «✅ enlace (SHEIN/ASIN) · ⛔ sin_equivalente (motivo)
@@ -99,5 +113,5 @@ Una línea por producto: «✅ enlace (SHEIN/ASIN) · ⛔ sin_equivalente (motiv
   producto en su nicho, cambia y habría que volver a guardar el enlace.
 - API: `GET /api/v1/multiplataforma/cuentas/{cuenta}/productos?sin_enlace=1`,
   `PUT|DELETE /cuentas/{cuenta}/enlaces/{producto_key}`,
-  `POST /cuentas/{cuenta}/encolar-tandas`, `GET /cola`.
+  `POST /cuentas/{cuenta}/encolar-tandas`, `POST /cuentas/{cuenta}/carrusel`, `GET /cola`.
 - Página pública (para la bio de IG/FB): `/links/<cuenta>`.

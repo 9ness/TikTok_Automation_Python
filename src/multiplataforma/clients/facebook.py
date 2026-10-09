@@ -16,6 +16,8 @@ el fallo queda en `comentario_error` para reintentarlo a mano.
 
 from __future__ import annotations
 
+import json
+
 from src.multiplataforma import config
 from src.multiplataforma.clients.base import ClienteBase, ErrorPublicacion
 
@@ -110,3 +112,49 @@ class FacebookClient(ClienteBase):
             return "dry-fb-comment"
         j = self._request("POST", url, data={"message": mensaje, "access_token": self.token})
         return str(j.get("id") or "")
+
+    # ---- carrusel de fotos (publicación con varias fotos) ----
+    def publicar_fotos(self, page_id: str, *, mensaje: str, imagenes_url: list[str], comentario: str = "",
+                       previo: dict | None = None) -> dict:
+        """Cada foto a `/{page}/photos` con `published=false` → `/{page}/feed`
+        con `attached_media` (en orden) → enlace en el primer comentario."""
+        previo = previo or {}
+        if not page_id:
+            raise ErrorPublicacion("facebook: la cuenta no tiene fb_page_id", reintentable=False)
+        fotos: list[str] = list(previo.get("photo_ids") or [])
+        post_id = previo.get("post_id", "")
+        try:
+            if not post_id:
+                url = f"{self.base}/{page_id}/photos"
+                for i, img in enumerate(imagenes_url[len(fotos):], start=len(fotos)):
+                    datos = {"url": img, "published": "false"}
+                    if self.dry_run:
+                        self._anotar("POST", url, data=datos)
+                        fotos.append(f"dry-fb-photo-{i + 1}")
+                        continue
+                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    if not j.get("id"):
+                        raise ErrorPublicacion(f"facebook: foto {i + 1} sin id: {j}")
+                    fotos.append(str(j["id"]))
+                datos = {"message": mensaje}
+                for i, f in enumerate(fotos):
+                    datos[f"attached_media[{i}]"] = json.dumps({"media_fbid": f})
+                url = f"{self.base}/{page_id}/feed"
+                if self.dry_run:
+                    self._anotar("POST", url, data=datos)
+                    post_id = "dry-fb-post"
+                else:
+                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    post_id = str(j.get("id") or "")
+                    if not post_id:
+                        raise ErrorPublicacion(f"facebook: /feed sin id: {j}")
+        except ErrorPublicacion as e:
+            e.parcial = {**e.parcial, "photo_ids": fotos}
+            raise
+        res = {"photo_ids": fotos, "post_id": post_id, "dry_run": self.dry_run, "pasos": self.pasos}
+        if comentario:
+            try:
+                res["comentario_id"] = self.comentar(post_id, comentario)
+            except ErrorPublicacion as e:
+                res["comentario_error"] = str(e)
+        return res

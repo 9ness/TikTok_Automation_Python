@@ -99,6 +99,31 @@ maniquí…) `tandas.encolar` les mezcla música en el fichero
 - Cualquier fallo (sin banco, ffmpeg) → log y se publica el original.
 - Overrides: `MULTIPLATAFORMA_MUSICA_DIR` (banco), `MULTIPLATAFORMA_MUSICA_TRABAJO` (copias).
 
+## Carruseles de fotos (`tipo="carrusel"`, oct 2026)
+
+Los carruseles de «Replicar carrusel» (`src/replicar_viral/carrusel.py`) se
+publican con `services/carruseles.py:encolar(slug, carrusel_id, asin|shein, caption, desde)`
+(API `POST /cuentas/{slug}/carrusel`, MCP `encolar_carrusel`):
+- Copia las fotos listas (con texto quemado, o la de Flow si no lleva) a
+  `Multiplataforma/<cuenta>/carruseles/<id>/NN.jpg` y una versión 4:5
+  (`ig/NN.jpg`, lienzo 1080×1350 con el fondo desenfocado): **IG rechaza 3:4
+  y 9:16**. `Publicacion.imagenes` / `imagenes_ig` / `carrusel_id`;
+  `video_path` = la primera foto (identidad / idempotencia).
+- Enlace obligatorio (ASIN o SHEIN, se guarda en `enlaces:<slug>` con la misma
+  `producto_key` tienda|título). Sin enlace no se encola.
+- Hora: `horas["carrusel"]` de la cuenta (por defecto 17:00 ± desfase), ritmo
+  1/día, tras el último carrusel programado y no antes de `desde`.
+- Texto: el caption de la réplica sin las frases de carrito/TikTok (o el que
+  se pase), hashtags sin los de TikTok + los de la tienda.
+- Publicación: IG contenedores IMAGE `is_carousel_item` → CAROUSEL `children`
+  → `media_publish`; FB `/{page}/photos published=false` → `/{page}/feed`
+  `attached_media[i]` + enlace en el primer comentario; Threads items IMAGE →
+  CAROUSEL → `threads_publish`; Pinterest `multiple_image_urls` (máx. 5). Los
+  ids intermedios (`children`, `photo_ids`, `container_id`) se guardan para
+  no duplicar al reintentar.
+- Sin música: la API de Meta no la admite en fotos. La sugerida
+  (`musica.meta` de la réplica) vuelve en la respuesta.
+
 ## Reglas del tick
 
 - Coge las publicaciones con `programada_en <= ahora` (orden ascendente), hasta `limite`.

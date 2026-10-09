@@ -84,7 +84,7 @@ def test_reparto_por_dias_y_horas(raiz, monkeypatch):
 
 def test_defaults_y_ritmo_mayor_que_horas():
     c = CuentaDestino(slug="x")
-    assert c.ritmo == {"prueba_viral": 1, "producto": 1}
+    assert c.ritmo == {"prueba_viral": 1, "producto": 1, "carrusel": 1}
     assert c.horas["prueba_viral"] == ["19:00"] and c.horas["producto"] == ["13:00"]
     assert ingesta.horas_del_dia(3, ["19:00"]) == [(19, 0), (20, 0), (21, 0)]
     assert ingesta.horas_del_dia(0, ["19:00"]) == []

@@ -234,7 +234,7 @@ def test_mcp_tiene_las_herramientas():
     from src.agente_mcp import servidor
 
     for nombre in ("productos_sin_enlace", "guardar_enlace", "encolar_tandas", "cola_multiplataforma",
-                   "cuentas_multiplataforma"):
+                   "cuentas_multiplataforma", "encolar_carrusel"):
         assert callable(getattr(servidor, nombre))
     assert "NUNCA en TikTok" in servidor.guia("multiplataforma")
 

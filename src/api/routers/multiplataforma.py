@@ -23,7 +23,7 @@ from src.api.exceptions import APIError
 from src.multiplataforma import config, publicador
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo
-from src.multiplataforma.services import enlaces, ingesta, tandas, textos, video_url
+from src.multiplataforma.services import carruseles, enlaces, ingesta, tandas, textos, video_url
 
 router = APIRouter(
     prefix="/api/v1/multiplataforma",
@@ -123,8 +123,9 @@ def encolar(body: PublicacionIn) -> dict:
     cuenta = cuentas_repo.get(body.cuenta)
     if not cuenta:
         raise APIError(f"No existe la cuenta {body.cuenta}", status_code=404)
-    if body.tipo not in config.TIPOS:
-        raise APIError(f"tipo no válido: {body.tipo}", status_code=400)
+    if body.tipo not in config.TIPOS or body.tipo == "carrusel":
+        raise APIError(f"tipo no válido: {body.tipo} (los carruseles van por /cuentas/<slug>/carrusel)",
+                       status_code=400)
     malas = set(body.plataformas) - set(config.PLATAFORMAS)
     if malas or not body.plataformas:
         raise APIError(f"Plataformas no válidas: {sorted(malas) or 'ninguna'}", status_code=400)
@@ -235,6 +236,32 @@ def encolar_tandas(slug: str, incluir_no_subidos: Annotated[bool, Query()] = Fal
         return tandas.encolar(slug, incluir_no_subidos=incluir_no_subidos, limite=limite)
     except tandas.ErrorTandas as e:
         raise _err_tandas(e) from e
+
+
+class CarruselIn(BaseModel):
+    """Un carrusel de «Replicar carrusel» → IG/FB/Threads/Pinterest."""
+
+    carrusel_id: str
+    usuario: str = ""  # dueño de la réplica (por defecto, el de la cuenta)
+    asin: str = ""
+    shein: str = ""
+    nota: str = ""
+    caption: str = ""  # vacío = el de la réplica sin lo de TikTok
+    hashtags: list[str] = Field(default_factory=list)
+    desde: str = ""  # AAAA-MM-DD: no antes de ese día
+    plataformas: list[str] = Field(default_factory=lambda: list(config.PLATAFORMAS))
+
+
+@router.post("/cuentas/{slug}/carrusel")
+def encolar_carrusel(slug: str, body: CarruselIn) -> dict:
+    """Encola un carrusel de fotos a la hora «carrusel» de la cuenta."""
+    try:
+        return carruseles.encolar(slug, body.carrusel_id.strip(), usuario=body.usuario, asin=body.asin,
+                                  shein=body.shein, nota=body.nota, caption=body.caption,
+                                  hashtags=body.hashtags or None, desde=body.desde,
+                                  plataformas=body.plataformas)
+    except (tandas.ErrorTandas, carruseles.ErrorCarrusel) as e:
+        raise APIError(str(e), status_code=e.status) from e
 
 
 @router_publico.get("/links/{slug}")

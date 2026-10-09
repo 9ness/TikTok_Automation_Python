@@ -100,3 +100,35 @@ class PinterestClient(ClienteBase):
         if not pin_id:
             raise ErrorPublicacion(f"pinterest: /pins sin id: {j}")
         return pin_id
+
+    # ---- carrusel de fotos ----
+    def publicar_carrusel(self, board_id: str, *, titulo: str, descripcion: str, enlace: str,
+                          imagenes_url: list[str], previo: dict | None = None) -> dict:
+        """Pin carrusel (`multiple_image_urls`, de 2 a 5 fotos: si hay más,
+        las 5 primeras)."""
+        if not board_id:
+            raise ErrorPublicacion("pinterest: la cuenta no tiene pinterest_board_id", reintentable=False)
+        imgs = imagenes_url[: config.MAX_FOTOS_CARRUSEL["pinterest"]]
+        if len(imgs) < 2:
+            raise ErrorPublicacion("pinterest: un carrusel lleva al menos 2 fotos", reintentable=False)
+        item = {"title": titulo[: config.MAX_TITULO_PINTEREST], "description": descripcion[:500]}
+        if enlace:
+            item["link"] = enlace
+        cuerpo = {
+            "board_id": board_id,
+            "title": titulo[: config.MAX_TITULO_PINTEREST],
+            "description": descripcion[: config.MAX_CHARS["pinterest"]],
+            "media_source": {"source_type": "multiple_image_urls",
+                             "items": [{**item, "url": u} for u in imgs]},
+        }
+        if enlace:
+            cuerpo["link"] = enlace
+        url = f"{self.base}/pins"
+        if self.dry_run:
+            self._anotar("POST", url, json=cuerpo)
+            return {"pin_id": "dry-pin", "dry_run": True, "pasos": self.pasos}
+        j = self._request("POST", url, json=cuerpo, headers=self._auth())
+        pin_id = str(j.get("id") or "")
+        if not pin_id:
+            raise ErrorPublicacion(f"pinterest: /pins sin id: {j}")
+        return {"pin_id": pin_id, "dry_run": False, "pasos": self.pasos}

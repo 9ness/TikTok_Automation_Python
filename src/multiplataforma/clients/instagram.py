@@ -149,3 +149,54 @@ class InstagramClient(ClienteBase):
         if not media_id:
             raise ErrorPublicacion(f"instagram: media_publish sin id: {j}")
         return media_id
+
+    # ---- carrusel de fotos ----
+    def publicar_carrusel(self, ig_user_id: str, *, caption: str, imagenes_url: list[str],
+                          previo: dict | None = None) -> dict:
+        """Carrusel de 2-10 fotos: un contenedor IMAGE `is_carousel_item` por
+        foto → contenedor CAROUSEL con `children` → `media_publish`. Las fotos
+        tienen que ser JPEG entre 4:5 y 1.91:1 (Meta rechaza 3:4 y 9:16: van
+        ya adaptadas a 4:5, ver `services/carruseles.py`)."""
+        previo = previo or {}
+        if not ig_user_id:
+            raise ErrorPublicacion("instagram: la cuenta no tiene ig_user_id", reintentable=False)
+        if not 2 <= len(imagenes_url) <= config.MAX_FOTOS_CARRUSEL["instagram"]:
+            raise ErrorPublicacion(f"instagram: un carrusel lleva de 2 a 10 fotos ({len(imagenes_url)})",
+                                   reintentable=False)
+        cuota = self.cuota(ig_user_id)
+        if cuota["usado"] >= cuota["total"]:
+            raise ErrorPublicacion(f"instagram: cuota de Meta agotada ({cuota['usado']}/{cuota['total']})")
+
+        hijos: list[str] = list(previo.get("children") or [])
+        contenedor = previo.get("container_id", "")
+        try:
+            if not contenedor:
+                url = f"{self.base}/{ig_user_id}/media"
+                for i, img in enumerate(imagenes_url[len(hijos):], start=len(hijos)):
+                    datos = {"image_url": img, "is_carousel_item": "true"}
+                    if self.dry_run:
+                        self._anotar("POST", url, data=datos)
+                        hijos.append(f"dry-ig-item-{i + 1}")
+                        continue
+                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    if not j.get("id"):
+                        raise ErrorPublicacion(f"instagram: foto {i + 1} sin id de contenedor: {j}")
+                    hijos.append(str(j["id"]))
+                for h in hijos:
+                    self._esperar_contenedor(h)
+                datos = {"media_type": "CAROUSEL", "children": ",".join(hijos), "caption": caption}
+                if self.dry_run:
+                    self._anotar("POST", url, data=datos)
+                    contenedor = "dry-ig-carousel"
+                else:
+                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    contenedor = str(j.get("id") or "")
+                    if not contenedor:
+                        raise ErrorPublicacion(f"instagram: Meta no devolvió id del carrusel: {j}")
+            self._esperar_contenedor(contenedor)
+            media_id = self._publicar_contenedor(ig_user_id, contenedor)
+        except ErrorPublicacion as e:
+            e.parcial = {**e.parcial, "children": hijos, **({"container_id": contenedor} if contenedor else {})}
+            raise
+        return {"children": hijos, "container_id": contenedor, "media_id": media_id,
+                "dry_run": self.dry_run, "pasos": self.pasos}

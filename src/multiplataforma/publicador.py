@@ -18,6 +18,7 @@ No hay cerrojo entre procesos: se asume un único timer.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Callable
 
 import httpx
@@ -47,6 +48,9 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
     texto = pub.textos.get(plataforma, "")
     simulado = dry_run or not token
 
+    if pub.tipo == "carrusel":
+        return _ejecutar_carrusel(plataforma, pub, token, destino, texto, simulado, kw, previo)
+
     if not simulado and not pub.video_path.startswith(("http://", "https://")):
         ClienteBase._fichero(pub.video_path)  # error claro y no reintentable si no está
 
@@ -69,6 +73,31 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
             destino, titulo=pub.titulo or texto[:100], descripcion=texto, enlace=pub.enlace,
             video_path=pub.video_path, cover_url=pub.cover_url, previo=previo,
         )
+    raise ErrorPublicacion(f"Plataforma desconocida: {plataforma}", reintentable=False)
+
+
+def _ejecutar_carrusel(plataforma: str, pub: Publicacion, token: str, destino: str, texto: str,
+                       simulado: bool, kw: dict, previo: dict) -> dict:
+    """Carrusel de fotos (`pub.imagenes`; IG usa `pub.imagenes_ig`, en 4:5)."""
+    fotos = (pub.imagenes_ig or pub.imagenes) if plataforma == "instagram" else pub.imagenes
+    if not fotos:
+        raise ErrorPublicacion("carrusel sin fotos", reintentable=False)
+    if not simulado:
+        for f in fotos:
+            if not f.startswith(("http://", "https://")) and not Path(f).is_file():
+                raise ErrorPublicacion(f"No existe la foto {f}", reintentable=False)
+    urls = [video_url.url_publica(f) for f in fotos]
+    if plataforma == "instagram":
+        return InstagramClient(token, **kw).publicar_carrusel(destino, caption=texto, imagenes_url=urls, previo=previo)
+    if plataforma == "facebook":
+        return FacebookClient(token, **kw).publicar_fotos(destino, mensaje=texto, imagenes_url=urls,
+                                                          comentario=pub.comentario, previo=previo)
+    if plataforma == "threads":
+        return ThreadsClient(token, **kw).publicar_carrusel(destino, texto=texto, imagenes_url=urls, previo=previo)
+    if plataforma == "pinterest":
+        return PinterestClient(token, **kw).publicar_carrusel(
+            destino, titulo=pub.titulo or texto[:100], descripcion=texto, enlace=pub.enlace,
+            imagenes_url=urls, previo=previo)
     raise ErrorPublicacion(f"Plataforma desconocida: {plataforma}", reintentable=False)
 
 

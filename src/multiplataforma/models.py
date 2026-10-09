@@ -88,7 +88,7 @@ class Publicacion:
     cuenta: str
     video_path: str
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
-    tipo: str = "producto"  # producto | prueba_viral
+    tipo: str = "producto"  # producto | prueba_viral | carrusel
     producto_ref: str = ""  # ref opcional al producto del nicho de origen
     titulo: str = ""
     # Texto base (sin enlace) para poder rehacer `textos` si el enlace llega
@@ -99,6 +99,11 @@ class Publicacion:
     comentario: str = ""  # primer comentario de Facebook (lleva el enlace)
     enlace: str = ""
     cover_url: str = ""
+    # Solo `carrusel`: las fotos en orden (`video_path` = la primera, para la
+    # identidad) y su versión 4:5 para Instagram; `carrusel_id` = la réplica.
+    imagenes: list[str] = field(default_factory=list)
+    imagenes_ig: list[str] = field(default_factory=list)
+    carrusel_id: str = ""
     plataformas: list[str] = field(default_factory=lambda: list(config.PLATAFORMAS))
     estado: dict[str, str] = field(default_factory=dict)
     programada_en: float = field(default_factory=time.time)

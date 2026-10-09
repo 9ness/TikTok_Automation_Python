@@ -91,6 +91,8 @@ original en encuadre y emoción pero en otro sitio.
 4. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
    hashtags, y lo marca **Subido** en Mis tandas › Fotos
    (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide).
+5. **Instagram/Facebook/Threads**: con su enlace de Amazon/SHEIN, se programa
+   con `encolar_carrusel` (ver `guia("multiplataforma")` › Carruseles).
 
 ## Replicar otra vez / para otro usuario
 

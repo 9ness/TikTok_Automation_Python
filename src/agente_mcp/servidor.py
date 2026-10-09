@@ -971,6 +971,27 @@ async def encolar_tandas(ctx: Context, cuenta: str, incluir_no_subidos: bool = F
 
 
 @_herramienta(structured_output=False)
+async def encolar_carrusel(ctx: Context, cuenta: str, carrusel_id: str, asin: str = "", shein: str = "",
+                           nota: str = "", caption: str = "", hashtags: list[str] | None = None,
+                           desde: str = "", plataformas: list[str] | None = None) -> str:
+    """Publica en IG/FB/Threads (y Pinterest) un carrusel de «Replicar
+    carrusel» (`carrusel_id`, todas sus fotos hechas) en la `cuenta`: uno al
+    día a la hora «carrusel» (17:00 Madrid ± unos minutos), tras lo ya
+    programado y no antes de `desde` (AAAA-MM-DD). Enlace: `asin` (Amazon,
+    viva_shop/viva_salud) o `shein` (ama_shop, enlace del panel tal cual); si
+    ya está guardado para ese producto, no hace falta. Sin enlace fiable NO
+    se encola. `caption` (español, sin «carrito» ni TikTok): vacío = el de la
+    réplica limpio. IG recibe las fotos en un lienzo 4:5. La música no va
+    (la API de Meta no la admite en fotos): devuelve la sugerida.
+    Idempotente: repetirlo no duplica."""
+    return _json(await Interno(_usuario(ctx)).post(
+        f"{_MP}/cuentas/{_cuenta_mp(cuenta)}/carrusel",
+        {"carrusel_id": carrusel_id, "asin": asin, "shein": shein, "nota": nota, "caption": caption,
+         "hashtags": hashtags or [], "desde": desde,
+         "plataformas": plataformas or ["instagram", "facebook", "threads", "pinterest"]}))
+
+
+@_herramienta(structured_output=False)
 async def cola_multiplataforma(ctx: Context, cuenta: str = "", todas: bool = False,
                                limite: int = 50) -> str:
     """Estado de la cola del publicador: por publicación, cuenta, título,

@@ -24,7 +24,13 @@ import time
 from pathlib import Path
 
 PLATAFORMAS: tuple[str, ...] = ("instagram", "facebook", "threads", "pinterest")
-TIPOS: tuple[str, ...] = ("producto", "prueba_viral")
+TIPOS: tuple[str, ...] = ("producto", "prueba_viral", "carrusel")
+# Carrusel de fotos (Replicar carrusel → `services/carruseles.py`): IG admite
+# 2-10 fotos, Threads 2-20, Pinterest 2-5 (se cogen las primeras).
+MAX_FOTOS_CARRUSEL: dict[str, int] = {"instagram": 10, "facebook": 10, "threads": 20, "pinterest": 5}
+# IG solo acepta fotos entre 4:5 y 1.91:1: las de 9:16 o 3:4 se meten en un
+# lienzo 4:5 con el fondo de la propia foto desenfocado.
+IG_LIENZO_CARRUSEL: tuple[int, int] = (1080, 1350)
 
 # Estados de cada plataforma dentro de una publicación.
 ESTADO_PENDIENTE = "pendiente"
@@ -121,8 +127,8 @@ CARPETAS_INGESTA: dict[str, str] = {"viralizacion": "prueba_viral", "producto": 
 CARPETA_PUBLICADOS = "publicados"
 EXTENSIONES_INGESTA = (".mp4", ".mov")
 ZONA_HORARIA = os.getenv("MULTIPLATAFORMA_TZ", "Europe/Madrid")
-RITMO_DEFAULT: dict[str, int] = {"prueba_viral": 1, "producto": 1}  # vídeos/día
-HORAS_DEFAULT: dict[str, list[str]] = {"prueba_viral": ["19:00"], "producto": ["13:00"]}
+RITMO_DEFAULT: dict[str, int] = {"prueba_viral": 1, "producto": 1, "carrusel": 1}  # vídeos/día
+HORAS_DEFAULT: dict[str, list[str]] = {"prueba_viral": ["19:00"], "producto": ["13:00"], "carrusel": ["17:00"]}
 # Desfase de ±N minutos sobre cada hora (14:00 → 13:57, 14:03…) para no
 # publicar siempre al minuto exacto. Fijo por cuenta y día (hash), 0 lo apaga.
 DESFASE_MAX_MIN = int(os.getenv("MULTIPLATAFORMA_DESFASE_MIN", "4"))
