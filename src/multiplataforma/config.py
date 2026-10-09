@@ -91,6 +91,13 @@ EXTENSIONES_INGESTA = (".mp4", ".mov")
 ZONA_HORARIA = os.getenv("MULTIPLATAFORMA_TZ", "Europe/Madrid")
 RITMO_DEFAULT: dict[str, int] = {"prueba_viral": 1, "producto": 1}  # vídeos/día
 HORAS_DEFAULT: dict[str, list[str]] = {"prueba_viral": ["19:00"], "producto": ["13:00"]}
+# Desfase de ±N minutos sobre cada hora (14:00 → 13:57, 14:03…) para no
+# publicar siempre al minuto exacto. Fijo por cuenta y día (hash), 0 lo apaga.
+DESFASE_MAX_MIN = int(os.getenv("MULTIPLATAFORMA_DESFASE_MIN", "4"))
+# Plataformas por tipo cuando el vídeo no dice otra cosa. Los virales de
+# viralización son para ganar seguidores en Instagram (clase 7/10: «solo
+# mételos en reel de prueba»); FB y Threads ya tienen enlace y no los necesitan.
+PLATAFORMAS_POR_TIPO: dict[str, tuple[str, ...]] = {"prueba_viral": ("instagram",)}
 
 
 def raiz_drive() -> Path:

@@ -62,7 +62,8 @@ def test_ingesta_sin_duplicar_y_orden_natural(raiz):
     assert len(publicaciones_repo.pendientes()) == 3
 
 
-def test_reparto_por_dias_y_horas(raiz):
+def test_reparto_por_dias_y_horas(raiz, monkeypatch):
+    monkeypatch.setattr(config, "DESFASE_MAX_MIN", 0)
     _cuenta(ritmo={"prueba_viral": 2, "producto": 1}, horas={"prueba_viral": ["19:00", "09:00"], "producto": ["13:00"]})
     for n in ("a.mp4", "b.mp4", "c.mp4"):
         _video(raiz, "viralizacion", n)
@@ -202,3 +203,29 @@ def test_texto_carpeta_no_usa_el_nombre_como_titulo(tmp_path):
     meta = ing.leer_metadatos(v)
     assert meta["titulo"] == ""
     assert meta["caption"] == "Reflexión de Pablo Motos"
+
+
+def test_huecos_con_desfase_no_repite_dia():
+    import itertools
+    from src.multiplataforma import config
+    from src.multiplataforma.services import ingesta as ing
+    t0 = 1791500000.0
+    ts = list(itertools.islice(ing.huecos(1, ["14:00"], t0, semilla="viva_shop"), 10))
+    assert all(abs(((t - 3600 * 12) % 86400) - 0) >= 0 for t in ts)
+    dias = [round((b - a) / 86400) for a, b in zip(ts, ts[1:])]
+    assert dias == [1] * 9
+    # seguir desde la última (con desfase) no vuelve a dar el mismo día
+    sig = next(ing.huecos(1, ["14:00"], ts[-1], semilla="viva_shop"))
+    assert round((sig - ts[-1]) / 86400) == 1
+    sin = list(itertools.islice(ing.huecos(1, ["14:00"], t0), 3))
+    assert all(int(t) % 3600 == 0 for t in sin)
+    assert any(int(t) % 3600 != 0 for t in ts) or config.DESFASE_MAX_MIN == 0
+
+
+def test_virales_solo_instagram(tmp_path):
+    from src.multiplataforma.models import CuentaDestino
+    from src.multiplataforma.services import ingesta as ing
+    v = tmp_path / "pablo1_3.mp4"
+    v.write_bytes(b"x")
+    pub = ing._publicacion(CuentaDestino(slug="x", nombre="x"), v, "prueba_viral", 0.0)
+    assert pub.plataformas == ["instagram"]

@@ -129,7 +129,8 @@ def leer_metadatos(video: Path) -> dict:
 
 def _publicacion(cuenta: CuentaDestino, video: Path, tipo: str, programada_en: float) -> Publicacion:
     meta = leer_metadatos(video)
-    plataformas = [p for p in (meta.get("plataformas") or config.PLATAFORMAS) if p in config.PLATAFORMAS]
+    defecto = config.PLATAFORMAS_POR_TIPO.get(tipo, config.PLATAFORMAS)
+    plataformas = [p for p in (meta.get("plataformas") or defecto) if p in config.PLATAFORMAS]
     enlace = enlaces.resolver(asin=str(meta.get("asin") or ""), enlace=str(meta.get("enlace") or ""),
                               amazon_tag=cuenta.afiliado_amazon_tag)
     producto_ref = str(meta.get("producto_ref") or "")
@@ -171,18 +172,24 @@ def horas_del_dia(ritmo: int, horas: list[str]) -> list[tuple[int, int]]:
     return out
 
 
-def huecos(ritmo: int, horas: list[str], desde: float, tz: str = config.ZONA_HORARIA) -> Iterator[float]:
-    """Timestamps de publicación posteriores a `desde`, `ritmo` por día."""
+def huecos(ritmo: int, horas: list[str], desde: float, tz: str = config.ZONA_HORARIA,
+           semilla: str = "") -> Iterator[float]:
+    """Timestamps de publicación posteriores a `desde`, `ritmo` por día. Con
+    `semilla` (la cuenta), cada hueco se mueve ±`DESFASE_MAX_MIN` minutos."""
     if ritmo <= 0:
         return
     zona = zoneinfo.ZoneInfo(tz)
     dia = dt.datetime.fromtimestamp(desde, zona).date()
     franjas = horas_del_dia(ritmo, horas)
+    maximo = config.DESFASE_MAX_MIN if semilla else 0
     while True:
         for h, m in franjas:
             ts = dt.datetime(dia.year, dia.month, dia.day, h, m, tzinfo=zona).timestamp()
-            if ts > desde:
-                yield ts
+            # `desde` puede ser la última ya programada CON su desfase: el
+            # margen evita repetir el mismo hueco del día
+            if ts > desde + maximo * 60:
+                n = int(hashlib.sha1(f"{semilla}|{dia}|{h}:{m}".encode()).hexdigest(), 16)
+                yield ts + ((n % (2 * maximo + 1)) - maximo) * 60 if maximo else ts
         dia += dt.timedelta(days=1)
 
 
@@ -215,7 +222,7 @@ def ingestar(cuenta: str | CuentaDestino, ahora: float | None = None, *,
             log(f"[multiplataforma] {c.slug}/{carpeta}: ritmo 0, {len(nuevos)} vídeo(s) sin ingestar")
             continue
         horas = (c.horas or {}).get(tipo) or config.HORAS_DEFAULT.get(tipo, ["12:00"])
-        reloj = huecos(ritmo, horas, max(ahora, _ultima_programada(c.slug, tipo)))
+        reloj = huecos(ritmo, horas, max(ahora, _ultima_programada(c.slug, tipo)), semilla=c.slug)
         for video in nuevos:
             try:
                 pub = _publicacion(c, video, tipo, 0.0)

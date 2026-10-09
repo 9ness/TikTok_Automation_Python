@@ -251,7 +251,7 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
     if limite > 0:
         candidatas = candidatas[:limite]
 
-    reloj = ingesta.huecos(ritmo, horas, max(ahora, ingesta._ultima_programada(slug, TIPO)))
+    reloj = ingesta.huecos(ritmo, horas, max(ahora, ingesta._ultima_programada(slug, TIPO)), semilla=slug)
     for f, k, e in candidatas:
         titulo = e.get("titulo") or f.get("titulo") or ""
         caption = f.get("caption", "")

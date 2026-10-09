@@ -56,6 +56,8 @@ Carpetas (se crean solas al `POST /cuentas`, mkdir -p defensivo):
   `MULTIPLATAFORMA_TZ`, def. Europe/Madrid: viral 19:00, producto 13:00). Se
   continúa tras la última pendiente de esa cuenta+tipo (o desde ahora). Si el
   ritmo supera las horas dadas, los huecos extra van cada hora tras la última.
+  Cada hueco se mueve ±`MULTIPLATAFORMA_DESFASE_MIN` (def. 4) minutos, fijo
+  por cuenta y día (14:00 → 13:57 / 14:03…), para no publicar al minuto exacto.
 - Al quedar `publicado` en TODAS sus plataformas, el vídeo (y su .json/.txt)
   pasa a `<carpeta>/publicados/` y sale del SET; si mover falla, solo log.
   `simulado` no cuenta: sin tokens no se mueve nada.
@@ -109,8 +111,12 @@ maniquí…) `tandas.encolar` les mezcla música en el fichero
   cuota real de Meta antes de crear el contenedor.
 - Error 5xx/429/timeout → `error` y reintento (máx. `MULTIPLATAFORMA_MAX_INTENTOS`=3);
   4xx → `fallido`.
-- `tipo="prueba_viral"` → en IG sale como **reel de prueba** (`trial_params`,
-  `trial_graduation` MANUAL o SS_PERFORMANCE). En el resto, publicación normal.
+- `tipo="prueba_viral"` → **solo Instagram** por defecto
+  (`config.PLATAFORMAS_POR_TIPO`; un `.json` con `plataformas` lo cambia): son
+  para llegar a los 1000 seguidores de IG Shop, y la clase del 7/10 dice de los
+  vídeos de viralización «solo mételos en reel de prueba». En IG sería reel de
+  prueba (`trial_params`), pero Meta lo rechaza con nuestra app
+  (`IG_TRIAL_REELS=0`) y salen como reel normal.
 
 ## Textos
 
