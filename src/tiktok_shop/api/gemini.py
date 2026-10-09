@@ -356,11 +356,13 @@ def _call_openai_fallback(
     system_prompt: str, user_prompt: str, *,
     expect_json: bool, images: list[str | bytes] | None, temperature: float,
 ) -> str:
-    """Respaldo con OpenAI Chat (gpt-4o-mini por defecto). Soporta texto +
+    """Respaldo con OpenAI Chat (gpt-6-luna por defecto). Soporta texto +
     imágenes (no vídeo). Mismo contrato que generate_text."""
     import openai
 
-    model = os.getenv("TIKTOK_SHOP_OPENAI_FALLBACK_MODEL", "gpt-5.4")
+    # gpt-6-luna (oct 2026): ~12x más barato que gpt-5.4. La familia gpt-6
+    # solo admite la temperatura por defecto (400 si se manda otra).
+    model = os.getenv("TIKTOK_SHOP_OPENAI_FALLBACK_MODEL", "gpt-6-luna")
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     content: list[dict[str, Any]] = [{"type": "text", "text": user_prompt}]
     for img in images or []:
@@ -382,8 +384,9 @@ def _call_openai_fallback(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
         ],
-        "temperature": temperature,
     }
+    if not model.startswith("gpt-6"):
+        kwargs["temperature"] = temperature
     if expect_json:
         kwargs["response_format"] = {"type": "json_object"}
     resp = client.chat.completions.create(**kwargs)

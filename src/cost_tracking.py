@@ -89,6 +89,8 @@ _OPENAI_CHAT_RATES: dict[str, tuple[float, float]] = {
     # estimadas (tier GPT-5); calibrar con el coste real del panel /costs.
     "gpt-5.4":     (1.25, 10.00),
     "gpt-5":       (1.25, 10.00),
+    # Respaldo de Gemini en los guiones (oct 2026).
+    "gpt-6-luna":  (0.10, 0.50),
 }
 
 
