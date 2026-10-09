@@ -120,6 +120,9 @@ def leer_metadatos(video: Path) -> dict:
         meta["caption"] = "\n".join(caption).strip()
         if hashtags:
             meta["hashtags"] = hashtags
+        if txt.name == TEXTO_CARPETA and meta["caption"]:
+            # texto común: el nombre del fichero («pablo1_2») no es un título
+            meta.setdefault("titulo", "")
     meta.setdefault("titulo", _titulo_de_nombre(video))
     return meta
 

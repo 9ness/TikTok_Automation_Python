@@ -192,3 +192,13 @@ def test_validacion_de_ruta(raiz, tmp_path, monkeypatch):
     c = TestClient(app)
     assert c.get(f"/api/v1/multiplataforma/archivo/{video_url.firmar(str(dentro))}").status_code == 200
     assert c.get(f"/api/v1/multiplataforma/archivo/{video_url.firmar(str(fuera))}").status_code == 403
+
+
+def test_texto_carpeta_no_usa_el_nombre_como_titulo(tmp_path):
+    from src.multiplataforma.services import ingesta as ing
+    v = tmp_path / "pablo1_2.mp4"
+    v.write_bytes(b"x")
+    (tmp_path / ing.TEXTO_CARPETA).write_text("Reflexión de Pablo Motos\n#pablomotos #reflexion\n", encoding="utf-8")
+    meta = ing.leer_metadatos(v)
+    assert meta["titulo"] == ""
+    assert meta["caption"] == "Reflexión de Pablo Motos"

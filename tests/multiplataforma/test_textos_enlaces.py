@@ -43,3 +43,10 @@ def test_sin_amazon_no_hay_aviso_y_threads_cabe():
     assert len(t["textos"]["threads"]) <= 500
     assert "https://es.shein.com/p-1.html" in t["textos"]["threads"]
     assert "{" not in t["textos"]["instagram"]
+
+
+def test_sin_enlace_no_anuncia_enlace():
+    from src.multiplataforma.services import textos as tx
+    t = tx.construir(titulo="", caption="Reflexión de Pablo Motos", hashtags=["#pablomotos"])
+    for p, texto in t["textos"].items():
+        assert "enlace" not in texto.lower(), p

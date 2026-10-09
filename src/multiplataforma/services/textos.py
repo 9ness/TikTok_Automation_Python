@@ -51,6 +51,8 @@ def rellenar(nombre: str, valores: dict[str, str]) -> str:
         huecos = _HUECO.findall(linea)
         if huecos and all(not valores.get(h) for h in huecos) and not _HUECO.sub("", linea).strip():
             continue
+        if not huecos and "enlace" in linea.lower() and not valores.get("enlace"):
+            continue  # «👇 Enlace abajo:» sin enlace (virales): fuera
         lineas.append(_HUECO.sub(lambda m: valores.get(m.group(1), ""), linea).rstrip())
     texto = "\n".join(lineas)
     texto = re.sub(r"\n{3,}", "\n\n", texto)

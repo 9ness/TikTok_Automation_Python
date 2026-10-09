@@ -205,10 +205,13 @@ de publicación son gratuitas.
    `PUT /cuentas/{slug}/tokens`. Falta flujo OAuth y refresco.
 3. **Pinterest**: app con acceso **Standard** (con Trial solo sandbox), token
    OAuth con `pins:write`, `boards:read`, y el `board_id` de cada cuenta.
-4. **Timer** (systemd/cron) que llame a `scripts/multiplataforma_tick.py`
-   DENTRO del container de la API (`docker compose exec api python scripts/...`):
-   las rutas guardadas son las del proceso que ingesta (`/mnt/drive/...`) y
-   las sirve el container; ingestar desde el host guardaría `~/gdrive/...`.
+4. ✅ **Timer** (9/10/2026): cron del host cada 15 min (`2,17,32,47`) →
+   `~/multiplataforma/tick.sh` (log `~/multiplataforma/tick.log`, `flock`).
+   Corre DENTRO del container de la API: las rutas guardadas son las del
+   proceso que ingesta (`/mnt/drive/...`); ingestar desde el host guardaría
+   `~/gdrive/...`. `scripts/` no va en la imagen, así que el wrapper lo copia
+   con `docker compose cp` antes de cada tick. IG no deja programar reels por
+   API: la programación es nuestra cola (`programada_en`).
 5. Que `PUBLIC_BASE_URL/api/v1/multiplataforma/archivo/...` sea accesible
    desde internet (Caddy) — Meta descarga el vídeo de ahí.
 6. Frontend de la cola/cuentas (no hecho; enlaces y tandas van por MCP, a propósito).
