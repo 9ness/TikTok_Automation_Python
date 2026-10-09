@@ -74,7 +74,7 @@ dentro de la carpeta (no pongas el mismo a todos).
 | ropa (vestidos, pantalones, jerséis, chaquetas…) | `mm_espejo` (Espejo Solo Música) · `mm_espejo_escenas` (Espejo Multi Escena) | **sí** | FRAME INICIAL |
 | camiseta | `mm_maniqui` (sin persona) · `mm_sarcastica` (solo si la camiseta lleva FRASE) · o los de ropa | maniquí no / sarcástica sí | FRAME INICIAL |
 | calzado (zapatillas, zapatos, tacones) | `mm_zapatillas_espejo` · `mm_zapatos_escenas` · `mm_zapatos_pov` · 🎙️ `mm_zapatillas_pov20` · 🎙️ `mm_zapatillas_sentado20` | espejo y escenas sí; POV y los de 20 s no | escenas = **INGREDIENTE**; resto FRAME INICIAL |
-| botas | `mm_botas_1` · `mm_botas_2` · `mm_botas_largas_1` · `mm_botas_largas_2` (las «largas», solo botas altas) · o los de calzado (también los 🎙️ de 20 s) | no | FRAME INICIAL |
+| botas | `mm_botas_1` · `mm_botas_2` · `mm_botas_largas_1` · `mm_botas_largas_2` (las «largas», solo botas altas) · `mm_botas_calle` · `mm_botas_espejo4` (nuevos 9/10; el del espejo lleva en Flow una 2.ª referencia de PERSPECTIVA: `_agente/_referencias/vintage_botas_espejo4_perspectiva.jpg`) · o los de calzado (también los 🎙️ de 20 s) | no | FRAME INICIAL |
 
 Los 🎙️ de 20 s son los únicos con voz: úsalos para **mezclar largos con
 cortos** (lo pide el curso para evitar sanciones). Son dos clips, así que

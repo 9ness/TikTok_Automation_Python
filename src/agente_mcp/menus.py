@@ -71,6 +71,7 @@ MENUS: dict[str, Menu] = {
                 "multimodo", "mm_espejo", "mm_espejo_escenas", "mm_maniqui", "mm_sarcastica",
                 "mm_zapatillas_espejo", "mm_zapatos_escenas", "mm_zapatos_pov",
                 "mm_botas_1", "mm_botas_2", "mm_botas_largas_1", "mm_botas_largas_2",
+                "mm_botas_calle", "mm_botas_espejo4",
                 "mm_bolso_1", "mm_bolso_2", "mm_bolso_3",
                 "mm_zapatillas_pov20", "mm_zapatillas_sentado20",
                 "mm_habla_espejo", "mm_habla_selfie", "mm_habla_calle_1", "mm_habla_calle_2",

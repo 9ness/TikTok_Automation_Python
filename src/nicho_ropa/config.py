@@ -372,6 +372,23 @@ MODOS: dict[str, dict] = {
         "modalidad": "multimodo",
         "tipo": "botas",
     },
+    # Los dos que publicó el curso el 9/10/2026 (Marca Personal).
+    "mm_botas_calle": {
+        "desc": "Vintage otoño: las botas en una calle mojada con hojas, de rodillas para abajo.",
+        "label": "🍂 Vintage Botas Calle",
+        "estilo_mof10": "vintage_botas_calle",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "botas",
+    },
+    "mm_botas_espejo4": {
+        "desc": "Vintage otoño: POV desde arriba frente al espejo, las botas y su reflejo.",
+        "label": "🍂 Vintage Botas Frente Espejo",
+        "estilo_mof10": "vintage_botas_espejo4",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "botas",
+    },
     "mm_bolso_1": {
         "desc": "Vintage otoño: el bolso en el asiento del copiloto, con café y texto otoñal.",
         "label": "👜 Vintage Bolso 1",
@@ -736,7 +753,8 @@ _VINTAGE_BOTAS_NAVIDAD = [
 for _claves, _otono, _invierno, _navidad in (
     (("vintage_bolso_1", "vintage_bolso_2", "vintage_bolso_3"),
      _VINTAGE_BOLSO, _VINTAGE_BOLSO_INVIERNO, _VINTAGE_BOLSO_NAVIDAD),
-    (("vintage_botas_1", "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2"),
+    (("vintage_botas_1", "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2",
+     "vintage_botas_calle", "vintage_botas_espejo4"),
      _VINTAGE_BOTAS, _VINTAGE_BOTAS_INVIERNO, _VINTAGE_BOTAS_NAVIDAD),
 ):
     for _clave in _claves:
@@ -814,7 +832,8 @@ MUSICA_MULTIMODO: dict[str, list[dict]] = {
 }
 for _clave in ("vintage_bolso_1", "vintage_bolso_2", "vintage_bolso_3"):
     MUSICA_MULTIMODO[_clave] = _MUSICA_VINTAGE_BOLSO
-for _clave in ("vintage_botas_1", "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2"):
+for _clave in ("vintage_botas_1", "vintage_botas_2", "vintage_botas_largas_1", "vintage_botas_largas_2",
+     "vintage_botas_calle", "vintage_botas_espejo4"):
     MUSICA_MULTIMODO[_clave] = _MUSICA_VINTAGE_BOTAS
 # Se SUMA una a las búsquedas del estilo que toque: así una parte de los
 # vídeos suena a la época y el resto no se queda anclado en ella.
@@ -917,7 +936,7 @@ def es_halloween(hoy=None) -> bool:
     return (hoy.month == 10 and hoy.day >= 10) or (hoy.month == 11 and hoy.day == 1)
 
 _PARRAFO_TEXTO_IMAGEN = re.compile(
-    r"Añade directamente sobre la fotografía.*?integrado en la imagen\.\s*", re.S,
+    r"Añade directamente sobre la fotografía.*?integrado en la (?:imagen|fotografía)\.\s*", re.S,
 )
 
 
@@ -930,7 +949,8 @@ def sin_texto_en_imagen(prompt: str) -> str:
 # estático": con la foto ya sin rótulo, Kling lo tomaba como orden de poner
 # uno y se inventaba letras sin sentido. Se cambia por la prohibición.
 _FRASE_TEXTO_VIDEO = re.compile(
-    r"El [Tt]exto se mantiene est[aá]tico y fijo durante todo el clip\. No desaparece\.\s*",
+    r"(?:El [Tt]exto se mantiene est[aá]tico y fijo durante todo el clip\. No desaparece\."
+    r"|El [Tt]exto de la pantalla no desaparece, queda fijado\.)\s*",
 )
 SIN_TEXTO_VIDEO = (
     "No aparece ningún texto, letra ni rótulo en pantalla. "
@@ -1023,6 +1043,18 @@ EXTRA_VIDEO_MULTIMODO = {
     # después de los bolsos — una chica de cintura para abajo sin moverse.
     "mm_botas_largas_1": _PIERNAS_BOTA + " Se mece suavemente en el columpio.",
     "mm_botas_largas_2": _PIERNAS_BOTA,
+    # Los dos de 9/10: su «mueve sus piernas como enseñando las botas» ya va
+    # en el prompt; se dice qué NO puede pasar.
+    "mm_botas_calle": (
+        "Solo dos piernas y dos botas, las dos puestas; no cambian de forma, "
+        "color, altura ni diseño. Las hojas y los charcos del suelo se quedan "
+        "donde están."
+    ),
+    "mm_botas_espejo4": (
+        "Abajo, las dos botas reales vistas desde arriba; arriba, su reflejo en "
+        "el espejo, que se mueve igual que ellas. Solo dos botas reales y dos "
+        "en el reflejo, iguales entre sí; no cambian de forma, color ni diseño."
+    ),
     # Lo que Kling se inventa en calzado, y el clip ya no vale: en POV el pie
     # descalzo acababa calzado con un tercer zapato; en el espejo entraba una
     # pierna real por delante, la chica acercaba la zapatilla a cámara o el
@@ -2035,6 +2067,7 @@ ESTILOS_MOF10: dict[str, dict] = {
             ("bolso_1", "bolso 1"), ("bolso_2", "bolso 2"), ("bolso_3", "bolso 3"),
             ("botas_1", "botas 1"), ("botas_2", "botas 2"),
             ("botas_largas_1", "botas largas 1"), ("botas_largas_2", "botas largas 2"),
+            ("botas_calle", "botas calle"), ("botas_espejo4", "botas frente espejo"),
         )
     },
     # Este va en los DOS menús de su web, cada uno con su imagen. El guion de
