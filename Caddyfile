@@ -145,9 +145,10 @@
 	handle @datos {
 		reverse_proxy api:8000
 	}
-	# Dirección corta para la bio: `/<cuenta>` → `/links/<cuenta>`.
-	@corto path_regexp corto ^/([a-z0-9_-]+)$
-	rewrite @corto /links/{re.corto.1}
+	# Dirección corta para la bio: `/<cuenta>` → `/links/<cuenta>`, y su
+	# política de privacidad `/<cuenta>/privacidad` (la piden Pinterest y Meta).
+	@corto path_regexp corto ^/([a-z0-9_-]+)(/privacidad)?$
+	rewrite @corto /links/{re.corto.1}{re.corto.2}
 	@pagina path /links/* /_next/* /favicon.ico /icon.png /brand/*
 	handle @pagina {
 		reverse_proxy web:3000
