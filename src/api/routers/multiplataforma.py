@@ -299,7 +299,9 @@ def links_foto(slug: str, producto_key: str, w: Annotated[int, Query(ge=96, le=8
     return FileResponse(res, headers={"Cache-Control": "public, max-age=86400"})
 
 
-@router_publico.get("/archivo/{token}")
+# HEAD también: el robot de Instagram mira el tipo con HEAD antes de bajar la
+# foto, y con un 405 en JSON rechaza el carrusel («Only photo or video…», 2207052).
+@router_publico.api_route("/archivo/{token}", methods=["GET", "HEAD"])
 def archivo_firmado(token: str) -> FileResponse:
     ruta = video_url.verificar(token)
     if not ruta:
@@ -309,4 +311,4 @@ def archivo_firmado(token: str) -> FileResponse:
     p = Path(ruta)
     if not p.is_file():
         raise APIError("El fichero ya no existe", status_code=404)
-    return FileResponse(p, filename=p.name)
+    return FileResponse(p, filename=p.name, content_disposition_type="inline")

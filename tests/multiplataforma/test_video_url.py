@@ -34,4 +34,8 @@ def test_endpoint_publico(tmp_path, monkeypatch):
     tok = video_url.firmar(str(f))
     r = c.get(f"/api/v1/multiplataforma/archivo/{tok}")
     assert r.status_code == 200 and r.content == b"video"
+    # El robot de Instagram hace HEAD antes de bajar la foto del carrusel
+    h = c.head(f"/api/v1/multiplataforma/archivo/{tok}")
+    assert h.status_code == 200 and h.headers["content-type"] == "video/mp4"
+    assert r.headers["content-disposition"].startswith("inline")
     assert c.get("/api/v1/multiplataforma/archivo/basura.firma").status_code == 403
