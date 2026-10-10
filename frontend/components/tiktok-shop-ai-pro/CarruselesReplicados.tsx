@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Check, Download, Loader2 } from "lucide-react";
 
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
@@ -18,7 +18,9 @@ function fechaCorta(iso: string): string {
 
 /** Pestaña «Fotos» de Mis tandas: los carruseles de «Replicar carrusel» en
  *  tandas de diez, con su PROPIO contador (no son vídeos ni cuentan para la
- *  cuota del día). ZIP de la tanda entera; cada carrusel baja sus fotos una a una y en orden, y «Subido». */
+ *  cuota de vídeos). ZIP de la tanda entera; cada carrusel baja sus fotos una
+ *  a una y en orden, y lleva los mismos botones que un vídeo: 🚫 sin stock (del
+ *  producto) y «Marcar subido» (suma al tope diario de carruseles). */
 export function CarruselesReplicados() {
   const [verCerradas, setVerCerradas] = useState(false);
   const tandas = useTandasFotos(verCerradas);
@@ -33,7 +35,11 @@ export function CarruselesReplicados() {
       icono="🖼️"
       titulo="Tandas de fotos"
       hint="Carruseles con su texto quemado, de diez en diez. Se hacen en Replicar carrusel; aquí entran en cuanto tienen una foto."
-      extra={datos ? `${datos.subidos}/${datos.total} subidos` : undefined}
+      extra={
+        datos
+          ? `${datos.subidos}/${datos.total} subidos` + (datos.sin_stock ? ` · 🚫 ${datos.sin_stock}` : "")
+          : undefined
+      }
     >
       <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
         {datos ? (
@@ -96,6 +102,11 @@ export function CarruselesReplicados() {
                           📅 {fechaCorta(t.fecha)}
                         </span>
                       ) : null}
+                      {t.sin_stock ? (
+                        <span className="rounded-full bg-rose-500/15 px-1.5 py-px text-[9px] font-semibold text-rose-500">
+                          🚫 {t.sin_stock}
+                        </span>
+                      ) : null}
                       {t.completos < t.total ? (
                         <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold text-amber-500">
                           {t.total - t.completos} a medias
@@ -117,12 +128,25 @@ export function CarruselesReplicados() {
                       <li
                         key={c.id}
                         className={`space-y-1 rounded-lg border px-2 py-1.5 ${
-                          c.subido ? "border-emerald-500/40 bg-emerald-500/[0.04]" : "border-border/60"
+                          c.subido
+                            ? "border-emerald-500/40 bg-emerald-500/[0.04]"
+                            : c.sin_stock
+                              ? "border-border/60 bg-rose-500/5"
+                              : "border-border/60"
                         }`}
                       >
-                        <p className="truncate text-[11px] font-medium">
+                        <p
+                          className={`truncate text-[11px] font-medium ${
+                            c.sin_stock && !c.subido ? "text-muted-foreground line-through" : ""
+                          }`}
+                        >
                           {String(i + 1).padStart(2, "0")} · {c.titulo}
                         </p>
+                        {c.sin_stock && !c.subido ? (
+                          <p className="text-[10px] text-rose-500">
+                            🚫 Sin stock: no se sube ni se baja con la tanda. Si el producto vuelve, pulsa 🚫 otra vez.
+                          </p>
+                        ) : null}
                         <p className="truncate text-[10px] text-muted-foreground">
                           {new Date(c.creado_at * 1000).toLocaleDateString("es-ES")} ·{" "}
                           <span className={c.completo ? "text-emerald-400" : "text-amber-400"}>
@@ -153,17 +177,44 @@ export function CarruselesReplicados() {
                           >
                             Abrir
                           </a>
+                          {(!c.subido || c.sin_stock) && (
+                            <button
+                              type="button"
+                              onClick={() => marcar.mutate({ id: c.id, sin_stock: !c.sin_stock })}
+                              title={
+                                c.sin_stock
+                                  ? "Quitar «sin stock» (el producto ha vuelto)"
+                                  : "Marcar sin stock: el producto ya no está en TikTok Shop"
+                              }
+                              className={`ml-auto flex shrink-0 items-center rounded-md border px-1.5 py-1 text-[10px] ${
+                                c.sin_stock
+                                  ? "border-rose-500/60 bg-rose-500/15 text-rose-500"
+                                  : "border-border/60 text-muted-foreground hover:text-rose-500"
+                              }`}
+                            >
+                              🚫
+                            </button>
+                          )}
                           <button
                             type="button"
-                            disabled={marcar.isPending}
                             onClick={() => marcar.mutate({ id: c.id, subido: !c.subido })}
-                            className={`ml-auto rounded border px-2 py-1 text-[10px] font-semibold disabled:opacity-40 ${
+                            className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] ${
+                              c.subido && !c.sin_stock ? "ml-auto" : ""
+                            } ${
                               c.subido
-                                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-500"
+                                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                                 : "border-border/60 text-muted-foreground hover:text-foreground"
                             }`}
                           >
-                            {c.subido ? "✓ Subido" : "Subido"}
+                            <Check className="h-3 w-3" />
+                            {c.subido ? (
+                              "Subido"
+                            ) : (
+                              <>
+                                <span className="hidden sm:inline">Marcar subido</span>
+                                <span className="sm:hidden">Subir</span>
+                              </>
+                            )}
                           </button>
                         </div>
                         <MusicaCarrusel musica={c.musica} />
