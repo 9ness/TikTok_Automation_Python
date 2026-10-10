@@ -293,6 +293,8 @@ export interface CarruselTanda {
   folder: string;
   producto: string;
   url: string;
+  /** Ficha de TikTok Shop del producto ("" si el catálogo no la tiene). */
+  product_url?: string;
   hechas: number;
   diapositivas: number;
   completo: boolean;

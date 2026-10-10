@@ -43,7 +43,7 @@ export interface CarruselReplica {
   creado_at: number;
   url: string;
   referencia: { titulo: string; autor: string; vistas: number; diapositivas: number; recortado: boolean };
-  producto: { source: string; folder: string; producto: string; titulo: string; tienda: string };
+  producto: { source: string; folder: string; producto: string; titulo: string; tienda: string; product_url?: string };
   formato: "3:4" | "9:16";
   original: { tema?: string; por_que_funciona?: string };
   apto: boolean;

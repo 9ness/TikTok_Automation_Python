@@ -8,6 +8,7 @@ import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnO
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
+import { ProductoCarrusel as FichaProductoCarrusel } from "@/components/tiktok-shop-ai-pro/ProductoCarrusel";
 import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { useMe } from "@/lib/queries/auth";
 import { useBuscarProductos, useSources } from "@/lib/queries/nichoPovBof";
@@ -335,6 +336,13 @@ function CarruselAbierto({ doc }: { doc: CarruselReplica }) {
         hint="Las fotos con su texto, una a una y en orden (01, 02…). El caption, con su botón. También está en Mis tandas."
         extra={doc.completo ? "✓ completo" : `${doc.hechas}/${doc.total}`}
       >
+        <FichaProductoCarrusel
+          source={doc.producto.source}
+          folder={doc.producto.folder}
+          producto={doc.producto.producto}
+          titulo={doc.producto.titulo}
+          productUrl={doc.producto.product_url}
+        />
         <div className="flex flex-wrap gap-1.5">
           <BotonFotosEnOrden id={doc.id} disabled={!doc.hechas} className="px-3 py-2 text-xs" />
           <CopyChip label="Caption" text={doc.caption} siempre />

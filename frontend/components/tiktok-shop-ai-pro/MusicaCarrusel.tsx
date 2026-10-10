@@ -1,5 +1,6 @@
 "use client";
 
+import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import type { MusicaCarrusel as Musica } from "@/lib/queries/replicarCarrusel";
 
 /** La canción del carrusel: la del viral para TikTok (se pone a mano al
@@ -11,12 +12,13 @@ export function MusicaCarrusel({ musica }: { musica?: Musica }) {
   return (
     <div className="space-y-0.5 text-[10px] text-muted-foreground">
       {tk ? (
-        <p className="break-words">
+        <p className="flex flex-wrap items-center gap-1 break-words">
           🎵 TikTok:{" "}
           <a href={tk.enlace} target="_blank" rel="noreferrer" className="font-semibold text-sky-400 hover:underline">
             {tk.titulo || "sonido del viral"}
           </a>
           {tk.autor ? ` · ${tk.autor}` : ""}
+          {tk.titulo ? <CopyChip label="Canción" text={tk.titulo} /> : null}
         </p>
       ) : null}
       {meta?.pista ? (

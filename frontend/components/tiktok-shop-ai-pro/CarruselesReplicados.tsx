@@ -6,6 +6,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
+import { ProductoCarrusel } from "@/components/tiktok-shop-ai-pro/ProductoCarrusel";
 import { useMarcarFoto, useTandasFotos, urlZipTandaFotos } from "@/lib/queries/misTandas";
 import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 
@@ -128,6 +129,13 @@ export function CarruselesReplicados() {
                             {c.hechas}/{c.diapositivas} fotos
                           </span>
                         </p>
+                        <ProductoCarrusel
+                          source={c.source}
+                          folder={c.folder}
+                          producto={c.producto}
+                          titulo={c.titulo}
+                          productUrl={c.product_url}
+                        />
                         <div className="flex flex-wrap items-center gap-1">
                           <BotonFotosEnOrden
                             id={c.id}

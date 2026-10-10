@@ -295,6 +295,21 @@ def ver(usuario: str, id_: str) -> dict:
     return doc
 
 
+def _con_url(prod: dict, usuario: str) -> dict:
+    """El producto + su `product_url` de TikTok Shop (la del catálogo), para
+    el botón «Ver producto». Sin ella, la pantalla ofrece copiar el título."""
+    if prod.get("product_url") or not prod.get("source"):
+        return prod
+    try:
+        from src.nicho_pov_bof.repos import product_repo
+
+        url = product_repo.get_product(prod["source"], prod.get("folder", ""), str(prod.get("producto", "")),
+                                       usuario).get("product_url") or ""
+    except Exception:  # noqa: BLE001 — sin Redis o sin producto: solo falta el botón
+        url = ""
+    return {**prod, "product_url": url}
+
+
 def con_estado(doc: dict) -> dict:
     """El documento + qué fotos hay ya en disco de cada diapositiva."""
     usuario, id_ = doc.get("usuario") or "ness", doc["id"]
@@ -309,7 +324,7 @@ def con_estado(doc: dict) -> dict:
                        "lista": bool(base) and (bool(txt) or not d.get("texto")),
                        "version": int(final.stat().st_mtime) if final else 0})
     hechas = sum(1 for d in diapos if d["lista"])
-    return {**doc, "diapositivas": diapos, "hechas": hechas, "total": len(diapos),
+    return {**doc, "producto": _con_url(doc.get("producto") or {}, usuario), "diapositivas": diapos, "hechas": hechas, "total": len(diapos),
             "completo": bool(diapos) and hechas == len(diapos)}
 
 

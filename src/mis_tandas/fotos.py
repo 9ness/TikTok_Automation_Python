@@ -55,6 +55,7 @@ def _publica(d: dict) -> dict:
         "folder": prod.get("folder", ""),
         "producto": str(prod.get("producto", "")),
         "url": d.get("url", ""),
+        "product_url": prod.get("product_url", ""),
         "hechas": d["hechas"],
         "diapositivas": d["total"],
         "completo": d["completo"],

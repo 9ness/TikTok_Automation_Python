@@ -87,7 +87,10 @@ original en encuadre y emoción pero en otro sitio.
      copyright del banco de Multiplataforma (`estilo`, `pista`, `fichero`
      relativo a `Multiplataforma/`, `url`). Fija por carrusel: úsala tal cual,
      nunca la del viral fuera de TikTok.
-   En la web sale debajo del caption, en Replicar carrusel y en Mis tandas › Fotos.
+   En la web sale debajo del caption, en Replicar carrusel y en Mis tandas › Fotos,
+   con botón «Canción» para copiar el título y buscarlo en TikTok. Al lado va la
+   miniatura del producto con «Ver producto» (su ficha de TikTok Shop) o «Título»
+   para copiarlo si el catálogo no tiene la URL.
 4. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
    hashtags, y lo marca **Subido** en Mis tandas › Fotos
    (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide).
