@@ -169,6 +169,9 @@ def cliente():
     register_exception_handlers(app)
     app.include_router(router_mp.router)
     app.include_router(router_mp.router_publico)
+    from src.api.dependencies import get_current_user, get_web_user
+    app.dependency_overrides[get_current_user] = lambda: "k"
+    app.dependency_overrides[get_web_user] = lambda: "ness"
     return TestClient(app)
 
 
@@ -191,7 +194,7 @@ def test_api_enlaces_y_links_publicos(filas, drive, cuenta, cliente, monkeypatch
     r = cliente.post("/api/v1/multiplataforma/cuentas/ama_shop/encolar-tandas")
     assert r.status_code == 200 and r.json()["total"] == 2
 
-    pub = r.json()["encoladas"][0]
+    pub, otra = r.json()["encoladas"][:2]
     p = publicaciones_repo.get(pub["id"])
     p.estado["instagram"] = config.ESTADO_PUBLICADO
     p.resultados["instagram"] = {"publicado_en": AHORA}
@@ -201,8 +204,17 @@ def test_api_enlaces_y_links_publicos(filas, drive, cuenta, cliente, monkeypatch
     assert r.status_code == 200
     d = r.json()
     assert d["cuenta"] == "Ama Shop"
-    assert len(d["productos"]) == 2  # sin_equivalente no sale
-    assert d["productos"][0]["id"] == pub["producto_key"]  # lo último publicado, primero
+    # Solo lo ya publicado: el otro con enlace sigue en cola y sin_equivalente no sale.
+    assert [x["id"] for x in d["productos"]] == [pub["producto_key"]]
+    assert d["productos"][0]["publicado_en"] == int(AHORA)
+
+    # Al publicarse la otra (antes), sale DETRÁS: lo último publicado, primero.
+    p = publicaciones_repo.get(otra["id"])
+    p.resultados["instagram"] = {"publicado_en": AHORA - 3600}
+    publicaciones_repo.guardar(p)
+    tandas._links_cache.clear()
+    d = cliente.get("/api/v1/multiplataforma/links/ama_shop").json()
+    assert [x["id"] for x in d["productos"]] == [pub["producto_key"], otra["producto_key"]]
     assert "obtengo ingresos" in d["aviso_amazon"]
     texto = r.text
     assert str(drive) not in texto and "fila_id" not in texto and "largo|" not in texto
@@ -277,3 +289,20 @@ def test_temporada_se_guarda_pero_no_se_encola_fuera(filas, drive, cuenta):
     assert tandas.encolar("ama_shop", ahora=junio)["total"] == 1
     with pytest.raises(tandas.ErrorTandas):
         tandas.guardar_enlace("ama_shop", k, shein=SHEIN, temporada="primavera")
+
+
+def test_hashtags_por_cuenta_sin_categoria():
+    # viva_salud no puede caer en #hogar; el aceite corporal es belleza
+    amz = "https://www.amazon.es/dp/B000000000"
+    assert tandas._hashtags("Freshly Aceite Corporal para estrías y cicatrices", amz, "viva_salud")[:1] == ["skincare"]
+    assert tandas._hashtags("Producto raro sin categoría", amz, "viva_salud")[:1] == ["bienestar"]
+    assert tandas._hashtags("Producto raro sin categoría", amz, "viva_shop")[:1] == ["hogar"]
+
+
+def test_categoria_link():
+    assert tandas.categoria_link("Women's Knee High Boots Round Toe") == "👢 Botas"
+    assert tandas.categoria_link("Bolso bandolera estampado con mariposas") == "👜 Bolsos"
+    assert tandas.categoria_link("Women's Bohemian Gladiator Sandals") == "👟 Zapatos"
+    assert tandas.categoria_link("Conjunto deportivo de dos piezas para mujer") == "👚 Conjuntos"
+    assert tandas.categoria_link("Set 12 Utensilios de Cocina de Silicona") == "🍳 Cocina"
+    assert tandas.categoria_link("Cosa rara") == config.CATEGORIA_OTROS

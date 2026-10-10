@@ -58,7 +58,8 @@ encontrar ese enlace, guardarlo y encolar los vídeos.
    - `nota`: una frase de qué has comparado («mismo vestido satinado verde,
      tirantes finos; SHEIN no tiene la abertura lateral»).
    - Opcional: `foto_url` (https de la foto del candidato) y `titulo` corto:
-     es lo que sale en la página pública `/links/<cuenta>`.
+     es lo que sale en la página pública `/links/<cuenta>` (solo desde que se
+     publica su vídeo; la categoría sale de las palabras del título).
    - Sin equivalente: `shein="sin_equivalente"` (o `asin=`) + `nota`. Ese
      producto ya cuenta como revisado y no se encola.
    - Producto de temporada (tumbonas, piscinas, ventiladores, paddle surf…):

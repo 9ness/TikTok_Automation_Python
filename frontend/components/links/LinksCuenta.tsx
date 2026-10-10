@@ -11,6 +11,10 @@ interface ProductoLink {
   foto: string;
   enlace: string;
   tienda: "amazon" | "shein" | "";
+  /** Por palabras del título (`config.CATEGORIAS_LINKS`), con emoji. */
+  categoria?: string;
+  /** Epoch (s) de cuando salió el vídeo/carrusel. */
+  publicado_en?: number;
 }
 
 interface Tema {
@@ -45,6 +49,24 @@ const NOMBRE_TIENDA: Record<string, string> = { amazon: "Amazon", shein: "SHEIN"
 
 /** Con más productos que esto aparece el buscador. */
 const MIN_BUSCADOR = 8;
+/** Productos por tanda en la lista: el resto con «Ver más» (menos fotos de golpe). */
+const POR_TANDA = 20;
+
+/** Foto a la medida en que se pinta (la API la reduce; ×2 para pantallas retina). */
+function fotoUrl(p: ProductoLink, ancho: number): string {
+  return `${api.baseUrl}${p.foto}?w=${ancho}`;
+}
+
+/** «hoy», «ayer», «hace 3 días» o «12 oct». */
+function cuando(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts * 1000);
+  const dias = Math.floor((Date.now() - d.getTime()) / 86_400_000);
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "ayer";
+  if (dias < 7) return `hace ${dias} días`;
+  return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
 
 /** Minúsculas y sin acentos, para que «camiseta» encuentre «Camísetá». */
 function normaliza(t: string): string {
@@ -79,6 +101,8 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
   const [datos, setDatos] = useState<DatosLinks | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
+  const [categoria, setCategoria] = useState<string | null>(null);
+  const [cuantos, setCuantos] = useState(POR_TANDA);
 
   useEffect(() => {
     let vivo = true;
@@ -112,16 +136,35 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
     };
   }, [cuenta]);
 
+  // Categorías presentes, de la que más tiene a la que menos.
+  const categorias = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const p of datos?.productos ?? []) {
+      if (p.categoria) n.set(p.categoria, (n.get(p.categoria) ?? 0) + 1);
+    }
+    return [...n.entries()].sort((a, b) => b[1] - a[1]);
+  }, [datos]);
+
+  const filtrando = Boolean(busca.trim() || categoria);
+  // Sin filtro, el primero (el del último vídeo) va aparte en grande.
+  const ultimo = !filtrando ? datos?.productos[0] : undefined;
+
   const visibles = useMemo(() => {
-    const lista = datos?.productos ?? [];
+    let lista = datos?.productos ?? [];
+    if (categoria) lista = lista.filter((p) => p.categoria === categoria);
     const q = normaliza(busca.trim());
-    if (!q) return lista;
-    const palabras = q.split(/\s+/);
-    return lista.filter((p) => {
-      const t = normaliza(p.titulo);
-      return palabras.every((w) => t.includes(w));
-    });
-  }, [datos, busca]);
+    if (q) {
+      const palabras = q.split(/\s+/);
+      lista = lista.filter((p) => {
+        const t = normaliza(`${p.titulo} ${p.categoria ?? ""}`);
+        return palabras.every((w) => t.includes(w));
+      });
+    }
+    return ultimo ? lista.slice(1) : lista;
+  }, [datos, busca, categoria, ultimo]);
+
+  // Al cambiar de filtro, vuelve a la primera tanda.
+  useEffect(() => setCuantos(POR_TANDA), [busca, categoria]);
 
   const tema = datos?.tema ?? TEMA_DEFAULT;
   const claro = tema.claro;
@@ -152,6 +195,11 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
   const textoPanel = claro ? "text-stone-700" : "text-white/85";
   const nombre = datos?.cuenta ?? "";
   const conBuscador = (datos?.productos.length ?? 0) > MIN_BUSCADOR;
+  const conCategorias = categorias.length >= 2;
+  const chip = (activo: boolean) =>
+    `shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+      activo ? `border-transparent bg-[var(--acento)] ${sobreAcento}` : `${tarjeta} ${texto}`
+    }`;
 
   return (
     <div
@@ -222,8 +270,42 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
           </div>
         )}
 
-        {conBuscador && (
-          <div className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-4 bg-[var(--fondo)]/90 px-4 py-2 backdrop-blur">
+        {ultimo && (
+          <a
+            href={ultimo.enlace}
+            target="_blank"
+            rel="nofollow sponsored noopener"
+            className={`group mb-5 block overflow-hidden rounded-2xl border transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--acento)] ${tarjeta}`}
+          >
+            <div className="relative aspect-[4/3] w-full bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element -- foto servida por la API, sin optimizador */}
+              <img
+                src={fotoUrl(ultimo, 640)}
+                alt={ultimo.titulo}
+                fetchPriority="high"
+                decoding="async"
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+                }}
+              />
+              <span className={`absolute left-3 top-3 rounded-full bg-[var(--acento2)] px-3 py-1 text-xs font-bold shadow ${esColorClaro(tema.acento2) ? "text-stone-950" : "text-white"}`}>
+                🆕 Último vídeo{ultimo.publicado_en ? ` · ${cuando(ultimo.publicado_en)}` : ""}
+              </span>
+            </div>
+            <div className="p-3">
+              <p className="line-clamp-2 break-words text-base font-semibold leading-snug">{ultimo.titulo}</p>
+              <span className={`mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-[var(--acento)] px-3 py-2.5 text-sm font-bold ${sobreAcento}`}>
+                Ver oferta{ultimo.tienda ? ` en ${NOMBRE_TIENDA[ultimo.tienda]}` : ""}
+                <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              </span>
+            </div>
+          </a>
+        )}
+
+        {(conBuscador || conCategorias) && (
+          <div className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-4 space-y-2 bg-[var(--fondo)]/90 px-4 py-2 backdrop-blur">
+            {conBuscador && (
             <label className="relative block">
               <span className="sr-only">Buscar producto</span>
               <Search className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 ${textoSuave}`} />
@@ -245,6 +327,24 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
                 </button>
               )}
             </label>
+            )}
+            {conCategorias && (
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button type="button" onClick={() => setCategoria(null)} className={chip(!categoria)}>
+                  Todo
+                </button>
+                {categorias.map(([c, n]) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCategoria(categoria === c ? null : c)}
+                    className={chip(categoria === c)}
+                  >
+                    {c} <span className="opacity-70">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -260,23 +360,22 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
           </div>
         )}
 
-        {datos && visibles.length === 0 && (
+        {datos && !ultimo && visibles.length === 0 && (
           <p className={`mx-auto my-12 w-fit rounded-xl px-4 py-3 text-center text-sm font-medium ${panel} ${textoPanel}`}>
-            {busca ? `Nada con «${busca}». Prueba con otra palabra.` : "Muy pronto, los productos de mis vídeos aquí."}
+            {filtrando ? "Nada por aquí. Prueba con otra palabra o categoría." : "Muy pronto, los productos de mis vídeos aquí."}
           </p>
+        )}
+
+        {ultimo && visibles.length > 0 && (
+          <h2 className={`mb-2 w-fit rounded-lg px-2 py-0.5 text-sm font-bold ${panel} ${textoPanel}`}>
+            Otros vídeos
+          </h2>
         )}
 
         {visibles.length > 0 && (
           <ul className="space-y-3">
-            {visibles.map((p, i) => (
+            {visibles.slice(0, cuantos).map((p) => (
               <li key={p.id} className="relative">
-                {/* El primero es el del último vídeo publicado: el que viene a
-                    buscar casi todo el que llega desde la bio. */}
-                {i === 0 && !busca && visibles.length > 1 && (
-                  <span className={`absolute -top-2 right-3 z-10 rounded-full bg-[var(--acento2)] px-2.5 py-0.5 text-[11px] font-bold shadow ${esColorClaro(tema.acento2) ? "text-stone-950" : "text-white"}`}>
-                    🆕 Último vídeo
-                  </span>
-                )}
                 <a
                   href={p.enlace}
                   target="_blank"
@@ -286,9 +385,12 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-white sm:h-24 sm:w-24">
                     {/* eslint-disable-next-line @next/next/no-img-element -- foto servida por la API, sin optimizador */}
                     <img
-                      src={`${api.baseUrl}${p.foto}`}
+                      src={fotoUrl(p, 192)}
                       alt={p.titulo}
                       loading="lazy"
+                      decoding="async"
+                      width={96}
+                      height={96}
                       className="h-full w-full object-cover"
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
@@ -297,6 +399,11 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 break-words text-sm font-semibold leading-snug">{p.titulo}</p>
+                    {(p.categoria || p.publicado_en) && (
+                      <p className={`mt-0.5 truncate text-[11px] ${textoSuave}`}>
+                        {[p.categoria, cuando(p.publicado_en)].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
                     <span className={`mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--acento)] px-3 py-1.5 text-xs font-bold ${sobreAcento}`}>
                       Ver oferta{p.tienda ? ` en ${NOMBRE_TIENDA[p.tienda]}` : ""}
                       <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
@@ -306,6 +413,16 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
               </li>
             ))}
           </ul>
+        )}
+
+        {visibles.length > cuantos && (
+          <button
+            type="button"
+            onClick={() => setCuantos((n) => n + POR_TANDA)}
+            className={`mt-4 w-full rounded-xl border py-3 text-sm font-bold ${tarjeta} ${texto}`}
+          >
+            Ver más ({visibles.length - cuantos})
+          </button>
         )}
 
         {datos?.aviso_amazon && (

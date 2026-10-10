@@ -35,7 +35,7 @@ from src.multiplataforma.services import enlaces, ingesta, musica, textos, video
 logger = logging.getLogger(__name__)
 
 ORIGEN = "tandas"
-MAX_LINKS = 60
+MAX_LINKS = 300
 TIPO = "producto"
 
 
@@ -268,7 +268,7 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
         # en inglés: el texto sale del caption + emojis de la fila, en español.
         titulo = f.get("titulo") or e.get("titulo") or ""
         caption = " ".join(x for x in ((f.get("caption") or titulo).strip(), (f.get("emojis") or "").strip()) if x)
-        tags = _hashtags(titulo, e["enlace"])
+        tags = _hashtags(titulo, e["enlace"], slug)
         t = textos.construir(titulo="", caption=caption, enlace=e["enlace"], hashtags=tags,
                              plataformas=config.PLATAFORMAS)
         # Mudos (multimodo de 10 s): copia con música del banco según su
@@ -289,11 +289,12 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
     return informe
 
 
-def _hashtags(titulo: str, enlace: str) -> list[str]:
-    """Hashtags por categoría del producto (`config.HASHTAGS_CATEGORIA`) + los de la tienda."""
+def _hashtags(titulo: str, enlace: str, slug: str = "") -> list[str]:
+    """Hashtags por categoría del producto (`config.HASHTAGS_CATEGORIA`) + los de la tienda.
+    Sin categoría, los de la cuenta (`HASHTAGS_DEFECTO_CUENTA`) o los genéricos de hogar."""
     t = f" {_norm(titulo)} "
     tags = next((h for palabras, h in config.HASHTAGS_CATEGORIA if any(p in t for p in palabras)),
-                config.HASHTAGS_DEFECTO)
+                config.HASHTAGS_DEFECTO_CUENTA.get(slug, config.HASHTAGS_DEFECTO))
     tienda = "shein" if enlaces.es_shein(enlace) else "amazon" if enlaces.es_amazon(enlace) else ""
     return list(tags) + config.HASHTAGS_TIENDA.get(tienda, [])
 
@@ -382,6 +383,18 @@ def links_publicos(slug: str) -> dict:
     return datos
 
 
+def categoria_link(titulo: str) -> str:
+    """Categoría del producto por palabras del título (`config.CATEGORIAS_LINKS`)."""
+    t = unicodedata.normalize("NFKD", titulo or "").encode("ascii", "ignore").decode().lower()
+    palabras = set(t.replace("/", " ").replace(",", " ").replace("-", " ").split()) | set(t.split())
+    # Plurales sin listar: «sandals» → «sandal», «chaquetas» → «chaqueta».
+    palabras |= {w[:-1] for w in palabras if w.endswith("s")} | {w[:-2] for w in palabras if w.endswith("es")}
+    for nombre, claves in config.CATEGORIAS_LINKS:
+        if palabras & set(claves):
+            return nombre
+    return config.CATEGORIA_OTROS
+
+
 def _links_publicos(slug: str) -> dict:
     c = cuentas_repo.get(slug)
     if not c or not c.activa:
@@ -391,18 +404,24 @@ def _links_publicos(slug: str) -> dict:
     for k, e in enlaces_repo.todos(slug).items():
         if e.get("sin_equivalente") or not e.get("enlace"):
             continue
-        pubs = cola.get(k, [])
-        orden = _ultima_publicacion(pubs) or max((p.programada_en for p in pubs if p.programada_en <= time.time()),
-                                                 default=0.0)
-        items.append((orden, float(e.get("actualizado") or 0), {
+        # Solo lo que YA salió en un vídeo/carrusel: los enlaces se preparan
+        # en lote para la cola (cientos) y quien llega de la bio busca lo que
+        # ha visto, no lo que se publicará dentro de tres semanas.
+        publicado = _ultima_publicacion(cola.get(k, []))
+        if not publicado:
+            continue
+        titulo = _corto(e.get("titulo") or "Producto")
+        items.append((publicado, {
             "id": k,
-            "titulo": _corto(e.get("titulo") or "Producto"),
+            "titulo": titulo,
             "foto": f"/api/v1/multiplataforma/links/{slug}/foto/{k}",
             "enlace": e["enlace"],
             "tienda": "amazon" if enlaces.es_amazon(e["enlace"]) else ("shein" if enlaces.es_shein(e["enlace"]) else ""),
+            "categoria": categoria_link(e.get("titulo") or ""),
+            "publicado_en": int(publicado),
         }))
-    items.sort(key=lambda t: (t[0], t[1]), reverse=True)
-    productos_ = [i[2] for i in items[:MAX_LINKS]]
+    items.sort(key=lambda t: t[0], reverse=True)
+    productos_ = [i[1] for i in items[:MAX_LINKS]]
     hay_amazon = any(p["tienda"] == "amazon" for p in productos_)
     base = f"/api/v1/multiplataforma/links/{slug}/marca"
     return {

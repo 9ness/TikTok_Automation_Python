@@ -212,8 +212,12 @@ resuben: `ama_shop`→ana, `viva_shop`→ness).
 
 **Página pública** `/links/<cuenta>` (Next, sin login, `noindex`) — la de la
 bio de IG/FB. Lee `GET /links/{slug}` (público, sin auth, caché 120 s: solo
-id, título corto, foto, enlace, tienda + `aviso_amazon` si hay alguno de
-Amazon; orden: lo último publicado primero) y `GET /links/{slug}/foto/{producto_key}?w=`
+id, título corto, foto, enlace, tienda, `categoria`, `publicado_en` +
+`aviso_amazon` si hay alguno de Amazon; SOLO productos ya publicados en
+alguna red —los enlaces se preparan en lote para la cola y no salen hasta su
+vídeo—; orden: lo último publicado primero; categoría por palabras del título,
+`config.CATEGORIAS_LINKS`). La página pone el último en grande, chips de
+categoría, buscador y la lista de 20 en 20 con miniaturas `?w=192` y `GET /links/{slug}/foto/{producto_key}?w=`
 (solo productos con enlace; `foto_url` del candidato o la foto de Mis tandas).
 No hace falta tocar Caddy (no autentica); `/api/v1/multiplataforma/links/`
 está en `_PREFIJOS_PRO` para que un `pro` con sesión no reciba 403, y el

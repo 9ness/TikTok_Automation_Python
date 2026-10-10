@@ -67,11 +67,13 @@ MAX_HASHTAGS: dict[str, int] = {"instagram": 5, "facebook": 3, "threads": 1, "pi
 # detrás en `tandas._hashtags`.
 HASHTAGS_CATEGORIA: list[tuple[tuple[str, ...], list[str]]] = [
     (("bolso", "bandolera", "mochila"), ["bolsos", "bolso", "modamujer"]),
-    (("bota", "zapat", "sandalia", "deportiva"), ["zapatos", "zapatillas", "modamujer"]),
+    (("bota", "botin", "zapat", "sandalia", "deportiva"), ["zapatos", "zapatillas", "modamujer"]),
     (("vestido", "falda", "camiseta", "pantal", "jersey", "chaqueta", "abrigo", "blusa", "top ",
       "conjunto", "sudadera", "chaleco", "cardigan", "mono "), ["outfit", "moda", "modamujer"]),
     (("serum", "crema", "spf", "antimanchas", "facial", "micelar", "retin", "cosmetic", "rellenador",
-      "maquillaje", "bronceador"), ["skincare", "belleza", "cuidadodelapiel"]),
+      "maquillaje", "bronceador", "aceite corporal", "crema corporal", "ampolla", "esencia", "centella", "exfolia", "estrias", "cicatri", "hidratante",
+      "champu", "acondicionador", "capilar", "cabello", "perfume", "colonia", "pestan", "unas "),
+     ["skincare", "belleza", "cuidadodelapiel"]),
     (("creatina", "proteina", "whey", "colageno", "magnesio", "capsula", "vitamina", "melatonina",
       "ashwagandha", "shilajit", "probiotic", "biotina", "inositol", "moringa", "curcuma", "matcha",
       "gomita"), ["bienestar", "salud", "suplementos"]),
@@ -91,6 +93,12 @@ TEMPORADAS: dict[str, tuple[int, ...]] = {
     "navidad": (11, 12),
 }
 HASHTAGS_DEFECTO = ["hogar", "casa", "ideasparacasa"]
+# Si el título no encaja en ninguna fila, cada cuenta cae en los suyos (viva_salud
+# no puede salir con #hogar). Las que no estén aquí usan HASHTAGS_DEFECTO.
+HASHTAGS_DEFECTO_CUENTA: dict[str, list[str]] = {
+    "viva_salud": ["bienestar", "salud", "cuidadopersonal"],
+    "ama_shop": ["outfit", "moda", "modamujer"],
+}
 HASHTAGS_TIENDA = {"shein": ["shein", "sheinhaul"], "amazon": ["amazonfinds", "chollos"]}
 
 # Longitudes máximas de texto que aceptan las APIs.
@@ -242,6 +250,48 @@ TEMAS: dict[str, dict] = {
 }
 # Franja de urgencia: honesta (sin inventar descuentos ni plazos).
 BANNER_LINKS = "🔥 Ofertas activas · los precios cambian a diario"
+
+
+# Categorías de la página de enlaces: (nombre, palabras del título). Gana la
+# PRIMERA que case, así que van de lo concreto a lo general (botas antes que
+# zapatos, conjuntos antes que pantalones). Títulos en ES e EN (SHEIN/Amazon).
+CATEGORIAS_LINKS: list[tuple[str, tuple[str, ...]]] = [
+    ("👢 Botas", ("bota", "botas", "botin", "botines", "boot", "boots")),
+    ("👟 Zapatos", ("zapatilla", "zapatillas", "zapato", "zapatos", "sandalia", "sandalias", "sneaker",
+                   "sneakers", "shoe", "shoes", "loafers", "mocasin", "mocasines", "tacon", "heels", "sandal", "slingback", "espadrille", "espadrilles", "wedge", "heel", "flats", "slipper", "slippers", "mules", "zuecos", "clogs", "crocs", "pumps", "alpargatas")),
+    ("👜 Bolsos", ("bolso", "bolsos", "bandolera", "mochila", "cartera", "bag", "handbag", "tote",
+                  "backpack", "purse", "clutch")),
+    ("🧥 Abrigos y chaquetas", ("abrigo", "chaqueta", "cazadora", "gabardina", "parka", "plumifero", "blazer",
+                               "coat", "jacket", "trench", "puffer", "bomber", "chaleco", "vest", "cardigan", "overcoat", "outerwear", "forro", "polar", "fleece")),
+    ("👚 Conjuntos", ("conjunto", "piezas", "piece", "chandal", "tracksuit", "pijama", "pajama", "jumpsuit")),
+    ("👗 Vestidos y faldas", ("vestido", "falda", "dress", "skirt")),
+    ("👖 Pantalones", ("pantalon", "pantalones", "vaquero", "vaqueros", "jeans", "leggings", "mallas", "pants",
+                      "trousers", "sweatpants", "joggers", "tights", "medias", "shorts", "pantis")),
+    ("🧶 Jerséis y sudaderas", ("jersey", "sudadera", "sweater", "hoodie", "sweatshirt", "knit",
+                               "pullover")),
+    ("👕 Camisetas y tops", ("camiseta", "camisa", "blusa", "top", "tops", "shirt", "t-shirt", "tee", "blouse",
+                            "tank", "bralette")),
+    ("🧤 Accesorios", ("guantes", "gloves", "gorro", "gorra", "hat", "beanie", "bufanda", "scarf", "gafas",
+                      "sunglasses", "reloj", "watch", "pendientes", "earrings", "necklace", "pulsera",
+                      "bracelet", "cinturon", "joyeria", "jewelry")),
+    ("💄 Belleza", ("crema", "serum", "maquillaje", "labial", "perfume", "colonia", "mascarilla", "champu",
+                   "pelo", "cabello", "unas", "pestanas", "aceite", "skincare", "makeup", "beauty", "solar", "spf", "tonico", "rellenador", "arrugas", "antimanchas", "toner", "cosmetica", "depiladora", "secador", "plancha", "afeitadora", "cortapelos", "ojos", "labios", "delineador", "delineadores", "exozomas", "facial", "keratina", "termico", "alisador", "rizador", "ampollas", "exfoliante", "esencia", "centella", "oneblade", "barba")),
+    ("🩺 Salud", ("salud", "masajeador", "termica", "vitamina", "suplemento", "dientes", "bascula", "creatina", "colageno", "omega", "vitaminas", "magnesio", "ashwagandha", "curcuma", "capsulas", "matcha", "probiotico", "q10", "menstrual", "melatonina", "termometro", "masajeadora", "resveratrol", "inositol", "nasal", "circulatorio", "vibratoria", "masaje", "cisteina")),
+    ("🍳 Cocina", ("cocina", "freidora", "sarten", "olla", "licuadora", "batidora", "cafetera", "utensilios",
+                  "kitchen", "molinillo", "cafe", "cuchillo", "cuchillos", "tostadora", "vaso", "vasos", "termo", "aceitero", "selladora", "desayuno", "alimentos", "bayetas", "escurreplatos")),
+    ("🐾 Mascotas", ("mascota", "mascotas", "gato", "gatos", "perro", "perros", "arena", "rascador", "comedero")),
+    ("👶 Bebé", ("bebe", "bebes", "biberon", "biberones", "panales", "portabebes", "cabestrillo", "formula")),
+    ("🎮 Juegos", ("consola", "gaming", "gamer", "ps5", "volante", "squishy", "squishies", "juguete", "lego",
+                  "juego")),
+    ("🏕️ Exterior y camping", ("camping", "playa", "carpa", "tumbona", "tumbonas", "sombrilla", "parasol",
+                              "carro", "carrito", "hidrolimpiadora", "plantas", "jardin", "suelo")),
+    ("🏠 Hogar", ("lampara", "luz", "silla", "sofa", "mesa", "colchon", "manta", "almohada", "estanteria",
+                 "zapatero", "tendedero", "organizador", "alfombra", "cortina", "paraguas", "hogar", "casa", "aspiradora", "vacuum", "mopa", "fregona", "puff", "ventilador", "escalera", "gazebo", "rascador", "gato", "gatos", "perro", "mascota", "navidad", "arbol", "almacenaje", "escritorio", "desk", "lijadora", "taladro", "herramienta", "jardin", "limpieza", "cojin", "sabanas", "toalla", "hucha", "burro", "copas", "decorativa", "incienso", "vela", "armario", "cesto", "cubo", "basura", "reciclaje", "papelera", "dispensador", "jabon", "quitapelusas", "acuario", "candado", "sillon", "tocador", "estante", "musica")),
+    ("🏋️ Deporte", ("deporte", "deportivo", "gym", "mancuernas", "yoga", "bicicleta", "fitness", "cinta", "correr", "treadmill", "gimnasio", "pesas", "balon", "raqueta", "paddle", "surf", "sup", "pilates", "tonificacion", "mancuerna", "abdominal")),
+    ("📱 Tecnología", ("cargador", "auriculares", "altavoz", "proyector", "camara", "movil", "usb", "bluetooth",
+                      "wifi", "led", "smart", "coche", "radares", "laser", "nivel", "multimetro", "lector", "inflador", "electrica", "inalambrica")),
+]
+CATEGORIA_OTROS = "✨ Otros"
 
 
 def tema_links(slug: str) -> dict:
