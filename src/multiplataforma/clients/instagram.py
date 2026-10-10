@@ -68,7 +68,7 @@ class InstagramClient(ClienteBase):
             self._esperar_contenedor(contenedor)
             media_id = self._publicar_contenedor(ig_user_id, contenedor)
         except ErrorPublicacion as e:
-            e.parcial = {**e.parcial, "container_id": contenedor}
+            e.parcial = {**e.parcial, "container_id": "" if e.descartar_contenedor else contenedor}
             raise
         return {
             "container_id": contenedor,
@@ -136,8 +136,16 @@ class InstagramClient(ClienteBase):
             j = self._request("GET", url, params={"fields": "status_code,status", "access_token": self.token})
             return j.get("status_code") or ""
 
-        self._esperar(consultar, ok=("FINISHED", "PUBLISHED"), malos=("ERROR", "EXPIRED"),
-                      que=f"contenedor {contenedor}")
+        try:
+            self._esperar(consultar, ok=("FINISHED", "PUBLISHED"), malos=("ERROR", "EXPIRED"),
+                          que=f"contenedor {contenedor}")
+        except ErrorPublicacion as e:
+            if not e.reintentable:
+                # Meta da ERROR pasajeros (10/10: dos reels en ERROR que minutos después
+                # salían FINISHED). Se tira el contenedor y el siguiente tick crea otro.
+                e.reintentable = True
+                e.descartar_contenedor = True
+            raise
 
     def _publicar_contenedor(self, ig_user_id: str, contenedor: str) -> str:
         url = f"{self.base}/{ig_user_id}/media_publish"
@@ -196,7 +204,9 @@ class InstagramClient(ClienteBase):
             self._esperar_contenedor(contenedor)
             media_id = self._publicar_contenedor(ig_user_id, contenedor)
         except ErrorPublicacion as e:
-            e.parcial = {**e.parcial, "children": hijos, **({"container_id": contenedor} if contenedor else {})}
+            if e.descartar_contenedor:  # los hijos también caducan: se empieza de cero
+                hijos, contenedor = [], ""
+            e.parcial = {**e.parcial, "children": hijos, "container_id": contenedor}
             raise
         return {"children": hijos, "container_id": contenedor, "media_id": media_id,
                 "dry_run": self.dry_run, "pasos": self.pasos}

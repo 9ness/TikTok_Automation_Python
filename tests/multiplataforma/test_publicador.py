@@ -5,6 +5,7 @@ import json
 import httpx
 
 from src.multiplataforma import config, publicador
+from src.multiplataforma.clients.base import ErrorPublicacion
 from src.multiplataforma.clients.instagram import InstagramClient
 from src.multiplataforma.clients.pinterest import PinterestClient
 from src.multiplataforma.models import CuentaDestino, Publicacion
@@ -146,6 +147,20 @@ def test_instagram_reintento_reutiliza_contenedor():
     assert res["media_id"] == "m2"
     assert not any(r.url.path.endswith("/17841/media") for r in g.peticiones)
 
+
+
+def test_instagram_contenedor_en_error_se_reintenta_con_otro():
+    g = Grabadora([
+        ("GET", "content_publishing_limit", {"data": [{"quota_usage": 0}]}),
+        ("GET", "/c-malo", {"status_code": "ERROR"}),
+    ])
+    try:
+        InstagramClient("tok", http=g.cliente()).publicar(
+            "17841", caption="x", video_url="https://x/v.mp4", previo={"container_id": "c-malo"})
+    except ErrorPublicacion as e:
+        assert e.reintentable and e.parcial["container_id"] == ""
+    else:
+        raise AssertionError("debía fallar")
 
 def test_pinterest_pin_de_video(tmp_path):
     video = tmp_path / "v.mp4"

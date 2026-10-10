@@ -29,6 +29,8 @@ class ErrorPublicacion(Exception):
         super().__init__(mensaje)
         self.reintentable = reintentable
         self.parcial = parcial or {}
+        # IG: el contenedor acabó en ERROR/EXPIRED y el reintento debe crear otro.
+        self.descartar_contenedor = False
 
 
 def _ocultar(d: dict | None) -> dict:
