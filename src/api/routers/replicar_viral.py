@@ -160,6 +160,19 @@ def carrusel_texto(
         raise _error(e) from e
 
 
+@router.post("/carrusel/{id_}/estilo")
+def carrusel_estilo(
+    id_: str, estilo: Annotated[str, Body(embed=True)] = "",
+    y: Annotated[float | None, Body(embed=True)] = None,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Letra del carrusel (`texto_foto.ESTILOS`) y altura del texto; se vuelven a quemar todas."""
+    try:
+        return carrusel.cambiar_estilo(usuario, id_, estilo, y)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
 @router.get("/carrusel/{id_}/imagen/{n}")
 def carrusel_imagen(
     id_: str, n: int, tipo: str = "final", descargar: bool = False,

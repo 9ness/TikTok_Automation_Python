@@ -201,6 +201,36 @@ def test_cambiar_texto_vuelve_a_quemar_desde_la_base(entorno):
     assert carrusel.ruta_foto("ness", id_, 1, "txt") is None
 
 
+def test_cambiar_estilo_requema_todas_y_se_guarda(entorno):
+    doc = _replicar()
+    id_ = doc["id"]
+    carrusel.subir_imagen("ness", id_, 1, _jpeg())
+    antes = carrusel.ruta_foto("ness", id_, 1, "txt").read_bytes()
+    st = carrusel.cambiar_estilo("ness", id_, "pildora", y=0.7)
+    assert st["estilo_texto"] == {"nombre": "pildora", "y": 0.7}
+    assert carrusel.ruta_foto("ness", id_, 1, "txt").read_bytes() != antes
+    # cambiar el texto respeta el estilo guardado
+    con_estilo = carrusel.ruta_foto("ness", id_, 1, "txt").read_bytes()
+    carrusel.cambiar_texto("ness", id_, 1, doc["diapositivas"][0]["texto"])
+    assert carrusel.ruta_foto("ness", id_, 1, "txt").read_bytes() == con_estilo
+    with pytest.raises(ErrorReplica, match="no existe"):
+        carrusel.cambiar_estilo("ness", id_, "comic")
+    with pytest.raises(ErrorReplica):
+        carrusel.cambiar_estilo("ness", id_, "maquina", y=2)
+
+
+@pytest.mark.parametrize("estilo", ["tiktok", "clasico", "pildora", "pildora_negra", "maquina",
+                                    "elegante", "manuscrita", "rotulador", "impacto"])
+def test_todos_los_estilos_queman(tmp_path, estilo):
+    from src.nicho_carruseles.services import texto_foto
+
+    assert estilo in texto_foto.ESTILOS
+    base = tmp_path / "b.jpg"
+    base.write_bytes(_jpeg())
+    out = texto_foto.quemar(base, "Hola 🌿 qué tal", tmp_path / "t.jpg", estilo=estilo)
+    assert out.read_bytes() != base.read_bytes()
+
+
 def test_errores(entorno):
     doc = _replicar()
     with pytest.raises(ErrorReplica):

@@ -335,16 +335,18 @@ def _diapo(doc: dict, n: int) -> dict:
     return d
 
 
-def _quemar(usuario: str, id_: str, n: int, texto: str) -> None:
-    """Siempre desde la foto de Flow (`base`), nunca desde la ya quemada."""
+def _quemar(usuario: str, id_: str, n: int, texto: str, doc: dict | None = None) -> None:
+    """Siempre desde la foto de Flow (`base`), nunca desde la ya quemada.
+    Con el estilo de letra del carrusel (`estilo_texto`, ver `cambiar_estilo`)."""
     from src.nicho_carruseles.services import texto_foto
 
     base = ruta_foto(usuario, id_, n, "base")
     destino = dir_replica(usuario, id_) / "txt" / f"{int(n):02d}.jpg"
     if not base:
         return
+    est = (doc or {}).get("estilo_texto") or {}
     if texto.strip():
-        texto_foto.quemar(base, texto, destino)
+        texto_foto.quemar(base, texto, destino, estilo=est.get("nombre", ""), y_rel=est.get("y"))
     elif destino.exists():
         destino.unlink()
 
@@ -355,7 +357,7 @@ def subir_imagen(usuario: str, id_: str, n: int, datos: bytes) -> dict:
     doc = ver(usuario, id_)
     d = _diapo(doc, n)
     _a_jpeg(datos, dir_replica(usuario, id_) / "base" / f"{int(n):02d}.jpg")
-    _quemar(usuario, id_, n, d.get("texto") or "")
+    _quemar(usuario, id_, n, d.get("texto") or "", doc)
     return con_estado(doc)
 
 
@@ -366,7 +368,31 @@ def cambiar_texto(usuario: str, id_: str, n: int, texto: str) -> dict:
     d = _diapo(doc, n)
     d["texto"] = sin_cupones_afirmados((texto or "").strip())
     servicio.guardar(doc, indexar=False)
-    _quemar(usuario, id_, n, d["texto"])
+    _quemar(usuario, id_, n, d["texto"], doc)
+    return con_estado(doc)
+
+
+def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None) -> dict:
+    """Letra del carrusel entero (para parecerse al viral: máquina de escribir,
+    manuscrita, píldora blanca…; ver `texto_foto.ESTILOS`) y, si se da, altura
+    del texto (0-1 sobre el alto). Vuelve a quemar todas las que tengan foto."""
+    from src.nicho_carruseles.services import texto_foto
+
+    usuario = usuario or "ness"
+    doc = ver(usuario, id_)
+    try:
+        nombre = texto_foto.estilo_valido(estilo)
+    except ValueError as e:
+        raise ErrorReplica(str(e)) from e
+    est = {"nombre": nombre}
+    if y is not None:
+        if not 0.05 <= float(y) <= 0.95:
+            raise ErrorReplica("y: entre 0.05 (arriba) y 0.95 (abajo)")
+        est["y"] = float(y)
+    doc["estilo_texto"] = est
+    servicio.guardar(doc, indexar=False)
+    for d in doc.get("diapositivas") or []:
+        _quemar(usuario, id_, d["n"], d.get("texto") or "", doc)
     return con_estado(doc)
 
 

@@ -68,6 +68,21 @@ ficha y a tamaño real, nada flotando, **ningún texto ni letras en la imagen**
 (lo pone la app), sin niños, sin pantallas con números, y que se parezca a la
 original en encuadre y emoción pero en otro sitio.
 
+### Letra: la que se parezca al viral
+
+Por defecto el texto sale como el nativo de TikTok (blanco, contorno negro).
+Mira las fotos del viral (`original` de cada diapositiva) y elige la letra que
+más se le parezca, para TODO el carrusel:
+`descargar_carrusel(id, estilo_texto=…, texto_y=…)` — `tiktok`, `clasico`
+(TikTok sin contorno grueso), `pildora` (negra sobre píldora blanca),
+`pildora_negra` (blanca sobre píldora oscura), `maquina` (máquina de
+escribir), `elegante` (serif gruesa), `manuscrita`, `rotulador`, `impacto`
+(mayúsculas condensadas). `texto_y` = altura del bloque (0.05 arriba … 0.95
+abajo; si el viral lo lleva abajo, ~0.75). Vuelve a quemar todas las fotos.
+**Que se lea siempre**: comprueba la hoja final; si el texto pisa algo claro y
+se pierde, cambia `texto_y` o usa `pildora`/`pildora_negra`. Nunca letra oscura
+suelta sobre la foto.
+
 ## 4. Subir y descargar
 
 1. `subir_imagen_carrusel(id, n, archivo_id|ruta_bandeja|url)` por diapositiva
