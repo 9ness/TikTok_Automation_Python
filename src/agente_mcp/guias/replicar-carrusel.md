@@ -114,3 +114,11 @@ Mis tandas › Fotos de ese usuario.
 - Lo que se vea tiene que ser NUESTRO producto (sanción por «producto
   incoherente»). Al menos una diapositiva lo enseña.
 - Una réplica por carrusel y producto: no lances varias «por si acaso».
+- **Sin precios**: ni cifras («8,45 €», «por menos de 10 €», «sin gastar 300 €»)
+  en los textos ni en el caption. El precio cambia y el enlace de Meta es otro.
+- **Revisa los `prompt_imagen` ANTES de generar** (Gemini se equivoca): el
+  producto sale idéntico a la ficha (nunca «un proyector genérico»), en un sitio
+  donde tiene sentido, y lo que va con corriente (lámparas, proyectores, mesitas
+  con carga, tocadores con luces) junto a la pared con el cable a un enchufe
+  visible. Fuera bocadillos, pantallas con texto o precios e iconos de apps. Si
+  la foto limpia es una infografía o lleva sellos, usa otra como referencia.
