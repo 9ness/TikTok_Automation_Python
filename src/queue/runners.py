@@ -2003,6 +2003,22 @@ def _textos_ropa(prod: dict) -> dict:
     }
 
 
+def _sin_epoca_ropa(prompt: str) -> str:
+    """Los de 20s de Moda se montan semanas antes de publicarse y tienen que
+    valer de diciembre a febrero (oct 2026, cuenta de Ana): el apunte de «se
+    publica en octubre» del Largo hacía decir «este otoño». Se cambia por uno
+    que prohíbe nombrar estación o mes."""
+    corte = prompt.rfind("\n\nÚLTIMO APUNTE: el vídeo se publica en")
+    if corte >= 0:
+        prompt = prompt[:corte]
+    return prompt + (
+        "\n\nÚLTIMO APUNTE: el vídeo se publicará en cualquier semana entre "
+        "noviembre y febrero. NO nombres ninguna estación ni mes (nunca "
+        "«otoño», ni «este invierno», ni «Navidad») y no le atribuyas al "
+        "producto usos, materiales ni abrigo que no estén en la ficha."
+    )
+
+
 def _guion_fish_ropa(
     carpeta: str, pid: str, prod: dict, modo: str, movimiento: str,
     usuario: str, foto: Path | None, on_log: OnLog,
@@ -2027,7 +2043,7 @@ def _guion_fish_ropa(
     escrito = largo_guionista.escribir(
         titulo=textos["titulo"], tienda=textos["tienda"], caption=textos["caption"],
         foto=foto, plazos=plazos,
-        prompt=largo_config.prompt_guion(plazos, "dolor", envio, segundos),
+        prompt=_sin_epoca_ropa(largo_config.prompt_guion(plazos, "dolor", envio, segundos)),
         max_caracteres=largo_config.caracteres_guion(segundos),
         etiqueta="nicho_ropa_fish", on_log=on_log,
     )

@@ -67,7 +67,7 @@ _FILE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{10,}$")
 def get_prompts(
     carpeta: str = Query(""), plazos: bool = Query(False),
     modo: str = Query(""), duracion: str = Query("10"),
-    modalidad: str = Query(""),
+    modalidad: str = Query(""), epoca: str = Query(""),
 ) -> PromptsRopaResponse:
     """Los prompts del curso. El de vídeo, en sus dos versiones.
 
@@ -91,7 +91,9 @@ def get_prompts(
             video_sin_manos=config.prompt_video(False),
             video_percha=config.prompt_video_percha(),
             sexo=sexo,
-            mof10=config.prompts_mof10(sexo, plazos, modo, duracion),
+            # `epoca` (neutro/invierno/navidad): la escena para un vídeo que
+            # se publicará más adelante; sin ella, la estación de hoy.
+            mof10=config.prompts_mof10(sexo, plazos, modo, duracion, epoca),
             # Los modos de ESA modalidad: personajes aleatorios (los de
             # siempre) o marca personal. Son cuentas distintas, no un ajuste.
             modos=config.modos_de(sexo, modalidad or config.MODALIDAD_DEFECTO),

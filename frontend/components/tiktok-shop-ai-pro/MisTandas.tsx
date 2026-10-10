@@ -10,6 +10,7 @@ import {
   buildFotoTandaUrl,
   buildVideoTandaUrl,
   useCompletarTanda,
+  useEpocaTanda,
   useMarcarTanda,
   useMisTandas,
   useOcultarTanda,
@@ -17,6 +18,7 @@ import {
   useRecargarTandas,
   useSemaforoTanda,
   type ColorSemaforo,
+  type Epoca,
   type VideoTanda,
 } from "@/lib/queries/misTandas";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
@@ -64,6 +66,35 @@ function PuntoSemaforo({ v }: { v: VideoTanda }) {
 }
 
 /** «sáb 3 oct» a partir de «2026-10-03». */
+const EPOCAS: Record<Epoca, string> = {
+  neutro: "⚪ Neutro",
+  otono: "🍂 Otoño",
+  halloween: "🎃 Halloween",
+  black_friday: "🛍️ Black Friday",
+  invierno: "❄️ Invierno",
+  navidad: "🎄 Navidad",
+};
+
+/** La época del vídeo, editable: cuándo publicarlo en TikTok y en Meta. */
+function SelectorEpoca({ v }: { v: VideoTanda }) {
+  const epoca = useEpocaTanda();
+  return (
+    <select
+      value={v.epoca ?? "neutro"}
+      disabled={epoca.isPending}
+      title="Época: cuándo publicarlo"
+      onChange={(e) => epoca.mutate({ id: v.id, epoca: e.target.value as Epoca })}
+      className="rounded border border-border/60 bg-background px-1 py-px text-[9px] font-semibold"
+    >
+      {(Object.keys(EPOCAS) as Epoca[]).map((k) => (
+        <option key={k} value={k}>
+          {EPOCAS[k]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function fechaCorta(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
   return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }).replace(".", "");
@@ -293,6 +324,36 @@ export function MisTandas() {
         </div>
       ) : null}
 
+      {datos?.solo_meta?.length ? (
+        <details className="mb-2 rounded-lg border border-sky-500/30 bg-sky-500/5 p-2">
+          <summary className="cursor-pointer text-[11px] font-semibold text-sky-600 dark:text-sky-400">
+            📘 Solo Meta (mudos) · {datos.solo_meta.length}
+          </summary>
+          <p className="my-1 text-[10px] text-muted-foreground">
+            Vídeos sin voz: en esta cuenta no se suben a TikTok. Se publican en Meta (uno al día, por época).
+          </p>
+          <ul className="space-y-1">
+            {datos.solo_meta.map((v) => (
+              <li key={v.id} className="flex flex-wrap items-center gap-1 text-[11px]">
+                <PuntoSemaforo v={v} />
+                {v.modo_label ? (
+                  <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${colorModo(v.nicho, v.modo)}`}>
+                    {v.modo_label}
+                  </span>
+                ) : null}
+                <SelectorEpoca v={v} />
+                <span className="min-w-0 flex-1 break-words">
+                  {v.titulo || `Producto ${v.producto}`}{" "}
+                  <span className="text-[10px] text-muted-foreground">
+                    · {v.catalogo_label} · {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
       {datos?.esperando_stock?.length ? (
         <details className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2">
           <summary className="cursor-pointer text-[11px] font-semibold text-rose-500">
@@ -519,6 +580,7 @@ export function MisTandas() {
                                 📁 {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
                               </span>
                               <MontadoEl ts={v.video_listo_at} />
+                              <SelectorEpoca v={v} />
                               {v.desde ? (
                                 <span
                                   title="Su carpeta no se publica antes de este día"

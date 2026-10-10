@@ -45,7 +45,13 @@ export interface VideoTanda {
   musica: { busqueda: string; alternativas: string[]; estilo: string } | null;
   /** Revisión antes de subir (de ESTE montaje); null = sin revisar. */
   semaforo?: SemaforoVideo | null;
+  /** Cuándo publicarlo (TikTok y Meta). */
+  epoca?: Epoca;
+  /** Lleva voz (los mudos no van a TikTok en las cuentas «solo hablados»). */
+  habla?: boolean;
 }
+
+export type Epoca = "neutro" | "otono" | "halloween" | "black_friday" | "invierno" | "navidad";
 
 export type ColorSemaforo = "verde" | "ambar" | "rojo";
 
@@ -85,6 +91,8 @@ export interface MisTandasResponse {
   ocultos_items: VideoTanda[];
   /** Lo pendiente sin stock: fuera de las tandas hasta que vuelva. */
   esperando_stock: VideoTanda[];
+  /** Cuentas que en TikTok solo suben hablados: los mudos sin subir (→ Meta). */
+  solo_meta?: VideoTanda[];
   tandas: Tanda[];
 }
 
@@ -151,6 +159,16 @@ export function useSemaforoTanda() {
   const qc = useQueryClient();
   return useMutation<unknown, Error, { id: string; color: ColorSemaforo | ""; motivo?: string }>({
     mutationFn: (body) => api.post(`${ROOT}/semaforo`, { ...body, por: "a mano" }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: misTandasKeys.all }),
+    onError: (e) => toast.error(`No se pudo: ${e.message}`),
+  });
+}
+
+/** Época del vídeo ("" la quita y vuelve a la de por defecto). */
+export function useEpocaTanda() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { id: string; epoca: Epoca | "" }>({
+    mutationFn: (body) => api.post(`${ROOT}/epoca`, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: misTandasKeys.all }),
     onError: (e) => toast.error(`No se pudo: ${e.message}`),
   });
@@ -300,6 +318,8 @@ export interface CarruselTanda {
   completo: boolean;
   subido: boolean;
   subido_at: number;
+  /** Del PRODUCTO (textos del POV BOF), igual que en los vídeos. */
+  sin_stock: boolean;
   caption: string;
   hashtags: string[];
   musica?: import("./replicarCarrusel").MusicaCarrusel;
@@ -309,6 +329,7 @@ export interface TandaFotos {
   numero: number;
   total: number;
   subidos: number;
+  sin_stock: number;
   completos: number;
   abierta: boolean;
   desde: number;
@@ -322,6 +343,8 @@ export interface TandasFotosResponse {
   por_tanda: number;
   total: number;
   subidos: number;
+  sin_stock: number;
+  subidos_hoy: number;
   completos: number;
   abiertas: number;
   cerradas: number;
@@ -341,15 +364,53 @@ export function useTandasFotos(todas = false) {
   });
 }
 
+export type CambioFoto = { id: string; subido?: boolean; sin_stock?: boolean };
+
+/** Subido / sin stock de un carrusel, con el mismo cambio al instante que en
+ *  los vídeos (se deshace si el servidor falla). */
 export function useMarcarFoto() {
   const qc = useQueryClient();
-  return useMutation<CarruselTanda, Error, { id: string; subido: boolean }>({
+  return useMutation<CarruselTanda, Error, CambioFoto, [readonly unknown[], unknown][]>({
     mutationFn: (v) => api.post<CarruselTanda>(`${ROOT}/fotos/estado`, v),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: fotosKeys.all });
-      qc.invalidateQueries({ queryKey: ["replicar-carrusel"] });
+    onMutate: async (c) => {
+      await qc.cancelQueries({ queryKey: fotosKeys.all });
+      const antes = qc.getQueriesData<TandasFotosResponse>({ queryKey: fotosKeys.all });
+      const ahora = Date.now() / 1000;
+      qc.setQueriesData<TandasFotosResponse>({ queryKey: fotosKeys.all }, (d) =>
+        d
+          ? {
+              ...d,
+              tandas: d.tandas.map((t) => ({
+                ...t,
+                items: t.items?.map((x) =>
+                  x.id !== c.id
+                    ? x
+                    : {
+                        ...x,
+                        ...(c.subido !== undefined ? { subido: c.subido, subido_at: c.subido ? ahora : 0 } : {}),
+                        ...(c.sin_stock !== undefined ? { sin_stock: c.sin_stock } : {}),
+                      },
+                ),
+              })),
+            }
+          : d,
+      );
+      return antes;
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e, _c, antes) => {
+      antes?.forEach(([k, v]) => qc.setQueryData(k, v));
+      toast.error(`No se pudo guardar: ${e.message}`);
+    },
+    onSettled: (_r, _e, c) => {
+      void qc.invalidateQueries({ queryKey: fotosKeys.all });
+      void qc.invalidateQueries({ queryKey: ["replicar-carrusel"] });
+      // Sin stock es del producto: sus vídeos y su nicho lo enseñan igual.
+      if (c.sin_stock !== undefined) {
+        void qc.invalidateQueries({ queryKey: misTandasKeys.all });
+        void qc.invalidateQueries({ queryKey: ["nicho-pov-bof"], refetchType: "none" });
+        void qc.invalidateQueries({ queryKey: ["pov-bof-largo"], refetchType: "none" });
+      }
+    },
   });
 }
 

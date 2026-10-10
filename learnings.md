@@ -1108,3 +1108,4 @@
 - 2026-10-09 · GenAI Omni rechaza («Provider rejected») la imagen POV de botas con muslos y minifalda vistos desde arriba → ese formato (mm_botas_espejo4) va mejor en Kling/Magnific
 - 2026-10-10 · Se gastaron créditos en vídeos de productos sin stock (7_6, 2_9) → antes de una ronda, filtrar con `esperando_stock` de mis_tandas
 - 2026-10-10 · /links/ama_shop enseñaba 60 de 211 productos con enlace SHEIN, casi ninguno publicado (los enlaces se preparan en lote para la cola) → la página pública solo lista lo ya publicado, con categoría por palabras del título y el último vídeo en grande.
+- 2026-10-10 · El prompt de imagen del multimodo metía la estación de HOY (octubre → hojas y ocres) y el guion Fish heredaba «se publica en octubre» del Largo → `epoca` (neutro/invierno/navidad) en `prompts_mof10`/`plan_producto`, y `_sin_epoca_ropa` en el guion Fish de Moda

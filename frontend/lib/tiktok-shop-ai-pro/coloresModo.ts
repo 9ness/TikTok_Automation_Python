@@ -42,6 +42,9 @@ const ESTILOS_LARGO: Record<string, string> = {
 const FAMILIAS_MM: [string, string, string][] = [
   ["mm_zapatillas_pov20", "Zapatillas 20s", "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300"],
   ["mm_zapatillas_sentado20", "Zapatillas 20s", "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300"],
+  ["mm_bolso_pov20", "👜 Bolsos 20s", "bg-green-600/20 text-green-700 dark:text-green-300"],
+  ["mm_bolso_coche20", "👜 Bolsos 20s", "bg-green-600/20 text-green-700 dark:text-green-300"],
+  ["mm_ropa_espejo20", "🪞 Espejo 20s", "bg-rose-500/15 text-rose-700 dark:text-rose-300"],
   ["mm_espejo", "🪞 Espejo", "bg-pink-500/15 text-pink-700 dark:text-pink-300"],
   ["mm_maniqui", "👕 Camisetas", "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300"],
   ["mm_sarcastica", "👕 Camisetas", "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300"],

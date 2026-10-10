@@ -138,6 +138,51 @@ def ocultar(usuario: str, id_: str, oculto: bool = True) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Época y destino: cuándo se publica cada vídeo y si habla (TikTok) o no (Meta)
+# ---------------------------------------------------------------------------
+def habla(f: dict) -> bool:
+    """Si el vídeo lleva voz: POV/Largo y Aleatorios siempre; del multimodo,
+    los hablados (`mm_habla_*`) y los de 20 s con Fish."""
+    if f["nicho"] != "mm":
+        return True
+    from src.nicho_ropa import config as ropa_config
+
+    modo = f.get("modo") or ""
+    return modo.startswith("mm_habla_") or ropa_config.lleva_fish(modo)
+
+
+def _epoca_defecto(f: dict) -> str:
+    return "otono" if str(f.get("modo_label") or "").startswith("🍂") else "neutro"
+
+
+def epocas(usuario: str) -> dict[str, str]:
+    r = _redis()
+    if not r.is_available():
+        return {}
+    return (r.get_json(config.EPOCA_KEY.format(usuario=usuario or "ness")) or {}).get("videos") or {}
+
+
+def poner_epoca(usuario: str, id_: str, epoca: str) -> dict:
+    """Pone (o quita, con "") la época de un vídeo."""
+    usuario = usuario or "ness"
+    epoca = (epoca or "").strip().lower().replace("ñ", "n").replace(" ", "_")
+    if epoca and epoca not in config.EPOCAS:
+        raise ErrorTanda(f"Época «{epoca}» no vale: {', '.join(config.EPOCAS)} o vacío para quitarla.")
+    f = _fila_de(usuario, id_)
+    r = _redis()
+    if not r.is_available():
+        raise ErrorTanda("Redis no está disponible.", status=503)
+    clave = config.EPOCA_KEY.format(usuario=usuario)
+    videos = (r.get_json(clave) or {}).get("videos") or {}
+    if epoca:
+        videos[id_] = epoca
+    else:
+        videos.pop(id_, None)
+    r.set_json(clave, {"videos": videos, "updated_at": time.time()})
+    return {"ok": True, "id": id_, "epoca": videos.get(id_) or _epoca_defecto(f)}
+
+
+# ---------------------------------------------------------------------------
 # Semáforo de revisión: verde / ámbar / rojo por vídeo (ver config).
 # ---------------------------------------------------------------------------
 def semaforos(usuario: str) -> dict[str, dict]:
@@ -225,7 +270,8 @@ def _clave_producto(f: dict) -> str:
 
 
 def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
-              previos: dict[str, dt.date] | None = None) -> list[tuple[list[dict], dt.date | None]]:
+              previos: dict[str, dt.date] | None = None,
+              n: int = config.POR_TANDA) -> list[tuple[list[dict], dt.date | None]]:
     """Reparte en tandas de `POR_TANDA` respetando el ORDEN fijo, salvo dos
     cosas que obligan a esperar (sin bloquear a los demás):
 
@@ -237,7 +283,6 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
     no gasta día. `previos`: producto → día en que ya va en una tanda fija.
     Devuelve [(vídeos, fecha o None si está cerrada)].
     """
-    n = config.POR_TANDA
     sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO)
     ultimo: dict[str, dt.date] = dict(previos or {})
     for f in lista:
@@ -377,6 +422,14 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     escondidos = ocultos(usuario)
     completa = filas(usuario, fresco=fresco)
     lista = [f for f in completa if f["id"] not in escondidos]
+    n_tanda = config.por_tanda(usuario)
+    # Cuenta que en TikTok solo publica hablados: los mudos sin subir salen
+    # de las tandas y van aparte (Meta). Lo ya subido se queda donde estaba.
+    solo_meta: list[dict] = []
+    if usuario in config.SOLO_HABLADOS:
+        solo_meta = [f for f in lista if not habla(f) and not f["uploaded"]]
+        fuera_tiktok = {f["id"] for f in solo_meta}
+        lista = [f for f in lista if f["id"] not in fuera_tiktok]
     por_id = {f["id"]: f for f in lista}
 
     dia = dt.datetime.now(_TZ).date()
@@ -475,11 +528,11 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     abiertas_fijas = sum(1 for _, _, c in grupos if not c)
     historicas: list[tuple[list[dict], dt.date | None, bool]] = []
     nuevas: list[tuple[list[dict], dt.date | None, bool]] = []
-    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos):
+    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos, n_tanda):
         if all(f["uploaded"] for f in grupo):
             historicas.append((grupo, None, True))
             continue
-        if abiertas_fijas < config.FIJAR_ABIERTAS or len(grupo) >= config.POR_TANDA:
+        if abiertas_fijas < config.FIJAR_ABIERTAS or len(grupo) >= n_tanda:
             fijas.append({"ids": [f["id"] for f in grupo], "creada": time.time(),
                           "listo": {f["id"]: f["video_listo_at"] for f in grupo}})
             abiertas_fijas += 1
@@ -518,6 +571,13 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
             salida.append(t)
     _precalentar(usuario, precalentar)
     sem = semaforos(usuario)
+    epo = epocas(usuario)
+    meta_items = [_publica(f) for f in solo_meta]
+    for v in meta_items:
+        v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
+    for v in meta_items + [v for t in salida for v in t.get("items", [])]:
+        v["epoca"] = epo.get(v["id"]) or _epoca_defecto(v)
+        v["habla"] = habla(v)
     for t in salida:
         for v in t.get("items", []):
             v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
@@ -526,7 +586,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
                          for c in config.SEMAFORO_COLORES}
     return {
         "usuario": usuario,
-        "por_tanda": config.POR_TANDA,
+        "por_tanda": n_tanda,
         "total": len(lista),
         "subidos": sum(1 for f in lista if f["uploaded"]),
         "sin_stock": sum(1 for f in lista if f["sin_stock"] and not f["uploaded"]),
@@ -536,6 +596,8 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         "ocultos": sum(1 for f in completa if f["id"] in escondidos),
         "ocultos_items": [_publica(f) for f in completa if f["id"] in escondidos] if ver_ocultos else [],
         "esperando_stock": [_publica(f) for f in sin_stock],
+        # Mudos sin subir de una cuenta `SOLO_HABLADOS`: no van a TikTok (Meta).
+        "solo_meta": meta_items,
         "tandas": salida,
     }
 

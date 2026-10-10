@@ -55,6 +55,27 @@ OCULTOS_KEY = "mis_tandas:ocultos:{usuario}"
 SEMAFORO_KEY = "mis_tandas:semaforo:{usuario}"
 SEMAFORO_COLORES = ("verde", "ambar", "rojo")
 FIJAS_KEY = "mis_tandas:fijas:{usuario}"
+
+# ÉPOCA de cada vídeo (oct 2026): para saber CUÁNDO publicarlo (TikTok y Meta,
+# que va a uno al día y reparte por época). La pone el agente al montarlo
+# (`epoca_video` del MCP); sin poner, los Vintage 🍂 son «otono» y el resto
+# «neutro». Va por id de vídeo y no caduca al rehacer: la escena la pidió así.
+EPOCA_KEY = "mis_tandas:epoca:{usuario}"
+EPOCAS = ("neutro", "otono", "halloween", "black_friday", "invierno", "navidad")
+
+# Cuentas que en TikTok SOLO publican vídeos con voz (oct 2026: la de Ana se
+# sancionó por «muchos vídeos cortos de baja calidad o parecidos» — mudos de
+# 10 s con música). Sus tandas son solo de hablados; los mudos salen aparte en
+# `solo_meta` (van a Meta), sin ocultarse ni borrarse.
+SOLO_HABLADOS: set[str] = {"ana"}
+
+# Vídeos por tanda por usuario (si no, `POR_TANDA`): Ana, 6 al día desde el
+# 18/10/2026 (del 10 al 17, uno al día: sube solo el mejor de la tanda).
+POR_TANDA_USUARIO: dict[str, int] = {"ana": 6}
+
+
+def por_tanda(usuario: str) -> int:
+    return POR_TANDA_USUARIO.get(usuario or "ness", POR_TANDA)
 FIJAR_ABIERTAS = 2   # tandas abiertas que se fijan (la de hoy y la siguiente)
 FIJAS_GUARDAR = 60   # completadas que se recuerdan
 

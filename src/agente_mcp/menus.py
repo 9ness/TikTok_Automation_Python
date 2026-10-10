@@ -74,13 +74,15 @@ MENUS: dict[str, Menu] = {
                 "mm_botas_calle", "mm_botas_espejo4",
                 "mm_bolso_1", "mm_bolso_2", "mm_bolso_3",
                 "mm_zapatillas_pov20", "mm_zapatillas_sentado20",
+                "mm_bolso_pov20", "mm_bolso_coche20", "mm_ropa_espejo20",
                 "mm_habla_espejo", "mm_habla_selfie", "mm_habla_calle_1", "mm_habla_calle_2",
                 "mm_habla_dividido", "mm_habla_colores",
             ),
             notas=(
-                "Formatos MUDOS de 10 s, dos de 20 s con voz de Fish (mm_zapatillas_pov20 / "
-                "mm_zapatillas_sentado20: DOS clips mudos de 10 s y la app pone la voz con "
-                "guion de punto de dolor) y seis HABLADOS de ropa (mm_habla_*: la chica de la "
+                "Formatos MUDOS de 10 s, cinco de 20 s con voz de Fish (mm_zapatillas_pov20 / "
+                "mm_zapatillas_sentado20 calzado, mm_bolso_pov20 / mm_bolso_coche20 bolsos, "
+                "mm_ropa_espejo20 ropa: DOS clips mudos de 10 s y la app pone la voz con "
+                "guion de punto de dolor; `epoca` neutro/invierno/navidad en plan_producto) y seis HABLADOS de ropa (mm_habla_*: la chica de la "
                 "cuenta habla DENTRO del clip; Omni 1.1 en GenAI Pro, 1 crédito); PRIORIZA los "
                 "hablados (dan más visitas); en CADA producto eliges el que le va según su "
                 "`tipo_multimodo` (ropa/camiseta/calzado/botas/bolso; gafas se saltan) y "
@@ -164,6 +166,7 @@ class Ctx:
     modo: str = ""
     gancho: str = ""
     duracion: str = ""
+    epoca: str = ""  # Moda: neutro/invierno/navidad (escena de la imagen)
 
 
 async def catalogos(m: Menu, api: Interno) -> list[dict]:
@@ -281,7 +284,7 @@ def _modo_ropa(m: Menu, modo: str) -> str:
 
 async def contexto(
     menu_clave: str, api: Interno, catalogo: str, carpeta: str,
-    modo: str = "", gancho: str = "", duracion: str = "",
+    modo: str = "", gancho: str = "", duracion: str = "", epoca: str = "",
 ) -> Ctx:
     m = menu(menu_clave)
     if m.tipo == "ropa":
@@ -296,7 +299,7 @@ async def contexto(
         duracion = duracion or "10"
     nombres = [c["carpeta"] for c in await carpetas(m, api, catalogo, modo)]
     carpeta = _elegir(carpeta, nombres, "la carpeta")
-    return Ctx(m, api, catalogo, carpeta, modo, gancho, duracion)
+    return Ctx(m, api, catalogo, carpeta, modo, gancho, duracion, epoca)
 
 
 # ---------------------------------------------------------------------------
@@ -502,7 +505,7 @@ async def estilo_ropa(c: Ctx) -> dict:
     from src.nicho_ropa import config as ropa_config
 
     d = await c.api.get(f"{ROPA}/prompts", carpeta=c.carpeta, modo=c.modo,
-                        duracion=c.duracion, modalidad=c.m.modalidad)
+                        duracion=c.duracion, modalidad=c.m.modalidad, epoca=c.epoca)
     clave = ropa_config.estilo_de_modo(c.modo)
     est = next((e for e in d.get("mof10", []) if e.get("clave") == clave), None)
     if not est:

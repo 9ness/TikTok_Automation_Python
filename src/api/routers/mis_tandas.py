@@ -99,6 +99,25 @@ def set_semaforo(
         raise _error(e) from e
 
 
+class EpocaRequest(BaseModel):
+    """neutro / otono / halloween / black_friday / invierno / navidad, o "" para quitarla."""
+
+    id: str
+    epoca: str = ""
+
+
+@router.post("/epoca")
+def set_epoca(
+    body: EpocaRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Época del vídeo: cuándo publicarlo (TikTok y Meta)."""
+    try:
+        return servicio.poner_epoca(usuario, body.id, body.epoca)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
 class CompletarRequest(BaseModel):
     """Los vídeos de la tanda que se da por terminada (todos)."""
 
@@ -174,7 +193,8 @@ def get_foto(
 # ---------------------------------------------------------------------------
 class FotoEstadoRequest(BaseModel):
     id: str
-    subido: bool
+    subido: bool | None = None
+    sin_stock: bool | None = None
 
 
 @router.get("/fotos")
@@ -193,11 +213,11 @@ def get_tandas_fotos(
 
 @router.post("/fotos/estado")
 def post_estado_foto(body: FotoEstadoRequest, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
-    """Marca (o desmarca) un carrusel como subido."""
+    """Subido / sin stock de un carrusel, como los botones de un vídeo."""
     from src.mis_tandas import fotos
 
     try:
-        return fotos.marcar(usuario, body.id, body.subido)
+        return fotos.marcar(usuario, body.id, subido=body.subido, sin_stock=body.sin_stock)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 

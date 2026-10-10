@@ -94,13 +94,18 @@ pueden pedir varios a la vez. La cabecera de la tanda tiene **Todos (N)** y
 La pantalla tiene dos pestañas, **🎬 Vídeos** y **🖼️ Fotos**, cada una con su
 contador `subidos/total`. En Fotos están los **carruseles replicados**
 (`replicar-carrusel.md`) del usuario, en sus PROPIAS tandas de diez
-(`src/mis_tandas/fotos.py`): no cuentan como vídeos ni para la cuota del día.
+(`src/mis_tandas/fotos.py`): no cuentan como vídeos (cuentan para el tope
+diario de CARRUSELES).
 Un carrusel entra en cuanto tiene una foto subida, en orden de creación, y
 cada tanda abierta lleva su día (hoy, mañana…). Cada tanda baja en un ZIP
 (una carpeta `NN_<producto>` por carrusel con las fotos y `caption.txt`; si ya
 hay alguno subido, solo los pendientes) y cada carrusel tiene su botón
 «Fotos» (las baja una a una y en orden, sin ZIP), su música (la del viral
-para TikTok y una Mixkit sin copyright para Meta, ver `replicar-carrusel.md`), su caption y su botón **Subido** (se guarda en la réplica: `subido`/`subido_at`).
+para TikTok y una Mixkit sin copyright para Meta, ver `replicar-carrusel.md`), su caption y los mismos botones que un vídeo: **🚫 Sin stock** (del PRODUCTO,
+en los textos del POV BOF: lo ven también sus vídeos; se queda tachado en su
+tanda y no entra en el ZIP) y **Marcar subido** (se guarda en la réplica:
+`subido`/`subido_at`, y suma al tope diario de carruseles). Como en los vídeos,
+si hoy ya se subieron 8 la primera tanda abierta pasa a mañana.
 
 ## Colores
 
@@ -128,7 +133,7 @@ un nicho nuevo en Mis tandas, **asígnale color** en
 - `mis_tandas(fotos=True)` — las tandas de FOTOS (carruseles): por tanda,
   `zip` (todas) y `zip_pendientes`; por carrusel, `id`, `hechas`/`diapositivas`,
   `subido` y su `zip`. `marcar_tanda(id, subido=True, fotos=True)` marca un
-  carrusel (solo `subido`; también **solo si te lo pide el operador**).
+  carrusel (`subido` y/o `sin_stock`; también **solo si te lo pide el operador**).
 
 - `semaforo_tanda(id, color, motivo)` — la revisión antes de subir (ver
   «Semáforo»). Esto SÍ lo puedes hacer sin que te lo pidan cuando te encarguen
@@ -178,6 +183,18 @@ físicamente raro. Lo que sí es ámbar sin dudar: **electrónica que se enciend
 sola** — pantallas encendidas, números que cambian, luces de colores, apps en
 el móvil — porque no sabemos si el producto hace eso. Mejor evitarlo desde la
 imagen: pide la pantalla APAGADA y que no se encienda nada.
+
+## Época y «Solo Meta»
+
+- Cada vídeo trae `epoca`: `neutro`, `otono`, `halloween`, `black_friday`,
+  `invierno` o `navidad`. Dice cuándo publicarlo en TikTok y en Meta, que va a
+  uno al día y reparte por época. Se cambia con el selector de la tarjeta o con
+  `epoca_video(id, epoca)`. Si no se ha puesto, los Vintage 🍂 son `otono` y el
+  resto `neutro`. Ponla SIEMPRE al montar un vídeo con escena de época.
+- Hay cuentas que en TikTok solo suben vídeos con voz (`SOLO_HABLADOS`; Ana,
+  desde la sanción del 10/10/2026). En ellas las tandas son solo de hablados, de
+  6 al día, y los mudos sin subir salen en «📘 Solo Meta» (`solo_meta`). No se
+  ocultan ni se borran: van a Meta. Cada vídeo trae `habla`.
 
 ## Lo que no entra (todavía)
 

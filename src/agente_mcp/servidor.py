@@ -115,9 +115,9 @@ def _json(datos: Any) -> str:
 
 
 async def _ctx(ctx: Context, menu: str, catalogo: str, carpeta: str, modo: str = "",
-               gancho: str = "", duracion: str = "") -> menus.Ctx:
+               gancho: str = "", duracion: str = "", epoca: str = "") -> menus.Ctx:
     return await menus.contexto(menu, Interno(_usuario(ctx)), catalogo, carpeta,
-                                modo, gancho, duracion)
+                                modo, gancho, duracion, epoca)
 
 
 # ---------------------------------------------------------------------------
@@ -303,14 +303,17 @@ def _con_enlaces(u: str, plan: dict) -> dict:
 
 @_herramienta(structured_output=False)
 async def plan_producto(ctx: Context, menu: str, catalogo: str, carpeta: str, producto: str,
-                        modo: str = "", gancho: str = "", duracion: str = "") -> str:
+                        modo: str = "", gancho: str = "", duracion: str = "",
+                        epoca: str = "") -> str:
     """Todo lo necesario para UN producto: enlaces a sus fotos, cada imagen a
     generar (prompt, qué adjuntar, dónde, formato) y cada clip (prompt, qué
     imagen, FRAME INICIAL o INGREDIENTES, segundos, si habla, plataformas
     válidas), más los avisos. Los prompts se pegan TAL CUAL. POV BOF Largo:
     una imagen POR CLIP con `dice_la_voz_en_este_clip` (elige la escena según
-    ese tramo) y, en modo Épico, las imágenes/clips de cada inserto."""
-    c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion)
+    ese tramo) y, en modo Épico, las imágenes/clips de cada inserto. Moda:
+    `epoca` neutro/invierno/navidad pone la escena de esa época (para vídeos
+    que se publican más adelante); vacío = la estación de hoy."""
+    c = await _ctx(ctx, menu, catalogo, carpeta, modo, gancho, duracion, epoca)
     return _json(_con_enlaces(_usuario(ctx), await menus.plan(c, producto)))
 
 
@@ -609,7 +612,9 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False,
     las tandas abiertas; `todas=True` trae también las ya subidas.
     Cada vídeo trae `id` (para `marcar_tanda` y `semaforo_tanda`), su nicho,
     catálogo, carpeta y producto (para ir a su menú), `descargar` y `semaforo`
-    (null = sin revisar, o {color, motivo} de la revisión de ESE montaje).
+    (null = sin revisar, o {color, motivo} de la revisión de ESE montaje),
+    `epoca` (cuándo publicarlo, ver `epoca_video`) y `habla`. En cuentas que en
+    TikTok solo suben hablados (Ana) los mudos sin subir salen en `solo_meta`.
     `fotos=True`: el apartado «Fotos» — los carruseles de «Replicar carrusel»
     con al menos una foto, en sus PROPIAS tandas de diez (contador aparte de
     los vídeos); cada tanda trae `zip` (todos sus carruseles; `zip_pendientes`
@@ -657,13 +662,18 @@ async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
     «rehacer» con su nota (no existe en el POV BOF corto).
     `quitar=True` saca el vídeo de la lista (ya no se va a subir; no se borra
     nada del nicho y su hueco lo ocupa el siguiente); `quitar=False` lo devuelve.
-    `fotos=True`: el `id` es de un carrusel (de `mis_tandas(fotos=True)`) y
-    solo vale `subido`."""
+    `fotos=True`: el `id` es de un carrusel (de `mis_tandas(fotos=True)`);
+    valen `subido` y `sin_stock` (del producto, igual que en un vídeo)."""
     api = Interno(_usuario(ctx))
     if fotos:
-        if subido is None:
-            raise ErrorApp("En un carrusel solo se marca `subido`.")
-        return _json(await api.post("/api/v1/mis-tandas/fotos/estado", {"id": id, "subido": subido}))
+        if subido is None and sin_stock is None:
+            raise ErrorApp("En un carrusel se marca `subido` o `sin_stock`.")
+        cuerpo: dict = {"id": id}
+        if subido is not None:
+            cuerpo["subido"] = subido
+        if sin_stock is not None:
+            cuerpo["sin_stock"] = sin_stock
+        return _json(await api.post("/api/v1/mis-tandas/fotos/estado", cuerpo))
     if quitar is not None:
         return _json(await api.post("/api/v1/mis-tandas/ocultar", {"id": id, "oculto": quitar}))
     body: dict = {"id": id}
@@ -690,6 +700,17 @@ async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") ->
     El color vale solo para ese montaje: si el vídeo se rehace, vuelve a «sin revisar»."""
     return _json(await Interno(_usuario(ctx)).post(
         "/api/v1/mis-tandas/semaforo", {"id": id, "color": color, "motivo": motivo, "por": "agente"}))
+
+
+@_herramienta(structured_output=False)
+async def epoca_video(ctx: Context, id: str, epoca: str) -> str:
+    """Época de un vídeo de «Mis tandas» (`id` sale de `mis_tandas`): cuándo
+    publicarlo en TikTok y en Meta. `neutro` (vale todo el año), `otono`,
+    `halloween`, `black_friday`, `invierno` o `navidad`; `""` la quita. Ponla
+    al montar cada vídeo con la época que pediste en `plan_producto(epoca=…)`.
+    Sin poner: los Vintage 🍂 son «otono» y el resto «neutro»."""
+    return _json(await Interno(_usuario(ctx)).post(
+        "/api/v1/mis-tandas/epoca", {"id": id, "epoca": epoca}))
 
 
 @_herramienta(structured_output=False)

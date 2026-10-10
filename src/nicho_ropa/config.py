@@ -413,6 +413,35 @@ MODOS: dict[str, dict] = {
         "modalidad": "multimodo",
         "tipo": "bolso",
     },
+    # Los de 20 s con voz de Fish para BOLSOS y ROPA (oct 2026, no son del
+    # curso): la cuenta de Ana se sancionó por mudos de 10 s parecidos, y los
+    # bolsos son lo que más vende. Misma receta que los de zapatillas: DOS
+    # clips mudos de 10 s y el guion de punto de dolor locutado con Fish.
+    "mm_bolso_pov20": {
+        "desc": "Dos manos con manicura enseñando el bolso en primera persona, 20s: DOS clips de 10s mudos y voz de mujer (Fish) con guion de punto de dolor.",
+        "label": "🎙️ Bolso Vista POV 20s",
+        "estilo_mof10": "bolso_pov20",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "bolso",
+    },
+    "mm_bolso_coche20": {
+        "desc": "El bolso en el coche (copiloto o regazo) con una mano que lo usa, 20s: DOS clips de 10s mudos y voz de mujer (Fish).",
+        "label": "🎙️ Bolso en el Coche 20s",
+        "estilo_mof10": "bolso_coche20",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "bolso",
+    },
+    "mm_ropa_espejo20": {
+        "desc": "La chica de la cuenta frente al espejo con la prenda, el móvil le tapa la cara, 20s: DOS clips de 10s mudos y voz de mujer (Fish).",
+        "label": "🎙️ Espejo Voz en off 20s",
+        "estilo_mof10": "ropa_espejo20",
+        "sexos": ("mujer",),
+        "modalidad": "multimodo",
+        "tipo": "ropa",
+        "personaje_fijo": True,
+    },
     # Los hablados de ropa de Moda Mujer · Aleatorios, traídos al multimodo
     # (oct 2026): GenAI Pro tiene Omni 1.1 a 1 crédito el clip y los vídeos
     # que hablan le dan más visitas a la cuenta que los mudos. Mismo estilo
@@ -1033,6 +1062,31 @@ EXTRA_VIDEO_MULTIMODO = {
     ),
     # Los bolsos son un bodegón: con el «movimiento sutil» del curso salía
     # un temblor y poco más, y TikTok penaliza el contenido estático.
+    "mm_bolso_pov20": (
+        "Las manos sujetan el bolso y lo giran despacio para enseñarlo de "
+        "frente y de lado, una abre y cierra el cierre o pasa los dedos por el "
+        "asa, con la cámara moviéndose un poco como un móvil en mano. Solo dos "
+        "manos, con cinco dedos cada una, y nunca sueltan el bolso. El bolso no "
+        "cambia de forma, color, tamaño ni diseño y no aparece ningún bolso "
+        "nuevo. " + _SIN_VOZ_CLIP
+    ),
+    "mm_bolso_coche20": (
+        "Una mano de mujer usa el bolso con naturalidad: lo abre, saca o mete "
+        "algo pequeño (gafas, monedero) y lo vuelve a cerrar, o lo coloca mejor "
+        "sobre el asiento o el regazo, con la cámara moviéndose un poco como un "
+        "móvil en mano. Manos con cinco dedos, que nunca tapan el frente del "
+        "bolso. El bolso no cambia de forma, color, tamaño ni diseño, no se "
+        "mueve solo y no aparece ningún bolso nuevo. No se ve la cara. "
+        + _SIN_VOZ_CLIP
+    ),
+    "mm_ropa_espejo20": (
+        "Ella sigue frente al espejo con el móvil delante de la cara y se mueve "
+        "con naturalidad: gira un poco el cuerpo a un lado y al otro para "
+        "enseñar la prenda, se la ajusta con la mano libre y da medio paso, "
+        "mientras el reflejo se mueve un poco como un móvil en mano. La prenda "
+        "no cambia de forma, color, largo ni diseño y no aparece otra persona. "
+        + _SIN_VOZ_CLIP
+    ),
     "mm_bolso_1": _MANO_BOLSO,
     "mm_bolso_2": _MANO_BOLSO,
     "mm_bolso_3": _MANO_BOLSO,
@@ -2037,6 +2091,45 @@ ESTILOS_MOF10: dict[str, dict] = {
         "guion": "prompt_mm_zapatillas_20_movimiento.md",
         "derivado": (),
     },
+    "bolso_pov20": {
+        "duraciones": False,
+        "label": "Bolso vista POV · 20s con voz Fish",
+        "voz": False,
+        "fish": True,
+        "partes": 2,
+        "segundos_clip": 10,
+        "personaje": False,
+        "ingrediente": False,
+        "imagen": "prompt_mm_bolso_pov20_imagen.md",
+        "guion": "prompt_mm_zapatillas_20_movimiento.md",
+        "derivado": (),
+    },
+    "bolso_coche20": {
+        "duraciones": False,
+        "label": "Bolso en el coche · 20s con voz Fish",
+        "voz": False,
+        "fish": True,
+        "partes": 2,
+        "segundos_clip": 10,
+        "personaje": False,
+        "ingrediente": False,
+        "imagen": "prompt_mm_bolso_coche20_imagen.md",
+        "guion": "prompt_mm_zapatillas_20_movimiento.md",
+        "derivado": (),
+    },
+    "ropa_espejo20": {
+        "duraciones": False,
+        "label": "Espejo voz en off · 20s con voz Fish",
+        "voz": False,
+        "fish": True,
+        "partes": 2,
+        "segundos_clip": 10,
+        "personaje": True,
+        "ingrediente": False,
+        "imagen": "prompt_mm_ropa_espejo20_imagen.md",
+        "guion": "prompt_mm_zapatillas_20_movimiento.md",
+        "derivado": (),
+    },
     "sarcastica_mujer": {
         "duraciones": False,
         "label": "Camiseta sarcástica · en el súper (chica)",
@@ -2291,7 +2384,7 @@ _PRENDAS_DE_TEMPORADA = {
 }
 
 
-def nota_temporada_guion() -> str:
+def nota_temporada_guion(epoca: str = "") -> str:
     """El apunte de la época para el prompt del GUION (que va en español).
 
     Es un permiso, no un encargo: por defecto NO se nombra la estación. Solo
@@ -2299,6 +2392,13 @@ def nota_temporada_guion() -> str:
     POV BOF: la época cambia CÓMO se habla de la prenda, nunca lo que es — sin
     él, un vestido de tirantes se volvía "ideal para el frío".
     """
+    if epoca_valida(epoca):
+        return (
+            "\n\nÚLTIMO APUNTE: el vídeo se publicará más adelante y tiene que "
+            "valer en cualquier semana de esa época. NO nombres ninguna "
+            "estación ni mes (nunca «otoño»). Nunca le atribuyas tejidos, abrigo "
+            "ni usos que no estén en la ficha."
+        )
     from src.nicho_pov_bof import config as pov_config
 
     estacion = pov_config.estacion_actual()
@@ -2338,8 +2438,56 @@ def _estacion_hoy() -> tuple[int, str]:
     return mes, _ESTACIONES_EN[mes]
 
 
-def nota_temporada() -> str:
+# La ÉPOCA que pide el operador para un vídeo que se publicará MÁS ADELANTE
+# (oct 2026, cuenta de Ana sancionada): los hablados nuevos tienen que valer de
+# diciembre a febrero, así que no pueden llevar la estación de HOY (otoño:
+# hojas, ocres). Sin época se queda lo de siempre, la estación del mes.
+#   neutro    sin pistas de estación: vale todo el año
+#   invierno  frío, abrigo, lluvia; también Black Friday
+#   navidad   luces y escaparates de Navidad (1 dic - 6 ene)
+EPOCAS_PROMPT = ("neutro", "invierno", "navidad")
+_EPOCA_EN = {
+    "neutro": (
+        "This must look timeless: NO season cues at all. No fallen leaves, no "
+        "autumn or orange/ochre tones, no Christmas decorations, no snow, no "
+        "summer sun. Neutral everyday light and a setting that could be any "
+        "month (a modern street, a neutral interior, a car)."
+    ),
+    "invierno": (
+        "It is WINTER in Spain: cold soft light, bare trees or a clean city "
+        "street, wet pavement after the rain, passers-by in coats and scarves. "
+        "No fallen leaves, no autumn or orange/ochre tones and no Christmas "
+        "decorations."
+    ),
+    "navidad": (
+        "It is the CHRISTMAS season in Spain: warm Christmas street lights, "
+        "lit shop windows with festive decorations, a cosy evening atmosphere, "
+        "people in coats. No fallen leaves and no autumn or orange/ochre tones."
+    ),
+}
+_EPOCA_ES = {
+    "neutro": "sin ninguna pista de estación (nada de hojas, tonos ocres, nieve ni adornos de Navidad)",
+    "invierno": "en invierno: luz fría, árboles sin hojas o calle limpia, suelo mojado y gente con abrigo; sin hojas secas ni tonos ocres",
+    "navidad": "en Navidad: luces navideñas en la calle y escaparates decorados, gente con abrigo; sin hojas secas ni tonos ocres",
+}
+
+
+def epoca_valida(epoca: str | None) -> str:
+    e = (epoca or "").strip().lower()
+    return e if e in EPOCAS_PROMPT else ""
+
+
+def nota_temporada(epoca: str = "") -> str:
     """El apunte de la época que se le pega al prompt de imagen."""
+    e = epoca_valida(epoca)
+    if e:
+        return (
+            "\n\nSEASON (mandatory): " + _EPOCA_EN[e] + " The setting, the "
+            "weather, the light and any clothing that is NOT in the reference "
+            "image must match. The referenced product stays exactly as it is: "
+            "do not cover it, do not layer anything over it and do not change "
+            "it for the season."
+        )
     mes, estacion = _estacion_hoy()
     return (
         "\n\nSEASON (mandatory): this is shot in "
@@ -2351,13 +2499,15 @@ def nota_temporada() -> str:
     )
 
 
-def nota_temporada_imagen2() -> str:
+def nota_temporada_imagen2(epoca: str = "") -> str:
     """Lo mismo para la SEGUNDA imagen, que se pide en español y en una frase.
 
     Se creía que la heredaba del chat —es la misma conversación que hizo la
     primera— y no: al cambiar de sitio, el generador cambiaba también de
     estación.
     """
+    if epoca_valida(epoca):
+        return f" Sigue siendo la misma época, {_EPOCA_ES[epoca_valida(epoca)]}. La prenda no cambia."
     mes, estacion = _estacion_hoy()
     from src.nicho_pov_bof import config as pov_config
 
@@ -2382,7 +2532,7 @@ NOTA_PERSONAJE_FIJO = (
 
 def prompts_mof10(
     sexo: str = SEXO_DEFECTO, plazos: bool = False, modo: str = "",
-    duracion: str = DURACION_DEFECTO,
+    duracion: str = DURACION_DEFECTO, epoca: str = "",
 ) -> list[dict]:
     """Los estilos de 10s, cada uno con sus dos prompts ya en ese sexo.
 
@@ -2436,11 +2586,11 @@ def prompts_mof10(
             # Con la época del año puesta: es lo que hace que la calle y la
             # luz sean de este mes y no de cuando se escribió el prompt.
             "imagen": _con_duracion(_con_plazos(imagen, plazos), dur, tope)
-            + nota_temporada(),
+            + nota_temporada(epoca),
             # La SEGUNDA imagen, en los formatos que se graban en dos partes.
             # Vacío en el resto: la pantalla solo pinta el botón si viene.
             "imagen2": (
-                _limpio(meta["imagen2"]) + nota_temporada_imagen2()
+                _limpio(meta["imagen2"]) + nota_temporada_imagen2(epoca)
                 if meta.get("imagen2") else ""
             ),
             # Cuántos clips hay que generar y subir. 1 = como siempre.
@@ -2468,7 +2618,7 @@ def prompts_mof10(
                 plazos
                 and "{{FRASE_PLAZOS}}" in guion
                 and "{{CARACTERES}}" in guion,
-            ) + (nota_temporada_guion() if "{{CARACTERES}}" in guion else ""),
+            ) + (nota_temporada_guion(epoca) if "{{CARACTERES}}" in guion else ""),
             "derivado": sexo in meta["derivado"],
             # Lo que hay que saber AL PEGARLO, y que no se ve en el prompt:
             # si se adjunta el personaje de referencia, si la imagen entra

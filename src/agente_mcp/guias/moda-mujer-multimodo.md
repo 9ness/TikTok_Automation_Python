@@ -106,6 +106,19 @@ cuestan el doble de generación.
   genérico.
 - Los plazos y el envío gratis los decide la app por la ficha y el precio: no
   hace falta hacer nada.
+- **Bolsos y ropa también en 20 s con Fish** (oct 2026, misma receta: dos
+  clips MUDOS de 10 s y la app pone la voz):
+  - `mm_bolso_pov20`: dos manos enseñando el bolso en primera persona.
+  - `mm_bolso_coche20`: el bolso en el coche (copiloto o regazo) con una mano
+    que lo abre o saca algo. Alterna con el POV. Los bolsos son lo que más vende.
+  - `mm_ropa_espejo20`: Lucía frente al espejo con el móvil tapándole la cara
+    (adjunta el personaje); para prendas de cuerpo entero.
+- **Época (OBLIGATORIO en los nuevos):** pasa `epoca` a `plan_producto`
+  (`neutro`, `invierno` o `navidad`). Así la escena sale de esa época y no de la
+  estación de hoy: nada de hojas ni tonos ocres. El guion de Fish nunca nombra
+  estación ni mes. Al montar, pon la MISMA época con `epoca_video` (Mis tandas):
+  es lo que dice cuándo se publica en TikTok y en Meta. Reparte entre neutros
+  (valen siempre), invierno/Black Friday y navidad.
 | bolso | `mm_bolso_1` · `mm_bolso_2` · `mm_bolso_3` | no | FRAME INICIAL |
 | gafas | — **se saltan** (no hay formato mudo) | | |
 
