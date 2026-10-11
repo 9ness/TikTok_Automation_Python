@@ -210,3 +210,23 @@ def test_tick_no_se_atasca_con_simuladas_sin_token(tmp_path):
     nueva = _pub(video, titulo="nueva")
     inf = publicador.publicar_pendientes(ahora=AHORA, limite=1, dry_run=False)
     assert [i["id"] for i in inf["publicaciones"]] == [nueva.id]
+
+
+
+def test_instagram_carrusel_reintenta_foto_que_meta_no_baja():
+    fallos = iter([True, False, False, False])
+
+    def media(r):
+        if b"is_carousel_item" in r.content and next(fallos):
+            return httpx.Response(400, json={"error": {"message": "Only photo or video", "code": 9004,
+                                                       "error_subcode": 2207052}})
+        return {"id": "h"}
+    g = Grabadora([
+        ("GET", "content_publishing_limit", {"data": [{"quota_usage": 0}]}),
+        ("POST", "/17841/media_publish", {"id": "m1"}),
+        ("POST", "/17841/media", media),
+        ("GET", "/h", {"status_code": "FINISHED"}),
+    ])
+    res = InstagramClient("tok", http=g.cliente(), sleep=lambda s: None).publicar_carrusel(
+        "17841", caption="x", imagenes_url=["https://x/1.jpg", "https://x/2.jpg"])
+    assert res["media_id"] == "m1" and len(res["children"]) == 2

@@ -186,7 +186,20 @@ class InstagramClient(ClienteBase):
                         self._anotar("POST", url, data=datos)
                         hijos.append(f"dry-ig-item-{i + 1}")
                         continue
-                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    # Meta falla al bajar fotos AL AZAR (2207052, 11/10: la 4 entra y la 5 no,
+                    # y al repetir al revés): se reintenta la foto, y si no, el siguiente
+                    # tick sigue desde ella (los hijos ya hechos van en `parcial`).
+                    for intento in range(3):
+                        try:
+                            j = self._request("POST", url, data={**datos, "access_token": self.token})
+                            break
+                        except ErrorPublicacion as e:
+                            if "2207052" not in str(e):
+                                raise
+                            e.reintentable = True
+                            if intento == 2:
+                                raise
+                            self._sleep(5)
                     if not j.get("id"):
                         raise ErrorPublicacion(f"instagram: foto {i + 1} sin id de contenedor: {j}")
                     hijos.append(str(j["id"]))
