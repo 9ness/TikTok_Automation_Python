@@ -1722,16 +1722,23 @@ def _trozos_subtitulos(palabras: list[dict], video_dur: float) -> list[dict]:
 
 def _burn_subtitulos(
     video_in: Path, trozos: list[dict], out_path: Path, on_log: OnLog,
+    *, fuente: str = _FUENTE_RECTA, minusculas: bool = False,
+    stroke_frac: float = 0.09,
 ) -> Path:
-    """Quema los subtítulos: un PNG por trozo, cada uno en su ventana."""
+    """Quema los subtítulos: un PNG por trozo, cada uno en su ventana.
+
+    `fuente`/`minusculas`/`stroke_frac` los cambia quien quiera otra letra
+    (Moda Mujer usa una más fina); por defecto, la de todos los nichos."""
     # Centrados en el encuadre, así que el ancho se limita por los DOS lados:
     # a esta altura la columna de botones de TikTok ocupa el 15% derecho.
     max_w = int(config.TARGET_W * config.SUBS_MAX_ANCHO)
     pngs: list[tuple[Path, int, dict]] = []
     for i, t in enumerate(trozos):
         img = _render_text_line(
-            t["texto"], font_size=config.SUBS_FONT_SIZE, max_w=max_w,
-            fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=2, stroke_frac=0.09,
+            t["texto"].lower() if minusculas else t["texto"],
+            font_size=config.SUBS_FONT_SIZE, max_w=max_w,
+            fill=(255, 255, 255), stroke=(0, 0, 0), max_lines=2,
+            stroke_frac=stroke_frac, fuente=fuente,
         )
         if img is None:
             continue

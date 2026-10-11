@@ -269,6 +269,23 @@ def _clave_producto(f: dict) -> str:
     return f"{f['nicho']}|{f['source']}|{f['carpeta']}|{f['producto']}"
 
 
+def _alternar(lista: list[dict]) -> list[dict]:
+    """Lo pendiente intercalado por formato (uno de cada, por turnos) y lo
+    subido delante tal cual: TikTok sancionó a Ana por vídeos «muy parecidos
+    entre sí», y el orden de montaje deja cinco Tienda Colores seguidos."""
+    subidos = [f for f in lista if f["uploaded"]]
+    colas: dict[str, list[dict]] = {}
+    for f in lista:
+        if not f["uploaded"]:
+            colas.setdefault(f.get("modo") or f["nicho"], []).append(f)
+    salida: list[dict] = []
+    while any(colas.values()):
+        for cola in colas.values():
+            if cola:
+                salida.append(cola.pop(0))
+    return subidos + salida
+
+
 def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
               previos: dict[str, dt.date] | None = None,
               n: int = config.POR_TANDA) -> list[tuple[list[dict], dt.date | None]]:
@@ -464,10 +481,13 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         if t.get("completada_at"):
             # Cerrar la tanda no puede atrapar un rehacer: en cuanto se vuelve
             # a montar sale y se reparte de nuevo, como en una abierta.
+            # Igual con un formato NUEVO del mismo producto (el hablado que
+            # sustituye a un mudo ya subido): es otro vídeo, sin subir.
             fuera = {
-                i for i in marcados
+                i for i in (marcados | set(t.get("ids", [])))
                 if (f := todos.get(i)) and not f["rehacer"] and not f["uploaded"]
                 and i in listo and f["video_listo_at"] > listo[i] + 1
+                and (i in marcados or f["orden_at"] > listo[i] + 1)
             }
             if fuera:
                 t["ids"] = [i for i in t.get("ids", []) if i not in fuera]
@@ -488,7 +508,9 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
             if i not in listo:
                 listo[i] = f["video_listo_at"]
                 cambio = True
-            elif i in marcados and not f["rehacer"] and f["video_listo_at"] > listo[i] + 1:
+            elif not f["rehacer"] and f["video_listo_at"] > listo[i] + 1 and (
+                i in marcados or (f["orden_at"] > listo[i] + 1 and not f["uploaded"])
+            ):  # rehecho, o formato nuevo del producto (otro vídeo)
                 marcados.discard(i)
                 listo.pop(i, None)
                 cambio = True
@@ -523,6 +545,8 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     resto = [f for f in lista if f["id"] not in en_fijas]
     sin_stock = [f for f in resto if f["sin_stock"] and not f["uploaded"]]
     publicables = [f for f in resto if not (f["sin_stock"] and not f["uploaded"])]
+    if usuario in config.SOLO_HABLADOS:
+        publicables = _alternar(publicables)
     if hueco["usados"] >= por_dia:
         hueco["fecha"] += dt.timedelta(days=1)
     abiertas_fijas = sum(1 for _, _, c in grupos if not c)

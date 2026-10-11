@@ -237,7 +237,7 @@ def _silencio_final(
 SUBS_DE_LO_OIDO = "<<lo que se oye>>"
 
 
-def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
+def _subtitular(video: Path, texto: str, on_log: OnLog, modo: str = "") -> None:
     """Quema los subtítulos de lo que dice el clip, sobre el propio fichero.
 
     El texto es el guion escrito para la prenda (lo tenemos exacto) y Whisper
@@ -265,7 +265,13 @@ def _subtitular(video: Path, texto: str, on_log: OnLog) -> None:
     )
     salida = work / "subtitulado.mp4"
     try:
-        if _burn_subtitulos(video, trozos, salida, on_log) == salida and salida.is_file():
+        # Moda Mujer (multimodo) lleva su letra: más fina y en minúsculas,
+        # como los subtítulos de las cuentas de moda; el resto, la de siempre.
+        letra = (
+            {"fuente": config.SUBS_FUENTE_MODA, "minusculas": True, "stroke_frac": 0.07}
+            if modo and config.es_multimodo(modo) else {}
+        )
+        if _burn_subtitulos(video, trozos, salida, on_log, **letra) == salida and salida.is_file():
             salida.replace(video)
     finally:
         # Vive al lado del vídeo (en el Drive montado, para poder hacer
@@ -533,7 +539,7 @@ def _rematar(
 ) -> None:
     """Subtítulos, flecha y texto de temporada (si los lleva) y metadatos fuera."""
     if texto_subs.strip():
-        _subtitular(salida, texto_subs, on_log)
+        _subtitular(salida, texto_subs, on_log, modo)
     if modo and config.lleva_flecha(modo) and flecha is not False:
         _flecha(salida, on_log, semilla)
     elif flecha:

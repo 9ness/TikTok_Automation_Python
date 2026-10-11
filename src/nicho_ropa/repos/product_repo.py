@@ -182,6 +182,11 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
             v = video_de(vista, config.MODO_MULTI)
             if not v["video_path"]:
                 continue
+            # «Subido» es del producto, pero el vídeo que se ve es el último
+            # formato: si se monta OTRO formato (un hablado de un mudo ya
+            # subido) después de subir, ese vídeo nuevo está sin subir. Un
+            # re-montaje del mismo formato conserva `primer_listo_at` y no lo toca.
+            subido = bool(vista.get("uploaded")) and int(vista.get("uploaded_at") or 0) >= v["primer_listo_at"]
             salida.append({
                 "carpeta": slug,
                 "producto": str(pid),
@@ -191,8 +196,8 @@ def videos_multimodo(carpetas: list[str], usuario: str = "") -> list[dict]:
                 # curso no corresponde (pasa): el título literal, copiable.
                 "titulo_tiktok_completo": str(vista.get("titulo_tiktok_completo") or ""),
                 "product_url": str(vista.get("product_url") or ""),
-                "uploaded": bool(vista.get("uploaded")),
-                "uploaded_at": int(vista.get("uploaded_at") or 0),
+                "uploaded": subido,
+                "uploaded_at": int(vista.get("uploaded_at") or 0) if subido else 0,
                 # Lo que se pega en TikTok al publicar, sin abrir la carpeta.
                 "caption": str(vista.get("caption") or ""),
                 "emojis": str(vista.get("emojis") or ""),

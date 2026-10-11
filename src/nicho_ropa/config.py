@@ -550,6 +550,12 @@ TIPOS_MULTIMODO: dict[str, dict] = {
 }
 
 
+# Letra de los subtítulos del multimodo (Moda Mujer): Poppins en minúsculas,
+# elegida por Néstor (10/10/2026) frente a Montserrat en mayúsculas — más de
+# cuenta de moda y se lee igual de bien. Fichero en assets/fonts.
+SUBS_FUENTE_MODA = "Poppins-SemiBold.ttf"
+
+
 def es_multimodo(modo: str) -> bool:
     """¿Ese modo es del multimodo (o su vista de todos)?"""
     return modo == MODO_MULTI or MODOS.get(modo, {}).get("modalidad") == "multimodo"
