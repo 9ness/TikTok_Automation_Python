@@ -84,8 +84,12 @@ def _ejecutar_carrusel(plataforma: str, pub: Publicacion, token: str, destino: s
         raise ErrorPublicacion("carrusel sin fotos", reintentable=False)
     if not simulado:
         for f in fotos:
-            if not f.startswith(("http://", "https://")) and not Path(f).is_file():
-                raise ErrorPublicacion(f"No existe la foto {f}", reintentable=False)
+            if not f.startswith(("http://", "https://")):
+                if not Path(f).is_file():
+                    raise ErrorPublicacion(f"No existe la foto {f}", reintentable=False)
+                # Leerla calienta la caché del Drive montado: en frío la primera
+                # tardaba 24 s en servirse y Meta la daba por mala (2207052).
+                Path(f).read_bytes()
     urls = [video_url.url_publica(f) for f in fotos]
     if plataforma == "instagram":
         return InstagramClient(token, **kw).publicar_carrusel(destino, caption=texto, imagenes_url=urls, previo=previo)
