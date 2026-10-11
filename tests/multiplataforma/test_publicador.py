@@ -62,9 +62,9 @@ def test_dry_run_sin_tokens_no_toca_la_red(tmp_path, sin_red):
     pasos = inf["publicaciones"][0]["plataformas"]["instagram"]["pasos"]
     assert any("/17841/media" in p["url"] for p in pasos)
     assert all("access_token" not in (p.get("data") or {}) for p in pasos)
-    # segundo tick: sigue sin token → no re-simula, y sigue en la cola
+    # segundo tick: sigue sin token → ni se re-simula ni ocupa hueco del tick, pero sigue en la cola
     inf2 = publicador.publicar_pendientes(AHORA + 60, http=sin_red, sleep=lambda s: None)
-    assert inf2["publicaciones"][0]["plataformas"]["instagram"]["nota"] == "sigue sin token"
+    assert inf2["publicaciones"] == []
     assert publicaciones_repo.pendientes()
 
 
@@ -197,3 +197,16 @@ def test_error_no_reintentable_y_reintentable(tmp_path):
     assert p.estado["instagram"] == config.ESTADO_FALLIDO and "caído" in p.errores["instagram"]
     assert p.intentos["instagram"] == config.MAX_INTENTOS
     assert not publicaciones_repo.pendientes()
+
+
+def test_tick_no_se_atasca_con_simuladas_sin_token(tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"x")
+    _cuenta(tokens={})
+    for i in range(3):  # viejas: todo ya simulado, nada que hacer
+        p = _pub(video, titulo=f"vieja{i}", video_path=str(tmp_path / f"v{i}.mp4"), programada_en=AHORA - 1000 + i)
+        p.estado = {pl: config.ESTADO_SIMULADO for pl in p.plataformas}
+        publicaciones_repo.guardar(p)
+    nueva = _pub(video, titulo="nueva")
+    inf = publicador.publicar_pendientes(ahora=AHORA, limite=1, dry_run=False)
+    assert [i["id"] for i in inf["publicaciones"]] == [nueva.id]

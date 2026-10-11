@@ -172,13 +172,30 @@ def publicar_una(pub: Publicacion, *, ahora: float, dry_run: bool = False, http:
     return informe
 
 
+def _queda_algo(pub: Publicacion) -> bool:
+    cuenta = cuentas_repo.get(pub.cuenta)
+    if not cuenta:
+        return True  # que publicar_una lo anote como omitida
+    for plat in pub.plataformas:
+        estado = pub.estado.get(plat, config.ESTADO_PENDIENTE)
+        if estado in config.ESTADOS_FINALES:
+            continue
+        if estado == config.ESTADO_SIMULADO and not cuenta.lista_para(plat):
+            continue
+        return True
+    return False
+
+
 def publicar_pendientes(ahora: float | None = None, limite: int = 10, *, dry_run: bool | None = None,
                         http: httpx.Client | None = None, sleep: Callable[[float], None] = time.sleep,
                         log: Callable[[str], None] = _noop) -> dict:
     """Un tick: hasta `limite` publicaciones vencidas, por orden de `programada_en`."""
     ahora = time.time() if ahora is None else ahora
     dry = config.dry_run_global() if dry_run is None else dry_run
-    vencidas = publicaciones_repo.vencidas(ahora)[: max(0, limite)]
+    # Fuera las que solo esperan a una plataforma ya simulada y sin token (Pinterest
+    # hoy): no son finales y, al ir primero por fecha, se comían el límite del tick
+    # y nada nuevo salía (10-11/10: un día entero sin publicar).
+    vencidas = [p for p in publicaciones_repo.vencidas(ahora) if dry or _queda_algo(p)][: max(0, limite)]
     informes = []
     for pub in vencidas:
         try:

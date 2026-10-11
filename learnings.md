@@ -1116,3 +1116,4 @@
 - 2026-10-10 · Al recodificar un clip de Omni se pierde la ✦ de su firma y el montaje no aplica el zoom que se la come → recodificar con `-metadata comment=marca:omni`; los hablados se suben TAL CUAL (voz + firma)
 - 2026-10-10 · Disco del volumen al 100% → Redis MISCONF y montajes corruptos sin error visible → revisar cada montaje con `ffmpeg -v error -i f -f null -`
 - 2026-10-10 · Omni 1.1 a veces pega la 2ª mitad de OTRO producto o inventa piezas/una tercera mano → revisar 7 fotogramas de cada clip; «Provider rejected» (reembolsado) → relanzar desde la otra imagen del producto
+- 2026-10-11 · Multiplataforma: pubs con Pinterest 'simulado' (sin token) nunca terminan y, al ir primero por fecha, llenaban el --limite 6 del tick → un día sin publicar; ahora publicar_pendientes salta las que no tienen nada que hacer (_queda_algo)
