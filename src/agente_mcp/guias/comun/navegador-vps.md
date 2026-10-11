@@ -8,6 +8,9 @@ Si eres un agente que trabaja **desde el VPS** (Claude Code, Codex), aquí está
 que tienes que saber para usar ese Chrome tú solo, **sin pedirle nada al
 operador** salvo que aparezca un login, una verificación o un CAPTCHA.
 
+> ¿La web bloquea la IP del VPS? Usa el Chrome con IP residencial:
+> [`navegador-proxy-es.md`](navegador-proxy-es.md).
+
 ## 1. Qué hay
 
 - Un **Chrome estable con pantalla virtual** que guarda las sesiones en su perfil

@@ -116,6 +116,8 @@ decide la app.
   operador —: lee [`comun/navegador-vps.md`](comun/navegador-vps.md) (cómo
   manejarlo, cuidar CPU y RAM con pocas pestañas, y borrar lo descargado al
   terminar cada vídeo o tanda).
+  Si una web **bloquea la IP del VPS** (p. ej. Social1): Chrome aparte con IP
+  residencial española, [`comun/navegador-proxy-es.md`](comun/navegador-proxy-es.md).
 - **Nunca gastes sin permiso.** Cada imagen y cada clip cuesta créditos. Antes
   de generar, di cuántas imágenes y clips vas a lanzar y espera el «sí».
 - **Máximo 10 vídeos al día por cuenta nueva** (Moda Mujer, Ropa Hombre);
