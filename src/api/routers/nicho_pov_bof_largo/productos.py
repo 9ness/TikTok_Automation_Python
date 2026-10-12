@@ -152,12 +152,12 @@ def _huecos(prod: dict, plazos: bool = False, envio: bool = True) -> int:
         return config.CLIPS_POR_VIDEO
     guion = config.recortar_cta(guion, plazos=plazos, envio=envio)
     clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
-    return voz_svc.clips_para(
+    return max(config.CLIPS_POR_VIDEO, voz_svc.clips_para(
         len(guion),
         clip_s,
         segundos_min=_minimo(prod, len(guion), clip_s),
         maximos=config.CLIPS_MAXIMOS,
-    )
+    ))
 
 
 def _es_plazos(textos: dict) -> bool:

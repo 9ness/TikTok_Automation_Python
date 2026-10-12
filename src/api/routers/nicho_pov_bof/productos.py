@@ -281,11 +281,12 @@ def _clips_que_pide(prod: dict) -> int:
     guion = _guion_hablado(prod)
     if not guion:
         return 2
-    return voz_svc.clips_para(
+    # Dos como mínimo: el montaje no acepta uno solo.
+    return max(2, voz_svc.clips_para(
         len(guion),
         float(prod.get("clip_s") or largo_config.CLIP_TARGET_S),
         segundos_min=pov_config.DURACION_MINIMA_S,
-    )
+    ))
 
 
 def _guion_hablado(prod: dict) -> str:

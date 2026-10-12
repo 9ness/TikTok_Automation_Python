@@ -37,8 +37,9 @@ from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
 # ---------------------------------------------------------------------------
 # Dos clips de ~10s. Hasta que no están todos los que hacen falta no se encola
 # nada: con uno solo no hay vídeo que montar (mismo criterio que el BOF
-# Cinematográfico).
-CLIPS_POR_VIDEO = 1
+# Cinematográfico). Estuvo en 1 y un guion corto con clips de 10s pedía UN
+# clip, que el montaje rechaza.
+CLIPS_POR_VIDEO = 2
 # Cuánto dura un clip generado, por defecto. Se elige por carpeta y por
 # producto desde la pantalla; esto es con lo que arrancan los que no lo tengan
 # puesto. OCHO, que es con lo que se genera hoy y para lo que está medido el
@@ -610,7 +611,7 @@ def opciones_guion(clip_s: float = 0) -> tuple[tuple[int, int], ...]:
     cl = float(clip_s) if clip_s and clip_s > 0 else CLIP_TARGET_S
     return tuple(
         (n, int(round(n * cl)))
-        for n in range(CLIPS_POR_VIDEO + 1, CLIPS_MAXIMOS + 1)
+        for n in range(CLIPS_POR_VIDEO, CLIPS_MAXIMOS + 1)
         if n * cl <= SEGUNDOS_GUION_TOPE
     )
 
