@@ -158,7 +158,6 @@ export function CarruselesReplicados() {
                           folder={c.folder}
                           producto={c.producto}
                           titulo={c.titulo}
-                          productUrl={c.product_url}
                         />
                         <div className="flex flex-wrap items-center gap-1">
                           <BotonFotosEnOrden
@@ -177,6 +176,17 @@ export function CarruselesReplicados() {
                           >
                             Abrir
                           </a>
+                          {c.product_url ? (
+                            <a
+                              href={c.product_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir la ficha en TikTok Shop"
+                              className="shrink-0 rounded-md border border-border/60 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground"
+                            >
+                              🛍️
+                            </a>
+                          ) : null}
                           {(!c.subido || c.sin_stock) && (
                             <button
                               type="button"
