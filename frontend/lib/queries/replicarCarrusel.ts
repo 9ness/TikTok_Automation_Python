@@ -129,13 +129,17 @@ export async function descargarFotosCarrusel(
 ): Promise<{ bajadas: number; fallidas: number }> {
   const doc = await api.get<CarruselReplica>(`${ROOT}/carrusel/${id}`);
   const listas = doc.diapositivas.filter((d) => d.tiene_imagen).sort((a, b) => a.n - b.n);
-  const t = Math.floor(Date.now() / 1000);
   const total = String(listas.length);
+  // La galería pone lo ÚLTIMO bajado ARRIBA: se baja de la última a la primera
+  // y con fecha de captura decreciente, así la 01 queda la primera de la galería.
+  const t = Math.floor(Date.now() / 1000);
   return bajarEnOrden(
-    listas.map((d, i) => ({
-      href: `${urlFotoCarrusel(id, d.n, "final", d.version, true)}&t=${t}`,
-      nombre: `carrusel_${id.slice(0, 6)}_${String(i + 1).padStart(2, "0")}de${total.padStart(2, "0")}.jpg`,
-    })),
+    listas
+      .map((d, i) => ({
+        href: `${urlFotoCarrusel(id, d.n, "final", d.version, true)}&t=${t + (listas.length - i) - d.n}`,
+        nombre: `carrusel_${id.slice(0, 6)}_${String(i + 1).padStart(2, "0")}de${total.padStart(2, "0")}.jpg`,
+      }))
+      .reverse(),
     onProgreso,
     2,
   );

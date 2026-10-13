@@ -414,6 +414,17 @@ export function useMarcarFoto() {
   });
 }
 
+/** «Tanda completada» de fotos, como en vídeos: subirlo todo ya no la cierra. */
+export function useCompletarTandaFotos() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, Error, string[]>({
+    mutationFn: (ids) => api.post(`${ROOT}/fotos/completar`, { ids }),
+    onSuccess: () => toast.success("Tanda completada"),
+    onError: (e) => toast.error(`No se pudo completar: ${e.message}`),
+    onSettled: () => void qc.invalidateQueries({ queryKey: fotosKeys.all }),
+  });
+}
+
 /** ZIP de una tanda de fotos: va en <a href>, con la API key en la query. */
 export function urlZipTandaFotos(numero: number, pendientes = false): string {
   const key = process.env.NEXT_PUBLIC_API_KEY;

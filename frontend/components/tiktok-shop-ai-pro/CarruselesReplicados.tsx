@@ -7,7 +7,7 @@ import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
 import { ProductoCarrusel } from "@/components/tiktok-shop-ai-pro/ProductoCarrusel";
-import { useMarcarFoto, useTandasFotos, urlZipTandaFotos } from "@/lib/queries/misTandas";
+import { useCompletarTandaFotos, useMarcarFoto, useTandasFotos, urlZipTandaFotos } from "@/lib/queries/misTandas";
 import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 
 /** «sáb 3 oct» a partir de «2026-10-03». */
@@ -25,6 +25,8 @@ export function CarruselesReplicados() {
   const [verCerradas, setVerCerradas] = useState(false);
   const tandas = useTandasFotos(verCerradas);
   const marcar = useMarcarFoto();
+  const completar = useCompletarTandaFotos();
+  const [aCompletar, setACompletar] = useState<number | null>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
   const datos = tandas.data;
   const primera = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
@@ -121,6 +123,32 @@ export function CarruselesReplicados() {
                   >
                     <Download className="h-3 w-3" /> {t.subidos > 0 ? "ZIP pendientes" : "ZIP tanda"}
                   </a>
+                  {t.abierta && t.items?.length ? (
+                    <button
+                      type="button"
+                      disabled={completar.isPending}
+                      onClick={() => {
+                        if (aCompletar === t.numero) {
+                          completar.mutate(t.items!.map((c) => c.id));
+                          setACompletar(null);
+                        } else setACompletar(t.numero);
+                      }}
+                      onBlur={() => setACompletar((x) => (x === t.numero ? null : x))}
+                      title="Da la tanda por terminada y pasa a la siguiente. No marca nada como subido"
+                      className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-semibold disabled:opacity-50 ${
+                        aCompletar === t.numero
+                          ? "border-emerald-500 bg-emerald-500/20 text-emerald-500"
+                          : "border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10"
+                      }`}
+                    >
+                      <Check className="h-3 w-3" />
+                      {aCompletar === t.numero
+                        ? t.subidos < t.total
+                          ? `¿Cerrar? ${t.total - t.subidos} sin subir`
+                          : "¿Cerrar?"
+                        : "Tanda completada"}
+                    </button>
+                  ) : null}
                 </div>
                 {esta && t.items ? (
                   <ul className="grid grid-cols-1 gap-1.5 border-t border-border/40 p-2 sm:grid-cols-2">

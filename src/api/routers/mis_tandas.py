@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
@@ -218,6 +218,20 @@ def post_estado_foto(body: FotoEstadoRequest, usuario: Annotated[str, Depends(ge
 
     try:
         return fotos.marcar(usuario, body.id, subido=body.subido, sin_stock=body.sin_stock)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.post("/fotos/completar")
+def post_completar_fotos(
+    ids: Annotated[list[str], Body(embed=True)],
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """«Tanda completada» de una tanda de fotos (sus ids)."""
+    from src.mis_tandas import fotos
+
+    try:
+        return fotos.completar(usuario, ids)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 

@@ -107,6 +107,54 @@ def _grupos(lista: list[dict]) -> list[list[dict]]:
     return [lista[i:i + n] for i in range(0, len(lista), n)]
 
 
+COMPLETADAS_KEY = "mis_tandas:fotos_completadas:{usuario}"
+
+
+def _completadas(usuario: str) -> list[list[str]]:
+    """Las tandas cerradas con «Tanda completada», cada una con SUS ids (fijas:
+    lo que se cree después no se les mete dentro)."""
+    from src.mis_tandas import servicio
+
+    r = servicio._redis()
+    if not r.is_available():
+        return []
+    doc = r.get_json(COMPLETADAS_KEY.format(usuario=usuario)) or {}
+    return [list(map(str, t)) for t in doc.get("tandas") or [] if t]
+
+
+def completar(usuario: str, ids: list[str]) -> dict:
+    """«Tanda completada» de fotos, como en los vídeos: cierra la tanda con
+    esos carruseles aunque quede alguno sin subir (no marca nada como subido)."""
+    from src.mis_tandas import servicio
+
+    usuario = usuario or "ness"
+    ids = [str(i) for i in ids if i][: config.POR_TANDA * 2]
+    if not ids:
+        raise RuntimeError("No hay carruseles que cerrar.")
+    previas = _completadas(usuario)
+    ya = {i for t in previas for i in t}
+    nuevos = [i for i in ids if i not in ya]
+    if nuevos:
+        previas.append(nuevos)
+        servicio._redis().set_json(COMPLETADAS_KEY.format(usuario=usuario), {"tandas": previas})
+    return {"ok": True, "cerradas": len(previas)}
+
+
+def _repartir(lista: list[dict], usuario: str) -> list[tuple[list[dict], bool]]:
+    """(carruseles, cerrada). Primero las completadas, con su contenido fijo;
+    luego el resto en grupos de diez. Una tanda solo se cierra con «Tanda
+    completada»: subirlo todo no la quita de la vista."""
+    por_id = {c["id"]: c for c in lista}
+    salida, usados = [], set()
+    for t in _completadas(usuario):
+        grupo = [por_id[i] for i in t if i in por_id]
+        if grupo:
+            salida.append((grupo, True))
+            usados |= {c["id"] for c in grupo}
+    resto = [c for c in lista if c["id"] not in usados]
+    return salida + [(g, False) for g in _grupos(resto)]
+
+
 def tandas(usuario: str, todas: bool = False) -> dict:
     """Tandas de diez carruseles. Abierta = le queda alguno sin subir (sin
     stock no cuenta: no se puede publicar); cada abierta lleva su día (hoy,
@@ -126,8 +174,8 @@ def tandas(usuario: str, todas: bool = False) -> dict:
     if hoy >= config.SUBIDAS_DIA_HECHO:
         dia += dt.timedelta(days=1)
     salida, cerradas, abiertas = [], 0, 0
-    for i, grupo in enumerate(_grupos(lista)):
-        abierta = not all(_cerrado(c) for c in grupo)
+    for i, (grupo, cerrada) in enumerate(_repartir(lista, usuario)):
+        abierta = not cerrada
         t = {
             "numero": i + 1,
             "total": len(grupo),

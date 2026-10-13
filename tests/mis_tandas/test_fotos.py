@@ -22,6 +22,10 @@ def _sin_redis_real(monkeypatch):
 
     rp = FakeRedis()
     monkeypatch.setattr(pov_repo, "get_nicho_pov_bof_redis", lambda: rp)
+    from src.mis_tandas import servicio as mt_servicio
+
+    rm = FakeRedis()
+    monkeypatch.setattr(mt_servicio, "_redis", lambda: rm)
     cuotas: list[tuple] = []
     monkeypatch.setattr(cuota_repo, "marcar", lambda *a, **k: cuotas.append(a))
     return cuotas
@@ -55,16 +59,23 @@ def test_tandas_de_diez_con_su_contador(entorno):  # noqa: F811
     assert fotos.tandas("ana")["total"] == 0  # cada usuario lo suyo
 
 
-def test_marcar_subido_cierra_la_tanda(entorno):  # noqa: F811
+def test_subir_no_cierra_solo_tanda_completada(entorno):  # noqa: F811
     ids = _crear(11)
     for i in ids[:10]:
         assert fotos.marcar("ness", i, True)["subido"]
     t = fotos.tandas("ness")
-    assert t["cerradas"] == 1 and t["subidos"] == 10 and [x["numero"] for x in t["tandas"]] == [2]
+    # Subirlo todo no la quita de la vista: solo «Tanda completada».
+    assert t["cerradas"] == 0 and t["subidos"] == 10 and [x["numero"] for x in t["tandas"]] == [1, 2]
+    fotos.completar("ness", ids[:10])
+    t = fotos.tandas("ness")
+    assert t["cerradas"] == 1 and [x["numero"] for x in t["tandas"]] == [2]
     assert [x["numero"] for x in fotos.tandas("ness", todas=True)["tandas"]] == [1, 2]
-    assert not fotos.marcar("ness", ids[0], False)["subido"]
-    assert fotos.tandas("ness")["cerradas"] == 0
-    # El listado de «Replicar carrusel» también lo ve.
+    # Una completada con uno solo no se mezcla con lo que venga después.
+    fotos.completar("ness", ids[10:])
+    nuevos = _crear(2)
+    t = fotos.tandas("ness")
+    assert t["cerradas"] == 2 and [c["id"] for c in t["tandas"][0]["items"]] == nuevos
+    # El listado de «Replicar carrusel» también ve el subido.
     assert {x["id"]: x["subido"] for x in servicio.lista("ness", "carrusel")}[ids[1]] is True
 
 
@@ -133,7 +144,7 @@ def test_sin_stock_es_del_producto(entorno):  # noqa: F811
     assert prods["1"]["sin_stock"] is True
     t = fotos.tandas("ness", todas=True)
     assert t["sin_stock"] == 3 and t["tandas"][0]["sin_stock"] == 3
-    assert t["abiertas"] == 0 and t["cerradas"] == 1  # nada que publicar
+    assert t["abiertas"] == 1 and t["cerradas"] == 0  # solo «Tanda completada» la cierra
     try:
         fotos.zip_tanda("ness", 1)
     except carrusel.ErrorReplica as e:
