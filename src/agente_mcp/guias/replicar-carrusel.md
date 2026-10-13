@@ -107,7 +107,9 @@ suelta sobre la foto.
    miniatura del producto con «Ver producto» (su ficha de TikTok Shop) o «Título»
    para copiarlo si el catálogo no tiene la URL.
 4. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
-   hashtags, y lo marca **Subido** en Mis tandas › Fotos
+   hashtags (en TikTok, los MISMOS de los vídeos — configuración de hashtags
+   del POV BOF — más los de moda si es ropa/calzado/bolsos; los de la IA,
+   `hashtags_ia`, se usan en Meta), y lo marca **Subido** en Mis tandas › Fotos
    (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide).
 5. **Instagram/Facebook/Threads**: con su enlace de Amazon/SHEIN, se programa
    con `encolar_carrusel` (ver `guia("multiplataforma")` › Carruseles).

@@ -137,7 +137,7 @@ def test_replicar_guarda_tipo_carrusel_y_normaliza(entorno):
     assert "tu cupón" not in doc["caption"].lower()
     # Sin texto en la imagen, siempre.
     assert all("no text" in x["prompt_imagen"].lower() for x in d if x["prompt_imagen"])
-    assert doc["hashtags"] == ["#adviento", "#navidad"]
+    assert doc["hashtags_ia"] == ["#adviento", "#navidad"]
     assert doc["hechas"] == 0 and doc["total"] == 3 and not doc["completo"]
     # En Redis, junto a las de vídeo (mismo prefijo e índice).
     r = entorno["redis"]
@@ -186,7 +186,7 @@ def test_subir_quema_el_texto_y_zip(entorno):
     with zipfile.ZipFile(io.BytesIO(datos)) as z:
         nombres = sorted(z.namelist())
         assert [Path(n).name for n in nombres] == ["01.jpg", "03.jpg", "caption.txt"]
-        assert "#navidad" in z.read([n for n in nombres if n.endswith("caption.txt")][0]).decode()
+        assert "#tiktokshop" in z.read([n for n in nombres if n.endswith("caption.txt")][0]).decode()
 
 
 def test_cambiar_texto_vuelve_a_quemar_desde_la_base(entorno):
@@ -335,3 +335,15 @@ def test_con_fecha_pone_exif_sin_recomprimir():
         assert im.size == (40, 30)
         assert im.getexif().get_ifd(0x8769)[0x9003] == "2026:10:13 16:00:02"
     assert carrusel.con_fecha(b"no es jpeg", 5) == b"no es jpeg"
+
+
+def test_hashtags_tiktok_los_de_videos_y_moda_si_es_ropa(monkeypatch):
+    from src.nicho_pov_bof.repos import product_repo
+    from src.replicar_viral import carrusel
+
+    monkeypatch.setattr(product_repo, "get_hashtags",
+                        lambda nicho="": ["#Ofertasparati"] + (["#moda"] if nicho else []))
+    ropa = {"producto": {"titulo": "ÜTOPYA Gabardina oversize"}, "hashtags": ["#gabardina"]}
+    casa = {"producto": {"titulo": "Paraguas automático"}, "hashtags": ["#paraguas"]}
+    assert carrusel.hashtags_tiktok(ropa) == ["#Ofertasparati", "#moda"]
+    assert carrusel.hashtags_tiktok(casa) == ["#Ofertasparati"]

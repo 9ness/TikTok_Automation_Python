@@ -310,6 +310,32 @@ def _con_url(prod: dict, usuario: str) -> dict:
     return {**prod, "product_url": url}
 
 
+_ROPA = re.compile(
+    r"gabardina|abrigo|chaqueta|cazadora|jeans|vaquer|pantal|vestido|falda|camis|blusa|jersey|"
+    r"sudadera|top\b|legging|mallas|bolso|bandolera|zapat|bota|crocs|sandalia|deportiva|ropa|moda",
+    re.IGNORECASE,
+)
+
+
+def es_ropa(doc: dict) -> bool:
+    prod = doc.get("producto") or {}
+    return str(prod.get("source", "")).startswith(("mujer", "hombre")) or bool(
+        _ROPA.search(str(prod.get("titulo", ""))))
+
+
+def hashtags_tiktok(doc: dict) -> list[str]:
+    """Los de TikTok son los MISMOS que llevan los vídeos (los generales de la
+    configuración del POV BOF) y, si el producto es ropa/calzado/bolsos, los de
+    moda. Los que propuso la IA (`hashtags`) se quedan para Meta."""
+    try:
+        from src.nicho_pov_bof.repos import product_repo
+
+        tags = product_repo.get_hashtags("nicho-ropa-mujer" if es_ropa(doc) else "")
+    except Exception:  # noqa: BLE001 — sin Redis: los de la IA
+        tags = []
+    return tags or list(doc.get("hashtags") or [])
+
+
 def con_estado(doc: dict) -> dict:
     """El documento + qué fotos hay ya en disco de cada diapositiva."""
     usuario, id_ = doc.get("usuario") or "ness", doc["id"]
@@ -324,7 +350,8 @@ def con_estado(doc: dict) -> dict:
                        "lista": bool(base) and (bool(txt) or not d.get("texto")),
                        "version": int(final.stat().st_mtime) if final else 0})
     hechas = sum(1 for d in diapos if d["lista"])
-    return {**doc, "producto": _con_url(doc.get("producto") or {}, usuario), "diapositivas": diapos, "hechas": hechas, "total": len(diapos),
+    return {**doc, "producto": _con_url(doc.get("producto") or {}, usuario), "diapositivas": diapos,
+            "hashtags": hashtags_tiktok(doc), "hashtags_ia": list(doc.get("hashtags") or []), "hechas": hechas, "total": len(diapos),
             "completo": bool(diapos) and hechas == len(diapos)}
 
 
@@ -464,8 +491,9 @@ def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str) -> int:
             metidas += 1
     if metidas:
         pie = (doc.get("caption") or "").strip()
-        if doc.get("hashtags"):
-            pie = f"{pie}\n\n{' '.join(doc['hashtags'])}".strip()
+        tags = doc["hashtags"] if "hashtags_ia" in doc else hashtags_tiktok(doc)
+        if tags:
+            pie = f"{pie}\n\n{' '.join(tags)}".strip()
         z.writestr(f"{carpeta}/caption.txt", pie + "\n")
     return metidas
 
