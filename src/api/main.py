@@ -194,6 +194,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     carruseles_stop = asyncio.Event()
     carruseles_task = asyncio.create_task(carruseles_precalentado(carruseles_stop))
 
+    # Replicar carrusel · «Mis tandas › Fotos» lista ~90 carpetas del mount:
+    # en frío eran 30 s. Se mantienen en memoria (`carrusel._DISCO`).
+    from src.replicar_viral.carrusel import bucle_precalentado as replicas_precalentado
+
+    replicas_stop = asyncio.Event()
+    replicas_task = asyncio.create_task(replicas_precalentado(replicas_stop))
+
     # Nicho POV BOF · copia diaria del Drive del curso. El admin de aquel Drive
     # borra carpetas sin avisar y hasta ahora la copia dependía de que alguien
     # pulsara el botón: se perdieron ocho productos de "10 Agosto 2026" por dos
@@ -230,6 +237,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.wait_for(carruseles_task, timeout=5)
         except asyncio.TimeoutError:
             carruseles_task.cancel()
+        replicas_stop.set()
+        try:
+            await asyncio.wait_for(replicas_task, timeout=5)
+        except asyncio.TimeoutError:
+            replicas_task.cancel()
         calentador_stop.set()
         try:
             await asyncio.wait_for(calentador_task, timeout=5)

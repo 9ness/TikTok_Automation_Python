@@ -336,10 +336,25 @@ def hashtags_tiktok(doc: dict) -> list[str]:
     return tags or list(doc.get("hashtags") or [])
 
 
-def _fotos_en_disco(usuario: str, id_: str) -> dict[str, dict[str, float]]:
+# Lo que hay en disco de cada réplica, en memoria: en el Drive montado listar
+# en frío las ~90 carpetas de «Mis tandas › Fotos» eran 30 s. Lo que sube la
+# app pasa por `_quemar`, que lo olvida; el resto lo refresca `precalentar`.
+_DISCO: dict[tuple[str, str], tuple[float, dict]] = {}
+_DISCO_TTL_S = 20 * 60
+
+
+def olvidar_disco(usuario: str, id_: str) -> None:
+    _DISCO.pop((usuario or "ness", id_), None)
+
+
+def _fotos_en_disco(usuario: str, id_: str, fresco: bool = False) -> dict[str, dict[str, float]]:
     """{tipo: {«01.jpg»: mtime}} leyendo cada carpeta UNA vez. En el Drive
     montado, preguntar por un fichero que no existe cuesta cientos de ms;
     listar la carpeta, uno solo."""
+    clave = (usuario or "ness", id_)
+    guardado = _DISCO.get(clave)
+    if guardado and not fresco and time.time() - guardado[0] < _DISCO_TTL_S:
+        return guardado[1]
     raiz = dir_replica(usuario, id_)
     salida: dict[str, dict[str, float]] = {}
     for tipo in TIPOS_FOTO:
@@ -348,7 +363,47 @@ def _fotos_en_disco(usuario: str, id_: str) -> dict[str, dict[str, float]]:
                 salida[tipo] = {e.name: e.stat().st_mtime for e in it if e.is_file()}
         except OSError:
             salida[tipo] = {}
+    _DISCO[clave] = (time.time(), salida)
     return salida
+
+
+def precalentar() -> int:
+    """Relee el disco de todas las réplicas de carrusel (de todos los
+    usuarios) para que la primera visita a «Mis tandas › Fotos» no espere al
+    Drive. Devuelve cuántas leyó."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    r = servicio._redis()
+    if not r.is_available():
+        return 0
+    try:
+        usuarios = [p.name for p in _raiz().iterdir() if p.is_dir() and not p.name.startswith("_")]
+    except OSError:
+        return 0
+    pares = []
+    for u in usuarios:
+        ids = (r.get_json(servicio.INDICE.format(usuario=u)) or {}).get("ids") or []
+        pares += [(u, i) for i in ids if _ID.fullmatch(i or "")]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda p: _fotos_en_disco(*p, fresco=True), pares))
+    return len(pares)
+
+
+async def bucle_precalentado(stop) -> None:
+    """Cada 10 min, `precalentar` en un hilo (el mount bloquea)."""
+    import asyncio
+    import logging
+
+    log = logging.getLogger("api")
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(precalentar)
+        except Exception as e:  # noqa: BLE001 — Drive caído: no tumba la API
+            log.warning("precalentado de replicar carrusel falló: %s", e)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=600)
+        except asyncio.TimeoutError:
+            pass
 
 
 def con_estado(doc: dict) -> dict:
@@ -391,6 +446,7 @@ def _quemar(usuario: str, id_: str, n: int, texto: str, doc: dict | None = None)
         texto_foto.quemar(base, texto, destino, estilo=est.get("nombre", ""), y_rel=est.get("y"))
     elif destino.exists():
         destino.unlink()
+    olvidar_disco(usuario, id_)
 
 
 def subir_imagen(usuario: str, id_: str, n: int, datos: bytes) -> dict:

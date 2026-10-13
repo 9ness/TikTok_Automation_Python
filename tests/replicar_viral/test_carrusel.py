@@ -347,3 +347,16 @@ def test_hashtags_tiktok_los_de_videos_y_moda_si_es_ropa(monkeypatch):
     casa = {"producto": {"titulo": "Paraguas automático"}, "hashtags": ["#paraguas"]}
     assert carrusel.hashtags_tiktok(ropa) == ["#Ofertasparati", "#moda"]
     assert carrusel.hashtags_tiktok(casa) == ["#Ofertasparati"]
+
+
+def test_disco_en_memoria_se_olvida_al_quemar(tmp_path, monkeypatch):
+    from src.replicar_viral import carrusel
+
+    monkeypatch.setattr(carrusel, "_raiz", lambda: tmp_path)
+    carrusel._DISCO.clear()
+    (tmp_path / "ness" / "abc123abc123" / "base").mkdir(parents=True)
+    assert carrusel._fotos_en_disco("ness", "abc123abc123")["base"] == {}
+    (tmp_path / "ness" / "abc123abc123" / "base" / "01.jpg").write_bytes(b"x")
+    assert carrusel._fotos_en_disco("ness", "abc123abc123")["base"] == {}  # en memoria
+    carrusel.olvidar_disco("ness", "abc123abc123")
+    assert "01.jpg" in carrusel._fotos_en_disco("ness", "abc123abc123")["base"]
