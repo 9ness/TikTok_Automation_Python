@@ -37,13 +37,13 @@ def _carruseles(usuario: str) -> list[dict]:
         return []
     claves = [servicio.CLAVE.format(id=i) for i in ids]
     docs = r.mget_json(claves) if hasattr(r, "mget_json") else [r.get_json(k) for k in claves]
-    salida = []
-    for d in docs:
-        if not isinstance(d, dict) or d.get("tipo") != "carrusel":
-            continue
-        e = carrusel.con_estado(d)
-        if e["hechas"] > 0:
-            salida.append(e)
+    from concurrent.futures import ThreadPoolExecutor
+
+    validos = [d for d in docs if isinstance(d, dict) and d.get("tipo") == "carrusel"]
+    # Cada uno lee sus carpetas del Drive montado: en paralelo, no uno tras otro.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        estados = list(pool.map(carrusel.con_estado, validos))
+    salida = [e for e in estados if e["hechas"] > 0]
     salida.sort(key=lambda d: d.get("creado_at") or 0)
     return salida
 

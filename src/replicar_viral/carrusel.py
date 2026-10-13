@@ -336,19 +336,34 @@ def hashtags_tiktok(doc: dict) -> list[str]:
     return tags or list(doc.get("hashtags") or [])
 
 
+def _fotos_en_disco(usuario: str, id_: str) -> dict[str, dict[str, float]]:
+    """{tipo: {«01.jpg»: mtime}} leyendo cada carpeta UNA vez. En el Drive
+    montado, preguntar por un fichero que no existe cuesta cientos de ms;
+    listar la carpeta, uno solo."""
+    raiz = dir_replica(usuario, id_)
+    salida: dict[str, dict[str, float]] = {}
+    for tipo in TIPOS_FOTO:
+        try:
+            with os.scandir(raiz / tipo) as it:
+                salida[tipo] = {e.name: e.stat().st_mtime for e in it if e.is_file()}
+        except OSError:
+            salida[tipo] = {}
+    return salida
+
+
 def con_estado(doc: dict) -> dict:
     """El documento + qué fotos hay ya en disco de cada diapositiva."""
     usuario, id_ = doc.get("usuario") or "ness", doc["id"]
+    hay = _fotos_en_disco(usuario, id_)
     diapos = []
     for d in doc.get("diapositivas") or []:
-        n = d["n"]
-        base = ruta_foto(usuario, id_, n, "base")
-        txt = ruta_foto(usuario, id_, n, "txt")
-        final = txt or base
-        diapos.append({**d, "tiene_original": bool(ruta_foto(usuario, id_, n, "orig")),
-                       "tiene_imagen": bool(base), "tiene_texto": bool(txt),
-                       "lista": bool(base) and (bool(txt) or not d.get("texto")),
-                       "version": int(final.stat().st_mtime) if final else 0})
+        nombre = f"{int(d['n']):02d}.jpg"
+        base, txt = hay["base"].get(nombre), hay["txt"].get(nombre)
+        final = txt if txt is not None else base
+        diapos.append({**d, "tiene_original": nombre in hay["orig"],
+                       "tiene_imagen": base is not None, "tiene_texto": txt is not None,
+                       "lista": base is not None and (txt is not None or not d.get("texto")),
+                       "version": int(final) if final is not None else 0})
     hechas = sum(1 for d in diapos if d["lista"])
     return {**doc, "producto": _con_url(doc.get("producto") or {}, usuario), "diapositivas": diapos,
             "hashtags": hashtags_tiktok(doc), "hashtags_ia": list(doc.get("hashtags") or []), "hechas": hechas, "total": len(diapos),
