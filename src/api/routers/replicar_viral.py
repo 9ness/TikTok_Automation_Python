@@ -175,7 +175,7 @@ def carrusel_estilo(
 
 @router.get("/carrusel/{id_}/imagen/{n}")
 def carrusel_imagen(
-    id_: str, n: int, tipo: str = "final", descargar: bool = False,
+    id_: str, n: int, tipo: str = "final", descargar: bool = False, t: int = 0,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ):
     """`tipo`: orig (la del viral) · base (la de Flow) · txt (con texto) ·
@@ -196,6 +196,10 @@ def carrusel_imagen(
             nombre = f"{carrusel.nombre_carrusel(carrusel.ver(usuario, id_))}_{n:02d}.jpg"
         except Exception:  # noqa: BLE001
             nombre = f"diapositiva_{n:02d}.jpg"
+    if descargar and t > 0:  # fecha de captura t + n s: la galería las ordena aunque lleguen desordenadas
+        return Response(carrusel.con_fecha(p.read_bytes(), t + n), media_type="image/jpeg",
+                        headers={"Content-Disposition": f'attachment; filename="{nombre}"',
+                                 "Cache-Control": "no-store"})
     return FileResponse(p, media_type="image/jpeg", filename=nombre,
                         headers={"Cache-Control": "private, max-age=60"})
 

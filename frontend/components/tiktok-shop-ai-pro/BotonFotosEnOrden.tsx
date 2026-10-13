@@ -20,6 +20,7 @@ export function BotonFotosEnOrden({
   className?: string;
 }) {
   const [bajando, setBajando] = useState(false);
+  const [progreso, setProgreso] = useState("");
   return (
     <button
       type="button"
@@ -27,19 +28,21 @@ export function BotonFotosEnOrden({
       onClick={async () => {
         setBajando(true);
         try {
-          const n = await descargarFotosCarrusel(id);
-          if (n) toast.success(`${n} fotos descargadas en orden`);
+          const r = await descargarFotosCarrusel(id, (hechas, total) => setProgreso(`${hechas}/${total}`));
+          if (r.fallidas) toast.error(`${r.bajadas} bajadas · ${r.fallidas} fallaron`);
+          else if (r.bajadas) toast.success(`${r.bajadas} fotos descargadas en orden`);
           else toast.error("Aún no hay ninguna foto subida en este carrusel.");
         } catch (e) {
           toast.error(`No se pudieron descargar: ${(e as Error).message}`);
         } finally {
           setBajando(false);
+          setProgreso("");
         }
       }}
       className={`flex items-center gap-1.5 rounded-lg border border-sky-500/50 font-semibold text-sky-400 hover:bg-sky-500/10 disabled:pointer-events-none disabled:opacity-40 ${className}`}
     >
       {bajando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-      {etiqueta}
+      {bajando && progreso ? progreso : etiqueta}
     </button>
   );
 }

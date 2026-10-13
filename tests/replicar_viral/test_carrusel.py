@@ -318,3 +318,20 @@ def test_mcp_enlaces(monkeypatch):
 
     nombres = {t.name for t in asyncio.run(servidor.mcp.list_tools())}
     assert {"replicar_carrusel", "subir_imagen_carrusel", "descargar_carrusel"} <= nombres
+
+
+def test_con_fecha_pone_exif_sin_recomprimir():
+    import io
+
+    from PIL import Image
+
+    from src.replicar_viral import carrusel
+
+    b = io.BytesIO()
+    Image.new("RGB", (40, 30), (10, 200, 30)).save(b, "JPEG", exif=Image.Exif().tobytes())
+    sale = carrusel.con_fecha(b.getvalue(), 1791900000 + 2)
+    with Image.open(io.BytesIO(sale)) as im:
+        im.load()
+        assert im.size == (40, 30)
+        assert im.getexif().get_ifd(0x8769)[0x9003] == "2026:10:13 16:00:02"
+    assert carrusel.con_fecha(b"no es jpeg", 5) == b"no es jpeg"

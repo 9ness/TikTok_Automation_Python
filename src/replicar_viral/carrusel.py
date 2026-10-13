@@ -418,6 +418,39 @@ def nombre_carrusel(doc: dict) -> str:
     return f"carrusel_{_slug((doc.get('producto') or {}).get('titulo', ''))}_{doc['id'][:6]}"
 
 
+def con_fecha(datos: bytes, epoca: float) -> bytes:
+    """El JPEG con la fecha de captura (EXIF DateTimeOriginal) = `epoca`, hora
+    de Madrid, sin recomprimir. La galería del móvil ordena por esa fecha y no
+    por la de descarga, que llega desordenada; con 01 = t, 02 = t+1 s… quedan
+    en el orden del carrusel. Si no es un JPEG, se devuelve tal cual."""
+    import datetime as dt
+    import struct
+    import zoneinfo
+
+    from PIL import Image
+
+    if datos[:2] != b"\xff\xd8":
+        return datos
+    fecha = dt.datetime.fromtimestamp(epoca, zoneinfo.ZoneInfo("Europe/Madrid")).strftime("%Y:%m:%d %H:%M:%S")
+    exif = Image.Exif()
+    exif[0x0132] = fecha  # DateTime
+    ifd = exif.get_ifd(0x8769)
+    ifd[0x9003] = fecha  # DateTimeOriginal
+    ifd[0x9004] = fecha  # DateTimeDigitized
+    cuerpo = exif.tobytes()
+    if not cuerpo.startswith(b"Exif\x00\x00"):
+        cuerpo = b"Exif\x00\x00" + cuerpo
+    # Fuera los APP1 que ya traiga (un segundo EXIF lo ignora la galería).
+    i, resto = 2, bytearray()
+    while i + 4 <= len(datos) and datos[i] == 0xFF and datos[i + 1] in range(0xE0, 0xF0):
+        largo = struct.unpack(">H", datos[i + 2:i + 4])[0]
+        if datos[i + 1] != 0xE1:
+            resto += datos[i:i + 2 + largo]
+        i += 2 + largo
+    app1 = b"\xff\xe1" + struct.pack(">H", len(cuerpo) + 2) + cuerpo
+    return b"\xff\xd8" + bytes(resto) + app1 + datos[i:]
+
+
 def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str) -> int:
     """Mete en `z`, bajo `carpeta/`, las diapositivas listas (con su texto, o
     la de Flow tal cual si no lleva) en orden + `caption.txt`. Devuelve

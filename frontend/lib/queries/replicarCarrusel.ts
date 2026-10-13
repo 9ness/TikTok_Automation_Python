@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { bajarEnOrden } from "@/lib/descargas";
 import { api } from "@/lib/api";
 
 /** «Replicar carrusel» (`src/replicar_viral/carrusel.py`): un carrusel viral
@@ -117,24 +118,27 @@ export function urlFotoCarrusel(
 
 export { conClave };
 
-/** Baja las fotos listas de un carrusel UNA A UNA y en orden (sin ZIP), para
- *  tenerlas ya en la galería en el orden de publicación. Va por la URL con
- *  `descargar=true` (no por blob), que es lo que sabe bajar la APK. Pausa
- *  entre una y otra: el navegador bloquea o desordena descargas seguidas.
- *  Devuelve cuántas bajó. */
-export async function descargarFotosCarrusel(id: string): Promise<number> {
+/** Baja las fotos listas de un carrusel EN ORDEN (sin ZIP), igual que las
+ *  tandas de vídeos: `bajarEnOrden` las trae enteras antes de guardarlas, así
+ *  el fichero 02 nunca se crea antes que el 01. Además el servidor les pone
+ *  fecha de captura seguida (`t` + n s) para que la galería, que ordena por
+ *  esa fecha, las deje en el orden del carrusel. Devuelve cuántas bajó. */
+export async function descargarFotosCarrusel(
+  id: string,
+  onProgreso?: (hechos: number, total: number) => void,
+): Promise<{ bajadas: number; fallidas: number }> {
   const doc = await api.get<CarruselReplica>(`${ROOT}/carrusel/${id}`);
   const listas = doc.diapositivas.filter((d) => d.tiene_imagen).sort((a, b) => a.n - b.n);
-  for (const [i, d] of listas.entries()) {
-    if (i) await new Promise((r) => setTimeout(r, 1200));
-    const a = document.createElement("a");
-    a.href = urlFotoCarrusel(id, d.n, "final", d.version, true);
-    a.download = "";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-  return listas.length;
+  const t = Math.floor(Date.now() / 1000);
+  const total = String(listas.length);
+  return bajarEnOrden(
+    listas.map((d, i) => ({
+      href: `${urlFotoCarrusel(id, d.n, "final", d.version, true)}&t=${t}`,
+      nombre: `carrusel_${id.slice(0, 6)}_${String(i + 1).padStart(2, "0")}de${total.padStart(2, "0")}.jpg`,
+    })),
+    onProgreso,
+    2,
+  );
 }
 
 export function urlZipCarrusel(id: string): string {
