@@ -12,6 +12,8 @@ dice a qué documento escribir cuando se pulsa un botón:
 - `mm|<carpeta>|<producto>`
 - `alea|<carpeta>|<producto>|<modo>`   (Moda Mujer · Aleatorios: el modo va
   en el id porque un producto puede tener vídeo de varios modos)
+- `rv|<id>`   («Replicar virales»: el MP4 ya montado de una réplica,
+  `src/replicar_viral/video.py`; va aparte de `todas()`)
 """
 
 from __future__ import annotations
@@ -364,3 +366,42 @@ def todas(usuario: str) -> tuple[list[dict], list[dict], list[dict]]:
         f2 = ex.submit(multimodo, usuario)
         f3 = ex.submit(aleatorios, usuario)
         return f1.result(), f2.result(), f3.result()
+
+
+# ---------------------------------------------------------------------------
+# Replicar virales (MP4 ya montado por el agente, `src/replicar_viral/video.py`)
+# ---------------------------------------------------------------------------
+def replicas_video(usuario: str) -> list[dict]:
+    """Una fila por réplica en vídeo. Los estados viven en el documento de la
+    réplica (`replicar_viral:<id>`). Va aparte de `todas()` porque esa tupla
+    la usan también otros (Multiplataforma)."""
+    from src.replicar_viral import video
+
+    filas = []
+    for d in video.listar(usuario):
+        if not d.get("video_path"):
+            continue
+        prod = d.get("producto") or {}
+        hashtags = " ".join(d.get("hashtags") or [])
+        caption = str(d.get("caption") or "")
+        if hashtags and hashtags not in caption:
+            caption = f"{caption} {hashtags}".strip()
+        filas.append(_fila(
+            id=f"rv{SEP}{d['id']}", nicho="rv", modo=str(d.get("modo") or ""),
+            modo_label=video.MODOS.get(d.get("modo") or "", d.get("modo") or ""),
+            source="replicar_viral", carpeta="", carpeta_label="🔁 Replicar virales",
+            producto=d["id"], catalogo="replicar_viral", catalogo_label="🔁 Replicar virales",
+            carpeta_corta=video.MODOS.get(d.get("modo") or "", ""),
+            titulo=_limpio(prod.get("titulo")), titulo_tiktok_completo=_limpio(prod.get("titulo")),
+            tienda=_limpio(prod.get("tienda")), caption=caption,
+            product_url=str(prod.get("product_url") or ""),
+            uploaded=bool(d.get("uploaded")), uploaded_at=_num(d.get("uploaded_at")),
+            sin_stock=bool(d.get("sin_stock")),
+            rehacer=bool(d.get("rehacer")), rehacer_nota=str(d.get("rehacer_nota") or ""),
+            rehecho=bool(d.get("rehecho")), puede_rehacer=True,
+            video_path=str(d.get("video_path") or ""),
+            video_listo_at=_num(d.get("video_listo_at")),
+            orden_at=_num(d.get("creado_at") or d.get("video_listo_at")),
+            formato=str(d.get("modo") or ""),
+        ))
+    return filas

@@ -60,6 +60,9 @@ de un carrusel de fotos: `replicar_carrusel` → fotos en Flow → `subir_imagen
 → `descargar_carrusel` (ZIP con el texto quemado); el producto puede darse de
 alta ahí mismo con `producto_carrusel`, y los carruseles listos salen en
 `mis_tandas(fotos=True)`.
+Un viral replicado y YA MONTADO por ti (con IA en Omni o sin IA, vídeo real):
+`guia("replicar-virales")` → deja el MP4 en la bandeja → `registrar_replica_video`
+→ sale solo en `mis_tandas` (id `rv|<id>`) → `semaforo_tanda`. Lista: `listar_replicas_video`.
 Resubir lo montado a Instagram/Facebook/Threads/Pinterest con enlace de
 afiliado (SHEIN/Amazon): `guia("multiplataforma")` → `productos_sin_enlace` →
 `guardar_enlace` → `encolar_tandas` → `cola_multiplataforma`. Esos enlaces
@@ -141,6 +144,7 @@ def guia(menu: str = "") -> str:
     Con `menu` (ver `menus`): el paso a paso de ese menú. `menu="multiplataforma"`:
     enlaces de afiliado y resubida a IG/FB/Threads/Pinterest. `menu="genjutsu"`:
     receta de virales con personajes Flow y Higgsfield (no ejecuta generaciones).
+    `menu="replicar-virales"`: registrar un viral replicado YA MONTADO (con o sin IA).
     Léelas antes de trabajar."""
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
@@ -150,9 +154,12 @@ def guia(menu: str = "") -> str:
         return _leer_guia("multiplataforma.md")
     if menu == "genjutsu":  # flujo externo: guía, sin crear un menú ni llamar al proveedor
         return _leer_guia("genjutsu-higgsfield.md")
+    if menu in ("replicar-virales", "replicar_virales"):  # MP4 montado fuera de la app
+        return _leer_guia("replicar-virales.md")
     m = menus.MENUS.get(menu)
     if not m:
-        raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}, multiplataforma, genjutsu.")
+        raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}, multiplataforma, genjutsu, "
+                       "replicar-virales.")
     return _leer_guia(f"{m.guia}.md")
 
 
@@ -742,6 +749,79 @@ async def replicar_viral(ctx: Context, catalogo: str, carpeta: str, producto: st
         raise ErrorApp("Falta `url` (enlace de TikTok) o `archivo_id`.")
     r = await api._pedir("POST", "/api/v1/replicar-viral/analizar", data=datos)
     return _json(r.json())
+
+
+def _enlaces_replica_video(u: str, r: dict) -> dict:
+    from urllib.parse import quote
+
+    r["descargar"] = archivos.enlace_interno(
+        u, f"/api/v1/replicar-viral/video/{quote(str(r.get('id', '')), safe='')}/mp4?descargar=true")
+    return r
+
+
+@_herramienta(structured_output=False)
+async def registrar_replica_video(
+    ctx: Context, modo: str, titulo: str = "", ruta_bandeja: str = "", archivo_id: str = "",
+    url: str = "", url_viral: str = "", product_id: str = "", product_url: str = "",
+    tienda: str = "", caption: str = "", hashtags: list[str] | None = None,
+    prompts: list[str] | None = None, notas: str = "", replica_id: str = "", para: str = "",
+) -> str:
+    """Registra el MP4 YA MONTADO de un viral replicado («Replicar virales»):
+    sale solo en `mis_tandas` (id `rv|<id>`) con descargar, subido, sin stock,
+    rehacer, semáforo y época. `modo`: `con_ia` (clips de Omni/GenAI Pro) o
+    `sin_ia` (vídeo real o montaje sin IA). UNA fuente del vídeo:
+    `ruta_bandeja` (relativa a tu bandeja `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`,
+    lo recomendable: no se sube nada), `archivo_id` (subido a /subir) o `url`.
+    `titulo` = nombre del producto (obligatorio, el mismo que va quemado en el
+    vídeo) y `product_id` o `product_url` de TikTok Shop (con uno basta).
+    Opcionales: `url_viral` (el TikTok original), `tienda`, `caption`,
+    `hashtags`, `prompts` (los que usaste en Omni, para poder rehacerlo), `notas`.
+    `replica_id`: REEMPLAZA el vídeo de esa réplica (rehecha tras un 🔴): sale
+    de su tanda y entra en una nueva. `para`: otro usuario (solo admin).
+    Antes: el MP4 cumple la guía (`guia("replicar-virales")`): encuadre
+    anti-marca, rótulo con gancho + nombre del producto, metadatos limpios."""
+    u = _usuario(ctx)
+    campos = {"modo": modo, "titulo": titulo, "url_viral": url_viral, "product_id": product_id,
+              "product_url": product_url, "tienda": tienda, "caption": caption, "notas": notas,
+              "replica_id": replica_id, "para": para}
+    if ruta_bandeja and not (archivo_id or url):
+        r = await Interno(u).post("/api/v1/replicar-viral/video/bandeja",
+                                  {"ruta": ruta_bandeja, **campos, "hashtags": hashtags or [],
+                                   "prompts": prompts or []})
+        return _json(_enlaces_replica_video(u, r))
+    contenido, nombre = await archivos.leer_origen(u, url=url, archivo_id=archivo_id,
+                                                   ruta_bandeja=ruta_bandeja)
+    if not archivos.es_video(nombre, contenido):
+        raise ErrorApp("Eso no es un vídeo: aquí va el MP4 montado.")
+    datos = {**campos, "hashtags": json.dumps(hashtags or [], ensure_ascii=False),
+             "prompts": json.dumps(prompts or [], ensure_ascii=False)}
+    r = await Interno(u).post_form("/api/v1/replicar-viral/video", datos,
+                                   (nombre or "replica.mp4", contenido, "video/mp4"))
+    return _json(_enlaces_replica_video(u, r))
+
+
+@_herramienta(structured_output=False)
+async def listar_replicas_video(ctx: Context, modo: str = "", id: str = "") -> str:
+    """Las réplicas en vídeo registradas (lo último primero), con su estado
+    (subido, sin stock, rehacer + nota), `id_tandas` (el id en `mis_tandas`
+    para `semaforo_tanda`/`marcar_tanda`/`epoca_video`) y `descargar`.
+    `modo`: con_ia | sin_ia. Con `id`: esa réplica entera, con sus `prompts`."""
+    u = _usuario(ctx)
+    api = Interno(u)
+    if id:
+        return _json(_enlaces_replica_video(u, await api.get(f"/api/v1/replicar-viral/video/{id}")))
+    d = await api.get("/api/v1/replicar-viral/video", modo=modo)
+    d["items"] = [_enlaces_replica_video(u, r) for r in d.get("items", [])]
+    return _json(d)
+
+
+@_herramienta(structured_output=False)
+async def borrar_replica_video(ctx: Context, id: str, confirmar: bool = False) -> str:
+    """Borra una réplica en vídeo y su MP4 (sale de Mis tandas). Solo si el
+    operador lo pide: llama con `confirmar=True`."""
+    if not confirmar:
+        raise ErrorApp("Borra el MP4 del Drive: repite con confirmar=True solo si el operador lo ha pedido.")
+    return _json(await Interno(_usuario(ctx)).delete(f"/api/v1/replicar-viral/video/{id}"))
 
 
 def _enlaces_carrusel(u: str, doc: dict) -> dict:

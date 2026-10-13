@@ -174,3 +174,34 @@ def test_guias_publicas_y_sin_salirse(app_client):
 def test_todas_las_guias_del_menu_existen():
     for m in menus.MENUS.values():
         assert (config.GUIAS_DIR / f"{m.guia}.md").is_file(), m.guia
+
+
+def test_registrar_replica_video_desde_la_bandeja(app_client, usuarios, tmp_path, monkeypatch):
+    """`registrar_replica_video` con `ruta_bandeja`: el MP4 no se sube, se
+    copia de la bandeja al Drive y sale en `listar_replicas_video`."""
+    from src.replicar_viral import servicio, video
+    from tests.replicar_viral.test_video import MP4, FakeRedis
+
+    r = FakeRedis()
+    monkeypatch.setattr(servicio, "_redis", lambda: r)
+    monkeypatch.setattr(video, "_raiz", lambda: tmp_path / "drive")
+    monkeypatch.setenv("AGENTE_BANDEJA_DIR", str(tmp_path / "bandeja"))
+    (config.bandeja_dir("ness") / "replicas").mkdir(parents=True, exist_ok=True)
+    (config.bandeja_dir("ness") / "replicas" / "final.mp4").write_bytes(MP4)
+
+    url = f"/api/mcp/{config.token_de('ness')}"
+    res = _rpc(app_client, url, "tools/call", {"name": "registrar_replica_video", "arguments": {
+        "modo": "con_ia", "titulo": "Lámpara LED", "ruta_bandeja": "replicas/final.mp4",
+        "product_url": "https://www.tiktok.com/view/product/1729123456789",
+        "prompts": ["clip 1", "clip 2"]}})
+    assert not res.get("isError"), res
+    doc = json.loads(res["content"][0]["text"])
+    assert doc["id_tandas"] == f"rv|{doc['id']}" and "descargar" in doc
+    assert (tmp_path / "drive" / "ness" / f"{doc['id']}.mp4").read_bytes() == MP4
+
+    res = _rpc(app_client, url, "tools/call", {"name": "registrar_replica_video", "arguments": {
+        "modo": "con_ia", "titulo": "X", "ruta_bandeja": "../../fuera.mp4"}})
+    assert res["isError"] and "fuera de tu bandeja" in res["content"][0]["text"]
+
+    res = _rpc(app_client, url, "tools/call", {"name": "listar_replicas_video", "arguments": {}})
+    assert [i["id"] for i in json.loads(res["content"][0]["text"])["items"]] == [doc["id"]]

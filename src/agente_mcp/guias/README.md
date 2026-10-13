@@ -58,6 +58,7 @@ en la raíz del repo.
 |---|---|---|
 | **Mis tandas** (vídeos montados de todos los nichos, para publicar; no se sube nada) | `/tiktok-shop-ai-pro/mis-tandas` | [`mis-tandas.md`](mis-tandas.md) |
 | **Replicar viral** (copiar la fórmula de un viral con un producto nuestro; MCP `replicar_viral`) | — | [`replicar-viral.md`](replicar-viral.md) |
+| **Replicar virales** (MP4 de un viral replicado y YA MONTADO, con IA en Omni o sin IA; sale en Mis tandas como `rv|<id>`; MCP `registrar_replica_video`) | `/tiktok-shop-ai-pro/replicar-virales` | [`replicar-virales.md`](replicar-virales.md) |
 | **Replicar carrusel** (copiar un carrusel de fotos viral: texto + prompt de Flow por diapositiva, texto quemado y ZIP; MCP `replicar_carrusel`) | `/tiktok-shop-ai-pro/replicar-carrusel` | [`replicar-carrusel.md`](replicar-carrusel.md) |
 | **Multiplataforma** (enlaces de afiliado SHEIN/Amazon por producto y resubida de Mis tandas a IG/FB/Threads/Pinterest; sin pantalla, solo MCP con token de admin; los enlaces NUNCA en TikTok) | — | [`multiplataforma.md`](multiplataforma.md) |
 | POV BOF Largo | `/tiktok-shop-ai-pro/pov-bof-largo` | [`pov-bof-largo.md`](pov-bof-largo.md) · recetas: [`pov-bof-largo-recetas.md`](pov-bof-largo-recetas.md) |

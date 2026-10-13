@@ -31,6 +31,8 @@ NICHOS: dict[str, dict[str, str]] = {
     "largo": {"label": "POV BOF Largo", "hashtags": "pov-bof-largo", "pantalla": "/tiktok-shop-ai-pro/pov-bof-largo"},
     "mm": {"label": "Multimodo", "hashtags": "nicho-ropa-mujer", "pantalla": "/tiktok-shop-ai-pro/moda-mujer-multimodo"},
     "alea": {"label": "Moda Mujer · Aleatorios", "hashtags": "nicho-ropa-mujer", "pantalla": "/tiktok-shop-ai-pro/nicho-ropa-mujer"},
+    # MP4 ya montado por el agente: los hashtags van en su propio caption.
+    "rv": {"label": "Replicar virales", "hashtags": "", "pantalla": "/tiktok-shop-ai-pro/replicar-virales"},
 }
 
 # Los de Moda Mujer · Aleatorios (hablan: Tienda Colores, Calle Dividido) se

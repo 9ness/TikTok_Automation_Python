@@ -8,7 +8,8 @@
 
 Es la lista de **vídeos ya montados** del usuario, de **todos sus nichos**
 (POV BOF, POV BOF Largo en cualquiera de sus modos, Moda Mujer · Multimodo y
-Moda Mujer · Aleatorios —Tienda Colores, Calle Dividido…—),
+Moda Mujer · Aleatorios —Tienda Colores, Calle Dividido…— y los MP4 de
+«Replicar virales»),
 de **diez en diez** y en el orden en que toca publicarlos. Cada tanda abierta
 lleva una **fecha orientativa** (una tanda al día; si hoy ya hay 8 subidos,
 empieza mañana) y su **época** («🍂 Otoño», «🎃 Halloween», «❄️ Invierno ·
@@ -195,6 +196,16 @@ imagen: pide la pantalla APAGADA y que no se encienda nada.
   desde la sanción del 10/10/2026). En ellas las tandas son solo de hablados, de
   6 al día, y los mudos sin subir salen en «📘 Solo Meta» (`solo_meta`). No se
   ocultan ni se borran: van a Meta. Cada vídeo trae `habla`.
+
+## Replicar virales (id `rv|<id>`)
+
+Los MP4 de virales replicados y montados fuera de la app (con IA en Omni o sin
+IA) que se registran con `registrar_replica_video` (guía
+[`replicar-virales.md`](replicar-virales.md)). Entran **al final**, como lo
+nuevo. Subido, sin stock y rehacer se guardan en el documento de la réplica
+(`replicar_viral:<id>`), y para rehacer se vuelve a registrar con
+`replica_id`. La miniatura es un fotograma del vídeo y el caption lleva sus
+propios hashtags.
 
 ## Lo que no entra (todavía)
 

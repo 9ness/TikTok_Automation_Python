@@ -75,9 +75,11 @@ def _intercalar(ids: list[str], por_id: dict[str, dict], nuevos: list[str]) -> l
     return salida + cola
 
 
-def _ordenar(usuario: str, pov: list[dict], mm: list[dict], alea: list[dict] | None = None) -> list[dict]:
+def _ordenar(usuario: str, pov: list[dict], mm: list[dict], alea: list[dict] | None = None,
+             rv: list[dict] | None = None) -> list[dict]:
     alea = alea or []
-    por_id = {f["id"]: f for f in pov + mm + alea}
+    rv = rv or []
+    por_id = {f["id"]: f for f in pov + mm + alea + rv}
     r = _redis()
     clave = config.ORDEN_KEY.format(usuario=usuario or "ness")
     guardado = (r.get_json(clave) or {}).get("claves") or [] if r.is_available() else []
@@ -91,6 +93,8 @@ def _ordenar(usuario: str, pov: list[dict], mm: list[dict], alea: list[dict] | N
     alea_subidos = sorted((f for f in nuevos_alea if f["uploaded"]), key=_clave_orden)
     alea_pend = sorted((f for f in nuevos_alea if not f["uploaded"]), key=_clave_orden)
     nuevos = _mezclar(alea_subidos, nuevos) if alea_subidos else nuevos
+    # Replicar virales: lo nuevo, al final (por cuándo se registró).
+    nuevos += sorted((f for f in rv if f["id"] not in conocidos), key=_clave_orden)
     ids = _intercalar(guardado + [f["id"] for f in nuevos], por_id, [f["id"] for f in alea_pend])
     if (nuevos or alea_pend) and r.is_available():
         r.set_json(clave, {"claves": ids, "updated_at": time.time()})
@@ -107,7 +111,11 @@ def filas(usuario: str, fresco: bool = False) -> list[dict]:
         if c and not fresco and ahora - c[0] < config.CACHE_S:
             return c[1]
     pov, mm, alea = fuentes.todas(usuario)
-    ordenadas = _ordenar(usuario, pov, mm, alea)
+    try:
+        rv = fuentes.replicas_video(usuario)
+    except Exception:  # noqa: BLE001 — una fuente rota no tumba las tandas
+        rv = []
+    ordenadas = _ordenar(usuario, pov, mm, alea, rv)
     with _cerrojo:
         _cache[usuario] = (time.time(), ordenadas)
     return ordenadas
@@ -669,6 +677,8 @@ def _partes(id_: str) -> list[str]:
         return p
     if p[0] == "alea" and len(p) == 4:
         return p
+    if p[0] == "rv" and len(p) == 2:
+        return p
     raise ErrorTanda(f"Vídeo desconocido: {id_!r}")
 
 
@@ -693,7 +703,14 @@ def marcar(
     # crearía un documento nuevo en el nicho (los repos hacen upsert).
     _fila_de(usuario, id_)
     cambios: dict = {}
-    if p[0] == "pov":
+    if p[0] == "rv":
+        from src.replicar_viral import video as rv_video
+
+        cambios = rv_video.marcar(usuario, p[1], uploaded=uploaded, sin_stock=sin_stock,
+                                  rehacer=rehacer, rehacer_nota=rehacer_nota)
+        if uploaded is not None:
+            _cuota(f"replicar_viral|{p[1]}", usuario, bool(uploaded))
+    elif p[0] == "pov":
         _, fuente, carpeta, prod = p
         from src.nicho_pov_bof.repos import product_repo as pov_repo
 
@@ -878,7 +895,7 @@ def _limpiar_cache(dias: int = 10) -> None:
 def _precalentar(usuario: str, lista: list[dict]) -> None:
     """Deja preparados, en segundo plano, los vídeos y las fotos de las
     próximas tandas: al abrirlas ya salen del disco."""
-    sin_foto = [f for f in lista if ("foto|" + f["id"]) not in _calentando]
+    sin_foto = [f for f in lista if f["nicho"] != "rv" and ("foto|" + f["id"]) not in _calentando]
     if sin_foto:
         _calentando.update("foto|" + f["id"] for f in sin_foto)
 
@@ -897,7 +914,7 @@ def _precalentar(usuario: str, lista: list[dict]) -> None:
                     _calentando.discard("foto|" + f["id"])
 
         threading.Thread(target=_fotos, daemon=True).start()
-    pendientes = [f for f in lista if f["nicho"] in ("pov", "largo") and f["id"] not in _calentando]
+    pendientes = [f for f in lista if f["nicho"] in ("pov", "largo", "rv") and f["id"] not in _calentando]
     mm = [f["video_path"] for f in lista if f["nicho"] in ("mm", "alea") and f["video_path"]]
     if mm:
         try:
@@ -995,6 +1012,20 @@ def foto(usuario: str, id_: str, ancho: int = 96) -> Path:
     from src.nicho_pov_bof.services import drive_client
 
     f = _fila_de(usuario, id_)
+    if f["nicho"] == "rv":
+        # Sin foto limpia de catálogo: un fotograma del propio vídeo.
+        from src.replicar_viral import video as rv_video
+
+        p = rv_video.fotograma({"id": f["producto"], "video_path": f["video_path"],
+                                "video_listo_at": f["video_listo_at"]})
+        if not p:
+            raise ErrorTanda("Este vídeo no tiene miniatura.", status=404)
+        try:
+            from src.nicho_pov_bof.services import thumbs
+
+            return thumbs.miniatura(p, ancho) or p
+        except Exception:  # noqa: BLE001
+            return p
     file_id = _resolver_fotos([f]).get(_clave_foto(f), "")
     if not file_id:
         raise ErrorTanda("Este producto no tiene foto limpia.", status=404)

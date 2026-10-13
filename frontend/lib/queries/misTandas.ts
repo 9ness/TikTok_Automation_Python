@@ -11,7 +11,7 @@ const ROOT = "/api/v1/mis-tandas";
  *  escribe cada botón (ver `src/mis_tandas/fuentes.py`). */
 export interface VideoTanda {
   id: string;
-  nicho: "pov" | "largo" | "mm" | "alea";
+  nicho: "pov" | "largo" | "mm" | "alea" | "rv";
   nicho_label: string;
   hashtags_nicho: string;
   pantalla: string;

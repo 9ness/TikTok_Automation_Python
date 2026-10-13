@@ -18,6 +18,7 @@ export const COLOR_NICHO: Record<string, string> = {
   largo: "bg-violet-500/25 text-violet-700 dark:text-violet-300",
   mm: "bg-pink-500/25 text-pink-700 dark:text-pink-300",
   alea: "bg-rose-500/25 text-rose-700 dark:text-rose-300",
+  rv: "bg-teal-500/25 text-teal-700 dark:text-teal-300",
 };
 
 export const NOMBRE_NICHO: Record<string, string> = {
@@ -25,6 +26,7 @@ export const NOMBRE_NICHO: Record<string, string> = {
   largo: "POV Largo",
   mm: "Moda Mujer",
   alea: "Moda Aleatorios",
+  rv: "Replicar virales",
 };
 
 /** Estilos de guion del POV BOF Largo. */
@@ -61,12 +63,19 @@ const MODOS_ALEA: Record<string, string> = {
   calle_dividido: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
 };
 
+/** Modos de «Replicar virales» (MP4 ya montado por el agente). */
+export const MODOS_RV: Record<string, string> = {
+  con_ia: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  sin_ia: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+};
+
 const NEUTRO = "bg-muted text-muted-foreground";
 
 export function colorModo(nicho: string, modo: string): string {
   if (nicho === "largo") return ESTILOS_LARGO[modo] ?? NEUTRO;
   if (nicho === "mm") return FAMILIAS_MM.find(([p]) => modo.startsWith(p))?.[2] ?? NEUTRO;
   if (nicho === "alea") return MODOS_ALEA[modo] ?? NEUTRO;
+  if (nicho === "rv") return MODOS_RV[modo] ?? NEUTRO;
   return NEUTRO;
 }
 
@@ -75,6 +84,7 @@ export function familiaModo(nicho: string, modo: string, modoLabel: string) {
   if (nicho === "pov") return { clave: "pov", label: "POV BOF", color: COLOR_NICHO.pov ?? NEUTRO };
   if (nicho === "largo") return { clave: `largo|${modo}`, label: `Largo · ${modoLabel}`, color: colorModo(nicho, modo) };
   if (nicho === "alea") return { clave: `alea|${modo}`, label: modoLabel || modo, color: colorModo(nicho, modo) };
+  if (nicho === "rv") return { clave: `rv|${modo}`, label: `Réplica · ${modoLabel || modo}`, color: colorModo(nicho, modo) };
   const f = FAMILIAS_MM.find(([p]) => modo.startsWith(p));
   return f
     ? { clave: `mm|${f[1]}`, label: f[1], color: f[2] }
@@ -97,6 +107,7 @@ const CATALOGOS: [string, string][] = [
   ["temporada_q4", "border-red-500/70 text-red-600 dark:text-red-400"],
   ["carruseles_virales", "border-violet-500/60 text-violet-700 dark:text-violet-300"],
   ["aleatorios", "border-zinc-400/70 text-zinc-600 dark:text-zinc-300"],
+  ["replicar_viral", "border-teal-500/60 text-teal-700 dark:text-teal-300"],
 ];
 
 export function colorCatalogo(catalogo: string): string {

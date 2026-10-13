@@ -14,13 +14,32 @@ from fastapi.responses import FileResponse, Response
 
 from src.api.dependencies import get_current_user, get_web_user
 from src.api.exceptions import APIError
-from src.replicar_viral import carrusel, catalogo, servicio
+from pydantic import BaseModel, Field
+
+from src.replicar_viral import carrusel, catalogo, servicio, video
 
 router = APIRouter(
     prefix="/api/v1/replicar-viral",
     tags=["tiktok-shop-ai-pro · replicar viral"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+def _texto_a_lista(x: str) -> list[str]:
+    """`prompts`/`hashtags` del formulario: JSON (lista) o texto, uno por línea."""
+    import json
+
+    x = (x or "").strip()
+    if not x:
+        return []
+    if x.startswith("["):
+        try:
+            v = json.loads(x)
+            if isinstance(v, list):
+                return [str(i) for i in v]
+        except ValueError:
+            pass
+    return [linea for linea in x.splitlines() if linea.strip()]
 
 
 def _error(e: Exception) -> APIError:
@@ -60,6 +79,133 @@ def analizar(
 def listar(tipo: str = "", usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
     """Las últimas réplicas del usuario (resumen). `tipo`: video | carrusel."""
     return {"items": servicio.lista(usuario, tipo)}
+
+
+# ---------------------------------------------------------------------------
+# Vídeo YA MONTADO («Replicar virales», `src/replicar_viral/video.py`): sale
+# solo en Mis tandas como `rv|<id>`. Van ANTES de `/{id_}`.
+# ---------------------------------------------------------------------------
+@router.post("/video")
+def video_subir(
+    file: Annotated[UploadFile, File()],
+    modo: Annotated[str, Form()] = "",
+    titulo: Annotated[str, Form()] = "",
+    url_viral: Annotated[str, Form()] = "",
+    product_id: Annotated[str, Form()] = "",
+    product_url: Annotated[str, Form()] = "",
+    tienda: Annotated[str, Form()] = "",
+    caption: Annotated[str, Form()] = "",
+    hashtags: Annotated[str, Form()] = "",
+    prompts: Annotated[str, Form()] = "",
+    notas: Annotated[str, Form()] = "",
+    replica_id: Annotated[str, Form()] = "",
+    para: Annotated[str, Form()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Alta del MP4 montado de una réplica (`modo` con_ia | sin_ia). Con
+    `replica_id` reemplaza el vídeo de esa réplica (rehecho). `para`: otro
+    usuario (solo admin). `hashtags`/`prompts`: JSON o uno por línea."""
+    tmp = Path(tempfile.mkdtemp(prefix="replica_video_"))
+    try:
+        fichero = tmp / "subido.mp4"
+        with open(fichero, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+        doc = video.registrar(
+            carrusel.destino(usuario, para), modo=modo, origen=fichero, titulo=titulo,
+            url_viral=url_viral, product_id=product_id, product_url=product_url, tienda=tienda,
+            caption=caption, hashtags=_texto_a_lista(hashtags), prompts=_texto_a_lista(prompts),
+            notas=notas, replica_id=replica_id,
+        )
+        return video.resumen(doc)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+class VideoBandejaRequest(BaseModel):
+    ruta: str
+    modo: str = ""
+    titulo: str = ""
+    url_viral: str = ""
+    product_id: str = ""
+    product_url: str = ""
+    tienda: str = ""
+    caption: str = ""
+    hashtags: list[str] = Field(default_factory=list)
+    prompts: list[str] = Field(default_factory=list)
+    notas: str = ""
+    replica_id: str = ""
+    para: str = ""
+
+
+@router.post("/video/bandeja")
+def video_bandeja(body: VideoBandejaRequest, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Como `POST /video` pero el MP4 lo coge de la bandeja del agente
+    (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<ruta>`) de quien llama, sin subirlo."""
+    try:
+        origen = video.ruta_bandeja(usuario, body.ruta)
+        doc = video.registrar(
+            carrusel.destino(usuario, body.para), modo=body.modo, origen=origen, titulo=body.titulo,
+            url_viral=body.url_viral, product_id=body.product_id, product_url=body.product_url,
+            tienda=body.tienda, caption=body.caption, hashtags=body.hashtags, prompts=body.prompts,
+            notas=body.notas, replica_id=body.replica_id,
+        )
+        return video.resumen(doc)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.get("/video")
+def video_listar(modo: str = "", usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Las réplicas en vídeo del usuario (lo último primero)."""
+    try:
+        return {"modos": video.MODOS, "items": [video.resumen(d) for d in video.listar(usuario, modo)]}
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.get("/video/{id_}")
+def video_ver(id_: str, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    try:
+        doc = video.ver(usuario, id_)
+        return {**video.resumen(doc), "prompts": doc.get("prompts") or []}
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.get("/video/{id_}/mp4")
+def video_mp4(id_: str, descargar: bool = False,
+              usuario: Annotated[str, Depends(get_web_user)] = "") -> FileResponse:
+    try:
+        doc = video.ver(usuario, id_)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+    p = Path(doc.get("video_path") or "")
+    if not p.is_file():
+        raise APIError("El vídeo ya no está en el Drive.", status_code=404)
+    nombre = None
+    if descargar:
+        base = video_nombre(doc)
+        nombre = f"{base}.mp4"
+    return FileResponse(p, media_type="video/mp4", filename=nombre,
+                        headers={"Cache-Control": "private, max-age=60"})
+
+
+def video_nombre(doc: dict) -> str:
+    import re
+
+    titulo = (doc.get("producto") or {}).get("titulo", "") or "replica"
+    return "replica_" + (re.sub(r"[^A-Za-z0-9]+", "_", titulo).strip("_")[:40] or "video") + f"_{doc.get('id', '')}"
+
+
+@router.delete("/video/{id_}")
+def video_borrar(id_: str, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Borra la réplica y su MP4 (sale también de Mis tandas)."""
+    try:
+        return video.borrar(usuario, id_)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
 
 
 # ---------------------------------------------------------------------------
