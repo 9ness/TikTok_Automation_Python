@@ -36,6 +36,8 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Callable
 
+from src.nicho_pov_bof import config as pov_config
+
 OnLog = Callable[[str], None]
 _noop: OnLog = lambda _m: None
 
@@ -215,7 +217,7 @@ def montar(
             "-vf", (
                 f"scale={ANCHO}:{ALTO}:force_original_aspect_ratio=decrease,"
                 f"pad={ANCHO}:{ALTO}:(ow-iw)/2:(oh-ih)/2:color=black,"
-                f"fps={FPS},setsar=1"
+                f"fps={FPS},setsar=1{pov_config.acabado_4k()}"
             ),
             "-c:v", "libx264", "-preset", "medium", "-crf", "18",
             "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",

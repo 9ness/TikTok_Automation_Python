@@ -755,9 +755,25 @@ def nombre_video(
     return " ".join(x for x in partes if x) + ".mp4"
 
 
+# Acabado tipo filtro «4K» de CapCut (tutorial Genjutsu, 13/10/2026): quita el
+# velo blanquecino del vídeo de IA (negros a su sitio + algo de contraste) y da
+# nitidez. Es apariencia, no resolución. Medido sobre clips Omni: con más
+# `unsharp` ya se marcan las baldosas y la piel. Se enciende con FILTRO_4K=1.
+FILTRO_4K = os.getenv("FILTRO_4K", "0") == "1"
+ACABADO_4K = (
+    "hqdn3d=1.2:1.2:3:3,colorlevels=rimin=0.03:gimin=0.03:bimin=0.03,"
+    "eq=contrast=1.05:saturation=1.08:gamma=0.98,unsharp=5:5:0.55:3:3:0"
+)
+
+
+def acabado_4k(acabado: bool | None = None) -> str:
+    """El trozo de cadena del acabado («,…» o "") para pegar tras el encuadre."""
+    return f",{ACABADO_4K}" if (FILTRO_4K if acabado is None else acabado) else ""
+
+
 def filtro_encuadre(
     w: int = TARGET_W, h: int = TARGET_H, fps: int = TARGET_FPS,
-    *, zoom: float | None = None, esquina: str = "",
+    *, zoom: float | None = None, esquina: str = "", acabado: bool | None = None,
 ) -> str:
     """Cadena de filtros ffmpeg que encuadra a `w`x`h` y se come la marca.
 
@@ -772,7 +788,7 @@ def filtro_encuadre(
     if zoom <= 1.0:
         return (
             f"scale={w}:{h}:force_original_aspect_ratio=increase,"
-            f"crop={w}:{h},fps={fps},setsar=1"
+            f"crop={w}:{h},fps={fps},setsar=1{acabado_4k(acabado)}"
         )
     zw, zh = _par(w * zoom), _par(h * zoom)
     dx, dy = (zw - w) // 2, (zh - h) // 2
@@ -784,7 +800,7 @@ def filtro_encuadre(
     y = rf"max(0\,(in_h-out_h)/2{corre_y:+d})" if corre_y else "(in_h-out_h)/2"
     return (
         f"scale={zw}:{zh}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h}:{x}:{y},fps={fps},setsar=1"
+        f"crop={w}:{h}:{x}:{y},fps={fps},setsar=1{acabado_4k(acabado)}"
     )
 
 # Zonas seguras de TikTok — mismas que el resto del proyecto
