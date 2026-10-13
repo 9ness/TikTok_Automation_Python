@@ -149,3 +149,34 @@ def test_dry_run_sin_tokens(replica, cuenta, sin_red):
     pub = publicaciones_repo.get(inf["publicacion"]["id"])
     publicador.publicar_pendientes(pub.programada_en + 1, http=sin_red, sleep=lambda s: None)
     assert set(publicaciones_repo.get(pub.id).estado.values()) == {config.ESTADO_SIMULADO}
+
+
+def test_cuenta_por_nicho():
+    assert carruseles.cuenta_para("Vestido largo de punto") == "ama_shop"
+    assert carruseles.cuenta_para("Botas altas mujer") == "ama_shop"
+    assert carruseles.cuenta_para("Chaqueta de hombre acolchada") == "viva_shop"
+    assert carruseles.cuenta_para("MIKOMIKA Espejo maquillaje luz LED") == "viva_salud"
+    assert carruseles.cuenta_para("Yommy Cama para perros acolchada") == "viva_shop"
+    assert carruseles.cuenta_para("Paraguas automático") == "viva_shop"
+    assert carruseles.cuenta_para("Aigostar Foco proyector LED con panel solar") == "viva_shop"
+    assert carruseles.cuenta_para("MIKOMIKA Cajas de zapatos plegables") == "viva_shop"
+
+
+def test_auto_encola_terminados_con_enlace(replica, cuenta, monkeypatch):
+    from src.replicar_viral import servicio
+
+    filas = [{"id": "abc123", "diapositivas": 3, "hechas": 3, "producto": replica["producto"]},
+             {"id": "medias", "diapositivas": 3, "hechas": 1, "producto": replica["producto"]},
+             {"id": "sinlink", "diapositivas": 2, "hechas": 2, "producto": {"titulo": "Lámpara LED", "tienda": "Y"}}]
+    monkeypatch.setattr(servicio, "lista", lambda u, t="": filas if u == "ness" else [])
+    from src.multiplataforma.services import tandas
+
+    key = tandas.producto_key({"titulo": "Paraguas automático", "tienda": "Tienda X"})
+    tandas.guardar_enlace("viva_shop", key, asin="B0HJB4SN2P", titulo="Paraguas automático")
+    inf = carruseles.auto_encolar_todas(ahora=AHORA)
+    assert [e["id"] for e in inf["encolados"]] == ["abc123"]
+    assert [e["id"] for e in inf["sin_enlace"]] == ["sinlink"]
+    assert carruseles.auto_encolar_todas(ahora=AHORA + 60) == {"motivo": "reciente"}
+    # una hora después no repite el ya encolado
+    inf = carruseles.auto_encolar_todas(ahora=AHORA + 3700)
+    assert inf["encolados"] == []

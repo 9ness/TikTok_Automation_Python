@@ -173,3 +173,71 @@ def encolar(slug: str, carrusel_id: str, *, usuario: str = "", asin: str = "", s
             "programada": dt.datetime.fromtimestamp(pub.programada_en, zoneinfo.ZoneInfo(config.ZONA_HORARIA))
             .strftime("%Y-%m-%d %H:%M"), "fotos": len(imagenes),
             "musica_sugerida": (doc.get("musica") or {}).get("meta") or {}}
+
+
+# ---------------------------------------------------------------------------
+# Programarlos solos (lo llama el tick)
+# ---------------------------------------------------------------------------
+_HOGAR = (r"\b(cajas?|organizador\w*|zapatero|estanter\w*|armario|foco|focos|proyector|panel|lampara|"
+          r"mesa|mueble|tocador|escritorio)\b")
+
+
+def cuenta_para(titulo: str, cuentas: dict[str, str] | None = None) -> str:
+    """La cuenta de Meta de un carrusel según el nicho del producto (misma
+    categoría que la página de enlaces): moda de mujer, belleza/salud o el resto."""
+    from src.multiplataforma.services import tandas as _t
+
+    cuentas = cuentas or config.CARRUSEL_CUENTAS
+    cat = _t.categoria_link(titulo)
+    t = tandas._norm(titulo)
+    if re.search(_HOGAR, t):  # «cajas de zapatos», «foco … solar»: son de casa
+        return cuentas["resto"]
+    if cat in config.CATEGORIAS_MODA and not re.search(r"\b(hombre|men|mens|masculin[oa])\b", t):
+        return cuentas["moda"]
+    if cat in config.CATEGORIAS_SALUD:
+        return cuentas["salud"]
+    return cuentas["resto"]
+
+
+def auto_encolar_todas(*, ahora: float | None = None, cada_s: int = 3600, log=lambda _: None) -> dict:
+    """Los carruseles TERMINADOS (todas las fotos) de los dueños de las cuentas
+    que aún no están en la cola de ninguna cuenta entran solos en la de su
+    nicho (`cuenta_para`), 1 al día a la hora «carrusel». Los que no tienen
+    enlace en esa cuenta se saltan y se listan en `sin_enlace` (sin enlace no
+    van a Meta): entran en cuanto se guarde (`guardar_enlace` / MCP)."""
+    from src.multiplataforma.repos import cuentas_repo, redis_base
+    from src.replicar_viral import servicio
+
+    ahora = time.time() if ahora is None else ahora
+    r = redis_base.get_redis()
+    marca = "auto_carruseles"
+    if ahora - float((r.get_json(marca) or {}).get("at") or 0) < cada_s:
+        return {"motivo": "reciente"}
+    r.set_json(marca, {"at": ahora})
+
+    activas = {c.slug: c for c in cuentas_repo.listar() if c.activa}
+    # una sola pasada por la cola (de_cuenta la lee entera en cada llamada)
+    ya = {p.carrusel_id for p in publicaciones_repo.todas(limite=10**6) if p.tipo == TIPO}
+    out: dict = {"encolados": [], "sin_enlace": [], "errores": []}
+    for dueno in sorted({c.dueno for c in activas.values() if c.dueno}):
+        for f in servicio.lista(dueno, TIPO):
+            if f["id"] in ya or not f.get("diapositivas") or f.get("hechas", 0) < f["diapositivas"]:
+                continue
+            prod = f.get("producto") or {}
+            titulo = " ".join(str(prod.get("titulo") or "").split())
+            slug = cuenta_para(titulo)
+            if slug not in activas:
+                continue
+            key = tandas.producto_key({"titulo": titulo, "tienda": prod.get("tienda", "")})
+            if not enlaces_repo.enlace_de(slug, key):
+                out["sin_enlace"].append({"id": f["id"], "cuenta": slug, "titulo": titulo[:60]})
+                continue
+            try:
+                res = encolar(slug, f["id"], usuario=dueno, ahora=ahora)
+            except Exception as e:  # noqa: BLE001 — uno roto no para el resto
+                out["errores"].append({"id": f["id"], "cuenta": slug, "error": str(e)})
+                continue
+            ya.add(f["id"])
+            out["encolados"].append({"id": f["id"], "cuenta": slug, "programada": res.get("programada", "")})
+            log(f"[auto_carruseles] {slug}: {titulo[:40]} → {res.get('programada', '')}")
+    return out

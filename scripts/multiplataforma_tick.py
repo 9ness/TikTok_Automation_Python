@@ -25,7 +25,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(RAIZ / ".env")
 
 from src.multiplataforma import publicador  # noqa: E402
-from src.multiplataforma.services import ingesta, tandas  # noqa: E402
+from src.multiplataforma.services import carruseles, ingesta, tandas  # noqa: E402
 
 
 def main() -> int:
@@ -41,6 +41,11 @@ def main() -> int:
         informe["ingesta"] = ingesta.ingestar_todas(log=print)
         # vídeos de producto recién subidos a TikTok con enlace → a la cola
         informe["auto_tandas"] = tandas.auto_encolar_todas(log=print)
+        # carruseles terminados en «Replicar carrusel» → a la cuenta de su nicho
+        try:
+            informe["auto_carruseles"] = carruseles.auto_encolar_todas(log=print)
+        except Exception as e:  # noqa: BLE001 — no parar la publicación por esto
+            informe["auto_carruseles"] = {"error": str(e)}
     informe["publicacion"] = publicador.publicar_pendientes(limite=args.limite, dry_run=dry, log=print)
     print(json.dumps(informe, ensure_ascii=False, indent=2, default=str))
     return 0

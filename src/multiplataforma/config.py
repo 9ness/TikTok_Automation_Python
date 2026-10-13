@@ -293,6 +293,14 @@ CATEGORIAS_LINKS: list[tuple[str, tuple[str, ...]]] = [
 ]
 CATEGORIA_OTROS = "✨ Otros"
 
+# Carruseles que se programan solos (`services/carruseles.auto_encolar_todas`):
+# a qué cuenta va cada nicho, por la categoría de arriba.
+CARRUSEL_CUENTAS: dict[str, str] = {"moda": "ama_shop", "salud": "viva_salud", "resto": "viva_shop"}
+CATEGORIAS_MODA: tuple[str, ...] = ("👢 Botas", "👟 Zapatos", "👜 Bolsos", "🧥 Abrigos y chaquetas", "👚 Conjuntos",
+                                    "👗 Vestidos y faldas", "👖 Pantalones", "🧶 Jerséis y sudaderas",
+                                    "👕 Camisetas y tops", "🧤 Accesorios")
+CATEGORIAS_SALUD: tuple[str, ...] = ("💄 Belleza", "🩺 Salud")
+
 
 def tema_links(slug: str) -> dict:
     return {**TEMA_DEFAULT, **TEMAS.get(slug, {})}

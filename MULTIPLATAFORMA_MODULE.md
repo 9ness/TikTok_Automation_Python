@@ -123,6 +123,13 @@ publican con `services/carruseles.py:encolar(slug, carrusel_id, asin|shein, capt
   no duplicar al reintentar.
 - Sin música: la API de Meta no la admite en fotos. La sugerida
   (`musica.meta` de la réplica) vuelve en la respuesta.
+- **Solos desde el tick** (`carruseles.auto_encolar_todas`, 1 vez/hora): los
+  carruseles TERMINADOS de los dueños de las cuentas que no están en ninguna
+  cola entran en la de su nicho (`cuenta_para` por `categoria_link`: moda
+  mujer → `ama_shop`, belleza/salud → `viva_salud`, resto → `viva_shop`;
+  `config.CARRUSEL_CUENTAS`). Los que no tienen enlace en esa cuenta salen en
+  `sin_enlace` del tick.log y entran en cuanto se guarde el enlace. IG no
+  deja programar por API: lo «programado» es la hora a la que el tick publica.
 
 ## Reglas del tick
 

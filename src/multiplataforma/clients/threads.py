@@ -51,7 +51,7 @@ class ThreadsClient(ClienteBase):
             self._esperar_contenedor(contenedor)
             post_id = self._publicar(user_id, contenedor)
         except ErrorPublicacion as e:
-            e.parcial = {**e.parcial, "container_id": contenedor}
+            e.parcial = {**e.parcial, "container_id": "" if e.descartar_contenedor else contenedor}
             raise
         return {"container_id": contenedor, "post_id": post_id, "dry_run": self.dry_run, "pasos": self.pasos}
 
@@ -77,8 +77,16 @@ class ThreadsClient(ClienteBase):
             j = self._request("GET", url, params={"fields": "status,error_message", "access_token": self.token})
             return j.get("status") or ""
 
-        self._esperar(consultar, ok=("FINISHED", "PUBLISHED"), malos=("ERROR", "EXPIRED"),
-                      que=f"contenedor {contenedor}")
+        try:
+            self._esperar(consultar, ok=("FINISHED", "PUBLISHED"), malos=("ERROR", "EXPIRED"),
+                          que=f"contenedor {contenedor}")
+        except ErrorPublicacion as e:
+            if not e.reintentable:
+                # Igual que en IG: Meta da ERROR pasajeros (12/10, botines de ama_shop).
+                # Se tira el contenedor y el siguiente tick crea otro.
+                e.reintentable = True
+                e.descartar_contenedor = True
+            raise
 
     def _publicar(self, user_id: str, contenedor: str) -> str:
         url = f"{self.base}/{user_id}/threads_publish"
@@ -137,7 +145,10 @@ class ThreadsClient(ClienteBase):
             self._esperar_contenedor(contenedor)
             post_id = self._publicar(user_id, contenedor)
         except ErrorPublicacion as e:
-            e.parcial = {**e.parcial, "children": hijos, **({"container_id": contenedor} if contenedor else {})}
+            if e.descartar_contenedor:  # los hijos también caducan: se empieza de cero
+                e.parcial = {**e.parcial, "children": [], "container_id": ""}
+            else:
+                e.parcial = {**e.parcial, "children": hijos, **({"container_id": contenedor} if contenedor else {})}
             raise
         return {"children": hijos, "container_id": contenedor, "post_id": post_id,
                 "dry_run": self.dry_run, "pasos": self.pasos}

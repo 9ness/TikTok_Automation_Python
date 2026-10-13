@@ -101,6 +101,11 @@ Un carrusel con TODAS sus fotos hechas se publica en IG/FB/Threads con
   programado de esa cuenta. Repetir la llamada no duplica.
 - IG recibe las fotos en un lienzo 4:5 (no admite 3:4 ni 9:16). La música no
   se puede poner por API: la respuesta trae la sugerida.
+- **No hace falta encolarlos a mano**: el tick, una vez por hora, programa
+  solo cada carrusel terminado en la cuenta de su nicho **si ya tiene enlace**
+  en esa cuenta. Tu trabajo es dejar el enlace (`encolar_carrusel` con
+  `asin`/`shein`, o el guardado de enlaces); los que faltan salen como
+  `sin_enlace` en `~/multiplataforma/tick.log`.
 
 ## Informe al terminar
 
