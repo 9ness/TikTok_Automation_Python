@@ -1,3 +1,28 @@
+## Pendiente
+
+### 🔁 Genjutsu de Higgsfield — cuenta NUEVA, calidad antes que volumen (13 oct 2026)
+
+**Decisión de Néstor:** en unos días tendrá una cuenta nueva para menos vídeos y mayor calidad. El encargo actual es dejar TODO el proceso a futuros agentes, no lanzar una tanda en ness/Ana ni comprar Higgsfield. [Receta completa](src/agente_mcp/guias/genjutsu-higgsfield.md) · [tutorial y nueve prompts literales](docs/clases/2026-10-13_tutorial_genjutsu_higgsfield.md).
+
+- [ ] 👤 Crear/autorizar la cuenta Higgsfield cuando corresponda y autenticar el MCP. **Ya registrado** en Claude Code del VPS como `higgsfield` (`https://mcp.higgsfield.ai/mcp`, scope user), **Needs authentication**; en Claude `/mcp` → Higgsfield → autenticar. El plugin de ChatGPT se encontró y se ofreció, pero no quedó conectado. Sin compras ni generación.
+- [ ] Cuando exista la cuenta nueva: registrar nombre/usuario destino, personaje aprobado, voz/idioma, productos exactos y frecuencia elegida; no copiar el ritmo ni la identidad de ness/Ana. No asumir carrito habilitado.
+- [ ] Antes de producir: preparar `PLAN.md` con ficha, referencia de 20–30 s, leyenda `@Imagen N`, personaje Flow y ruta de audio; acordar calidad real y gasto/intentos. 480p+filtro es el ahorro del curso, no el valor por defecto del encargo de mayor calidad.
+- [ ] Tras OAuth: descubrir schemas reales del MCP Higgsfield y comprobar uploads, cotización y estados sin lanzar una generación no autorizada. Genjutsu/Motion Transfer; promos Unlimited/free web no sirven en MCP/CLI/Plugin.
+- [ ] Si se quiere servir la receta desde la app pública: incluir este cambio en el despliegue habitual (`guia("genjutsu")` y guía pública); no se ha hecho push ni desplegado.
+- [ ] **Destino decidido (repaso 13/10):** la cuenta nueva es **Casca Chollos** (la piloto, sale del modo piloto ~19/10; publicar mejor a los 30 días, pero ir preparando vídeos). Réplicas virales de máxima calidad, de vídeos reales y de vídeos con IA, aunque sea sin el personaje. ness/Ana/Mauro NO cambian de formato. Memoria `estrategia-cuentas-tiktok`.
+- [ ] **Probar primero con Omni 1.1 (GenAI Pro, 1 crédito/clip)** antes de pagar Higgsfield (Plus 59 €/1.200 cr; ~60 vídeos 480p por 220 €): Higgsfield solo cuando un viral dé dinero. Jonny anunció tutorial de Omni para replicar vídeos HECHOS CON IA → analizarlo cuando salga.
+- [ ] **Menú + MCP «Replicar virales» con dos modos** (sin IA = vídeo real → transferencia/Omni; con IA = receta del próximo tutorial de Omni) que monte y deje el vídeo en **Mis tandas**, para un usuario nuevo de la app (tipo `nestor_viral`, nombre por decidir). Lo hará un agente → guía + MCP en el mismo cambio.
+- [ ] **Filtro «4K» de CapCut en nuestro editor**: es apariencia (quita el velo blanquecino del render IA), no resolución. Propuesta: paso opcional en `_normalize_resolution` (`nicho_pov_bof/pipeline/video_editor.py`) con `scale=…:flags=lanczos`, `hqdn3d` suave, `unsharp=5:5:0.5` y `eq=contrast=1.05:saturation=1.06:gamma=0.98`; probar con 3 clips Omni comparando con CapCut lado a lado antes de activarlo por defecto (y no pasarse: el «8K» suaviza la piel).
+- [ ] Solo si se decide integrarlo: entrada de transferencia continua con audio convertido en montaje/Mis tandas; verificar subtítulos del guion locutado, nombre y metadatos. El Largo descarta audio: no subir ahí un hablado esperando conservarlo. Cambios de prompts/schemas requieren autorización y sus tipos/docs/MCP.
+
+## 🚲 Bici eléctrica HillMiles MileCity1 (669 €, muestra gratuita) — vender 3 (13 oct 2026)
+- Alta: Muestras productos › Mis Productos 5 › nº 8. Textos extraídos; 5 guiones (dolor, precio, acción, épico, inversa) a 30 s = 3 clips de 10 s (Omni 1.1, GenAI Pro).
+- [x] 13/10 · Capturas (23) como fotos extra `8(2)…8(22)` + dossier en Drive `TIKTOK_SHOP_AI_PRO/_agente/ness/bici_hillmiles_milecity1/` (`FICHA_BICI_HILLMILES_MILECITY1.md` con specs, contradicciones ficha↔manual, objeciones e ideas de guiones reales; `manual_MileCity1.pdf`; `capturas/`).
+- [x] 13/10 · 5 guiones rehechos con la ficha completa (80 km, sin Nm, sin luz trasera, sin charcos).
+- [ ] CTA fija del curso: sigue diciendo «aplica tus cupones» (precio, dolor, inversa) y el subliminal «Han ajustado el precio» (inversa) — es el literal del curso, no se tocó; decidir con Néstor si se cambia.
+- [x] 13/10 · Fase IA: 15 imágenes Flow (otoño/invierno, escenas distintas) + 17 clips GenAI Pro (2 reintentos; 17 créditos) → 5 vídeos montados, uno por modo (imágenes y clips en `imagenes_ia/` y `clips_ia/` del dossier). Épico: la CTA repite «plazos».
+- [ ] Fase real (llega ~18 oct): grabaciones de Néstor + duelo vs su moto eléctrica de 3 ruedas (seguro obligatorio), tier list, POV trayecto. Formatos virales en §8 (bicis) y §9 del dossier (comparaciones tipo @hotdeals_1, «mío vs tuyo» con Néstor duplicado en trípode fijo: triciclo eléctrico vs MileCity1). Montar la pantalla partida con ffmpeg cuando grabe.
+
 ## 🎙️ Multimodo de Ana: retomar con HABLADOS hacia el 12 oct 2026
 - 8 oct (Néstor): al acabar los pendientes, Ana pasa a HABLADOS (más visitas) + Vintage bolso en el coche con música (un bolso le ha dado 6 ventas → hacerle varias versiones y buscar bolsos parecidos). Varias versiones por producto también en Ana (separación 2 días).
 - Margen al 6/10: 98 vídeos sin subir (≈10 días a 10/día), pero solo 25 hablados. Néstor: los hablados (20 s, voz Fish) le dan más visitas; de los mudos de 10 s solo funcionan algo bolsos y botas.
@@ -614,6 +639,8 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] (13/10/2026) **Receta Genjutsu para futuros agentes de la cuenta nueva**: producto, personajes/variantes Flow, nueve prompts literales (incluido «vistela con ropa negra de gym y gorra», Nano Banana Pro/×1), leyenda de referencias, MCP oficial registrado sin OAuth, voz/edición/revisión y relevo; `guia("genjutsu")` + índices/AGENTS. 15 tests MCP pasan; sin compras, generaciones, publicación ni despliegue.
+- [x] (13/10/2026) **Tutorial Genjutsu de Higgsfield analizado**: flujo, prompts de Skool y pantalla, consejos, costes y encaje con Replicar viral/Largo/UGC/Ana; [documento](docs/clases/2026-10-13_tutorial_genjutsu_higgsfield.md). Sin compras, generaciones, cambios de código ni push.
 - [x] (6/10/2026) **Moda Mujer · Aleatorios con «rehacer»** en Mis tandas: es del VÍDEO (`modos.<modo>.rehacer` del doc personal de la prenda), lo marcan el botón y el 🔴 del semáforo, sale en `para_rehacer(menu="moda_mujer")` y se quita al montar el vídeo nuevo (conserva el puesto). Falta, tras desplegar, marcar los 5 rojos de Ana de Tienda Colores (Carpeta_13 · 3/4/9/10, Carpeta_14 · 5).
 - [x] (6/10/2026) **Mitigar saturación de memoria del VPS**: +2 GiB de swap temporal, sin cerrar chats ni reiniciar servicios; verificados web/API y salud pública de chats. Sin cambios persistentes en fstab; carga desde el dispositivo del operador pendiente de su comprobación.
 - [x] (3/10/2026) **Mis tandas — dos errores del operador**: (1) «Tanda completada» marcaba SUBIDOS los vídeos sin subir → ahora solo cierra la tanda; (2) marcar sin stock/subido metía un vídeo de la tanda siguiente en la actual → las tandas vistas quedan fijadas (`mis_tandas:fijas:<u>`): solo sale un vídeo rehecho (a una tanda nueva) y solo «Tanda completada» cierra.

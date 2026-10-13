@@ -9,6 +9,12 @@
 
 ## La idea
 
+**¿El encargo dice Genjutsu / cuenta nueva con menos vídeos y más calidad?**
+Lee [`genjutsu-higgsfield.md`](genjutsu-higgsfield.md) o `guia("genjutsu")`.
+Usa la actuación original como entrada en Higgsfield, con personaje de Flow
+y producto exacto. La herramienta `replicar_viral` de esta guía no ejecuta esa
+transferencia y el Largo no conserva el audio hablado del clip.
+
 No se copia el vídeo: se copia **su fórmula** (gancho, ritmo, demostración) en
 nuestro formato de siempre: **dos clips MUDOS de 8 s** (GenAI Pro o Magnific;
 nada de Omni con voz) y **una voz en off de ~16 s** locutada con Fish y montada

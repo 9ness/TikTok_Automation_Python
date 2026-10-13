@@ -14,6 +14,13 @@
 
 ## 0. Dos maneras de trabajar
 
+**Cuenta nueva de Néstor / virales con Genjutsu (13 oct 2026):** menos vídeos,
+más calidad. Lee [`genjutsu-higgsfield.md`](genjutsu-higgsfield.md), también con
+`guia("genjutsu")`: producto, personaje en Flow, leyenda de fotos, transferencia
+en Higgsfield, audio Fish y revisión. Es un flujo externo; no un menú nuevo ni
+la réplica POV de dos clips. El MCP oficial de Higgsfield está registrado en
+Claude Code del VPS y pendiente de autenticación del operador.
+
 - **Con el MCP «tiktok-shop-ai-pro»** (lo preferible). La app hace de
   herramientas: `carpetas`, `productos`, `preparar_carpeta`, `plan_producto`,
   `preparar_bandeja`, `ver`, `subir_clip`, `videos_montados`… Así no clicas la
@@ -105,6 +112,11 @@ enseña su tarjeta (huecos «Clip 1», «Clip 2»…), y la duración del guion 
 decide la app.
 
 ## 4. Reglas que no se saltan
+
+Para **Genjutsu**, la receta anterior permite usar el MCP oficial de Higgsfield
+con la cuenta y el gasto autorizados; la regla de navegador que sigue describe
+los generadores habituales de los menús de la app. Flow sigue siendo la vía
+de imágenes. Ninguna conexión autoriza por sí sola comprar o generar.
 
 - **Las imágenes y los vídeos se generan SIEMPRE en la web** (Google Flow,
   GenAI Pro, Magnific), con la cuenta del operador abierta en el navegador,

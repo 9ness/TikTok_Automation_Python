@@ -143,6 +143,12 @@ def test_protocolo_mcp(app_client, usuarios):
     r = _rpc(app_client, url, "tools/call", {"name": "guia", "arguments": {"menu": "pov_bof_largo"}})
     assert not r.get("isError") and "POV BOF Largo" in r["content"][0]["text"]
 
+    r = _rpc(app_client, url, "tools/call", {"name": "guia", "arguments": {"menu": "genjutsu"}})
+    assert not r.get("isError")
+    receta = r["content"][0]["text"]
+    assert "cuenta NUEVA" in receta and "Flow" in receta and "Voice Changer" in receta
+    assert "https://mcp.higgsfield.ai/mcp" in receta and "@Imagen 1" in receta
+
     r = _rpc(app_client, url, "tools/call", {"name": "menus_disponibles", "arguments": {}})
     assert "moda_mujer" in {m["menu"] for m in json.loads(r["content"][0]["text"])}
 
@@ -160,6 +166,8 @@ def test_token_malo_401(app_client, usuarios):
 def test_guias_publicas_y_sin_salirse(app_client):
     r = app_client.get("/api/v1/agente/guias/comun/app.md")
     assert r.status_code == 200 and "text/markdown" in r.headers["content-type"]
+    r = app_client.get("/api/v1/agente/guias/genjutsu-higgsfield.md")
+    assert r.status_code == 200 and "Genjutsu de Higgsfield" in r.text
     assert app_client.get("/api/v1/agente/guias/../config.py").status_code == 404
 
 

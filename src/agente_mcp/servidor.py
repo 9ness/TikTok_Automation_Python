@@ -49,6 +49,9 @@ montado → `videos_montados`.
 Las imágenes y los vídeos se generan SIEMPRE en la web (Flow, GenAI Pro,
 Magnific) controlando el navegador, NUNCA por API. Nunca generes nada sin
 decir antes cuánto vas a lanzar y esperar el «sí». No uses `marcar` salvo que te lo pidan.
+Para el formato Genjutsu de la cuenta nueva: `guia("genjutsu")` explica
+personajes en Flow, transferencia desde vídeo en Higgsfield (web o su MCP
+oficial autorizado), voz y revisión. Este MCP de la app no ejecuta Higgsfield.
 Si te piden rehacer lo marcado, `para_rehacer(menu)` lo lista todo con la nota.
 Lo montado de todos los nichos, en tandas de diez para publicar, está en
 `mis_tandas` (solo lectura: lo que montes aparece ahí solo, no se sube nada).
@@ -136,16 +139,20 @@ def guia(menu: str = "") -> str:
     """Las instrucciones. Sin `menu`: reglas generales + cómo se maneja la app,
     las plataformas (Flow, GenAI Pro, Magnific) y la revisión de calidad.
     Con `menu` (ver `menus`): el paso a paso de ese menú. `menu="multiplataforma"`:
-    enlaces de afiliado y resubida a IG/FB/Threads/Pinterest. Léelas antes de trabajar."""
+    enlaces de afiliado y resubida a IG/FB/Threads/Pinterest. `menu="genjutsu"`:
+    receta de virales con personajes Flow y Higgsfield (no ejecuta generaciones).
+    Léelas antes de trabajar."""
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
             "README.md", "comun/app.md", "comun/plataformas.md", "comun/revision-calidad.md",
             "comun/campanas.md", "comun/fotos-extra.md"))
     if menu == "multiplataforma":  # no es un menú de vídeo: solo guía + herramientas
         return _leer_guia("multiplataforma.md")
+    if menu == "genjutsu":  # flujo externo: guía, sin crear un menú ni llamar al proveedor
+        return _leer_guia("genjutsu-higgsfield.md")
     m = menus.MENUS.get(menu)
     if not m:
-        raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}, multiplataforma.")
+        raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}, multiplataforma, genjutsu.")
     return _leer_guia(f"{m.guia}.md")
 
 
