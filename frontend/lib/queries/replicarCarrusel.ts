@@ -142,6 +142,7 @@ export async function descargarFotosCarrusel(
       .reverse(),
     onProgreso,
     2,
+    1100,
   );
 }
 

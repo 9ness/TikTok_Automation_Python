@@ -41,6 +41,10 @@ export async function bajarEnOrden(
   /** Cuántos se piden a la vez. Se GUARDAN igual en orden: solo se adelanta
    *  la bajada de los siguientes mientras se espera al actual. */
   simultaneas = 1,
+  /** Pausa entre un guardado y el siguiente. Para FOTOS, más de 1 s: la
+   *  galería ordena por segundos y dos guardadas en el mismo segundo las
+   *  desempata a su aire (salían revueltas). */
+  pausaMs = 150,
 ): Promise<{ bajadas: number; fallidas: number }> {
   let bajadas = 0;
   let fallidas = 0;
@@ -79,7 +83,7 @@ export async function bajarEnOrden(
     }
     // Un respiro corto: el fichero ya está bajado, esto es solo para que el
     // gestor de descargas no agrupe dos guardados en el mismo instante.
-    await new Promise((r) => setTimeout(r, 150));
+    if (i < archivos.length - 1) await new Promise((r) => setTimeout(r, pausaMs));
   }
   return { bajadas, fallidas };
 }

@@ -535,6 +535,10 @@ def con_fecha(datos: bytes, epoca: float) -> bytes:
     ifd = exif.get_ifd(0x8769)
     ifd[0x9003] = fecha  # DateTimeOriginal
     ifd[0x9004] = fecha  # DateTimeDigitized
+    # Zona horaria de esas fechas: sin ella Android las toma como UTC.
+    zona = dt.datetime.fromtimestamp(epoca, zoneinfo.ZoneInfo("Europe/Madrid")).strftime("%z")
+    zona = f"{zona[:3]}:{zona[3:]}"
+    ifd[0x9010] = ifd[0x9011] = ifd[0x9012] = zona  # OffsetTime / Original / Digitized
     cuerpo = exif.tobytes()
     if not cuerpo.startswith(b"Exif\x00\x00"):
         cuerpo = b"Exif\x00\x00" + cuerpo
@@ -549,17 +553,33 @@ def con_fecha(datos: bytes, epoca: float) -> bytes:
     return b"\xff\xd8" + bytes(resto) + app1 + datos[i:]
 
 
-def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str) -> int:
+def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str, epoca: float | None = None) -> int:
     """Mete en `z`, bajo `carpeta/`, las diapositivas listas (con su texto, o
     la de Flow tal cual si no lleva) en orden + `caption.txt`. Devuelve
-    cuántas fotos entraron. Lo usa también «Mis tandas › Fotos»."""
+    cuántas fotos entraron. Lo usa también «Mis tandas › Fotos».
+
+    Con `epoca`, la 01 lleva esa fecha (EXIF y la del fichero en el ZIP) y
+    cada siguiente 2 s menos: al descomprimir en el móvil, la galería (lo más
+    nuevo arriba) las deja en orden. Sin ella iban con la fecha de disco y
+    salían revueltas. Pasos de 2 s porque el ZIP no guarda segundos impares."""
+    import datetime as dt
+    import zoneinfo
+
     usuario, id_ = doc.get("usuario") or "ness", doc["id"]
     metidas = 0
     for d in doc.get("diapositivas") or []:
         p = ruta_foto(usuario, id_, d["n"], "txt") or ruta_foto(usuario, id_, d["n"], "base")
-        if p:
-            z.write(p, f"{carpeta}/{d['n']:02d}.jpg")
-            metidas += 1
+        if not p:
+            continue
+        nombre = f"{carpeta}/{d['n']:02d}.jpg"
+        if epoca is None:
+            z.write(p, nombre)
+        else:
+            cuando = epoca - 2 * metidas
+            hora = dt.datetime.fromtimestamp(cuando, zoneinfo.ZoneInfo("Europe/Madrid"))
+            info = zipfile.ZipInfo(nombre, date_time=hora.timetuple()[:6])
+            z.writestr(info, con_fecha(p.read_bytes(), cuando))
+        metidas += 1
     if metidas:
         pie = (doc.get("caption") or "").strip()
         tags = doc["hashtags"] if "hashtags_ia" in doc else hashtags_tiktok(doc)
@@ -577,7 +597,7 @@ def zip_carrusel(usuario: str, id_: str) -> tuple[bytes, str]:
     nombre = nombre_carrusel(doc)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
-        metidas = meter_en_zip(z, doc, nombre)
+        metidas = meter_en_zip(z, doc, nombre, time.time())
     if not metidas:
         raise ErrorReplica("Aún no hay ninguna foto subida en este carrusel.", status=404)
     return buf.getvalue(), f"{nombre}.zip"

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import time
 import zipfile
 import zoneinfo
 
@@ -249,19 +250,25 @@ def zip_tanda(usuario: str, numero: int, pendientes: bool = False) -> tuple[byte
     usuario = usuario or "ness"
     docs = _carruseles(usuario)
     agotados = _sin_stock(docs)
-    grupos = _grupos(docs)
+    # Las mismas tandas que se ven en pantalla (con las completadas primero).
+    grupos = [g for g, _ in _repartir(docs, usuario)]
     if not 1 <= int(numero) <= len(grupos):
         raise carrusel.ErrorReplica(f"No existe la tanda {numero} de fotos.", status=404)
     buf = io.BytesIO()
     metidos = 0
+    # Fecha de captura DEcreciente (01 del primer carrusel = la más nueva): la
+    # galería pone lo más nuevo arriba y así sale en el orden de la tanda.
+    epoca = time.time()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
         for i, doc in enumerate(grupos[int(numero) - 1], start=1):
             if pendientes and doc.get("subido"):
                 continue
             if _clave(doc) in agotados and not doc.get("subido"):
                 continue  # sin stock no se publica (como en los vídeos)
-            if carrusel.meter_en_zip(z, doc, f"{i:02d}_{carrusel.nombre_carrusel(doc)}"):
+            n = carrusel.meter_en_zip(z, doc, f"{i:02d}_{carrusel.nombre_carrusel(doc)}", epoca)
+            if n:
                 metidos += 1
+                epoca -= 2 * n
     if not metidos:
         raise carrusel.ErrorReplica("No hay carruseles que bajar en esa tanda.", status=404)
     return buf.getvalue(), f"fotos_tanda_{int(numero):03d}.zip"
