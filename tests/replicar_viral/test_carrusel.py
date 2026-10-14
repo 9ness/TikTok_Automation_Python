@@ -320,6 +320,54 @@ def test_mcp_enlaces(monkeypatch):
     assert {"replicar_carrusel", "subir_imagen_carrusel", "descargar_carrusel"} <= nombres
 
 
+@pytest.mark.parametrize("con_t", [False, True])
+def test_descargas_con_fecha_aunque_el_cliente_no_mande_t(entorno, con_t):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from src.api.dependencies import get_current_user, get_web_user
+    from src.api.routers.replicar_viral import router
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_current_user] = lambda: "k"
+    app.dependency_overrides[get_web_user] = lambda: "ness"
+    client = TestClient(app)
+    doc = _replicar()
+    doc["creado_at"] = 1791900000
+    servicio.guardar(doc)
+    for n in [1, 2, 3]:
+        carrusel.subir_imagen("ness", doc["id"], n, _jpeg())
+
+    fechas = {}
+    # Reproduce peticiones que terminan fuera de orden, incluidas repetidas.
+    for n in [3, 1, 2, 1]:
+        params = {"descargar": "true"}
+        if con_t:
+            params["t"] = str(1791900000 - 3 * n)
+        resp = client.get(f"/api/v1/replicar-viral/carrusel/{doc['id']}/imagen/{n}", params=params)
+        assert resp.status_code == 200
+        assert resp.headers["cache-control"] == "no-store"
+        assert f"_{n:02d}.jpg" in resp.headers["content-disposition"]
+        with Image.open(io.BytesIO(resp.content)) as im:
+            exif = im.getexif().get_ifd(0x8769)
+            fecha = exif[0x9003]
+            assert exif[0x9011] == "+02:00"
+        if n in fechas:
+            assert fechas[n] == fecha
+        fechas[n] = fecha
+        # Solo cambia el EXIF: no se recompone ni pierde calidad la foto.
+        original = (carrusel.ruta_foto("ness", doc["id"], n, "txt")
+                    or carrusel.ruta_foto("ness", doc["id"], n, "base")).read_bytes()
+        assert resp.content[resp.content.index(b"\xff\xda"):] == original[original.index(b"\xff\xda"):]
+    assert sorted(fechas, key=fechas.get, reverse=True) == [1, 2, 3]
+
+    # La vista previa sigue siendo el archivo original, con su caché.
+    preview = client.get(f"/api/v1/replicar-viral/carrusel/{doc['id']}/imagen/1")
+    assert preview.headers["cache-control"] == "private, max-age=60"
+    assert "content-disposition" not in preview.headers
+
+
 def test_con_fecha_pone_exif_sin_recomprimir():
     import io
 

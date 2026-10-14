@@ -336,17 +336,19 @@ def carrusel_imagen(
         raise _error(e) from e
     if not p:
         raise APIError("Esa foto todavía no está.", status_code=404)
-    nombre = None
-    if descargar:  # «carrusel_<producto>_<id>_01.jpg»: en la galería quedan juntas y en orden
-        try:
-            nombre = f"{carrusel.nombre_carrusel(carrusel.ver(usuario, id_))}_{n:02d}.jpg"
-        except Exception:  # noqa: BLE001
-            nombre = f"diapositiva_{n:02d}.jpg"
-    if descargar and t > 0:  # fecha de captura t + n s: la galería las ordena aunque lleguen desordenadas
-        return Response(carrusel.con_fecha(p.read_bytes(), t + n), media_type="image/jpeg",
+    if descargar:
+        doc = carrusel.ver(usuario, id_)
+        nombre = f"{carrusel.nombre_carrusel(doc)}_{n:02d}.jpg"
+        # Los clientes antiguos no mandan `t`: antes recibían el JPEG sin
+        # EXIF y la galería lo ordenaba según cuándo terminaba la descarga.
+        # Una fecha común y estable del carrusel evita carreras entre peticiones
+        # y permite bajar también las fotos sueltas en cualquier orden.
+        # Conservamos `t + n` para los clientes que ya calculan su propia fecha.
+        cuando = t + n if t > 0 else float(doc["creado_at"]) - 2 * (n - 1)
+        return Response(carrusel.con_fecha(p.read_bytes(), cuando), media_type="image/jpeg",
                         headers={"Content-Disposition": f'attachment; filename="{nombre}"',
                                  "Cache-Control": "no-store"})
-    return FileResponse(p, media_type="image/jpeg", filename=nombre,
+    return FileResponse(p, media_type="image/jpeg",
                         headers={"Cache-Control": "private, max-age=60"})
 
 
