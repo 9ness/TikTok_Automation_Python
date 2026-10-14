@@ -33,7 +33,11 @@ cruza TikTok para sancionar por «producto incoherente».
    tramo del viral, y cada clip enseña lo que dice la voz en ese tramo.
 2. En cada clip va la **foto limpia del producto como ingrediente**. Desde el
    clip 2, además, la imagen del clip 1 como referencia: el producto tiene que
-   salir **idéntico** en todos.
+   salir **idéntico** en todos. Si el producto tiene **dos caras distintas**
+   (portada y contraportada, frente y espalda) y el clip lo gira, mete las dos
+   fotos y di en el prompt cuál es cuál («image 2 = BACK cover, show it when
+   turned»). Si no, Omni pinta la portada por los dos lados. Lo más seguro es
+   que el clip no lo gire.
 3. Di cuántos clips vas a lanzar y **espera el «sí»** antes de generar.
    Siempre en la web, nunca por API.
 4. Revisa cada clip con `ver` (unos 7 fotogramas): agarres reales, nada que se
