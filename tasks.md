@@ -1,4 +1,12 @@
 ## Pendiente
+- [ ] **Casca Chollos · réplicas Q4 juguetes/tecnología (14/10)**: 26 versiones Omni montadas en `_agente/ness/replicas_q4_juguetes/` y registradas en Mis tandas (todas 🟡, 65 cr). Falta: confirmar que la ficha 1729930618957568103 es el arbolito-proyector, que la R36S enlazada es la morada translúcida y que los productos TQ4 están en el catálogo; semáforo final de Néstor.
+
+- [ ] **Pedir a Néstor planos grabados para replicar virales** (13/10). Lo que Omni no puede hacer porque deforma el texto de las páginas o hace falta el producto real:
+  - Libro «100000 Porqués» (Mis Productos 5/10), en `_agente/ness/libro_100000_porques/virales/`. Ahí está cada PLAN.md con su lista de tomas. **Hecho con IA: el n.º 3 (mal padre / buen padre).**
+    - n.º 1 «brecha educativa»: el viral top, ~27 K€. Gancho Omni + hojeo cenital + portada.
+    - n.º 2 «3 preguntas»: solo libro real.
+    - n.º 4 «presentador a cámara»: gancho Omni + tomas del libro.
+  - Antes de grabar, comprobar en su ejemplar que salen las preguntas del guion.
 - [ ] **Casca Chollos · réplicas Omni (13/10)**: hechos y en el Drive, falta el semáforo de Néstor → bici v2 en cuesta (`replica_bici_demo_omni/DEMO_bici_milecity1_40s_v2_cuesta.mp4`), paraguas corriendo (`replica_paraguas_omni/PARAGUAS_corriendo_v3.mp4`) y las 6 de `replicas_candidatas/` (13 cr, `<n>/replica_*.mp4`; quedan 208 cr). Antes de publicar dar de alta plancha Dr.Flash, paraguas beige y zapatero T-LOVENDO (negro). Para que salgan en Mis tandas: rama local `feat/replicar-virales-video` (fe44dc13, MCP `registrar_replica_video`), sin push hasta el sí. Duelos de la bici: plantilla en `bici_hillmiles_milecity1/plantilla_duelos/`.
 
 ### 🔁 Genjutsu de Higgsfield — cuenta NUEVA, calidad antes que volumen (13 oct 2026)
