@@ -304,6 +304,44 @@ def elegir_voz(
     return (rng or random).choice(candidatas)
 
 
+# Unidades que Fish lee mal abreviadas («24 g» lo dice como «ge»): solo se
+# tocan pegadas a una cifra, y solo en lo que se manda a locutar (los
+# subtítulos llevan el guion tal cual).
+_UNIDADES = (
+    ("km/h", "kilómetro por hora", "kilómetros por hora"),
+    ("kg", "kilo", "kilos"),
+    ("km", "kilómetro", "kilómetros"),
+    ("mg", "miligramo", "miligramos"),
+    ("ml", "mililitro", "mililitros"),
+    ("cm", "centímetro", "centímetros"),
+    ("mm", "milímetro", "milímetros"),
+    ("mAh", "miliamperio hora", "miliamperios hora"),
+    ("g", "gramo", "gramos"),
+    ("l", "litro", "litros"),
+    ("m", "metro", "metros"),
+    ("W", "vatio", "vatios"),
+    ("h", "hora", "horas"),
+)
+_RE_UNIDAD = re.compile(
+    r"(?<![\w,.])(\d+(?:[.,]\d+)?)\s?("
+    + "|".join(re.escape(u) for u, _s, _p in _UNIDADES)
+    + r")(?![\w/])"
+)
+
+
+def para_fish(texto: str) -> str:
+    """«24,4 g» → «24,4 gramos», «1 kg» → «1 kilo», «25 km/h» → «25
+    kilómetros por hora». Lo demás, igual."""
+    nombres = {u: (s, pl) for u, s, pl in _UNIDADES}
+
+    def _cambio(m: re.Match) -> str:
+        cifra, unidad = m.group(1), m.group(2)
+        singular, plural = nombres[unidad]
+        return f"{cifra} {singular if cifra == '1' else plural}"
+
+    return _RE_UNIDAD.sub(_cambio, texto or "")
+
+
 def sintetizar(
     texto: str,
     destino: Path,
@@ -363,7 +401,7 @@ def sintetizar(
     def _locutar(frase: str) -> None:
         nonlocal elegida
         cuerpo = json.dumps({
-            "text": frase, "reference_id": elegida["id"], "format": "mp3",
+            "text": para_fish(frase), "reference_id": elegida["id"], "format": "mp3",
         }).encode("utf-8")
         peticion = urllib.request.Request(config.FISH_TTS_URL, data=cuerpo, headers={
             "Authorization": f"Bearer {clave}",
