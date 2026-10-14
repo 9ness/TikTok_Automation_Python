@@ -371,6 +371,16 @@ def todas(usuario: str) -> tuple[list[dict], list[dict], list[dict]]:
 # ---------------------------------------------------------------------------
 # Replicar virales (MP4 ya montado por el agente, `src/replicar_viral/video.py`)
 # ---------------------------------------------------------------------------
+def _hashtags_generales() -> list[str]:
+    """Los hashtags generales de los vídeos (configuración del POV BOF)."""
+    try:
+        from src.nicho_pov_bof.repos import product_repo
+
+        return product_repo.get_hashtags("")
+    except Exception:  # noqa: BLE001 — sin Redis, sin hashtags
+        return []
+
+
 def replicas_video(usuario: str) -> list[dict]:
     """Una fila por réplica en vídeo. Los estados viven en el documento de la
     réplica (`replicar_viral:<id>`). Va aparte de `todas()` porque esa tupla
@@ -382,8 +392,15 @@ def replicas_video(usuario: str) -> list[dict]:
         if not d.get("video_path"):
             continue
         prod = d.get("producto") or {}
-        hashtags = " ".join(d.get("hashtags") or [])
+        hashtags = " ".join(d.get("hashtags") or _hashtags_generales())
         caption = str(d.get("caption") or "")
+        if not caption.strip() and prod.get("titulo"):
+            # Sin caption del agente: el nombre del producto + los dos emojis
+            # de siempre (reacción + producto), y debajo los hashtags.
+            from src.nicho_pov_bof.services.emojis import emojis_para
+
+            titulo = _limpio(prod.get("titulo"))
+            caption = f"{titulo} {emojis_para(d['id'], titulo)}"
         if hashtags and hashtags not in caption:
             caption = f"{caption} {hashtags}".strip()
         filas.append(_fila(
