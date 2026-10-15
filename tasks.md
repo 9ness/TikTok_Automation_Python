@@ -1,5 +1,5 @@
 ## Pendiente
-- [ ] **Casca Chollos · réplicas Q4 juguetes/tecnología (14/10)**: 26 versiones Omni montadas en `_agente/ness/replicas_q4_juguetes/` y registradas en Mis tandas (todas 🟡, 65 cr). Falta: confirmar que la ficha 1729930618957568103 es el arbolito-proyector, que la R36S enlazada es la morada translúcida y que los productos TQ4 están en el catálogo; semáforo final de Néstor.
+- [ ] **Flores de bloques (14/10)**: ficha 1729482526768667183 desaparecida → 4 réplicas (rv|3d4a8a04a43d, 2906fc99f609, 1141445404f8, da21ab817f58) marcadas sin stock. Falta encontrar sustituto (rosas AZULES en cúpula, base negra); desde el VPS la ficha y la búsqueda de TikTok Shop piden captcha/login.
 
 - [ ] **Pedir a Néstor planos grabados para replicar virales** (13/10). Lo que Omni no puede hacer porque deforma el texto de las páginas o hace falta el producto real:
   - Libro «100000 Porqués» (Mis Productos 5/10), en `_agente/ness/libro_100000_porques/virales/`. Ahí está cada PLAN.md con su lista de tomas. **Hecho con IA: el n.º 3 (mal padre / buen padre).**
@@ -113,7 +113,7 @@ Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/202
 ## 🎄 Temporada Q4 — productos de temporada (5 oct 2026)
 - [x] Catálogo `temporada_q4` con 15 productos (Q4 2025 vendidos y hoy sin saturar), encargo pasado al agente del POV BOF Largo (2 versiones × 3 clips, ~90 clips: confirmar créditos).
 - [x] Ropa/accesorios para Ana: 5 en el catálogo nuevo `mujer_temporada` («🎄 Mujer · temporada 1») y encargo pasado a su agente del Multimodo (5 oct).
-- [ ] Más productos: el ranking DIARIO de EchoTik (`/product/ranklist`, rank_type=1, region=ES) da 10 que venden YA por llamada; los puestos 50-200 están menos saturados. La cuenta del 5 oct (plan gratis = 50 llamadas/mes) tiene ~6. Otra cuenta o plan de pago.
+- [ ] Más productos: el ranking DIARIO de EchoTik (`/product/ranklist`, rank_type=1, region=ES) da 10 que venden YA por llamada; los puestos 50-200 están menos saturados. Comprobado 14 oct: las TRES credenciales del banco (incluida la activa, 54 llamadas contadas) responden HTTP/code 402 «Usage Limit Exceeded» al consultar saldo; no hay cuota usable confirmada. Otra cuenta con cuota o plan de pago.
 
 ## 📦 Mis tandas — siguientes pasos (2 oct 2026)
 
@@ -648,7 +648,10 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] 2026-10-15 · Réplicas Q4 juguetes/tecnología de Casca Chollos: Néstor confirma ficha del arbolito (1729930618957568103) y semáforos → 22 en 🟢 (las 4 de flores siguen sin stock).
+- [x] 2026-10-15 · R36S: las 4 réplicas ya enlazan la ficha nueva 1729945657638623436 (lo cambió otra sesión). Mopa JUPPLIES (Carpeta_11/1, Acción) rehecha con Omni → 🟢.
 - [x] (14/10/2026) **Diagnóstico y corrección del orden de fotos en Mis tandas**: Hzuaneri Mueble TV (`e8eb2afcad62`), peticiones reales sin `t` recibían JPEG sin fecha EXIF. El endpoint ahora fecha también las descargas de clientes antiguos con una base estable del carrusel y 2 s menos por diapositiva; preserva `t` y vistas previas. 36 tests pasan en contenedor aislado sin red, y fechas del producto real ordenan 1–8. Commit/push y despliegue autorizados por el operador. Las copias ya descargadas no se cambian.
+- [x] (14/10/2026) **Asistentes de consultas Ana/Néstor en Telegram**: Codex con `gpt-6.1-sol`, esfuerzo `medium` y búsqueda web activa por defecto (también al compartir al grupo). Configuración en `~/asistentes-telegram/{bot.py,personas.json}` e instrucciones `consultas-*/AGENTS.md`; memoria compartida por archivos, hilos separados por motor. Pruebas de routing/reanudación/CLI pasan; ejecución real del helper CDP comprobada (Chrome apagado); ambos servicios reiniciados y activos. Sin commits ni push.
 - [x] (13/10/2026) **Receta Genjutsu para futuros agentes de la cuenta nueva**: producto, personajes/variantes Flow, nueve prompts literales (incluido «vistela con ropa negra de gym y gorra», Nano Banana Pro/×1), leyenda de referencias, MCP oficial registrado sin OAuth, voz/edición/revisión y relevo; `guia("genjutsu")` + índices/AGENTS. 15 tests MCP pasan; sin compras, generaciones, publicación ni despliegue.
 - [x] (13/10/2026) **Tutorial Genjutsu de Higgsfield analizado**: flujo, prompts de Skool y pantalla, consejos, costes y encaje con Replicar viral/Largo/UGC/Ana; [documento](docs/clases/2026-10-13_tutorial_genjutsu_higgsfield.md). Sin compras, generaciones, cambios de código ni push.
 - [x] (6/10/2026) **Moda Mujer · Aleatorios con «rehacer»** en Mis tandas: es del VÍDEO (`modos.<modo>.rehacer` del doc personal de la prenda), lo marcan el botón y el 🔴 del semáforo, sale en `para_rehacer(menu="moda_mujer")` y se quita al montar el vídeo nuevo (conserva el puesto). Falta, tras desplegar, marcar los 5 rojos de Ana de Tienda Colores (Carpeta_13 · 3/4/9/10, Carpeta_14 · 5).
