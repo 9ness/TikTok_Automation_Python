@@ -173,6 +173,16 @@
 	}
 }
 
+# Mi Dot: app web/APK de los asistentes personales (Néstor y Ana). Servicio del
+# HOST `mi-dot.service` (~/mi-dot) en el bridge 172.18.0.1:8793; la auth (código
+# por Telegram + cookie) la hace el propio servicio. flush_interval -1: las
+# respuestas van en streaming (SSE) y no deben quedarse en el buffer.
+dot.nebulabsmedia.com {
+	reverse_proxy 172.18.0.1:8793 {
+		flush_interval -1
+	}
+}
+
 # NOTA: La web de cliente (nebulabs-media) habla con el FastAPI a través de la
 # URL pública existente del box (Tailscale Funnel / el mismo {$DOMAIN}), en la
 # ruta /api/*. No hace falta un subdominio dedicado por ahora. Si en el futuro
