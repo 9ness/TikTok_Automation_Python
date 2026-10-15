@@ -76,6 +76,17 @@
 		reverse_proxy 172.18.0.1:6080
 	}
 
+	# Panel de agentes del VPS (Mini App de Telegram «👾 Agentes» de los
+	# asistentes). Servicio del HOST `panel-agentes.service` (~/panel-agentes),
+	# en el bridge 172.18.0.1:8792 (ufw solo abre 172.18.0.0/16). La auth la hace
+	# el propio servicio (initData firmado por el bot, o clave por persona).
+	redir /panel-agentes /panel-agentes/ 308
+	@panelag path /panel-agentes/*
+	handle @panelag {
+		uri strip_prefix /panel-agentes
+		reverse_proxy 172.18.0.1:8792
+	}
+
 	# Frontend Next.js (cualquier otra ruta).
 	handle {
 		reverse_proxy web:3000
