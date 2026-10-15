@@ -49,14 +49,26 @@ cruza TikTok para sancionar por «producto incoherente».
      quemados en pantalla. Si hay voz, también subtítulos de lo que dice.
    - **Metadatos limpios**: `-map_metadata -1 -map_chapters -1` (como
      `limpiar_metadatos` del POV BOF) y `-c:v libx264 -pix_fmt yuv420p -c:a aac`.
+   - **Flecha al carrito** los últimos ~4 s, SIEMPRE: la de la app
+     (`src/nicho_ropa/pipeline/video_editor._flecha(salida, on_log)`, que coge
+     una flecha real de `ready_video._arrows_dir()` con el color del fondo).
+   - **Con voz, sin música de fondo.** La música solo va en los mudos. Si el
+     viral original lleva música bajo la voz y quieres copiarla, pregunta antes.
+   - **Voz bien alta**: `loudnorm=I=-14:TP=-2:LRA=11` sobre la voz; la clonada de
+     Néstor sale floja de Fish, súbele antes `volume=4dB`. Escúchala al final.
+   - **Cierre con sentido**, una frase entera y natural, nunca «En el carrito
+     naranja» suelto: p. ej. «Te lo dejo en el carrito naranja, y revisa si
+     tienes cupones antes de comprar.» (nunca «tu cupón», ver memoria
+     no-afirmar-cupones). Con voz clonada, en primera persona.
 6. Registra (ver 3).
 
 ## 2. Sin IA (real)
 
 El operador graba (o te pasa las tomas) y montas el viral con ellas: mismos
 cortes y mismo gancho, con **nuestro** producto a la vista desde el primer
-segundo. Igual que con IA: rótulo con el gancho y el nombre del producto,
-subtítulos si hay voz y metadatos limpios. Si las tomas llevan marca de agua
+segundo. Igual que con IA (todo el punto 5): rótulo con el gancho y el nombre
+del producto, subtítulos si hay voz, flecha, sin música si hay voz, voz alta,
+cierre con sentido y metadatos limpios. Si las tomas llevan marca de agua
 o un borde, aplica el mismo encuadre.
 
 ## 3. Registrar → Mis tandas → semáforo
