@@ -285,6 +285,9 @@ def elegir(cands: list[dict], todas: list[str], evitar: set[str], n: int = 3) ->
 NOMBRE_CORTO = {
     "boca juniors": "Boca", "river plate": "River", "argentinos juniors": "Argentinos",
     "eintracht frankfurt": "Frankfurt", "racing club": "Racing",
+    "manchester city": "City", "manchester united": "United", "atletico madrid": "Atlético",
+    "atletico de madrid": "Atlético", "real madrid": "Madrid", "paris saint germain": "PSG",
+    "bayern": "Bayern", "inter milan": "Inter", "ac milan": "Milan", "borussia dortmund": "Dortmund",
 }
 
 
