@@ -436,6 +436,9 @@ def textos_tiktok(partidos: list[dict], out: Path, fecha: str, r: UpstashRedis |
         intro = [re.sub(r"\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b", n, b, count=1)
                  for b in bloques[:primero]]
         desc = "\n\n".join(intro + elegidos + bloques[ultimo + 1:])
+        # la caption de la IA a veces se equivoca de día («este viernes» para un sábado)
+        dia = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")[date.fromisoformat(fecha).weekday()]
+        desc = re.sub(r"\b(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b", dia, desc)
     else:   # sin caption de esa fecha: lista sencilla
         desc = f"{n.capitalize()} partidos para mañana:\n" + \
                "\n".join(f"{c['local']} vs {c['visitante']} · {c['hora']}" for c in partidos)
