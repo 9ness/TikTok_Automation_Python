@@ -64,6 +64,16 @@ repetir (hasta el máximo que acordaste con el operador).
 - [ ] El producto hace algo que **no hace de verdad** o que la ficha no dice
       (un ventilador que echa vapor, una crema que borra una cicatriz).
 - [ ] Manos o cuerpos que se deforman, objetos que atraviesan otros.
+- [ ] **La física no tiene sentido** (Néstor, 16/10/2026: dos réplicas
+      marcadas para rehacer). El producto **atraviesa** la caja, la mesa o
+      la mano; una tapa se cierra **encima de otro** recipiente en vez del
+      suyo; una ducha echa el agua **por donde no tiene agujeros** (por el
+      canto o la parte de atrás); el líquido o la luz salen de un sitio que
+      el producto real no tiene. Cada pieza tiene que hacer lo que hace en
+      la ficha, por el sitio por el que lo hace. Mira el fotograma de la
+      acción GRANDE, al lado de la foto del producto. Si falla, se rehace el
+      clip **aunque cueste un crédito más**: la consistencia va antes que el
+      ahorro.
 - [ ] **El producto se mueve solo** (gira, se desplaza, se cae, flota) o la
       mano lo **coge, lo empuja o lo gira**. Motivo de rechazo más frecuente
       en los clips mudos de Kling; casi siempre en el último segundo.

@@ -41,7 +41,11 @@ cruza TikTok para sancionar por «producto incoherente».
 3. Di cuántos clips vas a lanzar y **espera el «sí»** antes de generar.
    Siempre en la web, nunca por API.
 4. Revisa cada clip con `ver` (unos 7 fotogramas): agarres reales, nada que se
-   mueva solo, producto igual que en la ficha y sin texto inventado.
+   mueva solo, producto igual que en la ficha y sin texto inventado, y que
+   **la física tenga sentido**: nada atraviesa nada, cada tapa en su
+   recipiente, el agua o la luz salen por donde salen en el producto real
+   (`comun/revision-calidad.md`). Si falla, se rehace el clip aunque cueste
+   un crédito más.
 5. Monta con ffmpeg:
    - **Encuadre anti-marca** (quita la marca de agua del generador), en cada clip:
      `-vf "scale=1232:2188,crop=1080:1920:(in_w-out_w)/2:0"`
@@ -52,8 +56,17 @@ cruza TikTok para sancionar por «producto incoherente».
    - **Flecha al carrito** los últimos ~4 s, SIEMPRE: la de la app
      (`src/nicho_ropa/pipeline/video_editor._flecha(salida, on_log)`, que coge
      una flecha real de `ready_video._arrows_dir()` con el color del fondo).
-   - **Con voz, sin música de fondo.** La música solo va en los mudos. Si el
-     viral original lleva música bajo la voz y quieres copiarla, pregunta antes.
+   - **Música: NUNCA con copyright; solo libre de derechos verificada y
+     documentada** (Néstor, 16/10/2026). TikTok le silenció el Belén por una
+     canción comercial, y después de «comprobar vídeo» ya no deja añadir
+     música, así que se mezcla en el montaje. Fuentes, por este orden:
+     villancicos de dominio público en grabación libre (Musopen PD/CC0,
+     YouTube Audio Library sin atribución), o Mixkit/Pixabay comprobando la
+     licencia de la pista (uso comercial en redes; si la ficha avisa de
+     Content ID, se descarta). Nunca música comercial ni sonidos de TikTok.
+     Cada pista va al banco con su URL y su licencia en un `LICENCIAS.md`
+     (navideña: `_agente/ness/alisa_z/musica_navidad/`). Volumen bajo,
+     ~-22 LUFS; con voz, por debajo de ella.
    - **Voz bien alta**: `loudnorm=I=-14:TP=-2:LRA=11` sobre la voz; la clonada de
      Néstor sale floja de Fish, súbele antes `volume=4dB`. Escúchala al final.
    - **Cierre con sentido**, una frase entera y natural, nunca «En el carrito
@@ -67,7 +80,7 @@ cruza TikTok para sancionar por «producto incoherente».
 El operador graba (o te pasa las tomas) y montas el viral con ellas: mismos
 cortes y mismo gancho, con **nuestro** producto a la vista desde el primer
 segundo. Igual que con IA (todo el punto 5): rótulo con el gancho y el nombre
-del producto, subtítulos si hay voz, flecha, sin música si hay voz, voz alta,
+del producto, subtítulos si hay voz, flecha, música solo libre de derechos documentada (nunca con copyright), voz alta,
 cierre con sentido y metadatos limpios. Si las tomas llevan marca de agua
 o un borde, aplica el mismo encuadre.
 

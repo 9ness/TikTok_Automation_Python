@@ -11,7 +11,7 @@ SUBIDAS_DIA_HECHO = 8
 
 # Tandas al día por usuario, para la fecha orientativa. ness publica entre 10 y
 # 20 según el día; se deja en una y abre la siguiente si le da tiempo.
-TANDAS_DIA: dict[str, int] = {"ness": 1, "ana": 1, "mauro": 1}
+TANDAS_DIA: dict[str, int] = {"ness": 1, "ana": 1, "mauro": 1, "nestor2": 1}
 
 # El mismo producto (otro modo del Largo, la copia de Q4…) no se publica dos
 # veces en menos de estos días: el segundo espera.

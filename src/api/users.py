@@ -32,6 +32,8 @@ USUARIOS: dict[str, dict] = {
     "ness": {"nombre": "ness", "rol": ADMIN},
     "mauro": {"nombre": "Mauro", "rol": PRO},
     "ana": {"nombre": "Ana", "rol": PRO},
+    # Segunda cuenta de Néstor (Casca Chollos, oct 2026): sus propias tandas.
+    "nestor2": {"nombre": "Néstor 2", "rol": PRO},
 }
 
 # Prefijo de Redis para los PIN. Va sobre el cliente de viralización porque es
