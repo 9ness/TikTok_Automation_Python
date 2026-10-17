@@ -399,3 +399,9 @@ def musica_dir() -> Path:
 def musica_trabajo_dir() -> Path:
     override = os.getenv("MULTIPLATAFORMA_MUSICA_TRABAJO", "").strip()
     return Path(override) if override else Path.cwd() / "temp_work" / "multiplataforma_musica"
+
+
+def links_cache_dir() -> str:
+    """Fotogramas de los vídeos publicados para las fotos de /links."""
+    root = os.getenv("API_TEMP_ROOT") or "temp_work"
+    return os.path.join(root, "multiplataforma_links")

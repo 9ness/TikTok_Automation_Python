@@ -53,6 +53,33 @@ const MIN_BUSCADOR = 8;
 const POR_TANDA = 20;
 
 /** Foto a la medida en que se pinta (la API la reduce; ×2 para pantallas retina). */
+/** Foto del producto: fondo que late mientras carga (no un hueco blanco) y,
+ *  si no hay foto, un carrito en vez del recuadro vacío. */
+function FotoProducto({ src, alt, grande = false }: { src: string; alt: string; grande?: boolean }) {
+  const [estado, setEstado] = useState<"cargando" | "ok" | "error">("cargando");
+  return (
+    <div className={`relative h-full w-full ${estado === "ok" ? "bg-white" : "bg-white/10"} ${estado === "cargando" ? "animate-pulse" : ""}`}>
+      {estado === "error" ? (
+        <span className={`absolute inset-0 flex items-center justify-center ${grande ? "text-6xl" : "text-3xl"}`} aria-hidden>
+          🛒
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- foto servida por la API, sin optimizador
+        <img
+          src={src}
+          alt={alt}
+          loading={grande ? "eager" : "lazy"}
+          fetchPriority={grande ? "high" : "auto"}
+          decoding="async"
+          className={`h-full w-full ${grande ? "object-contain" : "object-cover"} transition-opacity duration-300 ${estado === "ok" ? "opacity-100" : "opacity-0"}`}
+          onLoad={() => setEstado("ok")}
+          onError={() => setEstado("error")}
+        />
+      )}
+    </div>
+  );
+}
+
 function fotoUrl(p: ProductoLink, ancho: number): string {
   return `${api.baseUrl}${p.foto}?w=${ancho}`;
 }
@@ -277,18 +304,8 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
             rel="nofollow sponsored noopener"
             className={`group mb-5 block overflow-hidden rounded-2xl border transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--acento)] ${tarjeta}`}
           >
-            <div className="relative aspect-[4/3] w-full bg-white">
-              {/* eslint-disable-next-line @next/next/no-img-element -- foto servida por la API, sin optimizador */}
-              <img
-                src={fotoUrl(ultimo, 640)}
-                alt={ultimo.titulo}
-                fetchPriority="high"
-                decoding="async"
-                className="h-full w-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-                }}
-              />
+            <div className="relative aspect-[4/3] w-full">
+              <FotoProducto src={fotoUrl(ultimo, 640)} alt={ultimo.titulo} grande />
               <span className={`absolute left-3 top-3 rounded-full bg-[var(--acento2)] px-3 py-1 text-xs font-bold shadow ${esColorClaro(tema.acento2) ? "text-stone-950" : "text-white"}`}>
                 🆕 Último vídeo{ultimo.publicado_en ? ` · ${cuando(ultimo.publicado_en)}` : ""}
               </span>
@@ -382,20 +399,8 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
                   rel="nofollow sponsored noopener"
                   className={`group flex items-center gap-3 rounded-2xl border p-2.5 transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--acento)] ${tarjeta}`}
                 >
-                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-white sm:h-24 sm:w-24">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- foto servida por la API, sin optimizador */}
-                    <img
-                      src={fotoUrl(p, 192)}
-                      alt={p.titulo}
-                      loading="lazy"
-                      decoding="async"
-                      width={96}
-                      height={96}
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-                      }}
-                    />
+                  <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl sm:h-24 sm:w-24">
+                    <FotoProducto src={fotoUrl(p, 192)} alt={p.titulo} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 break-words text-sm font-semibold leading-snug">{p.titulo}</p>
