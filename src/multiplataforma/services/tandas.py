@@ -380,6 +380,10 @@ def links_publicos(slug: str) -> dict:
         return hit[1]
     datos = _links_publicos(slug)
     _links_cache[slug] = (time.time(), datos)
+    import threading
+
+    threading.Thread(target=_precalentar_fotos, args=(slug, [p["id"] for p in datos["productos"]]),
+                     daemon=True, name=f"links-fotos-{slug}").start()
     return datos
 
 
@@ -436,6 +440,12 @@ def _links_publicos(slug: str) -> dict:
     }
 
 
+# Lo que ya se resolvió por (cuenta, producto, ancho): buscar la fila o la
+# publicación lee TODA la cola de la cuenta (~1-4 s) y la miniatura ya está.
+_FOTOS_TTL_S = 6 * 3600
+_fotos_cache: dict[tuple[str, str, str, int], tuple[float, Path]] = {}
+
+
 def foto_publica(slug: str, producto_key_: str, ancho: int = 400) -> Path | str:
     """Path de la miniatura, o la URL https externa (`foto_url`) a la que
     redirigir. Solo productos con enlace publicable de una cuenta activa."""
@@ -445,7 +455,71 @@ def foto_publica(slug: str, producto_key_: str, ancho: int = 400) -> Path | str:
         raise ErrorTandas("No existe", status=404)
     if e.get("foto_url"):
         return str(e["foto_url"])
-    return foto_interna(c, e.get("fila_id", ""), ancho)
+    # La comprobación de arriba va siempre (un enlace borrado deja de tener
+    # foto al momento); lo caro, buscar la fila o la publicación, se recuerda.
+    clave = (slug, producto_key_, str(e.get("fila_id") or ""), ancho)
+    hit = _fotos_cache.get(clave)
+    if hit and time.time() - hit[0] < _FOTOS_TTL_S and hit[1].is_file():
+        return hit[1]
+    res: Path | None = None
+    if e.get("fila_id"):
+        try:
+            res = foto_interna(c, e["fila_id"], ancho)
+        except ErrorTandas:
+            pass  # la fila ya no existe: se prueba con lo publicado
+    if res is None:
+        res = _foto_de_lo_publicado(slug, producto_key_, ancho)
+    _fotos_cache[clave] = (time.time(), res)
+    return res
+
+
+def _foto_de_lo_publicado(slug: str, producto_key_: str, ancho: int) -> Path:
+    """Sin fila de Mis tandas (carruseles, ingesta del Drive): la 1.ª foto del
+    carrusel o un fotograma del vídeo que se publicó. Antes salía un hueco
+    blanco en /links para casi la mitad de los productos."""
+    import subprocess
+
+    from src.nicho_pov_bof.services import thumbs
+
+    pubs = sorted(_cola_por_producto(slug).get(producto_key_, []),
+                  key=lambda p: _ultima_publicacion([p]), reverse=True)
+    for p in pubs:
+        origen = next((Path(i) for i in p.imagenes if Path(i).is_file()), None)
+        if origen is None and Path(p.video_path or "").is_file():
+            v = Path(p.video_path)
+            if v.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp"):
+                origen = v
+            else:
+                origen = Path(config.links_cache_dir()) / f"pub_{p.id}.jpg"
+                if not (origen.is_file() and origen.stat().st_size > 0):
+                    origen.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(v),
+                                        "-frames:v", "1", "-vf", "scale=720:-2", str(origen)],
+                                       check=True, timeout=60)
+                    except Exception:  # noqa: BLE001 — se prueba la siguiente
+                        continue
+        if origen is not None and origen.is_file():
+            try:
+                return thumbs.miniatura(origen, ancho) or origen
+            except Exception:  # noqa: BLE001
+                return origen
+    raise ErrorTandas("Sin foto", status=404)
+
+
+# Anchos que pide la página (/links): 640 el último vídeo, 192 la lista.
+_ANCHOS_LINKS = (640, 192)
+
+
+def _precalentar_fotos(slug: str, claves: list[str]) -> None:
+    """Deja hechas las miniaturas para que la primera visita no espere a
+    bajarlas del Drive y recortarlas una a una."""
+    for k in claves:
+        for w in _ANCHOS_LINKS:
+            try:
+                foto_publica(slug, k, w)
+            except Exception:  # noqa: BLE001 — sin foto: la página pone el hueco
+                break
 
 
 def foto_interna(c: CuentaDestino, fila_id: str, ancho: int = 400) -> Path:

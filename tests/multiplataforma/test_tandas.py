@@ -306,3 +306,26 @@ def test_categoria_link():
     assert tandas.categoria_link("Conjunto deportivo de dos piezas para mujer") == "👚 Conjuntos"
     assert tandas.categoria_link("Set 12 Utensilios de Cocina de Silicona") == "🍳 Cocina"
     assert tandas.categoria_link("Cosa rara") == config.CATEGORIA_OTROS
+
+
+def test_foto_links_de_carrusel_sin_fila(cuenta, drive, monkeypatch):
+    """Producto sin fila de Mis tandas (carrusel): la foto sale de la 1.ª imagen
+    publicada, no un 404 (hueco blanco en /links)."""
+    from src.nicho_pov_bof.services import thumbs
+
+    monkeypatch.setattr(thumbs, "miniatura", lambda origen, ancho: origen)
+    tandas._fotos_cache.clear()
+    k = "abcdef0123456789"
+    enlaces_repo.guardar("ama_shop", k, {"titulo": "Paraguas", "enlace": "https://amzn.to/x"})
+    img = drive / "01.jpg"
+    img.write_bytes(b"\xff\xd8jpg")
+    pub = Publicacion(cuenta="ama_shop", video_path=str(img), tipo="carrusel",
+                      producto_ref=k, imagenes=[str(img)])
+    pub.estado["instagram"] = config.ESTADO_PUBLICADO
+    pub.resultados["instagram"] = {"publicado_en": AHORA}
+    publicaciones_repo.guardar(pub)
+    assert tandas.foto_publica("ama_shop", k, 192) == img
+    # Borrado el enlace, la foto deja de servirse aunque esté recordada.
+    enlaces_repo.borrar("ama_shop", k)
+    with pytest.raises(tandas.ErrorTandas):
+        tandas.foto_publica("ama_shop", k, 192)
