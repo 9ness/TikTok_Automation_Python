@@ -146,6 +146,14 @@ montarse el vídeo nuevo, se quita el «rehacer» y conserva su puesto en la tan
 
 ## Semáforo (revisar antes de subir)
 
+> ⛔ **REGLA Nº 1 (Néstor, 18/10/2026): un vídeo NO está terminado hasta que
+> se comprueba.** Cada vídeo montado se revisa (≥7 fotogramas por clip contra la
+> ficha + voz y subtítulos) y lleva `semaforo_tanda` ANTES de decir que está
+> hecho. Nunca digas que una tanda está lista con `sin_revisar` > 0 en
+> `mis_tandas`. La web ya no deja bajar para publicar un vídeo sin semáforo o en
+> rojo. Por saltarse esto: -24 a la Estrella de Belén (réplica de Navidad con
+> IA, se encendía sola y el Nacimiento aparecía de la nada) y la cuenta a 118.
+
 Desde oct 2026 la cuenta de ness está en CRH **crítico** (140): cada sanción
 por «promoción de productos incoherente» cuesta 8-30 puntos y la deja más
 tiempo sin permisos. Por eso cada vídeo se revisa ANTES de subirlo y lleva un

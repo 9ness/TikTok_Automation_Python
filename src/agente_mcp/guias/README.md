@@ -1,5 +1,13 @@
 # Guías para agentes de IA — Tiktok Shop AI Pro
 
+> ⛔ **REGLA Nº 1 (Néstor, 18/10/2026): un vídeo NO está terminado hasta que
+> se comprueba.** Cada vídeo montado se revisa (≥7 fotogramas por clip contra la
+> ficha + voz y subtítulos) y lleva `semaforo_tanda` ANTES de decir que está
+> hecho. Nunca digas que una tanda está lista con `sin_revisar` > 0 en
+> `mis_tandas`. La web ya no deja bajar para publicar un vídeo sin semáforo o en
+> rojo. Por saltarse esto: -24 a la Estrella de Belén (réplica de Navidad con
+> IA, se encendía sola y el Nacimiento aparecía de la nada) y la cuenta a 118.
+
 > **Para quién es esto.** Para una IA (Claude en Chrome / Cowork, ChatGPT
 > Agent / Atlas, Claude Code o Codex en el VPS) a la que el operador le pide
 > que haga por él el trabajo de un menú de la app: bajar las fotos, generar

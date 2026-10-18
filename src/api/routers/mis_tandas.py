@@ -159,11 +159,14 @@ def set_oculto(
 def get_video(
     id: Annotated[str, Query()],
     descargar: Annotated[bool, Query()] = False,
+    forzar: Annotated[bool, Query()] = False,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> FileResponse:
-    """El vídeo de POV BOF o Largo (los del multimodo, por su nicho)."""
+    """El vídeo de POV BOF o Largo (los del multimodo, por su nicho).
+    `descargar` (bajarlo para publicar) exige semáforo verde o ámbar del
+    montaje; `forzar` es la confirmación explícita del operador en la web."""
     try:
-        path, nombre = servicio.video(usuario, id)
+        path, nombre = servicio.video(usuario, id, solo_revisado=descargar and not forzar)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
     return FileResponse(str(path), media_type="video/mp4", filename=nombre if descargar else None)

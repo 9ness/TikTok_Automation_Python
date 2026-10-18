@@ -627,7 +627,10 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False,
     Cada vídeo trae `id` (para `marcar_tanda` y `semaforo_tanda`), su nicho,
     catálogo, carpeta y producto (para ir a su menú), `descargar` y `semaforo`
     (null = sin revisar, o {color, motivo} de la revisión de ESE montaje),
-    `epoca` (cuándo publicarlo, ver `epoca_video`) y `habla`. En cuentas que en
+    `epoca` (cuándo publicarlo, ver `epoca_video`) y `habla`. Cada tanda trae
+    `sin_revisar`: **un vídeo no está terminado hasta que se comprueba** — nunca
+    digas que una tanda está lista con `sin_revisar` > 0 (la web no deja bajar
+    para publicar un vídeo sin semáforo o en rojo). En cuentas que en
     TikTok solo suben hablados (Ana) los mudos sin subir salen en `solo_meta`.
     `fotos=True`: el apartado «Fotos» — los carruseles de «Replicar carrusel»
     con al menos una foto, en sus PROPIAS tandas de diez (contador aparte de
@@ -659,8 +662,14 @@ async def mis_tandas(ctx: Context, todas: bool = False, fresco: bool = False,
                         f"&carpeta={quote(v['carpeta'], safe='')}"
                         f"&modo={quote(v.get('formato', ''), safe='')}&descargar=true")
             else:
-                ruta = f"/api/v1/mis-tandas/video?id={quote(v['id'], safe='')}&descargar=true"
+                # Sin `descargar=true`: el agente lo baja para REVISARLO, y la
+                # descarga para publicar exige semáforo (`sin_revisar`).
+                ruta = f"/api/v1/mis-tandas/video?id={quote(v['id'], safe='')}"
             v["descargar"] = archivos.enlace_interno(u, ruta)
+    if d.get("sin_revisar"):
+        d["aviso"] = (f"⛔ {d['sin_revisar']} vídeo(s) de tandas abiertas SIN REVISAR o en rojo: esas tandas "
+                      "NO están terminadas. Revísalos (7 fotogramas por clip contra la ficha) y pon "
+                      "`semaforo_tanda` antes de decir que están listas.")
     return _json(d)
 
 

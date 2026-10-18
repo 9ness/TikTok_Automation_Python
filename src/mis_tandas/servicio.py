@@ -207,6 +207,14 @@ def _semaforo_vigente(s: dict | None, f: dict) -> dict | None:
     return s
 
 
+def sin_revisar(v: dict) -> bool:
+    """Un vídeo NO está terminado hasta que se comprueba (18/10/2026: -24 a una
+    Estrella de Belén que se subió sin pasar por el semáforo). Cuenta como sin
+    revisar el que no tiene color vigente para ESE montaje y el que está en rojo."""
+    s = v.get("semaforo")
+    return not s or s.get("color") == "rojo"
+
+
 def poner_semaforo(usuario: str, id_: str, color: str, motivo: str = "", por: str = "") -> dict:
     """Pone (o quita, con color "") el semáforo de un vídeo. Rojo marca además
     «rehacer» con el motivo en los nichos que lo tienen."""
@@ -616,6 +624,8 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         items = t.get("items", [])
         t["semaforo"] = {c: sum(1 for v in items if (v.get("semaforo") or {}).get("color") == c and not v["uploaded"])
                          for c in config.SEMAFORO_COLORES}
+        # Lo pendiente que no se puede bajar ni dar por terminado.
+        t["sin_revisar"] = sum(1 for v in items if not v["uploaded"] and not v["sin_stock"] and sin_revisar(v))
     return {
         "usuario": usuario,
         "por_tanda": n_tanda,
@@ -630,6 +640,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         "esperando_stock": [_publica(f) for f in sin_stock],
         # Mudos sin subir de una cuenta `SOLO_HABLADOS`: no van a TikTok (Meta).
         "solo_meta": meta_items,
+        "sin_revisar": sum(t.get("sin_revisar", 0) for t in salida if t.get("abierta")),
         "tandas": salida,
     }
 
@@ -940,11 +951,20 @@ def _precalentar(usuario: str, lista: list[dict]) -> None:
     threading.Thread(target=_leer, daemon=True).start()
 
 
-def video(usuario: str, id_: str) -> tuple[Path, str]:
-    """(fichero, nombre). Para el multimodo se usa su propio endpoint."""
+def video(usuario: str, id_: str, solo_revisado: bool = False) -> tuple[Path, str]:
+    """(fichero, nombre). Para el multimodo se usa su propio endpoint.
+    `solo_revisado`: la DESCARGA para publicar — sin semáforo vigente o en
+    rojo no se entrega (ver `sin_revisar`). Ver o revisar el vídeo sí se puede."""
     f = _fila_de(usuario, id_)
     if f["nicho"] in ("mm", "alea"):
         raise ErrorTanda("Los vídeos de Moda Mujer se sirven desde su nicho.")
+    if solo_revisado:
+        sem = _semaforo_vigente(semaforos(usuario).get(id_), f)
+        if sin_revisar({"semaforo": sem}):
+            raise ErrorTanda(
+                "Este vídeo está en rojo: hay que rehacerlo." if sem else
+                "Este vídeo está SIN REVISAR: un vídeo no está terminado hasta que se comprueba. "
+                "Ponle el semáforo antes de bajarlo para publicar.", status=409)
     p = _copia_local(f, usuario)
     if not p or not p.is_file():
         raise ErrorTanda(f"El vídeo ya no está en {f['video_path']} (¿borrado de Drive?).", status=404)

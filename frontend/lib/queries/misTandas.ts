@@ -74,6 +74,8 @@ export interface Tanda {
   temporada?: string;
   /** Pendientes de subir por color del semáforo. */
   semaforo?: Record<ColorSemaforo, number>;
+  /** Pendientes sin semáforo vigente o en rojo: no se pueden bajar para publicar. */
+  sin_revisar?: number;
   items: VideoTanda[];
 }
 
@@ -93,6 +95,8 @@ export interface MisTandasResponse {
   esperando_stock: VideoTanda[];
   /** Cuentas que en TikTok solo suben hablados: los mudos sin subir (→ Meta). */
   solo_meta?: VideoTanda[];
+  /** Suma de `sin_revisar` de las tandas abiertas. */
+  sin_revisar?: number;
   tandas: Tanda[];
 }
 
@@ -279,7 +283,13 @@ function conApiKey(path: string): string {
 }
 
 /** El vídeo. Los del multimodo los sirve su nicho; el resto, este router. */
-export function buildVideoTandaUrl(v: VideoTanda, descargar = false): string {
+/** Un vídeo NO está terminado hasta que se comprueba (18/10/2026): sin
+ *  semáforo vigente o en rojo no se baja para publicar. Lo subido ya no cuenta. */
+export function sinRevisar(v: VideoTanda): boolean {
+  return !v.uploaded && (!v.semaforo || v.semaforo.color === "rojo");
+}
+
+export function buildVideoTandaUrl(v: VideoTanda, descargar = false, forzar = false): string {
   if (v.nicho === "mm" || v.nicho === "alea") {
     return conApiKey(
       `/api/v1/nicho-ropa/video?producto=${encodeURIComponent(v.producto)}` +
@@ -290,7 +300,8 @@ export function buildVideoTandaUrl(v: VideoTanda, descargar = false): string {
   }
   return conApiKey(
     `${ROOT}/video?id=${encodeURIComponent(v.id)}&v=${Math.round(v.video_listo_at)}` +
-      (descargar ? "&descargar=true" : ""),
+      (descargar ? "&descargar=true" : "") +
+      (forzar ? "&forzar=true" : ""),
   );
 }
 

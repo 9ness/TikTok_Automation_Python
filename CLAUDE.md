@@ -748,6 +748,9 @@ herramientas del mismo grupo en el futuro.
   diálogos con `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`, texto
   `text-xs sm:text-sm`, valores largos con `truncate`/`break-words`. La app
   se usa también desde móvil.
+- **Un vídeo no está terminado hasta que se comprueba** (18/10/2026): semáforo en
+  Mis tandas de cada vídeo antes de darlo por hecho; la web bloquea bajar para
+  publicar lo que no lo tiene (ver `src/agente_mcp/guias/mis-tandas.md`).
 - **Cost tracking obligatorio**: TODA llamada a API externa con coste (OpenAI,
   MiniMax, Atlas Cloud, …) debe pasar por un `record_*` de
   [`src/cost_tracking.py`](src/cost_tracking.py). El runner ya envuelve cada

@@ -211,6 +211,11 @@ programa: `betai:` (Pronósticos, escrito por `bet-ai-master`), `tiktok_shop:`,
   Escaparate/Subido/Vendió siempre la última. Lo que no encaje se añade a
   `components/tiktok-shop-ai-pro/` y se usa desde todos — no se inventa un
   diseño por pantalla.
+- **Un vídeo NO está terminado hasta que se comprueba (OBLIGATORIO, 18/10/2026).**
+  Todo vídeo montado (de cualquier nicho, réplicas incluidas) se revisa y lleva
+  semáforo en Mis tandas antes de darlo por hecho; una tanda con `sin_revisar` > 0
+  no está terminada. La web bloquea la descarga para publicar de lo que no tiene
+  semáforo o está en rojo (`servicio.sin_revisar`). Ver `guias/mis-tandas.md`.
 - **Refuerzo anti-sanción en TODO vídeo que se monte (OBLIGATORIO).** TikTok
   Shop sanciona por "promoción de productos incoherente" cuando no le queda
   claro que el vídeo enseña el producto enlazado, y lo decide una máquina. Así

@@ -43,3 +43,34 @@ def test_quitar_y_color_invalido(entorno):
     assert servicio.semaforos("ness") == {}
     with pytest.raises(servicio.ErrorTanda):
         servicio.poner_semaforo("ness", "largo|a|b|1|", "azul")
+
+
+def test_sin_revisar():
+    assert servicio.sin_revisar({"semaforo": None})
+    assert servicio.sin_revisar({"semaforo": {"color": "rojo"}})
+    assert not servicio.sin_revisar({"semaforo": {"color": "verde"}})
+    assert not servicio.sin_revisar({"semaforo": {"color": "ambar"}})
+
+
+def test_descarga_para_publicar_exige_semaforo(entorno, monkeypatch, tmp_path):
+    """18/10/2026: un vídeo no está terminado hasta que se comprueba."""
+    _, filas, _ = entorno
+    f = filas["largo|a|b|1|"]
+    f.update(nicho="largo", video_path=str(tmp_path / "v.mp4"))
+    (tmp_path / "v.mp4").write_bytes(b"x")
+    monkeypatch.setattr(servicio, "_copia_local", lambda fila, u: tmp_path / "v.mp4")
+    # ver / revisar: siempre
+    assert servicio.video("ness", "largo|a|b|1|")[0].name == "v.mp4"
+    # bajar para publicar: sin revisar → 409
+    with pytest.raises(servicio.ErrorTanda) as e:
+        servicio.video("ness", "largo|a|b|1|", solo_revisado=True)
+    assert e.value.status == 409 and "SIN REVISAR" in str(e.value)
+    servicio.poner_semaforo("ness", "largo|a|b|1|", "rojo", "producto distinto")
+    with pytest.raises(servicio.ErrorTanda):
+        servicio.video("ness", "largo|a|b|1|", solo_revisado=True)
+    servicio.poner_semaforo("ness", "largo|a|b|1|", "verde", "ok")
+    assert servicio.video("ness", "largo|a|b|1|", solo_revisado=True)[0].name == "v.mp4"
+    # se rehace el montaje: vuelve a estar sin revisar
+    f["video_listo_at"] = 300.0
+    with pytest.raises(servicio.ErrorTanda):
+        servicio.video("ness", "largo|a|b|1|", solo_revisado=True)

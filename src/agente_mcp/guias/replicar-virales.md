@@ -1,5 +1,18 @@
 # Replicar virales (vídeo ya montado): guía para agentes
 
+> ⛔ **REGLA Nº 1 (Néstor, 18/10/2026): un vídeo NO está terminado hasta que
+> se comprueba.** Cada vídeo montado se revisa (≥7 fotogramas por clip contra la
+> ficha + voz y subtítulos) y lleva `semaforo_tanda` ANTES de decir que está
+> hecho. Nunca digas que una tanda está lista con `sin_revisar` > 0 en
+> `mis_tandas`. La web ya no deja bajar para publicar un vídeo sin semáforo o en
+> rojo. Por saltarse esto: -24 a la Estrella de Belén (réplica de Navidad con
+> IA, se encendía sola y el Nacimiento aparecía de la nada) y la cuenta a 118.
+
+> **Navidad y productos que se encienden o se despliegan:** nada de unboxing con
+> IA donde el producto sale de la caja ya encendido, sin cable/interruptor, o
+> con piezas que aparecen o desaparecen entre planos. Mismo tamaño en todos los
+> planos. Si no sale idéntico a la ficha, 🔴 y se rehace o se descarta.
+
 > Pantalla: `/tiktok-shop-ai-pro/replicar-virales`. Código: `src/replicar_viral/video.py`,
 > API `/api/v1/replicar-viral/video*`, MCP `registrar_replica_video` /
 > `listar_replicas_video` / `borrar_replica_video`, `guia("replicar-virales")`.

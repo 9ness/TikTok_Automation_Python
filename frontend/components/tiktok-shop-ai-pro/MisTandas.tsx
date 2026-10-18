@@ -9,6 +9,7 @@ import { bajarEnOrden, nombreDescarga } from "@/lib/descargas";
 import {
   buildFotoTandaUrl,
   buildVideoTandaUrl,
+  sinRevisar,
   useCompletarTanda,
   useEpocaTanda,
   useMarcarTanda,
@@ -210,9 +211,18 @@ export function MisTandas() {
     if (!t) return;
     const clave = `${numero}|${soloPendientes ? "pendientes" : "todos"}`;
     setBajando(clave);
-    const elegidos = t.items
+    const candidatos = t.items
       .map((v, i) => ({ v, i }))
       .filter(({ v }) => (soloPendientes ? !v.uploaded && !v.sin_stock : !(v.sin_stock && !v.uploaded)));
+    // Un vídeo no está terminado hasta que se comprueba: lo que no tiene
+    // semáforo (o está en rojo) no se baja en bloque.
+    const elegidos = candidatos.filter(({ v }) => !sinRevisar(v));
+    const saltados = candidatos.length - elegidos.length;
+    if (saltados) toast.warning(`${saltados} vídeo(s) sin revisar o en rojo no se han bajado: ponles el semáforo primero`);
+    if (!elegidos.length) {
+      setBajando(null);
+      return;
+    }
     const r = await bajarEnOrden(
       elegidos.map(({ v, i }) => ({ href: buildVideoTandaUrl(v, true), nombre: nombre(numero, i, v) })),
       (hechos, total) => setProgreso(`${hechos}/${total}`),
@@ -474,6 +484,14 @@ export function MisTandas() {
                           🔁 {t.rehacer}
                         </span>
                       ) : null}
+                      {t.abierta && t.sin_revisar ? (
+                        <span
+                          title="Sin semáforo o en rojo: la tanda no está terminada y no se bajan para publicar"
+                          className="rounded-full bg-red-500/15 px-1.5 py-px text-[9px] font-semibold text-red-500"
+                        >
+                          ⚪ {t.sin_revisar} sin revisar
+                        </span>
+                      ) : null}
                       {t.semaforo && t.semaforo.verde + t.semaforo.ambar + t.semaforo.rojo > 0 ? (
                         <span
                           title="Revisión antes de subir (pendientes): sin dudas · producto complejo · rehacer"
@@ -639,10 +657,23 @@ export function MisTandas() {
                               navegador baja cada vídeo por su cuenta y se pueden
                               pedir varios a la vez sin esperar. */}
                           <a
-                            href={buildVideoTandaUrl(v, true)}
+                            href={buildVideoTandaUrl(v, true, sinRevisar(v))}
                             download={nombre(t.numero, i, v)}
-                            title="Descargar este vídeo"
-                            className="flex shrink-0 items-center rounded-md border border-border/60 px-1.5 py-1 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => {
+                              if (
+                                sinRevisar(v) &&
+                                !window.confirm(
+                                  v.semaforo
+                                    ? "Este vídeo está en ROJO: hay que rehacerlo. ¿Bajarlo igualmente?"
+                                    : "Este vídeo está SIN REVISAR. Un vídeo no está terminado hasta que se comprueba. ¿Bajarlo igualmente?",
+                                )
+                              )
+                                e.preventDefault();
+                            }}
+                            title={sinRevisar(v) ? "Sin revisar: no publicar sin comprobarlo" : "Descargar este vídeo"}
+                            className={`flex shrink-0 items-center rounded-md border px-1.5 py-1 hover:text-foreground ${
+                              sinRevisar(v) ? "border-red-500/60 text-red-500" : "border-border/60 text-muted-foreground"
+                            }`}
                           >
                             <Download className="h-3 w-3" />
                           </a>
