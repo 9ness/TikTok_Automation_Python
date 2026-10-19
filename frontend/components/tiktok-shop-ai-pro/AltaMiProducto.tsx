@@ -40,6 +40,9 @@ export function AltaMiProducto({
   // título solo, Gemini estira lo mismo con más adjetivos.
   const refExtras = useRef<HTMLInputElement>(null);
   const [extras, setExtras] = useState<File[]>([]);
+  // El enlace de TikTok Shop: con él el producto nace enlazado y no hay que
+  // buscarlo después (ropa de Ana, productos físicos).
+  const [url, setUrl] = useState("");
   const [abierto, setAbierto] = useState(false);
   // El WebView de la APK devuelve la selección VACÍA cuando el input lleva
   // `multiple`: se eligen las cuatro capturas y no llega ninguna, sin error
@@ -54,7 +57,7 @@ export function AltaMiProducto({
   // veinte productos eso es media hora mirando la pantalla de uno en uno, así
   // que se preparan todos y se sube del tirón.
   const [cola, setCola] = useState<
-    { limpia: File; ficha: File | null; extras: File[] }[]
+    { limpia: File; ficha: File | null; extras: File[]; url: string }[]
   >([]);
   const [subiendoLote, setSubiendoLote] = useState(0);
 
@@ -62,6 +65,7 @@ export function AltaMiProducto({
     setLimpia(null);
     setFicha(null);
     setExtras([]);
+    setUrl("");
     if (refLimpia.current) refLimpia.current.value = "";
     if (refFicha.current) refFicha.current.value = "";
     if (refExtras.current) refExtras.current.value = "";
@@ -72,7 +76,7 @@ export function AltaMiProducto({
       toast.error("Falta la foto del producto.");
       return;
     }
-    setCola((prev) => [...prev, { limpia, ficha, extras }]);
+    setCola((prev) => [...prev, { limpia, ficha, extras, url }]);
     limpiarCampos();
   }
 
@@ -90,6 +94,7 @@ export function AltaMiProducto({
           fotoFicha: item.ficha,
           fotosExtra: item.extras,
           source,
+          productUrl: item.url,
         });
         ultimaCarpeta = r.carpeta;
         setCola((prev) => prev.filter((x) => x !== item));
@@ -113,7 +118,7 @@ export function AltaMiProducto({
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source },
+      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url },
       {
         onSuccess: (r) => {
           toast.success(
@@ -216,6 +221,20 @@ export function AltaMiProducto({
           </span>
         )}
       </label>
+      <label className="flex flex-col gap-1 rounded-lg border border-dashed border-border/60 p-2.5">
+        <span className="text-[11px] font-semibold">URL del producto (opcional)</span>
+        <span className="text-[10px] text-muted-foreground">
+          El enlace de TikTok Shop: así queda enlazado desde ya.
+        </span>
+        <input
+          type="url"
+          inputMode="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://www.tiktok.com/view/product/…"
+          className="mt-1 w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
+        />
+      </label>
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         <button
           type="button"
@@ -255,6 +274,7 @@ export function AltaMiProducto({
                   {i + 1}. {item.limpia.name}
                   {item.ficha ? " + ficha" : " · sin ficha"}
                   {item.extras.length ? ` + ${item.extras.length} captura(s)` : ""}
+                  {item.url ? " + URL" : ""}
                 </span>
                 {!subiendoLote && (
                   <button

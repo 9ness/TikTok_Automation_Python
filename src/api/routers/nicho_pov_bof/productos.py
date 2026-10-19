@@ -1447,8 +1447,13 @@ async def crear_mi_producto(
     foto_ficha: Annotated[UploadFile | None, File()] = None,
     fotos_extra: Annotated[list[UploadFile] | None, File()] = None,
     source: Annotated[str, Query()] = "mis_productos",
+    product_url: Annotated[str, Form()] = "",
 ) -> dict:
     """Alta de un producto PROPIO subiendo sus dos fotos.
+
+    `product_url` (opcional): el enlace de TikTok Shop, para que el producto
+    nazca ya enlazado. Va al documento (`url_de` lo lee de ahí mientras no
+    tenga textos con los que entrar en el índice de fichas).
 
     A partir de aquí se comporta igual que uno del curso: las fotos se guardan
     con el mismo convenio de nombres (`3.png` / `3(1).png`), así que el
@@ -1514,6 +1519,20 @@ async def crear_mi_producto(
         )
     except Exception:  # noqa: BLE001 — las fotos ya están; esto es un apunte
         pass
+
+    url = (product_url or "").strip()
+    if url:
+        from src.nicho_pov_bof.repos import product_repo
+        from src.nicho_pov_bof.services import product_url as url_svc
+
+        try:
+            product_repo.update_product(
+                source, str(creado.get("carpeta") or ""), str(creado.get("producto") or ""),
+                product_url=url, product_id=url_svc.id_desde_url(url),
+            )
+            creado = {**creado, "product_url": url}
+        except Exception:  # noqa: BLE001 — se puede poner después en la tarjeta
+            pass
 
     return {"source": source, **creado}
 

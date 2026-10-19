@@ -102,7 +102,8 @@ o un borde, aplica el mismo encuadre.
 Receta de los virales de reacción (referencias en
 `_agente/_referencias/ganchos_reaccion/` con su `LEEME.md`). El producto sale
 del catálogo **«📦 Productos físicos»** (`productos_fisicos`): los que Néstor
-tiene en casa, subidos por él con foto limpia + ficha. Casca Chollos: **máx.
+tiene en casa, subidos por él con foto limpia + ficha + URL de TikTok Shop
+(campo opcional del alta: el producto nace enlazado). Casca Chollos: **máx.
 3 vídeos/día**.
 
 1. **Gancho IA, 2-3 s, SIN el producto** (así no hay nada que la IA pueda

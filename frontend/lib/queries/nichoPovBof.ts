@@ -333,13 +333,16 @@ export function useCrearMiProducto() {
        *  las que dan de qué hablar en un guion de 30-40s. */
       fotosExtra?: File[];
       source?: string;
+      /** Enlace de TikTok Shop (opcional): el producto nace ya enlazado. */
+      productUrl?: string;
     }
   >({
-    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos" }) => {
+    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl }) => {
       const fd = new FormData();
       fd.append("foto_limpia", fotoLimpia);
       if (fotoFicha) fd.append("foto_ficha", fotoFicha);
       for (const f of fotosExtra ?? []) fd.append("fotos_extra", f);
+      if (productUrl?.trim()) fd.append("product_url", productUrl.trim());
       return api.post(`${ROOT}/mis-productos?source=${encodeURIComponent(source)}`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
