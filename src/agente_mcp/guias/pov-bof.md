@@ -92,7 +92,8 @@ limpia metadatos. **El clip va mudo** (el audio se descarta).
 - `GET /api/v1/nicho-pov-bof/prompts` → `imagen`, `video`.
 - `GET /api/v1/nicho-pov-bof/folders?source=<catálogo>`
 
-Slugs de catálogo: `mis_productos`, `tareas_productos`, `productos_web`,
+Slugs de catálogo: `mis_productos`, `tareas_productos`, `productos_fisicos`
+(los que el operador tiene en casa y graba de verdad), `productos_web`,
 `inventario_general`, `top_vendidos`.
 
 ## Con el MCP

@@ -97,6 +97,33 @@ del producto, subtítulos si hay voz, flecha, música solo libre de derechos doc
 cierre con sentido y metadatos limpios. Si las tomas llevan marca de agua
 o un borde, aplica el mismo encuadre.
 
+## 2b. Gancho con IA + producto real (Casca Chollos, 19/10/2026)
+
+Receta de los virales de reacción (referencias en
+`_agente/_referencias/ganchos_reaccion/` con su `LEEME.md`). El producto sale
+del catálogo **«📦 Productos físicos»** (`productos_fisicos`): los que Néstor
+tiene en casa, subidos por él con foto limpia + ficha. Casca Chollos: **máx.
+3 vídeos/día**.
+
+1. **Gancho IA, 2-3 s, SIN el producto** (así no hay nada que la IA pueda
+   deformar): el cascanueces naranja reacciona — se le cae el vaso, se desmaya,
+   se queda boquiabierto y señala, barrido de cámara hacia donde mira. Varias
+   versiones por producto, rotando; nunca el mismo gancho dos días seguidos.
+2. **Gancho de texto** quemado desde el segundo 0 (corto, curiosidad, sin
+   precio ni promesas que la ficha no tenga): «No sabía que esto existía»,
+   «Esto me lo tenía que haber comprado antes»…
+3. **Néstor en primera persona ~2 s** enseñando el producto en la mano.
+4. **Funcionalidades con muchos cambios de plano** (1-2 s cada uno): tomas
+   REALES de Néstor siempre que se pueda (es lo que la política AIGC no
+   puede tocar). IA solo en planos donde el producto quede idéntico a la ficha
+   y sin hacer nada irreal (nada se enciende, despliega ni mueve solo).
+5. Acabado del punto 1.5 (nombre del producto, subtítulos si hay voz, flecha,
+   música solo libre de derechos documentada, metadatos limpios) y etiqueta
+   «Contenido generado por IA» al publicar si lleva planos de IA.
+
+Se registra como `sin_ia` si todo lo que enseña el producto es real (el
+gancho no lo enseña) y `con_ia` si algún plano del producto es generado.
+
 ## 3. Registrar → Mis tandas → semáforo
 
 Deja el MP4 en tu bandeja (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`, por

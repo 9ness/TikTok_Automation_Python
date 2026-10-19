@@ -29,6 +29,30 @@ repetir (hasta el máximo que acordaste con el operador).
 > lado con la foto limpia y no sigas hasta que no haya ninguna diferencia en
 > el producto. En electrónica, pantallas apagadas y nada encendido.
 
+## Política AIGC de TikTok Shop (oficial, leída el 19/10/2026)
+
+Fuente: Seller University, `knowledge_id=5234615598237462`. Es la base del
+cuestionario «IPP de la AIGC» y de las sanciones por vídeos con IA.
+
+- **Etiquetar SIEMPRE** el vídeo con IA: interruptor «Contenido generado por
+  IA» al publicar (o texto/nota en pantalla o descripción). Sin etiqueta →
+  retiran el producto del vídeo.
+- **Prohibido**:
+  - suplantar a famosos o a personas reales (deepfakes), o crear avatares que
+    parezcan médicos, sanitarios, policías, militares o jueces;
+  - imágenes de salud que meten miedo (órganos dañados, «desintoxicación»);
+  - **funcionalidad exagerada**: resultados imposibles, curar enfermedades,
+    antes/después falsos;
+  - **atributos incorrectos**: cambiar tamaño, embalaje o características,
+    pasar algo de 2D a 3D, **animar el producto de forma irreal** (se enciende
+    solo, se despliega de la caja, se mueve solo);
+  - **contenido repetitivo**: muchos vídeos idénticos o casi idénticos de
+    poco esfuerzo (el límite de Ana);
+  - logos o marcas sin autorización, o contenido copiado.
+- **Sanciones**: límite de publicación (p. ej. 15 vídeos/30 días), menos
+  tráfico, suspensión de cuenta o de permisos de venta, retención de
+  comisiones.
+
 ## Imagen generada — rechazar si…
 
 **El producto**

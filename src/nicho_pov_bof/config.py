@@ -89,6 +89,15 @@ SOURCES: dict[str, dict[str, str]] = {
         "folder": "temporada_q4",
         "propia": "1",
     },
+    # Productos FÍSICOS que el operador tiene en casa (19 oct 2026): los sube
+    # él (foto limpia + ficha) para grabarlos de verdad —gancho con IA y
+    # el resto real— en cualquier formato. Catálogo del operador como los de
+    # arriba: mismas carpetas de diez y mismo convenio de nombres.
+    "productos_fisicos": {
+        "label": "📦 Productos físicos",
+        "folder": "productos_fisicos",
+        "propia": "1",
+    },
     # Los productos de «Replicar carrusel» (8 oct 2026): se dan de alta en esa
     # pantalla con foto limpia + ficha + URL y se COMPARTEN entre usuarios para
     # replicar el mismo carrusel viral en otra cuenta. Catálogo del operador
@@ -140,6 +149,9 @@ SOURCES: dict[str, dict[str, str]] = {
 MIS_PRODUCTOS_POR_CARPETA = 10
 MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
 TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/temporada_q4"
+PRODUCTOS_FISICOS_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_fisicos"
+)
 CARRUSELES_VIRALES_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/carruseles_virales"
 )
@@ -155,6 +167,7 @@ CATALOGOS_OPERADOR: dict[str, dict[str, str]] = {
     "tareas_productos": {"root": TAREAS_PRODUCTOS_ROOT, "prefijo": "Tareas Productos"},
     "temporada_q4": {"root": TEMPORADA_Q4_ROOT, "prefijo": "Temporada Q4"},
     "carruseles_virales": {"root": CARRUSELES_VIRALES_ROOT, "prefijo": "Carruseles Virales"},
+    "productos_fisicos": {"root": PRODUCTOS_FISICOS_ROOT, "prefijo": "Productos Fisicos"},
 }
 
 
