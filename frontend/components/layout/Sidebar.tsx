@@ -54,7 +54,7 @@ import { SelectorCuenta } from "@/components/layout/SelectorCuenta";
 import { useDiagnosticsSummary } from "@/lib/queries/diagnostics";
 import { MENU_PREFS_VACIAS, useMenuPrefs, type MenuPrefs } from "@/lib/queries/uiMenu";
 import { useGlobalFolderCounts } from "@/lib/queries/editor-auto";
-import { Inbox, LogOut, User } from "lucide-react";
+import { Inbox, LogOut, Upload, User } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -124,6 +124,9 @@ const NAV: NavGroup[] = [
       // Lo primero de todo para los tres: los vídeos ya montados de todos los
       // nichos, de diez en diez para subirlos (`src/mis_tandas/`).
       { href: "/tiktok-shop-ai-pro/mis-tandas", label: "Mis tandas", icon: ListChecks },
+      // Alta de los productos FÍSICOS de cada cuenta (catálogo filtrado por
+      // usuario en el backend: ness/nestor2 el suyo, Ana el suyo).
+      { href: "/tiktok-shop-ai-pro/subir-productos", label: "Subir productos", icon: Upload },
       { href: "/tiktok-shop-ai-pro/replicar-carrusel", label: "Replicar carrusel", icon: GalleryHorizontalEnd },
       // MP4 de un viral replicado y YA MONTADO por el agente (con IA o real).
       { href: "/tiktok-shop-ai-pro/replicar-virales", label: "Replicar virales", icon: Clapperboard },
@@ -190,6 +193,7 @@ const BASE_AI_PRO = "/tiktok-shop-ai-pro";
 /** Lo que se usa a diario va primero; el resto sigue debajo en su orden. */
 const ORDEN_AI_PRO = [
   `${BASE_AI_PRO}/mis-tandas`,
+  `${BASE_AI_PRO}/subir-productos`,
   `${BASE_AI_PRO}/replicar-carrusel`,
   `${BASE_AI_PRO}/replicar-virales`,
   `${BASE_AI_PRO}/viralizacion`,
@@ -215,6 +219,7 @@ const ORDEN_AI_PRO = [
  *  (el backend corta aparte lo que no les toca, ver `_PREFIJOS_PRO`). */
 const ITEMS_PRO = [
   `${BASE_AI_PRO}/mis-tandas`,
+  `${BASE_AI_PRO}/subir-productos`,
   // Como «Replicar viral» (MCP): sus rutas ya están en `_PREFIJOS_PRO`.
   `${BASE_AI_PRO}/replicar-carrusel`,
   `${BASE_AI_PRO}/replicar-virales`,

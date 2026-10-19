@@ -335,14 +335,17 @@ export function useCrearMiProducto() {
       source?: string;
       /** Enlace de TikTok Shop (opcional): el producto nace ya enlazado. */
       productUrl?: string;
+      /** Carpeta destino: vacía = la que toca; "__nueva__" = abre otra. */
+      carpeta?: string;
     }
   >({
-    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl }) => {
+    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl, carpeta }) => {
       const fd = new FormData();
       fd.append("foto_limpia", fotoLimpia);
       if (fotoFicha) fd.append("foto_ficha", fotoFicha);
       for (const f of fotosExtra ?? []) fd.append("fotos_extra", f);
       if (productUrl?.trim()) fd.append("product_url", productUrl.trim());
+      if (carpeta) fd.append("carpeta", carpeta);
       return api.post(`${ROOT}/mis-productos?source=${encodeURIComponent(source)}`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),

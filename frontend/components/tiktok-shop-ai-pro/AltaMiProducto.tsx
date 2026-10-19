@@ -25,7 +25,13 @@ import { useCrearMiProducto } from "@/lib/queries/nichoPovBof";
 export function AltaMiProducto({
   source = "mis_productos",
   onCreado,
+  carpeta = "",
+  abiertoInicial = false,
 }: {
+  /** Carpeta destino (pantalla «Subir productos»); vacía = la que toca. */
+  carpeta?: string;
+  /** Desplegado de entrada (en su pantalla propia no tiene sentido plegarlo). */
+  abiertoInicial?: boolean;
   /** En cuál de los dos catálogos del operador cae el producto. */
   source?: string;
   onCreado?: (carpeta: string) => void;
@@ -43,7 +49,7 @@ export function AltaMiProducto({
   // El enlace de TikTok Shop: con él el producto nace enlazado y no hay que
   // buscarlo después (ropa de Ana, productos físicos).
   const [url, setUrl] = useState("");
-  const [abierto, setAbierto] = useState(false);
+  const [abierto, setAbierto] = useState(abiertoInicial);
   // El WebView de la APK devuelve la selección VACÍA cuando el input lleva
   // `multiple`: se eligen las cuatro capturas y no llega ninguna, sin error
   // (ver learnings.md). Dentro de la app el mismo botón acumula de una en una.
@@ -86,6 +92,8 @@ export function AltaMiProducto({
     // que ya subieron se quedan subidos.
     const pendientes = [...cola];
     let ultimaCarpeta = "";
+    // «Carpeta nueva» se abre UNA vez: el resto de la cola va a la misma.
+    let destino = carpeta;
     for (const [i, item] of pendientes.entries()) {
       setSubiendoLote(i + 1);
       try {
@@ -95,8 +103,10 @@ export function AltaMiProducto({
           fotosExtra: item.extras,
           source,
           productUrl: item.url,
+          carpeta: destino,
         });
         ultimaCarpeta = r.carpeta;
+        if (destino === "__nueva__") destino = r.carpeta;
         setCola((prev) => prev.filter((x) => x !== item));
       } catch (e) {
         setSubiendoLote(0);
@@ -118,7 +128,7 @@ export function AltaMiProducto({
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url },
+      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url, carpeta },
       {
         onSuccess: (r) => {
           toast.success(

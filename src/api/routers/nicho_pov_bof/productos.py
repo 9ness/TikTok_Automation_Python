@@ -1448,6 +1448,7 @@ async def crear_mi_producto(
     fotos_extra: Annotated[list[UploadFile] | None, File()] = None,
     source: Annotated[str, Query()] = "mis_productos",
     product_url: Annotated[str, Form()] = "",
+    carpeta: Annotated[str, Form()] = "",
 ) -> dict:
     """Alta de un producto PROPIO subiendo sus dos fotos.
 
@@ -1504,7 +1505,10 @@ async def crear_mi_producto(
             nombre_ficha=(foto_ficha.filename or "") if foto_ficha else "",
             source=source,
             extras=extras,
+            carpeta=carpeta,
         )
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
     except OSError as e:
         raise APIError(f"No se pudieron guardar las fotos: {e}", status_code=500) from e
 

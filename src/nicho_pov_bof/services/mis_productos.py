@@ -155,12 +155,21 @@ def _extension(filename: str) -> str:
     return ext if ext in _EXTS else ".jpg"
 
 
+# Valor de `carpeta` que pide abrir una carpeta nueva al dar de alta.
+NUEVA = "__nueva__"
+
+
 def guardar_producto(
     limpia: bytes, ficha: bytes | None, *,
     nombre_limpia: str = "", nombre_ficha: str = "", source: str = SOURCE,
     extras: list[tuple[bytes, str]] | None = None,
+    carpeta: str = "",
 ) -> dict:
     """Guarda las fotos y devuelve `{carpeta, producto}`.
+
+    `carpeta` (pantalla «Subir productos»): vacía = la que toca (la última con
+    hueco); `NUEVA` = abre la siguiente; un nombre = esa, si existe y tiene
+    hueco (si no, ValueError).
 
     La ficha es opcional: sin ella el producto existe igual y el título se
     escribe a mano (o se reintenta luego con otra captura).
@@ -171,7 +180,21 @@ def guardar_producto(
     con la principal. Sirven para los guiones largos: con el título solo no
     hay de qué hablar treinta segundos.
     """
-    carpeta = carpeta_actual(source)
+    elegida = (carpeta or "").strip()
+    existentes = carpetas(source)
+    if elegida == NUEVA:
+        carpeta = (
+            f"{_prefijo(source)} {_num_carpeta(existentes[-1]) + 1}"
+            if existentes else f"{_prefijo(source)} 1"
+        )
+    elif elegida:
+        if elegida not in existentes:
+            raise ValueError(f"La carpeta «{elegida}» no existe en este catálogo.")
+        if len(_productos_en(elegida, source)) >= config.MIS_PRODUCTOS_POR_CARPETA:
+            raise ValueError(f"La carpeta «{elegida}» ya tiene {config.MIS_PRODUCTOS_POR_CARPETA} productos.")
+        carpeta = elegida
+    else:
+        carpeta = carpeta_actual(source)
     destino = _dir(source) / carpeta
     destino.mkdir(parents=True, exist_ok=True)
     producto = siguiente_producto(carpeta, source)
@@ -183,7 +206,8 @@ def guardar_producto(
     # ocupado se relee de verdad y se coge el siguiente.
     if any((destino / f"{producto}{ext}").exists() for ext in _EXTS):
         _LISTADOS.pop(f"{source}:fotos:{carpeta}", None)
-        carpeta = carpeta_actual(source)
+        if not elegida:
+            carpeta = carpeta_actual(source)
         destino = _dir(source) / carpeta
         destino.mkdir(parents=True, exist_ok=True)
         producto = siguiente_producto(carpeta, source)
