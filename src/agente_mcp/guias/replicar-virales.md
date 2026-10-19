@@ -140,6 +140,12 @@ Vídeo de 12-15 s, muy variado:
    producto incoherente, de momento sin «comprobar vídeo»). El semáforo en Mis
    tandas sigue siendo obligatorio.
 
+**Mientras Ana no tenga los clips reales** (19/10/2026) sube vídeos SOLO de IA,
+de calidad. Hasta el 24/10 su cuenta está limitada a 1 vídeo/día: la apelación
+se rechazó y no se vuelve a apelar. Después, 3-4 al día como mucho y nunca dos
+de IA parecidos seguidos (misma chica, encuadre o plantilla). Cuando lleguen los
+clips reales, se pasa a esta receta.
+
 Hay dos «📦 Productos físicos»: `productos_fisicos` (solo ness y nestor2) y `productos_fisicos_ana` (solo Ana, ropa y lo que tenga en casa); ninguno ve el del otro.
 
 ## 3. Registrar → Mis tandas → semáforo
