@@ -119,6 +119,19 @@ Sin tomas reales del producto, el agente no se inventa el plano de Néstor:
 monta con planos de IA de calidad (receta del punto 4) o deja el producto para
 cuando lleguen.
 
+**Variante «sitio real + producto con Omni» (Casca Chollos, 19/10/2026).** Sirve
+para productos del Inventario General que Néstor NO tiene en casa. Néstor graba
+rincones de su piso, sin producto, en tomas de ~30 s con 3 huecos donde iría el
+producto (uno cada ~12 s), y las sube a `_agente/_clips_reales/nestor2/sitios/`
+con nombre por sitio (`cocina_1.mp4`…). El agente corta trozos de 10-12 s (uno
+por producto, sin repetir trozo), los pasa a SDR 1080×1920 H.264 y en **Omni de
+Magnific** (vídeo + foto limpia → vídeo, 720p, **1.600 créditos el clip**) pone
+el producto en la escena. Va con el gancho IA y el texto de abajo, y se registra
+`con_ia`. Sin productos con luces ni pantallas. Créditos: plan Premium+ con
+~24.000 al mes, que **no se acumulan** (se reinician con el cobro, el día 24
+de cada mes), y el Unlimited sigue suspendido. Avisa del coste antes de lanzar
+cada tanda.
+
 1. **Gancho IA, 2-3 s, SIN el producto** (así no hay nada que la IA pueda
    deformar): el cascanueces naranja reacciona — se le cae el vaso, se desmaya,
    se queda boquiabierto y señala, barrido de cámara hacia donde mira. Varias
