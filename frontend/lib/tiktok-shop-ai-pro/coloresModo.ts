@@ -107,7 +107,7 @@ const CATALOGOS: [string, string][] = [
   ["temporada_q4", "border-red-500/70 text-red-600 dark:text-red-400"],
   ["carruseles_virales", "border-violet-500/60 text-violet-700 dark:text-violet-300"],
   ["productos_fisicos", "border-orange-500/60 text-orange-700 dark:text-orange-300"],
-  ["ropa_fisica_ana", "border-rose-500/60 text-rose-700 dark:text-rose-300"],
+  ["productos_fisicos_ana", "border-rose-500/60 text-rose-700 dark:text-rose-300"],
   ["aleatorios", "border-zinc-400/70 text-zinc-600 dark:text-zinc-300"],
   ["replicar_viral", "border-teal-500/60 text-teal-700 dark:text-teal-300"],
 ];

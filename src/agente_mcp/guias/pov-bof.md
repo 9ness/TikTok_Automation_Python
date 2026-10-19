@@ -93,7 +93,7 @@ limpia metadatos. **El clip va mudo** (el audio se descarta).
 - `GET /api/v1/nicho-pov-bof/folders?source=<catálogo>`
 
 Slugs de catálogo: `mis_productos`, `tareas_productos`, `productos_fisicos`
-(ness/nestor2) y `ropa_fisica_ana` (Ana) — lo que tienen en casa y graban de verdad —, `productos_web`,
+(ness/nestor2) y `productos_fisicos_ana` (Ana) — lo que tienen en casa y graban de verdad —, `productos_web`,
 `inventario_general`, `top_vendidos`.
 
 ## Con el MCP

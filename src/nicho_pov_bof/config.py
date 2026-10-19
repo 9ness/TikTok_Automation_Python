@@ -94,19 +94,19 @@ SOURCES: dict[str, dict[str, str]] = {
     # el resto real— en cualquier formato. Catálogo del operador como los de
     # arriba: mismas carpetas de diez y mismo convenio de nombres.
     # `usuarios`: solo sale en el selector de esas cuentas (lo de Néstor no
-    # es de Ana, y la ropa de Ana va en su catálogo propio, el de abajo).
+    # es de Ana: ella tiene el suyo, el de abajo, con la misma etiqueta).
     "productos_fisicos": {
         "label": "📦 Productos físicos",
         "folder": "productos_fisicos",
         "propia": "1",
         "usuarios": "ness,nestor2",
     },
-    # La ropa que Ana tiene en casa: gancho con IA en tienda + ella tirándola
+    # Lo que Ana tiene en casa (ropa y lo demás): gancho con IA en tienda + ella tirándola
     # al sofá + la chica probándosela en el espejo (receta en
     # `replicar-virales.md`). Mismo mecanismo que el de Néstor, solo para ella.
-    "ropa_fisica_ana": {
-        "label": "👗 Ropa física",
-        "folder": "ropa_fisica_ana",
+    "productos_fisicos_ana": {
+        "label": "📦 Productos físicos",
+        "folder": "productos_fisicos_ana",
         "propia": "1",
         "usuarios": "ana",
     },
@@ -164,8 +164,8 @@ TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/
 PRODUCTOS_FISICOS_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_fisicos"
 )
-ROPA_FISICA_ANA_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/ropa_fisica_ana"
+PRODUCTOS_FISICOS_ANA_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_fisicos_ana"
 )
 CARRUSELES_VIRALES_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/carruseles_virales"
@@ -183,7 +183,7 @@ CATALOGOS_OPERADOR: dict[str, dict[str, str]] = {
     "temporada_q4": {"root": TEMPORADA_Q4_ROOT, "prefijo": "Temporada Q4"},
     "carruseles_virales": {"root": CARRUSELES_VIRALES_ROOT, "prefijo": "Carruseles Virales"},
     "productos_fisicos": {"root": PRODUCTOS_FISICOS_ROOT, "prefijo": "Productos Fisicos"},
-    "ropa_fisica_ana": {"root": ROPA_FISICA_ANA_ROOT, "prefijo": "Ropa Fisica"},
+    "productos_fisicos_ana": {"root": PRODUCTOS_FISICOS_ANA_ROOT, "prefijo": "Productos Fisicos"},
 }
 
 

@@ -124,7 +124,7 @@ tiene en casa, subidos por él con foto limpia + ficha. Casca Chollos: **máx.
 Se registra como `sin_ia` si todo lo que enseña el producto es real (el
 gancho no lo enseña) y `con_ia` si algún plano del producto es generado.
 
-### Variante ropa (Ana, catálogo «👗 Ropa física», `ropa_fisica_ana`)
+### Variante ropa (Ana, su catálogo «📦 Productos físicos», `productos_fisicos_ana`)
 
 Vídeo de 12-15 s, muy variado:
 1. **Gancho IA en una tienda, 2-3 s**, sin la prenda: dos chicas se desmayan,
@@ -138,7 +138,7 @@ Vídeo de 12-15 s, muy variado:
    producto incoherente, de momento sin «comprobar vídeo»). El semáforo en Mis
    tandas sigue siendo obligatorio.
 
-«📦 Productos físicos» solo lo ven ness y nestor2; «👗 Ropa física», solo Ana.
+Hay dos «📦 Productos físicos»: `productos_fisicos` (solo ness y nestor2) y `productos_fisicos_ana` (solo Ana, ropa y lo que tenga en casa); ninguno ve el del otro.
 
 ## 3. Registrar → Mis tandas → semáforo
 
