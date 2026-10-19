@@ -107,6 +107,18 @@ tiene en casa, subidos por él con foto limpia + ficha + URL de TikTok Shop
 (`/tiktok-shop-ai-pro/subir-productos`), eligiendo carpeta o automática. Casca Chollos: **máx.
 3 vídeos/día**.
 
+**Reparto del trabajo.** Néstor solo da de alta el producto (foto + ficha +
+enlace) y, cuando puede, sube sus tomas reales en bruto, sin cortar ni editar, a
+`TIKTOK_SHOP_AI_PRO/_agente/_clips_reales/<cuenta>/` (`nestor2` o `ana`). Si
+el nombre del fichero no dice de qué producto es, se averigua comparando los
+fotogramas con las fotos del catálogo. TODO lo demás lo hace el agente cuando se
+le pide el vídeo: elige gancho y texto, genera el gancho IA, corta las tomas
+reales en los planos que quiera, monta, revisa y registra. Al usar una toma, la
+mueve a `usados/` (puede volver a servir para otro vídeo con otros cortes).
+Sin tomas reales del producto, el agente no se inventa el plano de Néstor:
+monta con planos de IA de calidad (receta del punto 4) o deja el producto para
+cuando lleguen.
+
 1. **Gancho IA, 2-3 s, SIN el producto** (así no hay nada que la IA pueda
    deformar): el cascanueces naranja reacciona — se le cae el vaso, se desmaya,
    se queda boquiabierto y señala, barrido de cámara hacia donde mira. Varias
@@ -132,7 +144,9 @@ Vídeo de 12-15 s, muy variado:
 1. **Gancho IA en una tienda, 2-3 s**, sin la prenda: dos chicas se desmayan,
    se quedan boquiabiertas, se giran de golpe… + gancho de texto fuerte.
 2. **Clip real de Ana** (sin IA): tira la prenda al sofá y la estira o la
-   toca. Es el segundo gancho.
+   toca. Es el segundo gancho. Las tomas en bruto llegan a
+   `_agente/_clips_reales/ana/`, y el reparto del trabajo es el mismo de
+   arriba: los cortes los decide el agente.
 3. **La chica probándosela frente al espejo, ~4 s en varias tomas** distintas
    (IA con la foto limpia como ingrediente: diseño, color, estampado, corte y
    largo idénticos a la foto).
