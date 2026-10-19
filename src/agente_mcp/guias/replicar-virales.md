@@ -124,6 +124,22 @@ tiene en casa, subidos por él con foto limpia + ficha. Casca Chollos: **máx.
 Se registra como `sin_ia` si todo lo que enseña el producto es real (el
 gancho no lo enseña) y `con_ia` si algún plano del producto es generado.
 
+### Variante ropa (Ana, catálogo «👗 Ropa física», `ropa_fisica_ana`)
+
+Vídeo de 12-15 s, muy variado:
+1. **Gancho IA en una tienda, 2-3 s**, sin la prenda: dos chicas se desmayan,
+   se quedan boquiabiertas, se giran de golpe… + gancho de texto fuerte.
+2. **Clip real de Ana** (sin IA): tira la prenda al sofá y la estira o la
+   toca. Es el segundo gancho.
+3. **La chica probándosela frente al espejo, ~4 s en varias tomas** distintas
+   (IA con la foto limpia como ingrediente: diseño, color, estampado, corte y
+   largo idénticos a la foto).
+4. La música la pone Ana al publicar (en ropa no ha habido sanciones por
+   producto incoherente, de momento sin «comprobar vídeo»). El semáforo en Mis
+   tandas sigue siendo obligatorio.
+
+«📦 Productos físicos» solo lo ven ness y nestor2; «👗 Ropa física», solo Ana.
+
 ## 3. Registrar → Mis tandas → semáforo
 
 Deja el MP4 en tu bandeja (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`, por

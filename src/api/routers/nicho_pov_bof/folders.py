@@ -75,7 +75,7 @@ def list_sources(
             for slug, meta in config.SOURCES.items()
             # Las ocultas no salen en ningún selector: siguen existiendo y se
             # pueden pedir por API, pero ya no son sitio donde empezar nada.
-            if not meta.get("oculta")
+            if not meta.get("oculta") and config.ve_catalogo(slug, usuario)
         ]
     )
 

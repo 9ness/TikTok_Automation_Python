@@ -93,10 +93,22 @@ SOURCES: dict[str, dict[str, str]] = {
     # él (foto limpia + ficha) para grabarlos de verdad —gancho con IA y
     # el resto real— en cualquier formato. Catálogo del operador como los de
     # arriba: mismas carpetas de diez y mismo convenio de nombres.
+    # `usuarios`: solo sale en el selector de esas cuentas (lo de Néstor no
+    # es de Ana, y la ropa de Ana va en su catálogo propio, el de abajo).
     "productos_fisicos": {
         "label": "📦 Productos físicos",
         "folder": "productos_fisicos",
         "propia": "1",
+        "usuarios": "ness,nestor2",
+    },
+    # La ropa que Ana tiene en casa: gancho con IA en tienda + ella tirándola
+    # al sofá + la chica probándosela en el espejo (receta en
+    # `replicar-virales.md`). Mismo mecanismo que el de Néstor, solo para ella.
+    "ropa_fisica_ana": {
+        "label": "👗 Ropa física",
+        "folder": "ropa_fisica_ana",
+        "propia": "1",
+        "usuarios": "ana",
     },
     # Los productos de «Replicar carrusel» (8 oct 2026): se dan de alta en esa
     # pantalla con foto limpia + ficha + URL y se COMPARTEN entre usuarios para
@@ -152,6 +164,9 @@ TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/
 PRODUCTOS_FISICOS_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_fisicos"
 )
+ROPA_FISICA_ANA_ROOT = (
+    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/ropa_fisica_ana"
+)
 CARRUSELES_VIRALES_ROOT = (
     "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/carruseles_virales"
 )
@@ -168,6 +183,7 @@ CATALOGOS_OPERADOR: dict[str, dict[str, str]] = {
     "temporada_q4": {"root": TEMPORADA_Q4_ROOT, "prefijo": "Temporada Q4"},
     "carruseles_virales": {"root": CARRUSELES_VIRALES_ROOT, "prefijo": "Carruseles Virales"},
     "productos_fisicos": {"root": PRODUCTOS_FISICOS_ROOT, "prefijo": "Productos Fisicos"},
+    "ropa_fisica_ana": {"root": ROPA_FISICA_ANA_ROOT, "prefijo": "Ropa Fisica"},
 }
 
 
@@ -233,6 +249,14 @@ CATALOGO_Q4 = "inventario_general"
 # Quién la ve en la lista de carpetas. Es trabajo de la cuenta de ness; a los
 # demás solo les saldría una carpeta que no han pedido.
 USUARIOS_Q4 = frozenset({"ness"})
+
+
+def ve_catalogo(slug: str, usuario: str) -> bool:
+    """Catálogos con `usuarios` solo salen a esas cuentas (sin usuario: API directa, sí)."""
+    permitidos = (SOURCES.get(slug) or {}).get("usuarios")
+    if not permitidos or not usuario:
+        return True
+    return usuario in permitidos.split(",")
 
 
 def ve_carpeta_q4(usuario: str) -> bool:
