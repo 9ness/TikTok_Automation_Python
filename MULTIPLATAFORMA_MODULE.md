@@ -178,7 +178,10 @@ publican con `services/carruseles.py:encolar(slug, carrusel_id, asin|shein, capt
 ## API (`/api/v1/multiplataforma`, API key)
 
 `GET /cuentas` (sin tokens) · `POST /cuentas` · `PUT /cuentas/{slug}/tokens`
-(solo escritura) · `POST /publicaciones` (encola; `asin` o `enlace`; mismo
+(solo escritura) · `POST /meta/conectar-facebook` y `/meta/conectar-threads`
+(pantalla web `/conectar-meta`: se pega el token de usuario FB ampliado → saca el de
+cada página por `/me/accounts`, y el de Threads se casa por el id de `/me`; el token
+es la prueba de permiso y nunca se devuelve) · `POST /publicaciones` (encola; `asin` o `enlace`; mismo
 vídeo+cuenta+tipo pendiente no se duplica) · `GET /cola?todas=` ·
 `POST /tick?dry_run=true` · `POST /cuentas/{slug}/ingestar` · **público**:
 `GET /archivo/{token}` (vídeo firmado; solo sirve rutas —resueltas, sin
@@ -253,8 +256,8 @@ de publicación son gratuitas.
    revisión de app (App Review) para usarla con cuentas que no sean de prueba.
    Cuentas IG profesionales vinculadas a una página de FB.
 2. **Tokens** de larga duración por cuenta (página FB → IG; Threads aparte) y
-   su renovación (los de Threads/IG caducan a 60 días): hoy se pegan a mano con
-   `PUT /cuentas/{slug}/tokens`. Falta flujo OAuth y refresco.
+   su renovación (los de Threads/IG caducan a 60 días): se pegan en la pantalla `/conectar-meta`
+   (o `PUT /cuentas/{slug}/tokens`). Falta refresco automático de Threads.
 3. **Pinterest**: app con acceso **Standard** (con Trial solo sandbox), token
    OAuth con `pins:write`, `boards:read`, y el `board_id` de cada cuenta.
 4. ✅ **Timer** (9/10/2026): cron del host cada 15 min (`2,17,32,47`) →

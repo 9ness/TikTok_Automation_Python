@@ -23,7 +23,7 @@ from src.api.exceptions import APIError
 from src.multiplataforma import config, publicador
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo
-from src.multiplataforma.services import carruseles, enlaces, ingesta, tandas, textos, video_url
+from src.multiplataforma.services import carruseles, conectar_meta, enlaces, ingesta, tandas, textos, video_url
 
 router = APIRouter(
     prefix="/api/v1/multiplataforma",
@@ -116,6 +116,32 @@ def guardar_tokens(slug: str, body: TokensIn) -> dict:
     except KeyError as e:
         raise APIError(f"No existe la cuenta {slug}", status_code=404) from e
     return {"cuenta": c.publico()}
+
+
+class TokenMetaIn(BaseModel):
+    token: str
+
+
+@router.post("/meta/conectar-facebook")
+def conectar_facebook(body: TokenMetaIn, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Token de usuario de Facebook → tokens de página de cada cuenta. Nunca devuelve tokens."""
+    if not usuario:
+        raise APIError("Hace falta iniciar sesión", status_code=401)
+    try:
+        return conectar_meta.conectar_facebook(body.token)
+    except conectar_meta.TokenInvalido as e:
+        raise APIError(str(e), status_code=400) from e
+
+
+@router.post("/meta/conectar-threads")
+def conectar_threads(body: TokenMetaIn, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Token de Threads de una cuenta → se guarda en la cuenta con ese id."""
+    if not usuario:
+        raise APIError("Hace falta iniciar sesión", status_code=401)
+    try:
+        return conectar_meta.conectar_threads(body.token)
+    except conectar_meta.TokenInvalido as e:
+        raise APIError(str(e), status_code=400) from e
 
 
 @router.post("/publicaciones")
