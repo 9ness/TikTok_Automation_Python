@@ -47,7 +47,7 @@ lo lista (con `carrusel_url`, el último viral con el que se replicó).
 `replicar_carrusel(catalogo, carpeta, producto, url=<enlace>)` (con el
 catálogo nuevo: `catalogo="carruseles_virales"`). ~1 min, una
 llamada de Gemini Flash (céntimos). Hasta 12 diapositivas. Devuelve `id`,
-`formato` (3:4 o 9:16, el del original), `apto`, `caption`, `hashtags` y por
+`formato` (3:4 o 9:16, el del original; **genera SIEMPRE las fotos en 3:4**, aunque el original sea 9:16 — decisión de Néstor del 20/10/2026; las fotos reales de la ficha se encajan también a 1080×1440), `apto`, `caption`, `hashtags` y por
 diapositiva: `rol`, `texto_original`, `texto` (el nuestro), `usa_foto_producto`,
 `prompt_imagen` y `original` (enlace a la foto del viral, ábrela con `ver`).
 
