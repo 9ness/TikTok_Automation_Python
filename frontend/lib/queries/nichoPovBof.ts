@@ -24,6 +24,9 @@ import type {
   ProductoItem,
   ProductoRecuperado,
   ProductoUrlRequest,
+  ReembolsableItem,
+  ReembolsablesResponse,
+  ReembolsoInfo,
   ProductosUrlsRequest,
   ProductosUrlsResponse,
   PromptsResponse,
@@ -46,6 +49,7 @@ export const nichoPovBofKeys = {
   buscar: (source: string, q: string) =>
     [...nichoPovBofKeys.all, "buscar", source, q] as const,
   recuperados: () => [...nichoPovBofKeys.all, "recuperados"] as const,
+  reembolsables: () => [...nichoPovBofKeys.all, "reembolsables"] as const,
 };
 
 /** Busca un producto por nombre, tienda o carpeta en TODAS las carpetas.
@@ -324,7 +328,14 @@ export function useTextosLote() {
 export function useCrearMiProducto() {
   const qc = useQueryClient();
   return useMutation<
-    { source: string; carpeta: string; producto: string },
+    {
+      source: string;
+      carpeta: string;
+      producto: string;
+      reembolso?: ReembolsoInfo | null;
+      /** Las fotos entraron pero no se pudo marcar como reembolsable. */
+      reembolso_error?: string;
+    },
     Error,
     {
       fotoLimpia: File;
@@ -337,15 +348,22 @@ export function useCrearMiProducto() {
       productUrl?: string;
       /** Carpeta destino: vacía = la que toca; "__nueva__" = abre otra. */
       carpeta?: string;
+      /** Solo «Muestras productos»: nace marcada como muestra reembolsable. */
+      reembolso?: { ventas_objetivo: number; dias: number } | null;
     }
   >({
-    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl, carpeta }) => {
+    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl, carpeta, reembolso }) => {
       const fd = new FormData();
       fd.append("foto_limpia", fotoLimpia);
       if (fotoFicha) fd.append("foto_ficha", fotoFicha);
       for (const f of fotosExtra ?? []) fd.append("fotos_extra", f);
       if (productUrl?.trim()) fd.append("product_url", productUrl.trim());
       if (carpeta) fd.append("carpeta", carpeta);
+      if (reembolso && source === "mis_productos") {
+        fd.append("reembolsable", "true");
+        fd.append("ventas_objetivo", String(reembolso.ventas_objetivo));
+        fd.append("dias", String(reembolso.dias));
+      }
       return api.post(`${ROOT}/mis-productos?source=${encodeURIComponent(source)}`, fd);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: nichoPovBofKeys.all }),
@@ -1229,4 +1247,95 @@ export function archivoLoteUrl(root: string, token: string): string {
     `${base}${root}/video/lote/archivo?token=${encodeURIComponent(token)}` +
     (k ? `&api_key=${encodeURIComponent(k)}` : "")
   );
+}
+
+// ---------------------------------------------------------------------------
+// Muestras REEMBOLSABLES (solo «Muestras productos»)
+// ---------------------------------------------------------------------------
+
+/** Lista de reembolsables: primero las que toca revisar, luego por días. */
+export function useReembolsables(activo = true) {
+  return useQuery<ReembolsablesResponse>({
+    queryKey: nichoPovBofKeys.reembolsables(),
+    queryFn: () => api.get<ReembolsablesResponse>(`${ROOT}/reembolsables`),
+    enabled: activo,
+    staleTime: 60_000,
+  });
+}
+
+export interface MarcarReembolsableReq {
+  folder: string;
+  producto: string;
+  ventas_objetivo: number;
+  dias: number;
+  ventas?: number;
+  notas?: string;
+}
+
+export interface ActualizarReembolsableReq {
+  folder: string;
+  producto: string;
+  /** TOTAL de ventas (no lo que se suma). */
+  ventas?: number;
+  sumar_ventas?: number;
+  dias?: number;
+  ventas_objetivo?: number;
+  notas?: string;
+  revisado?: boolean;
+}
+
+/** Tras cambiar un reembolsable: parchea la tarjeta en las listas del POV BOF
+ *  y del Largo (sin relistar la carpeta, que cuesta Drive) y recarga la caja. */
+function useAlCambiarReembolso() {
+  const qc = useQueryClient();
+  return (r: ReembolsableItem) => {
+    const parchea = <T extends { producto: string; folder?: string; reembolso?: unknown }>(
+      p: T,
+    ): T => (p.producto === r.producto ? { ...p, reembolso: r.reembolso } : p);
+    qc.setQueryData<ProductoItem[]>(
+      nichoPovBofKeys.productos(r.source, r.folder),
+      (old) => old?.map(parchea),
+    );
+    qc.setQueriesData<{ items: { producto: string; reembolso?: unknown }[] }>(
+      { queryKey: ["pov-bof-largo", "productos", r.source, r.folder] },
+      (old) => (old?.items ? { ...old, items: old.items.map(parchea) } : old),
+    );
+    void qc.invalidateQueries({ queryKey: nichoPovBofKeys.reembolsables() });
+  };
+}
+
+export function useMarcarReembolsable() {
+  const alCambiar = useAlCambiarReembolso();
+  return useMutation<ReembolsableItem, Error, MarcarReembolsableReq>({
+    mutationFn: (body) =>
+      api.post<ReembolsableItem>(`${ROOT}/reembolsable/marcar`, {
+        source: "mis_productos",
+        ...body,
+      }),
+    onSuccess: alCambiar,
+  });
+}
+
+export function useActualizarReembolsable() {
+  const alCambiar = useAlCambiarReembolso();
+  return useMutation<ReembolsableItem, Error, ActualizarReembolsableReq>({
+    mutationFn: (body) =>
+      api.post<ReembolsableItem>(`${ROOT}/reembolsable/actualizar`, {
+        source: "mis_productos",
+        ...body,
+      }),
+    onSuccess: alCambiar,
+  });
+}
+
+export function useDesmarcarReembolsable() {
+  const alCambiar = useAlCambiarReembolso();
+  return useMutation<ReembolsableItem, Error, { folder: string; producto: string }>({
+    mutationFn: (body) =>
+      api.post<ReembolsableItem>(`${ROOT}/reembolsable/desmarcar`, {
+        source: "mis_productos",
+        ...body,
+      }),
+    onSuccess: alCambiar,
+  });
 }

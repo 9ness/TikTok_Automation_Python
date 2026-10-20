@@ -17,7 +17,11 @@ const NUEVA = "__nueva__";
  *  Después se trabajan desde cualquier nicho (POV BOF, Largo, réplicas). */
 export default function SubirProductosPage() {
   const fuentes = useSources().data?.items ?? [];
-  const fisicos = fuentes.filter((f) => f.slug.startsWith("productos_fisicos"));
+  // Los físicos de la cuenta y, si la cuenta lo tiene, «Muestras productos»
+  // (ahí el alta deja marcar la muestra como reembolsable).
+  const fisicos = fuentes.filter(
+    (f) => f.slug.startsWith("productos_fisicos") || f.slug === "mis_productos",
+  );
   const [source, setSource] = useState("");
   const [carpeta, setCarpeta] = useState("");
   useEffect(() => {
@@ -33,13 +37,14 @@ export default function SubirProductosPage() {
           <div className="min-w-0">
             <h1 className="text-base font-bold sm:text-lg">Subir productos</h1>
             <p className="text-[11px] text-muted-foreground">
-              Tus productos físicos: foto limpia, ficha y enlace de TikTok Shop
+              Tus productos físicos o tus muestras: foto limpia, ficha y enlace de TikTok Shop
             </p>
           </div>
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Lo que subas aquí sale en el catálogo «📦 Productos físicos» de tu cuenta (nadie más lo
-          ve) y se usa desde POV BOF, POV BOF Largo o para replicar un viral.
+          ve) o en «Muestras productos», y se usa desde POV BOF, POV BOF Largo o para replicar un
+          viral. En Muestras puedes marcarla como reembolsable al subirla.
         </p>
       </header>
 

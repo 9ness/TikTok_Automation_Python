@@ -303,7 +303,7 @@ montado: **«🌐 Productos Web»** (`productos_web`), que se llena importando l
 ZIP que publica la web del curso —carpetas de diez, y el ZIP trae la
 convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y los **dos catálogos
 del operador**: «Muestras productos» (`mis_productos`, el slug es el viejo para
-no migrar lo ya guardado) y «Tareas Productos» (`tareas_productos`) — muestra
+no migrar lo ya guardado; una muestra puede ser REEMBOLSABLE —X ventas antes de una fecha, campo `reembolso` del producto, `services/reembolsables.py`, revisar cada `REVISAR_CADA_DIAS`, MCP `reembolsables`/`marcar_reembolsable`—) y «Tareas Productos» (`tareas_productos`) — muestra
 gratuita o tarea pagada, que no se trabajan igual — más «📦 Productos físicos» (`productos_fisicos`, solo ness/nestor2) y «📦 Productos físicos» de Ana (`productos_fisicos_ana`, solo ella) — oct 2026, productos que tienen en casa para grabar con gancho IA (guía `replicar-virales.md`; `usuarios` en SOURCES filtra el selector; se suben desde el menú «Subir productos», `/tiktok-shop-ai-pro/subir-productos`), «🎄 Temporada Q4» (`temporada_q4`, oct 2026: lo más vendido del Q4 anterior según EchoTik, sin saturar; ficha generada con los datos de EchoTik porque la web de TikTok pide captcha) y «🖼️ Carruseles virales» (`carruseles_virales`, COMPARTIDO: alta desde «Replicar carrusel» con foto + ficha + URL, `src/replicar_viral/catalogo.py`). Los sube él (foto limpia +
 ficha), viven en su Drive (`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/<slug>/`) en
 carpetas de 10, y un producto se puede mover de uno a otro con sus fotos y sus

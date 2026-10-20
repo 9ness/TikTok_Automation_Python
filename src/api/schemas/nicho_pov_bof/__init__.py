@@ -1,6 +1,12 @@
 """Schemas del Nicho POV BOF."""
 
 from .models import (
+    ActualizarReembolsableRequest,
+    DesmarcarReembolsableRequest,
+    MarcarReembolsableRequest,
+    ReembolsableItem,
+    ReembolsablesResponse,
+    ReembolsoInfo,
     BuscarProductosResponse,
     EchoTikCredsRequest,
     EchoTikCredsResponse,
@@ -48,6 +54,12 @@ from .models import (
 )
 
 __all__ = [
+    "ActualizarReembolsableRequest",
+    "DesmarcarReembolsableRequest",
+    "MarcarReembolsableRequest",
+    "ReembolsableItem",
+    "ReembolsablesResponse",
+    "ReembolsoInfo",
     "BuscarProductosResponse",
     "ProductoBuscado",
     "ProductoRecuperado",

@@ -14,6 +14,8 @@ automatización de los vídeos por producto.
 - GET  /api/v1/nicho-pov-bof/buscar          → busca un producto en TODAS las carpetas
 - GET  /api/v1/nicho-pov-bof/recuperados     → productos que aparecieron tarde (temporal)
 - GET  /api/v1/nicho-pov-bof/vendidos        → productos vendidos (referencia)
+- GET  /api/v1/nicho-pov-bof/reembolsables   → muestras reembolsables (Muestras productos)
+- POST /api/v1/nicho-pov-bof/reembolsable/{marcar,actualizar,desmarcar}
 
 Fase 1 (navegación de carpetas/fotos) vive en `folders.py`, sobre el mismo
 router prefix — este módulo se registra aparte para no mezclar los dos
@@ -34,6 +36,11 @@ from fastapi.responses import FileResponse
 from src.api.dependencies import get_current_user, get_queue, get_web_user
 from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
+    ActualizarReembolsableRequest,
+    DesmarcarReembolsableRequest,
+    MarcarReembolsableRequest,
+    ReembolsableItem,
+    ReembolsablesResponse,
     GuardarUrlRequest,
     GuionPlazosRequest,
     VideoLoteConfirmarRequest,
@@ -401,7 +408,17 @@ def _producto_info(
         url_ventas_30d=int(prod.get("url_ventas_30d") or 0),
         url_ventas_total=int(prod.get("url_ventas_total") or 0),
         montando=producto in _productos_montandose(queue, source, folder),
+        reembolso=_reembolso_de(source, prod),
     )
+
+
+def _reembolso_de(source: str, prod: dict) -> dict | None:
+    """El bloque de muestra reembolsable con sus derivados (solo Muestras)."""
+    if source != "mis_productos":
+        return None
+    from src.nicho_pov_bof.services import reembolsables
+
+    return reembolsables.info(prod.get("reembolso"))
 
 
 def _productos_montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
@@ -574,6 +591,7 @@ def _list_productos(
                 url_ventas_30d=int(guardado.get("url_ventas_30d") or 0),
                 url_ventas_total=int(guardado.get("url_ventas_total") or 0),
                 montando=producto in montandose,
+                reembolso=_reembolso_de(source, guardado),
             )
         )
 
@@ -1449,6 +1467,9 @@ async def crear_mi_producto(
     source: Annotated[str, Query()] = "mis_productos",
     product_url: Annotated[str, Form()] = "",
     carpeta: Annotated[str, Form()] = "",
+    reembolsable: Annotated[bool, Form()] = False,
+    ventas_objetivo: Annotated[int, Form()] = 0,
+    dias: Annotated[int, Form()] = 0,
 ) -> dict:
     """Alta de un producto PROPIO subiendo sus dos fotos.
 
@@ -1467,6 +1488,18 @@ async def crear_mi_producto(
 
     if not nicho_config.es_catalogo_operador(source):
         raise _bad_request(f"{source!r} no es un catálogo tuyo.")
+    # Muestra reembolsable (solo «Muestras productos»): se valida ANTES de
+    # guardar las fotos para no dejar un producto a medias.
+    if reembolsable:
+        if source != "mis_productos":
+            raise _bad_request(
+                "Solo las muestras de «Muestras productos» pueden ser reembolsables."
+            )
+        if ventas_objetivo < 1 or dias < 0:
+            raise _bad_request(
+                "Para una muestra reembolsable indica ventas necesarias (1 o más) "
+                "y los días que quedan."
+            )
 
     async def _leer(archivo: UploadFile, que: str) -> bytes:
         if not archivo:
@@ -1537,6 +1570,18 @@ async def crear_mi_producto(
             creado = {**creado, "product_url": url}
         except Exception:  # noqa: BLE001 — se puede poner después en la tarjeta
             pass
+
+    if reembolsable:
+        from src.nicho_pov_bof.services import reembolsables
+
+        try:
+            hecho = reembolsables.marcar(
+                str(creado.get("carpeta") or ""), str(creado.get("producto") or ""),
+                ventas_objetivo, dias, 0, comprobar=False,
+            )
+            creado = {**creado, "reembolso": hecho.get("reembolso")}
+        except Exception as e:  # noqa: BLE001 — las fotos ya están; se marca en la tarjeta
+            creado = {**creado, "reembolso_error": str(e)}
 
     return {"source": source, **creado}
 
@@ -2947,3 +2992,58 @@ def sumar_unidades_vendidas(
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
     return SoldProductsResponse(items=product_repo.ranking_vendidos(usuario=usuario))
+
+
+# ---------------------------------------------------------------------------
+# Muestras REEMBOLSABLES (solo «Muestras productos», `services/reembolsables.py`)
+# ---------------------------------------------------------------------------
+@router.get("/reembolsables", response_model=ReembolsablesResponse)
+def listar_reembolsables() -> ReembolsablesResponse:
+    """Todos los reembolsables de «Muestras productos»: primero los que toca
+    revisar, luego por días restantes; cumplidos y vencidos al final."""
+    from src.nicho_pov_bof.services import reembolsables
+
+    return ReembolsablesResponse(**reembolsables.listar())
+
+
+def _reembolso_op(fn, *a, **kw) -> ReembolsableItem:
+    try:
+        return ReembolsableItem(**fn(*a, **kw))
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+
+
+@router.post("/reembolsable/marcar", response_model=ReembolsableItem)
+def marcar_reembolsable(body: MarcarReembolsableRequest) -> ReembolsableItem:
+    """Marca (o reinicia) una muestra como reembolsable: ventas necesarias y
+    días que quedan (la fecha límite = hoy + días, hora de España)."""
+    from src.nicho_pov_bof.services import reembolsables
+
+    return _reembolso_op(
+        reembolsables.marcar, body.folder, body.producto, body.ventas_objetivo,
+        body.dias, body.ventas, body.notas, source=body.source,
+    )
+
+
+@router.post("/reembolsable/actualizar", response_model=ReembolsableItem)
+def actualizar_reembolsable(body: ActualizarReembolsableRequest) -> ReembolsableItem:
+    """Ventas (total o `sumar_ventas`), días, objetivo o notas. Sin cambiar nada
+    y con `revisado=True` es «revisado, sin ventas nuevas»."""
+    from src.nicho_pov_bof.services import reembolsables
+
+    return _reembolso_op(
+        reembolsables.actualizar, body.folder, body.producto,
+        ventas=body.ventas, dias=body.dias, ventas_objetivo=body.ventas_objetivo,
+        notas=body.notas, revisado=body.revisado, sumar_ventas=body.sumar_ventas,
+        source=body.source,
+    )
+
+
+@router.post("/reembolsable/desmarcar", response_model=ReembolsableItem)
+def desmarcar_reembolsable(body: DesmarcarReembolsableRequest) -> ReembolsableItem:
+    """Vuelve a muestra normal."""
+    from src.nicho_pov_bof.services import reembolsables
+
+    return _reembolso_op(
+        reembolsables.desmarcar, body.folder, body.producto, source=body.source,
+    )

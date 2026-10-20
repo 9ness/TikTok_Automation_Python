@@ -76,6 +76,27 @@ limpia metadatos. **El clip va mudo** (el audio se descarta).
 «🏪 Escaparate · 📤 Subido · 💰 Vendió» (aquí «Vendió» marca también
 «Subido»). La carpeta: «Completada» / «Pendiente».
 
+### 6. Muestras reembolsables (solo «Muestras productos»)
+Una muestra REEMBOLSABLE la paga el operador y la tienda se la devuelve si el
+producto llega a X ventas antes de una fecha. En la tarjeta sale el badge
+«💸 Reembolsable · 1/3 ventas · faltan 45 días» (🔔 si toca revisar, ✅ cumplido,
+⛔ vencido) y arriba la caja «💸 Muestras reembolsables» con todas.
+- **Marcar:** en la tarjeta «💸 ¿Reembolsable?» (ventas necesarias + días que
+  quedan), o al darla de alta en **«Subir productos»** eligiendo «Muestras
+  productos» y el check «Muestra reembolsable» (nace con 0 ventas). Por MCP no
+  hay alta de productos: el operador la sube y tú la marcas con
+  `marcar_reembolsable`.
+- **Revisar cada 3 días** (`REVISAR_CADA_DIAS`): mira las ventas del producto en
+  TikTok Shop y apúntalas («+1 venta» / `actualizar_reembolsable(ventas=N)`); si
+  no hay nuevas, «Revisado, sin ventas» (`actualizar_reembolsable` sin cambios)
+  para quitar la 🔔.
+- **Si no vende:** más versiones del vídeo (otro estilo en POV BOF Largo) o un
+  viral del mismo producto que replicar (`replicar_viral`). Avisa al operador
+  cuando falten pocos días.
+- Herramientas MCP: `reembolsables` (lista, primero las que toca revisar),
+  `marcar_reembolsable(carpeta, producto, ventas_objetivo, dias)`,
+  `actualizar_reembolsable(...)`, `desmarcar_reembolsable(...)`.
+
 ## Trampas
 
 - **«⚠️ El caption dice «X»…»** → no publicar sin el operador.
@@ -91,6 +112,7 @@ limpia metadatos. **El clip va mudo** (el audio se descarta).
 - `GET /api/v1/nicho-pov-bof/productos?source=<catálogo>&folder=<carpeta>`
 - `GET /api/v1/nicho-pov-bof/prompts` → `imagen`, `video`.
 - `GET /api/v1/nicho-pov-bof/folders?source=<catálogo>`
+- `GET /api/v1/nicho-pov-bof/reembolsables` (y `POST /reembolsable/{marcar,actualizar,desmarcar}`)
 
 Slugs de catálogo: `mis_productos`, `tareas_productos`, `productos_fisicos`
 (ness/nestor2) y `productos_fisicos_ana` (Ana) — lo que tienen en casa y graban de verdad —, `productos_web`,

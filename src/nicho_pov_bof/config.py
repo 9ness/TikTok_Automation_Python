@@ -159,6 +159,11 @@ SOURCES: dict[str, dict[str, str]] = {
 # del curso: pasada de ahí se abre la siguiente, para no acabar con una carpeta
 # de 200 imposible de mirar.
 MIS_PRODUCTOS_POR_CARPETA = 10
+
+# Muestras REEMBOLSABLES (oct 2026): la tienda devuelve la muestra si el vídeo
+# llega a X ventas antes de una fecha. Cada cuántos días hay que mirar si ha
+# habido venta para no perderlas de vista (`services/reembolsables.py`).
+REVISAR_CADA_DIAS = 3
 MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
 TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/temporada_q4"
 PRODUCTOS_FISICOS_ROOT = (

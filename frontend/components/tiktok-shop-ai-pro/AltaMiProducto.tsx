@@ -49,6 +49,18 @@ export function AltaMiProducto({
   // El enlace de TikTok Shop: con él el producto nace enlazado y no hay que
   // buscarlo después (ropa de Ana, productos físicos).
   const [url, setUrl] = useState("");
+  // Muestra REEMBOLSABLE (solo «Muestras productos»): X ventas en Y días.
+  // Se queda marcado entre altas (suele venir una tanda de la misma tienda).
+  const puedeReembolso = source === "mis_productos";
+  const [reembolsable, setReembolsable] = useState(false);
+  const [ventasObj, setVentasObj] = useState("1");
+  const [diasReemb, setDiasReemb] = useState("");
+  const reembolso =
+    puedeReembolso && reembolsable
+      ? { ventas_objetivo: Number.parseInt(ventasObj, 10), dias: Number.parseInt(diasReemb, 10) }
+      : null;
+  const reembolsoMal =
+    !!reembolso && !(reembolso.ventas_objetivo >= 1 && reembolso.dias >= 0);
   const [abierto, setAbierto] = useState(abiertoInicial);
   // El WebView de la APK devuelve la selección VACÍA cuando el input lleva
   // `multiple`: se eligen las cuatro capturas y no llega ninguna, sin error
@@ -63,7 +75,13 @@ export function AltaMiProducto({
   // veinte productos eso es media hora mirando la pantalla de uno en uno, así
   // que se preparan todos y se sube del tirón.
   const [cola, setCola] = useState<
-    { limpia: File; ficha: File | null; extras: File[]; url: string }[]
+    {
+      limpia: File;
+      ficha: File | null;
+      extras: File[];
+      url: string;
+      reembolso: { ventas_objetivo: number; dias: number } | null;
+    }[]
   >([]);
   const [subiendoLote, setSubiendoLote] = useState(0);
 
@@ -82,7 +100,11 @@ export function AltaMiProducto({
       toast.error("Falta la foto del producto.");
       return;
     }
-    setCola((prev) => [...prev, { limpia, ficha, extras, url }]);
+    if (reembolsoMal) {
+      toast.error("Muestra reembolsable: pon ventas necesarias (1 o más) y los días que quedan.");
+      return;
+    }
+    setCola((prev) => [...prev, { limpia, ficha, extras, url, reembolso }]);
     limpiarCampos();
   }
 
@@ -104,7 +126,9 @@ export function AltaMiProducto({
           source,
           productUrl: item.url,
           carpeta: destino,
+          reembolso: item.reembolso,
         });
+        if (r.reembolso_error) toast.error(`Producto ${r.producto}: no se marcó como reembolsable (${r.reembolso_error})`);
         ultimaCarpeta = r.carpeta;
         if (destino === "__nueva__") destino = r.carpeta;
         setCola((prev) => prev.filter((x) => x !== item));
@@ -127,10 +151,16 @@ export function AltaMiProducto({
       toast.error("Falta la foto del producto.");
       return;
     }
+    if (reembolsoMal) {
+      toast.error("Muestra reembolsable: pon ventas necesarias (1 o más) y los días que quedan.");
+      return;
+    }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url, carpeta },
+      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url, carpeta, reembolso },
       {
         onSuccess: (r) => {
+          if (r.reembolso_error)
+            toast.error(`No se marcó como reembolsable: ${r.reembolso_error}. Hazlo desde su tarjeta.`);
           toast.success(
             `Producto ${r.producto} añadido a «${r.carpeta}»` +
               (extras.length ? ` · ${extras.length} captura(s) más` : ""),
@@ -245,6 +275,52 @@ export function AltaMiProducto({
           className="mt-1 w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
         />
       </label>
+      {/* Solo en «Muestras productos»: la tienda devuelve la muestra si llega
+          a X ventas antes de una fecha (ver Reembolsable.tsx). */}
+      {puedeReembolso && (
+        <div className="space-y-1.5 rounded-lg border border-dashed border-teal-500/40 p-2.5">
+          <label className="flex cursor-pointer items-center gap-2 text-[11px] font-semibold">
+            <input
+              type="checkbox"
+              checked={reembolsable}
+              onChange={(e) => setReembolsable(e.target.checked)}
+              className="h-4 w-4 accent-teal-600"
+            />
+            💸 Muestra reembolsable
+          </label>
+          <p className="text-[10px] text-muted-foreground">
+            La tienda la devuelve si vende X unidades antes de una fecha. Saldrá marcada para
+            revisarla cada pocos días.
+          </p>
+          {reembolsable && (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-0.5">
+                <span className="text-[10px] text-muted-foreground">Ventas necesarias</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  value={ventasObj}
+                  onChange={(e) => setVentasObj(e.target.value)}
+                  className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
+                />
+              </label>
+              <label className="space-y-0.5">
+                <span className="text-[10px] text-muted-foreground">Días que quedan</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={diasReemb}
+                  placeholder="110"
+                  onChange={(e) => setDiasReemb(e.target.value)}
+                  className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
         <button
           type="button"
@@ -285,6 +361,7 @@ export function AltaMiProducto({
                   {item.ficha ? " + ficha" : " · sin ficha"}
                   {item.extras.length ? ` + ${item.extras.length} captura(s)` : ""}
                   {item.url ? " + URL" : ""}
+                  {item.reembolso ? ` · 💸 ${item.reembolso.ventas_objetivo} ventas/${item.reembolso.dias} d` : ""}
                 </span>
                 {!subiendoLote && (
                   <button

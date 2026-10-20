@@ -574,7 +574,7 @@ def _listar(
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado, textos_fijos
     from src.nicho_pov_bof.services import audience, drive_client, photo_pairing
     from src.nicho_pov_bof.services import emojis as emojis_svc
-    from src.nicho_pov_bof.services import top_vendidos
+    from src.nicho_pov_bof.services import reembolsables, top_vendidos
 
     try:
         # `refresh` salta la caché de listados: una carpeta que se listó vacía
@@ -695,6 +695,10 @@ def _listar(
             clip5=_clip_puesto(mio.get("clip5_path"), float(mio.get("video_listo_at") or 0)),
             golpes=list(mio.get("golpes") or []),
             replica_id=str(mio.get("replica_id") or ""),
+            reembolso=(
+                reembolsables.info(textos.get("reembolso"))
+                if source == reembolsables.SOURCE else None
+            ),
             insertos_subidos=[
                 n for n in range(1, config.INSERTOS_MAXIMOS + 1)
                 if _clip_puesto(mio.get(f"inserto{n}_path"), float(mio.get("video_listo_at") or 0))

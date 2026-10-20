@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from src.api.schemas.nicho_pov_bof.models import ReembolsoInfo
+
 
 class VozLargo(BaseModel):
     id: str
@@ -58,6 +60,9 @@ class ProductoLargo(BaseModel):
     url_match_score: float = 0.0
     # Solo en "Top vendidos": ventas del producto de origen y cuándo entró.
     ventas: int = 0
+    # Muestra reembolsable (solo «Muestras productos», dato compartido con el
+    # POV BOF). None si es una muestra normal.
+    reembolso: ReembolsoInfo | None = None
     vendido_at: float = 0
     # Precio y modo de guion — el dato lo extrae el POV BOF, aquí se lee.
     precio: float = 0

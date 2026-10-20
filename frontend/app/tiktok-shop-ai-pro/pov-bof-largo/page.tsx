@@ -120,6 +120,7 @@ import type { ProductoLargo } from "@/lib/types/povBofLargo";
 import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
+import { CajaReembolsables, ReembolsoTarjeta } from "@/components/tiktok-shop-ai-pro/Reembolsable";
 import { InsertosEpicos } from "@/components/tiktok-shop-ai-pro/InsertosEpicos";
 
 /** La de temporada: productos del Inventario copiados para la campaña (ver `productos_q4.py`). */
@@ -855,6 +856,9 @@ export default function PovBofLargoPage() {
 
 
       </Caja>
+
+      {/* Muestras reembolsables (solo «Muestras productos»). */}
+      <CajaReembolsables source={activaSource} onAbrir={(f) => setPicked(f)} />
 
       {/* El ranking de ventas es GLOBAL (mismo índice para todos los nichos),
           así que va fuera de la caja de la carpeta: no es de esta carpeta ni
@@ -1992,6 +1996,13 @@ function ProductoCard({
           {p.titulo_tiktok_completo && (
             <p className="truncate text-[10px] text-muted-foreground">{p.titulo_tiktok_completo}</p>
           )}
+          <ReembolsoTarjeta
+            source={source}
+            folder={folder}
+            producto={p.producto}
+            titulo={p.titulo}
+            info={p.reembolso}
+          />
           {esTopVendidos && p.ventas > 0 && (
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">

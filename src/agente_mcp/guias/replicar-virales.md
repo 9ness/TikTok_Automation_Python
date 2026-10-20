@@ -104,7 +104,7 @@ Receta de los virales de reacción (referencias en
 del catálogo **«📦 Productos físicos»** (`productos_fisicos`): los que Néstor
 tiene en casa, subidos por él con foto limpia + ficha + URL de TikTok Shop
 (campo opcional del alta: el producto nace enlazado). Se suben desde el menú **«Subir productos»**
-(`/tiktok-shop-ai-pro/subir-productos`), eligiendo carpeta o automática. Casca Chollos: **máx.
+(`/tiktok-shop-ai-pro/subir-productos`), eligiendo carpeta o automática. Ese menú también da de alta en «Muestras productos», y solo ahí sale el check «💸 Muestra reembolsable» (ventas necesarias + días; ver `pov-bof.md` §6). Casca Chollos: **máx.
 3 vídeos/día**.
 
 **Reparto del trabajo.** Néstor solo da de alta el producto (foto + ficha +

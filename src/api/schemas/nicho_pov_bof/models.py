@@ -159,6 +159,25 @@ class PromptsResponse(BaseModel):
     imagen_piernas_hombre: str = ""
 
 
+class ReembolsoInfo(BaseModel):
+    """Muestra REEMBOLSABLE (solo «Muestras productos»): lo guardado en el
+    producto + lo derivado (días, estado, si toca revisar), que no se guarda.
+    Ver `src/nicho_pov_bof/services/reembolsables.py`."""
+
+    activo: bool = True
+    ventas_objetivo: int = 1
+    ventas: int = 0
+    fecha_limite: str = ""
+    marcado_at: float = 0
+    revisado_at: float = 0
+    notas: str = ""
+    dias_restantes: int = 0
+    # en_curso | cumplido (ventas >= objetivo) | vencido (fecha pasada sin cumplir)
+    estado: str = "en_curso"
+    # En curso y sin revisar en los últimos REVISAR_CADA_DIAS días.
+    toca_revisar: bool = False
+
+
 class ProductoInfo(BaseModel):
     """Un producto de una carpeta: emparejado de fotos + textos + estado."""
 
@@ -285,6 +304,8 @@ class ProductoInfo(BaseModel):
     # abrirla TikTok responde "producto no encontrado".
     url_ventas_30d: int = 0
     url_ventas_total: int = 0
+    # Solo en «Muestras productos»: None si es una muestra normal.
+    reembolso: ReembolsoInfo | None = None
 
 
 class ProductosListResponse(BaseModel):
@@ -587,3 +608,54 @@ class HashtagsConfigResponse(BaseModel):
 
 class HashtagsConfigRequest(BaseModel):
     items: list[HashtagItem] = Field(default_factory=list)
+
+
+class ReembolsableItem(BaseModel):
+    source: str = "mis_productos"
+    folder: str
+    producto: str
+    titulo: str = ""
+    tienda: str = ""
+    # None tras desmarcarlo (vuelve a ser muestra normal).
+    reembolso: ReembolsoInfo | None = None
+
+
+class ReembolsablesResponse(BaseModel):
+    items: list[ReembolsableItem] = Field(default_factory=list)
+    total: int = 0
+    en_curso: int = 0
+    cumplidos: int = 0
+    vencidos: int = 0
+    toca_revisar: int = 0
+    revisar_cada_dias: int = 3
+
+
+class MarcarReembolsableRequest(BaseModel):
+    source: str = "mis_productos"
+    folder: str
+    producto: str
+    ventas_objetivo: int = Field(ge=1)
+    dias: int = Field(ge=0)
+    ventas: int = Field(default=0, ge=0)
+    notas: str = ""
+
+
+class ActualizarReembolsableRequest(BaseModel):
+    """Lo que no se manda no se toca. `ventas` es el TOTAL; `sumar_ventas`
+    suma encima (+1). `revisado` sella la revisión (por defecto sí)."""
+
+    source: str = "mis_productos"
+    folder: str
+    producto: str
+    ventas: int | None = Field(default=None, ge=0)
+    sumar_ventas: int = 0
+    dias: int | None = Field(default=None, ge=0)
+    ventas_objetivo: int | None = Field(default=None, ge=1)
+    notas: str | None = None
+    revisado: bool = True
+
+
+class DesmarcarReembolsableRequest(BaseModel):
+    source: str = "mis_productos"
+    folder: str
+    producto: str

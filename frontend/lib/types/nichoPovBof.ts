@@ -117,6 +117,44 @@ export interface PromptsResponse {
   imagen_piernas_hombre?: string;
 }
 
+/** Muestra REEMBOLSABLE (solo «Muestras productos»): lo guardado + lo derivado.
+ *  Refleja `ReembolsoInfo` de `src/api/schemas/nicho_pov_bof/models.py`. */
+export interface ReembolsoInfo {
+  activo: boolean;
+  ventas_objetivo: number;
+  ventas: number;
+  /** AAAA-MM-DD (hora de España). */
+  fecha_limite: string;
+  marcado_at: number;
+  revisado_at: number;
+  notas: string;
+  /** Negativo si ya pasó la fecha. */
+  dias_restantes: number;
+  estado: "en_curso" | "cumplido" | "vencido";
+  /** En curso y sin revisar en los últimos `revisar_cada_dias` días. */
+  toca_revisar: boolean;
+}
+
+export interface ReembolsableItem {
+  source: string;
+  folder: string;
+  producto: string;
+  titulo: string;
+  tienda: string;
+  /** null tras desmarcarlo. */
+  reembolso: ReembolsoInfo | null;
+}
+
+export interface ReembolsablesResponse {
+  items: ReembolsableItem[];
+  total: number;
+  en_curso: number;
+  cumplidos: number;
+  vencidos: number;
+  toca_revisar: number;
+  revisar_cada_dias: number;
+}
+
 export interface ProductoItem {
   producto: string;
   /** De qué carpeta es. Solo viene relleno en el listado de TODAS las carpetas
@@ -187,6 +225,8 @@ export interface ProductoItem {
   video_listo_at?: number;
   /** Hay un montaje de este producto en cola o en curso (lo dice la cola). */
   montando?: boolean;
+  /** Solo en «Muestras productos»: null/ausente si es una muestra normal. */
+  reembolso?: ReembolsoInfo | null;
   /** Voz que encaja con el producto; solo es el valor inicial de la ficha. */
   sexo_sugerido?: "hombre" | "mujer";
   /** Aviso si no se pudo confirmar cuál de las fotos es la del producto. */

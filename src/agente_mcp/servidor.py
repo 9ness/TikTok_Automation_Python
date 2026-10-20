@@ -67,6 +67,9 @@ Resubir lo montado a Instagram/Facebook/Threads/Pinterest con enlace de
 afiliado (SHEIN/Amazon): `guia("multiplataforma")` → `productos_sin_enlace` →
 `guardar_enlace` → `encolar_tandas` → `cola_multiplataforma`. Esos enlaces
 NUNCA van a TikTok (allí va el carrito de TikTok Shop).
+Muestras REEMBOLSABLES («Muestras productos»: X ventas en un plazo): llama a
+`reembolsables` al empezar, revisa las que toca y propone más vídeos o virales
+para las que no venden (`marcar_reembolsable`, `actualizar_reembolsable`).
 Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
 antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
 prometer nunca ofertas que la ficha no tenga.
@@ -1012,6 +1015,63 @@ async def borrar_productos(ctx: Context, catalogo: str, carpeta: str,
         raise ErrorApp("Borrar no se deshace. Repite con confirmar=True si el operador lo ha pedido.")
     c = await _ctx(ctx, "pov_bof", catalogo, carpeta)
     return _json({"ok": True, **(await menus.borrar_productos(c, productos))})
+
+
+# ---------------------------------------------------------------------------
+# Muestras REEMBOLSABLES de «Muestras productos» (guía `pov-bof.md`)
+# ---------------------------------------------------------------------------
+_POV = "/api/v1/nicho-pov-bof"
+
+
+@_herramienta(structured_output=False)
+async def reembolsables(ctx: Context) -> str:
+    """Las muestras REEMBOLSABLES de «Muestras productos» (mis_productos): la
+    tienda devuelve la muestra si el producto llega a X ventas antes de una
+    fecha. Úsala como RECORDATORIO al empezar: primero salen las que toca
+    revisar (`toca_revisar`, sin revisar en 3 días), luego por días que
+    faltan. Por cada una: ventas/ventas_objetivo, dias_restantes, estado
+    (en_curso | cumplido | vencido). Pregunta al operador si ha habido ventas
+    y apúntalas con `actualizar_reembolsable`; si va floja, propón más
+    versiones del vídeo o un viral que replicar (`replicar_viral`)."""
+    return _json(await Interno(_usuario(ctx)).get(f"{_POV}/reembolsables"))
+
+
+@_herramienta(structured_output=False)
+async def marcar_reembolsable(ctx: Context, carpeta: str, producto: str,
+                              ventas_objetivo: int, dias: int, ventas: int = 0,
+                              notas: str = "") -> str:
+    """Marca un producto de «Muestras productos» como muestra REEMBOLSABLE:
+    `ventas_objetivo` = ventas necesarias para el reembolso (1, 2, 3…),
+    `dias` = días que quedan para cumplirlo (110, 80…; la app guarda la fecha
+    límite = hoy + días), `ventas` = las que ya lleva. Volver a marcarlo lo
+    reinicia. Solo vale en el catálogo mis_productos."""
+    return _json(await Interno(_usuario(ctx)).post(f"{_POV}/reembolsable/marcar", {
+        "folder": carpeta, "producto": producto, "ventas_objetivo": ventas_objetivo,
+        "dias": dias, "ventas": ventas, "notas": notas}))
+
+
+@_herramienta(structured_output=False)
+async def actualizar_reembolsable(ctx: Context, carpeta: str, producto: str,
+                                  ventas: int | None = None, sumar_ventas: int = 0,
+                                  dias: int | None = None,
+                                  ventas_objetivo: int | None = None,
+                                  notas: str | None = None) -> str:
+    """Apunta la revisión de una muestra reembolsable. `ventas` = TOTAL que
+    lleva; `sumar_ventas=1` suma una. `dias` recalcula la fecha límite desde
+    hoy. Llamarla sin cambiar nada = «revisado, sin ventas nuevas» (sella la
+    revisión y deja de salir en `toca_revisar` durante 3 días)."""
+    return _json(await Interno(_usuario(ctx)).post(f"{_POV}/reembolsable/actualizar", {
+        "folder": carpeta, "producto": producto, "ventas": ventas,
+        "sumar_ventas": sumar_ventas, "dias": dias,
+        "ventas_objetivo": ventas_objetivo, "notas": notas, "revisado": True}))
+
+
+@_herramienta(structured_output=False)
+async def desmarcar_reembolsable(ctx: Context, carpeta: str, producto: str) -> str:
+    """Quita la marca de reembolsable (vuelve a muestra normal). Solo si el
+    operador lo pide."""
+    return _json(await Interno(_usuario(ctx)).post(f"{_POV}/reembolsable/desmarcar", {
+        "folder": carpeta, "producto": producto}))
 
 
 # ---------------------------------------------------------------------------
