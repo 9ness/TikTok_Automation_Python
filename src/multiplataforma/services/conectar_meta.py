@@ -124,8 +124,14 @@ def _app_threads() -> dict:
 
 def estado_app_threads() -> dict:
     d = redis_base.get_redis().get_json(_APP_KEY) or {}
+    renovados = redis_base.get_redis().get_json("threads_renovado") or {}
+    cuentas = [
+        {"cuenta": c.slug, "nombre": c.nombre or c.slug, "conectada": bool((c.tokens or {}).get("threads")),
+         "renovado": int(renovados.get(c.slug, 0))}
+        for c in cuentas_repo.listar() if c.threads_user_id
+    ]
     return {"configurada": bool(d.get("app_id") and d.get("app_secret")), "app_id": d.get("app_id", ""),
-            "url_retorno": url_retorno()}
+            "url_retorno": url_retorno(), "cuentas": cuentas}
 
 
 def _clave_state() -> bytes:

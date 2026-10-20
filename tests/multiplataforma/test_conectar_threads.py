@@ -66,3 +66,10 @@ def test_renovacion_semanal(red):
     assert cm.renovar_tokens_threads() == {"ama_shop": "renovado"}
     assert cuentas_repo.get("ama_shop").tokens["threads"] == "renovado"
     assert cm.renovar_tokens_threads() == {}  # ya renovado esta semana
+
+
+def test_estado_lista_cuentas_sin_secreto(red):
+    cm.guardar_app_threads("1", "s" * 32)
+    e = cm.estado_app_threads()
+    assert e["configurada"] and "app_secret" not in e
+    assert e["cuentas"][0]["cuenta"] == "ama_shop" and e["cuentas"][0]["conectada"] is False

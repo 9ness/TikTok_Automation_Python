@@ -443,6 +443,10 @@ _PREFIJOS_PRO = (
     # Página PÚBLICA de enlaces de afiliado (/links/<cuenta>): sin auth, pero
     # quien la abra con sesión de `pro` (Ana) no debe recibir un 403.
     "/api/v1/multiplataforma/links/",
+    # «Conectar Meta»: la app de Meta es de Ana (desde 20/10 el perfil de
+    # Néstor está bloqueado) y solo ella puede dar los permisos desde SU móvil.
+    # Solo escribe tokens que Meta valida; nunca devuelve ninguno.
+    "/api/v1/multiplataforma/meta/",
     "/api/v1/auth",
     "/api/v1/health",
     "/ws/queue",

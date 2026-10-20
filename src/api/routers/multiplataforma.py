@@ -386,4 +386,4 @@ def retorno_threads(code: str = "", state: str = "", error_description: str = ""
             q = {"threads": "ok", "cuenta": r["cuenta"], "usuario": r.get("usuario", "")}
         except conectar_meta.TokenInvalido as e:
             q = {"threads": "error", "msg": str(e)}
-    return RedirectResponse(f"/conectar-meta?{urlencode(q)}", status_code=303)
+    return RedirectResponse(f"/tiktok-shop-ai-pro/conectar-meta?{urlencode(q)}", status_code=303)

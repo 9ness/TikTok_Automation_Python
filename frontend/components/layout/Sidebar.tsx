@@ -148,6 +148,9 @@ const NAV: NavGroup[] = [
       // Mensajes para el vendedor (muestras gratuitas, colaboraciones). No es
       // un nicho: no genera nada y vale para todos.
       { href: "/tiktok-shop-ai-pro/plantillas", label: "Plantillas mensajes", icon: MessageSquareText },
+      // Tokens de Meta (FB/IG/Threads) para Multiplataforma. La app de Meta es
+      // de Ana, así que la pantalla tiene que estar en SU menú.
+      { href: "/tiktok-shop-ai-pro/conectar-meta", label: "Conectar Meta", icon: Link2 },
       { href: "/tiktok-shop-ai-pro/configuracion", label: "Configuración", icon: Settings },
     ],
   },
@@ -230,6 +233,7 @@ const ITEMS_PRO = [
   `${BASE_AI_PRO}/moda-mujer-multimodo`,
   `${BASE_AI_PRO}/creativos-profesionales`,
   `${BASE_AI_PRO}/carruseles`,
+  `${BASE_AI_PRO}/conectar-meta`,
 ];
 
 function esAiPro(n: NavGroup): boolean {
