@@ -117,7 +117,7 @@ export interface PromptsResponse {
   imagen_piernas_hombre?: string;
 }
 
-/** Muestra REEMBOLSABLE (solo «Muestras productos»): lo guardado + lo derivado.
+/** Muestra REEMBOLSABLE (Muestras productos y Productos físicos): lo guardado + lo derivado.
  *  Refleja `ReembolsoInfo` de `src/api/schemas/nicho_pov_bof/models.py`. */
 export interface ReembolsoInfo {
   activo: boolean;
@@ -137,6 +137,8 @@ export interface ReembolsoInfo {
 
 export interface ReembolsableItem {
   source: string;
+  /** Etiqueta del catálogo («Muestras productos», «📦 Productos físicos»). */
+  catalogo?: string;
   folder: string;
   producto: string;
   titulo: string;
@@ -225,7 +227,7 @@ export interface ProductoItem {
   video_listo_at?: number;
   /** Hay un montaje de este producto en cola o en curso (lo dice la cola). */
   montando?: boolean;
-  /** Solo en «Muestras productos»: null/ausente si es una muestra normal. */
+  /** Solo en Muestras / Productos físicos: null/ausente si es una muestra normal. */
   reembolso?: ReembolsoInfo | null;
   /** Voz que encaja con el producto; solo es el valor inicial de la ficha. */
   sexo_sugerido?: "hombre" | "mujer";

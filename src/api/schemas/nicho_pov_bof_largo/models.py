@@ -60,7 +60,7 @@ class ProductoLargo(BaseModel):
     url_match_score: float = 0.0
     # Solo en "Top vendidos": ventas del producto de origen y cuándo entró.
     ventas: int = 0
-    # Muestra reembolsable (solo «Muestras productos», dato compartido con el
+    # Muestra reembolsable (Muestras y Productos físicos, dato compartido con el
     # POV BOF). None si es una muestra normal.
     reembolso: ReembolsoInfo | None = None
     vendido_at: float = 0

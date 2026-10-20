@@ -857,8 +857,14 @@ export default function PovBofLargoPage() {
 
       </Caja>
 
-      {/* Muestras reembolsables (solo «Muestras productos»). */}
-      <CajaReembolsables source={activaSource} onAbrir={(f) => setPicked(f)} />
+      {/* Muestras reembolsables (Muestras productos y Productos físicos). */}
+      <CajaReembolsables
+        source={activaSource}
+        onAbrir={(f, s) => {
+          if (s !== activaSource) setSource(s);
+          setPicked(f);
+        }}
+      />
 
       {/* El ranking de ventas es GLOBAL (mismo índice para todos los nichos),
           así que va fuera de la caja de la carpeta: no es de esta carpeta ni

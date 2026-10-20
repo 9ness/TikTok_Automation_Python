@@ -4,6 +4,7 @@ import { Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AltaMiProducto } from "@/components/tiktok-shop-ai-pro/AltaMiProducto";
+import { CajaReembolsables } from "@/components/tiktok-shop-ai-pro/Reembolsable";
 import { Caja, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { useFolders, useSources } from "@/lib/queries/nichoPovBof";
 
@@ -17,8 +18,8 @@ const NUEVA = "__nueva__";
  *  Después se trabajan desde cualquier nicho (POV BOF, Largo, réplicas). */
 export default function SubirProductosPage() {
   const fuentes = useSources().data?.items ?? [];
-  // Los físicos de la cuenta y, si la cuenta lo tiene, «Muestras productos»
-  // (ahí el alta deja marcar la muestra como reembolsable).
+  // Los físicos de la cuenta y, si la cuenta lo tiene, «Muestras productos».
+  // En los dos el alta deja marcar la muestra como reembolsable.
   const fisicos = fuentes.filter(
     (f) => f.slug.startsWith("productos_fisicos") || f.slug === "mis_productos",
   );
@@ -44,7 +45,8 @@ export default function SubirProductosPage() {
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Lo que subas aquí sale en el catálogo «📦 Productos físicos» de tu cuenta (nadie más lo
           ve) o en «Muestras productos», y se usa desde POV BOF, POV BOF Largo o para replicar un
-          viral. En Muestras puedes marcarla como reembolsable al subirla.
+          viral. Si lo tienes en casa, va a Productos físicos; Muestras es para lo que se trabaja
+          solo con IA. En los dos puedes marcarla como reembolsable (💸) al subirla.
         </p>
       </header>
 
@@ -121,6 +123,8 @@ export default function SubirProductosPage() {
               : `Va a «${carpeta}».`}
         </p>
       </Caja>
+
+      <CajaReembolsables source={source} />
 
       {source && (
         <AltaMiProducto

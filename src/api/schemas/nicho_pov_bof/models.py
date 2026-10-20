@@ -160,7 +160,7 @@ class PromptsResponse(BaseModel):
 
 
 class ReembolsoInfo(BaseModel):
-    """Muestra REEMBOLSABLE (solo «Muestras productos»): lo guardado en el
+    """Muestra REEMBOLSABLE («Muestras productos» y «Productos físicos»): lo guardado en el
     producto + lo derivado (días, estado, si toca revisar), que no se guarda.
     Ver `src/nicho_pov_bof/services/reembolsables.py`."""
 
@@ -304,7 +304,7 @@ class ProductoInfo(BaseModel):
     # abrirla TikTok responde "producto no encontrado".
     url_ventas_30d: int = 0
     url_ventas_total: int = 0
-    # Solo en «Muestras productos»: None si es una muestra normal.
+    # Solo en Muestras / Productos físicos: None si es una muestra normal.
     reembolso: ReembolsoInfo | None = None
 
 
@@ -612,6 +612,8 @@ class HashtagsConfigRequest(BaseModel):
 
 class ReembolsableItem(BaseModel):
     source: str = "mis_productos"
+    # Etiqueta del catálogo («Muestras productos», «📦 Productos físicos»).
+    catalogo: str = ""
     folder: str
     producto: str
     titulo: str = ""

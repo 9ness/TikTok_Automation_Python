@@ -922,9 +922,16 @@ export default function NichoPovBofPage() {
 
       </Caja>
 
-      {/* Muestras reembolsables (solo «Muestras productos»): X ventas antes de
-          una fecha. Arriba y siempre a la vista para no perderlas de foco. */}
-      <CajaReembolsables source={source} onAbrir={(f) => setPicked(f)} />
+      {/* Muestras reembolsables (Muestras productos y Productos físicos): X
+          ventas antes de una fecha. Arriba y siempre a la vista para no
+          perderlas de foco. Una de otro catálogo cambia también de catálogo. */}
+      <CajaReembolsables
+        source={source}
+        onAbrir={(f, s) => {
+          if (s !== source) setSource(s);
+          setPicked(f);
+        }}
+      />
 
       {/* Lo que ya vendió dice qué buscar, y el índice es GLOBAL (el mismo para
           todos los nichos): por eso va fuera de la caja de la carpeta y a un

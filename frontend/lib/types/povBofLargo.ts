@@ -52,7 +52,7 @@ export interface ProductoLargo {
   /** Solo en "Top vendidos": ventas del producto de origen y cuándo entró. */
   ventas: number;
   vendido_at: number;
-  /** Muestra reembolsable (solo «Muestras productos»). */
+  /** Muestra reembolsable (Muestras productos y Productos físicos). */
   reembolso?: ReembolsoInfo | null;
   /** Precio leído por el POV BOF (0 = no detectado) y el de antes del descuento. */
   precio: number;

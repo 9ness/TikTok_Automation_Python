@@ -1,4 +1,5 @@
-"""Muestras reembolsables de «Muestras productos» (`services/reembolsables.py`)."""
+"""Muestras reembolsables de «Muestras productos» y «Productos físicos»
+(`services/reembolsables.py`)."""
 
 from __future__ import annotations
 
@@ -51,7 +52,9 @@ def fake(monkeypatch):
     monkeypatch.setattr(product_repo, "get_nicho_pov_bof_redis", lambda: r)
     monkeypatch.setattr(reembolsables, "hoy", lambda: HOY)
     monkeypatch.setattr(reembolsables, "_ahora", lambda: AHORA)
-    monkeypatch.setattr(reembolsables, "_existe", lambda folder, producto: producto != "99")
+    monkeypatch.setattr(
+        reembolsables, "_existe", lambda folder, producto, source="": producto != "99",
+    )
     # Para que tenga título en el listado.
     r.data["folder:mis_productos:Mis Productos 1"] = {
         "productos": {"1": {"titulo": "Lámpara"}, "2": {"titulo": "Taza"}, "3": {}},
@@ -163,7 +166,49 @@ def test_actualizar_sin_marcar(fake):
         reembolsables.actualizar("Mis Productos 1", "2", ventas=1)
 
 
-@pytest.mark.parametrize("source", ["tareas_productos", "aleatorios_1", "productos_fisicos"])
+def test_productos_fisicos(fake, monkeypatch):
+    from src.nicho_pov_bof.services import mis_productos
+
+    monkeypatch.setattr(mis_productos, "carpetas", lambda source="": {
+        "mis_productos": ["Mis Productos 1"],
+        "productos_fisicos": ["Productos Fisicos 1"],
+    }.get(source, []))
+    fake.data["folder:productos_fisicos:Productos Fisicos 1"] = {
+        "productos": {"1": {"titulo": "Freidora"}},
+    }
+    item = reembolsables.marcar(
+        "Productos Fisicos 1", "1", 2, 30, source="productos_fisicos",
+    )
+    assert item["source"] == "productos_fisicos"
+    assert item["catalogo"] == config.SOURCES["productos_fisicos"]["label"]
+    guardado = fake.data["folder:productos_fisicos:Productos Fisicos 1"]["productos"]["1"]
+    assert guardado["reembolso"]["ventas_objetivo"] == 2
+    # No toca el de Muestras con el mismo número.
+    assert "reembolso" not in fake.data["folder:mis_productos:Mis Productos 1"]["productos"]["1"]
+    item = reembolsables.actualizar(
+        "Productos Fisicos 1", "1", sumar_ventas=1, source="productos_fisicos",
+    )
+    assert item["reembolso"]["ventas"] == 1
+    reembolsables.marcar("Mis Productos 1", "2", 1, 10)
+    # Listado con varias fuentes: cada item con la suya.
+    r = reembolsables.listar(fuentes=["mis_productos", "productos_fisicos"])
+    assert {(i["source"], i["producto"]) for i in r["items"]} == {
+        ("mis_productos", "2"), ("productos_fisicos", "1"),
+    }
+    r = reembolsables.listar(["Productos Fisicos 1"], source="productos_fisicos")
+    assert [i["producto"] for i in r["items"]] == ["1"]
+    item = reembolsables.desmarcar(
+        "Productos Fisicos 1", "1", source="productos_fisicos",
+    )
+    assert item["reembolso"] is None
+    # La de Ana también vale.
+    item = reembolsables.marcar(
+        "Productos Fisicos 1", "3", 1, 5, source="productos_fisicos_ana",
+    )
+    assert item["source"] == "productos_fisicos_ana"
+
+
+@pytest.mark.parametrize("source", ["tareas_productos", "aleatorios_1", "temporada_q4"])
 def test_rechaza_otra_fuente(fake, source):
     with pytest.raises(ValueError, match="Muestras productos"):
         reembolsables.marcar("Mis Productos 1", "1", 1, 10, source=source)
@@ -193,8 +238,23 @@ def test_endpoints(app_client, fake, monkeypatch):
         "ventas_objetivo": 2, "dias": 30,
     })
     assert r.status_code == 400
+    r = app_client.post(f"{base}/reembolsable/marcar", json={
+        "source": "productos_fisicos", "folder": "Mis Productos 1", "producto": "1",
+        "ventas_objetivo": 1, "dias": 5,
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["source"] == "productos_fisicos" and r.json()["catalogo"]
+    r = app_client.post(f"{base}/reembolsable/actualizar", json={
+        "source": "inventario_general", "folder": "Mis Productos 1", "producto": "1",
+    })
+    assert r.status_code == 400
     r = app_client.get(f"{base}/reembolsables")
+    assert r.status_code == 200 and r.json()["total"] == 2
+    assert {i["source"] for i in r.json()["items"]} == {"mis_productos", "productos_fisicos"}
+    r = app_client.get(f"{base}/reembolsables?source=productos_fisicos")
     assert r.status_code == 200 and r.json()["total"] == 1
+    r = app_client.get(f"{base}/reembolsables?source=tareas_productos")
+    assert r.status_code == 400
     r = app_client.post(f"{base}/reembolsable/desmarcar", json={
         "folder": "Mis Productos 1", "producto": "2",
     })

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { enLaApp } from "@/lib/entorno-app";
-import { useCrearMiProducto } from "@/lib/queries/nichoPovBof";
+import { admiteReembolso, useCrearMiProducto } from "@/lib/queries/nichoPovBof";
 
 /** Alta de un producto PROPIO subiendo sus fotos: la limpia, la captura de la
  *  ficha y las capturas extra (características, medidas, qué trae).
@@ -49,9 +49,9 @@ export function AltaMiProducto({
   // El enlace de TikTok Shop: con él el producto nace enlazado y no hay que
   // buscarlo después (ropa de Ana, productos físicos).
   const [url, setUrl] = useState("");
-  // Muestra REEMBOLSABLE (solo «Muestras productos»): X ventas en Y días.
-  // Se queda marcado entre altas (suele venir una tanda de la misma tienda).
-  const puedeReembolso = source === "mis_productos";
+  // Muestra REEMBOLSABLE (Muestras productos y Productos físicos): X ventas en
+  // Y días. Se queda marcado entre altas (suele venir una tanda de la misma tienda).
+  const puedeReembolso = admiteReembolso(source);
   const [reembolsable, setReembolsable] = useState(false);
   const [ventasObj, setVentasObj] = useState("1");
   const [diasReemb, setDiasReemb] = useState("");
@@ -275,7 +275,7 @@ export function AltaMiProducto({
           className="mt-1 w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
         />
       </label>
-      {/* Solo en «Muestras productos»: la tienda devuelve la muestra si llega
+      {/* Muestras productos y Productos físicos: la tienda devuelve la muestra si llega
           a X ventas antes de una fecha (ver Reembolsable.tsx). */}
       {puedeReembolso && (
         <div className="space-y-1.5 rounded-lg border border-dashed border-teal-500/40 p-2.5">

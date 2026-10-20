@@ -14,6 +14,7 @@ import {
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { ApiError } from "@/lib/api";
 import {
+  admiteReembolso,
   useActualizarReembolsable,
   useDesmarcarReembolsable,
   useMarcarReembolsable,
@@ -21,7 +22,8 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import type { ReembolsoInfo } from "@/lib/types/nichoPovBof";
 
-/** Muestras REEMBOLSABLES de «Muestras productos» (`mis_productos`).
+/** Muestras REEMBOLSABLES de «Muestras productos» (`mis_productos`) y de los
+ *  «📦 Productos físicos» (`productos_fisicos`, `productos_fisicos_ana`).
  *
  *  Una muestra normal se pide gratis y basta con un vídeo; una reembolsable
  *  la devuelve la tienda solo si llega a X ventas antes de una fecha. Por eso
@@ -32,7 +34,6 @@ import type { ReembolsoInfo } from "@/lib/types/nichoPovBof";
  *  esmeralda cumplido, rosa vencido, ámbar «toca revisar».
  */
 
-export const SOURCE_REEMBOLSABLES = "mis_productos";
 
 function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
@@ -94,6 +95,7 @@ export function BadgeReembolso({ info, className = "" }: { info: ReembolsoInfo; 
 function DialogoReembolso({
   abierto,
   onCerrar,
+  source,
   folder,
   producto,
   titulo,
@@ -101,6 +103,7 @@ function DialogoReembolso({
 }: {
   abierto: boolean;
   onCerrar: () => void;
+  source: string;
   folder: string;
   producto: string;
   titulo: string;
@@ -138,13 +141,14 @@ function DialogoReembolso({
     const fin = { onSuccess: () => { toast.success("Guardado"); onCerrar(); }, onError: (e: unknown) => toast.error(err(e)) };
     if (!info) {
       marcar.mutate(
-        { folder, producto, ventas_objetivo: nObjetivo, dias: nDias, ventas: nVentas, notas },
+        { source, folder, producto, ventas_objetivo: nObjetivo, dias: nDias, ventas: nVentas, notas },
         fin,
       );
       return;
     }
     actualizar.mutate(
       {
+        source,
         folder,
         producto,
         ventas_objetivo: nObjetivo,
@@ -207,7 +211,7 @@ function DialogoReembolso({
                 disabled={ocupado}
                 onClick={() =>
                   desmarcar.mutate(
-                    { folder, producto },
+                    { source, folder, producto },
                     { onSuccess: () => { toast.success("Vuelve a ser una muestra normal"); onCerrar(); }, onError: (e) => toast.error(err(e)) },
                   )
                 }
@@ -246,7 +250,7 @@ function DialogoReembolso({
 }
 
 /** Lo que va en la tarjeta: el badge (si lo es) + acciones rápidas, o el
- *  botón para marcarlo. Solo se pinta en «Muestras productos». */
+ *  botón para marcarlo. Solo en Muestras productos y Productos físicos. */
 export function ReembolsoTarjeta({
   source,
   folder,
@@ -262,11 +266,11 @@ export function ReembolsoTarjeta({
 }) {
   const [abierto, setAbierto] = useState(false);
   const actualizar = useActualizarReembolsable();
-  if (source !== SOURCE_REEMBOLSABLES || !folder) return null;
+  if (!admiteReembolso(source) || !folder) return null;
 
   const rapido = (cambios: { sumar_ventas?: number }, ok: string) =>
     actualizar.mutate(
-      { folder, producto, ...cambios },
+      { source, folder, producto, ...cambios },
       { onSuccess: () => toast.success(ok), onError: (e) => toast.error(err(e)) },
     );
 
@@ -315,6 +319,7 @@ export function ReembolsoTarjeta({
       <DialogoReembolso
         abierto={abierto}
         onCerrar={() => setAbierto(false)}
+        source={source}
         folder={folder}
         producto={producto}
         titulo={titulo}
@@ -324,16 +329,17 @@ export function ReembolsoTarjeta({
   );
 }
 
-/** Caja arriba en «Muestras productos»: las reembolsables y cuántas toca
- *  revisar. Tocar una lleva a su carpeta. */
+/** Caja arriba en Muestras productos / Productos físicos: las reembolsables
+ *  de TODOS los catálogos que ve la cuenta (cada una con el suyo) y cuántas
+ *  toca revisar. Tocar una lleva a su carpeta (y a su catálogo si es otro). */
 export function CajaReembolsables({
   source,
   onAbrir,
 }: {
   source: string;
-  onAbrir?: (folder: string) => void;
+  onAbrir?: (folder: string, source: string) => void;
 }) {
-  const activo = source === SOURCE_REEMBOLSABLES;
+  const activo = admiteReembolso(source);
   const q = useReembolsables(activo);
   const [verTodas, setVerTodas] = useState(false);
   if (!activo) return null;
@@ -364,16 +370,21 @@ export function CajaReembolsables({
     >
       <ul className="space-y-1">
         {items.map((i) => (
-          <li key={`${i.folder}|${i.producto}`}>
+          <li key={`${i.source}|${i.folder}|${i.producto}`}>
             <button
               type="button"
-              onClick={() => onAbrir?.(i.folder)}
+              onClick={() => onAbrir?.(i.folder, i.source)}
               className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-border/60 px-2 py-1.5 text-left transition hover:border-teal-500/50 sm:flex-row sm:items-center sm:gap-2"
             >
               <span className="flex min-w-0 items-baseline gap-1.5 text-[11px] sm:flex-1">
                 <span className="shrink-0 rounded bg-muted px-1 font-mono text-[9px] text-muted-foreground">
-                  {i.folder.replace(/^Mis Productos\s*/, "C")}·{i.producto}
+                  {i.folder.replace(/^(Mis Productos|Productos Fisicos)\s*/, "C")}·{i.producto}
                 </span>
+                {i.catalogo && (
+                  <span className="shrink-0 rounded border border-border/60 px-1 text-[9px] text-muted-foreground">
+                    {i.catalogo}
+                  </span>
+                )}
                 <span className="truncate">{i.titulo || "sin título"}</span>
               </span>
               {i.reembolso && <BadgeReembolso info={i.reembolso} className="shrink-0" />}

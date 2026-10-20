@@ -697,7 +697,7 @@ def _listar(
             replica_id=str(mio.get("replica_id") or ""),
             reembolso=(
                 reembolsables.info(textos.get("reembolso"))
-                if source == reembolsables.SOURCE else None
+                if source in reembolsables.FUENTES_REEMBOLSO else None
             ),
             insertos_subidos=[
                 n for n in range(1, config.INSERTOS_MAXIMOS + 1)

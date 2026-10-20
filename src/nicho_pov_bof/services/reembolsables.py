@@ -1,4 +1,7 @@
-"""Muestras REEMBOLSABLES del catálogo «Muestras productos» (`mis_productos`).
+"""Muestras REEMBOLSABLES de los catálogos del operador donde se piden muestras:
+«Muestras productos» (`mis_productos`, lo que se trabaja solo con IA) y los
+«📦 Productos físicos» (`productos_fisicos` de ness/nestor2 y
+`productos_fisicos_ana`, lo que el operador TIENE en casa porque lo pidió).
 
 Una muestra normal se pide gratis y basta con publicar un vídeo. Una
 reembolsable la paga el operador y la tienda se la devuelve si el producto
@@ -27,7 +30,11 @@ from datetime import date, datetime, timedelta
 from src.nicho_pov_bof import config
 from src.nicho_pov_bof.repos import product_repo
 
-SOURCE = "mis_productos"
+SOURCE = "mis_productos"  # la fuente por defecto (compatibilidad)
+# Dónde puede haber muestras reembolsables, en el orden en que se listan.
+FUENTES_REEMBOLSO: tuple[str, ...] = (
+    "mis_productos", "productos_fisicos", "productos_fisicos_ana",
+)
 _TZ = zoneinfo.ZoneInfo("Europe/Madrid")
 
 
@@ -41,11 +48,16 @@ def _ahora() -> float:
 
 
 def _exige_fuente(source: str) -> None:
-    if source != SOURCE:
+    if source not in FUENTES_REEMBOLSO:
         raise ValueError(
-            "Las muestras reembolsables solo existen en «Muestras productos» "
-            f"(mis_productos), no en {source!r}."
+            "Las muestras reembolsables solo existen en «Muestras productos» y "
+            f"«Productos físicos» ({', '.join(FUENTES_REEMBOLSO)}), no en {source!r}."
         )
+
+
+def etiqueta(source: str) -> str:
+    """Nombre del catálogo para enseñarlo junto a cada reembolsable."""
+    return str((config.SOURCES.get(source) or {}).get("label") or source)
 
 
 def _entero(valor, nombre: str, minimo: int) -> int:
@@ -100,32 +112,33 @@ def info(reembolso: dict | None, *, ahora: float | None = None) -> dict | None:
     }
 
 
-def _existe(folder: str, producto: str) -> bool:
+def _existe(folder: str, producto: str, source: str = SOURCE) -> bool:
     """El producto está en la carpeta (listado cacheado del Drive montado)."""
     from src.nicho_pov_bof.services import mis_productos
 
-    if folder not in mis_productos.carpetas(SOURCE):
+    if folder not in mis_productos.carpetas(source):
         return False
-    return str(producto) in mis_productos._productos_en(folder, SOURCE)
+    return str(producto) in mis_productos._productos_en(folder, source)
 
 
-def _leer(folder: str, producto: str) -> dict:
+def _leer(source: str, folder: str, producto: str) -> dict:
     return (
-        (product_repo.load_folder(SOURCE, folder).get("productos") or {})
+        (product_repo.load_folder(source, folder).get("productos") or {})
         .get(str(producto)) or {}
     )
 
 
-def _guardar(folder: str, producto: str, reembolso: dict) -> dict:
+def _guardar(source: str, folder: str, producto: str, reembolso: dict) -> dict:
     prod = product_repo._update_product_sin_cerrojo(
-        SOURCE, folder, str(producto), reembolso=reembolso,
+        source, folder, str(producto), reembolso=reembolso,
     )
-    return _item(folder, str(producto), prod)
+    return _item(source, folder, str(producto), prod)
 
 
-def _item(folder: str, producto: str, prod: dict) -> dict:
+def _item(source: str, folder: str, producto: str, prod: dict) -> dict:
     return {
-        "source": SOURCE,
+        "source": source,
+        "catalogo": etiqueta(source),
         "folder": folder,
         "producto": producto,
         "titulo": str(prod.get("titulo") or ""),
@@ -143,11 +156,11 @@ def marcar(
     objetivo = _entero(ventas_objetivo, "Las ventas necesarias", 1)
     n_dias = _entero(dias, "Los días", 0)
     n_ventas = _entero(ventas, "Las ventas actuales", 0)
-    if comprobar and not _existe(folder, producto):
+    if comprobar and not _existe(folder, producto, source):
         raise ValueError(f"No hay producto {producto} en la carpeta {folder!r}.")
     ahora = _ahora()
-    with product_repo._cerrojo_carpeta(SOURCE, folder):
-        return _guardar(folder, producto, {
+    with product_repo._cerrojo_carpeta(source, folder):
+        return _guardar(source, folder, producto, {
             "activo": True,
             "ventas_objetivo": objetivo,
             "ventas": n_ventas,
@@ -170,8 +183,8 @@ def actualizar(
     revisión: llamarla sin cambiar nada es «revisado, sin ventas nuevas».
     """
     _exige_fuente(source)
-    with product_repo._cerrojo_carpeta(SOURCE, folder):
-        actual = _leer(folder, producto).get("reembolso")
+    with product_repo._cerrojo_carpeta(source, folder):
+        actual = _leer(source, folder, producto).get("reembolso")
         if not isinstance(actual, dict) or not actual.get("activo"):
             raise ValueError(
                 f"El producto {producto} de {folder!r} no está marcado como "
@@ -193,17 +206,17 @@ def actualizar(
             nuevo["notas"] = str(notas).strip()[:500]
         if revisado:
             nuevo["revisado_at"] = _ahora()
-        return _guardar(folder, producto, nuevo)
+        return _guardar(source, folder, producto, nuevo)
 
 
 def desmarcar(folder: str, producto: str, *, source: str = SOURCE) -> dict:
     """Vuelve a muestra normal. Se conserva lo que había con `activo=False`."""
     _exige_fuente(source)
-    with product_repo._cerrojo_carpeta(SOURCE, folder):
-        actual = _leer(folder, producto).get("reembolso")
+    with product_repo._cerrojo_carpeta(source, folder):
+        actual = _leer(source, folder, producto).get("reembolso")
         if not isinstance(actual, dict) or not actual.get("activo"):
-            return _item(folder, str(producto), _leer(folder, producto))
-        return _guardar(folder, producto, {
+            return _item(source, folder, str(producto), _leer(source, folder, producto))
+        return _guardar(source, folder, producto, {
             **actual, "activo": False, "desmarcado_at": _ahora(),
         })
 
@@ -213,19 +226,45 @@ def _orden(item: dict) -> tuple:
     return (not r["toca_revisar"], r["estado"] != "en_curso", r["dias_restantes"])
 
 
-def listar(carpetas: list[str] | None = None) -> dict:
-    """Todos los reembolsables del catálogo: primero los que toca revisar,
-    luego los en curso por días restantes, y al final cumplidos y vencidos."""
-    if carpetas is None:
-        from src.nicho_pov_bof.services import mis_productos
+def listar(
+    carpetas: list[str] | None = None,
+    *,
+    source: str | None = None,
+    fuentes: list[str] | tuple[str, ...] | None = None,
+) -> dict:
+    """Los reembolsables de los catálogos con muestras: primero los que toca
+    revisar, luego los en curso por días restantes, y al final cumplidos y
+    vencidos.
 
-        carpetas = mis_productos.carpetas(SOURCE)
-    docs = product_repo.load_folders([(SOURCE, c) for c in carpetas])
+    Sin `source` recorre `fuentes` (por defecto todas las de
+    FUENTES_REEMBOLSO); con `source`, solo esa. `carpetas` (solo con una
+    fuente) evita listar el Drive.
+    """
+    if source is not None:
+        _exige_fuente(source)
+        lista = [source]
+    else:
+        lista = [f for f in (fuentes or FUENTES_REEMBOLSO) if f in FUENTES_REEMBOLSO]
+        if carpetas is not None and len(lista) > 1:
+            lista = [SOURCE]  # compatibilidad: carpetas sueltas = Muestras
+    pares: list[tuple[str, str]] = []
+    for fuente in lista:
+        if carpetas is not None:
+            nombres = carpetas
+        else:
+            from src.nicho_pov_bof.services import mis_productos
+
+            try:
+                nombres = mis_productos.carpetas(fuente)
+            except Exception:  # noqa: BLE001 — un catálogo sin carpeta no tumba el resto
+                nombres = []
+        pares.extend((fuente, c) for c in nombres)
+    docs = product_repo.load_folders(pares) if pares else []
     items: list[dict] = []
-    for carpeta, doc in zip(carpetas, docs):
-        for pid, prod in (doc.get("productos") or {}).items():
+    for (fuente, carpeta), doc in zip(pares, docs):
+        for pid, prod in ((doc or {}).get("productos") or {}).items():
             if info(prod.get("reembolso")):
-                items.append(_item(carpeta, str(pid), prod))
+                items.append(_item(fuente, carpeta, str(pid), prod))
     items.sort(key=_orden)
     estados = [i["reembolso"]["estado"] for i in items]
     return {

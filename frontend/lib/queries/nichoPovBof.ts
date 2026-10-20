@@ -348,7 +348,7 @@ export function useCrearMiProducto() {
       productUrl?: string;
       /** Carpeta destino: vacía = la que toca; "__nueva__" = abre otra. */
       carpeta?: string;
-      /** Solo «Muestras productos»: nace marcada como muestra reembolsable. */
+      /** Muestras / Productos físicos: nace marcada como muestra reembolsable. */
       reembolso?: { ventas_objetivo: number; dias: number } | null;
     }
   >({
@@ -359,7 +359,7 @@ export function useCrearMiProducto() {
       for (const f of fotosExtra ?? []) fd.append("fotos_extra", f);
       if (productUrl?.trim()) fd.append("product_url", productUrl.trim());
       if (carpeta) fd.append("carpeta", carpeta);
-      if (reembolso && source === "mis_productos") {
+      if (reembolso && admiteReembolso(source)) {
         fd.append("reembolsable", "true");
         fd.append("ventas_objetivo", String(reembolso.ventas_objetivo));
         fd.append("dias", String(reembolso.dias));
@@ -1250,10 +1250,19 @@ export function archivoLoteUrl(root: string, token: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Muestras REEMBOLSABLES (solo «Muestras productos»)
+// Muestras REEMBOLSABLES («Muestras productos» y «Productos físicos»)
 // ---------------------------------------------------------------------------
 
-/** Lista de reembolsables: primero las que toca revisar, luego por días. */
+/** Catálogos donde una muestra puede ser reembolsable
+ *  (`reembolsables.FUENTES_REEMBOLSO` del backend). */
+export const FUENTES_REEMBOLSO = ["mis_productos", "productos_fisicos", "productos_fisicos_ana"];
+
+export function admiteReembolso(source: string | null | undefined): boolean {
+  return !!source && FUENTES_REEMBOLSO.includes(source);
+}
+
+/** Lista de reembolsables de todos los catálogos que ve el usuario: primero
+ *  las que toca revisar, luego por días. Cada item trae `source` y `catalogo`. */
 export function useReembolsables(activo = true) {
   return useQuery<ReembolsablesResponse>({
     queryKey: nichoPovBofKeys.reembolsables(),
@@ -1264,6 +1273,8 @@ export function useReembolsables(activo = true) {
 }
 
 export interface MarcarReembolsableReq {
+  /** Catálogo del producto (por defecto «mis_productos»). */
+  source?: string;
   folder: string;
   producto: string;
   ventas_objetivo: number;
@@ -1273,6 +1284,7 @@ export interface MarcarReembolsableReq {
 }
 
 export interface ActualizarReembolsableReq {
+  source?: string;
   folder: string;
   producto: string;
   /** TOTAL de ventas (no lo que se suma). */
@@ -1330,7 +1342,7 @@ export function useActualizarReembolsable() {
 
 export function useDesmarcarReembolsable() {
   const alCambiar = useAlCambiarReembolso();
-  return useMutation<ReembolsableItem, Error, { folder: string; producto: string }>({
+  return useMutation<ReembolsableItem, Error, { source?: string; folder: string; producto: string }>({
     mutationFn: (body) =>
       api.post<ReembolsableItem>(`${ROOT}/reembolsable/desmarcar`, {
         source: "mis_productos",
