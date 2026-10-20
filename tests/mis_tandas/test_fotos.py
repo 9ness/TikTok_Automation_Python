@@ -194,3 +194,16 @@ def test_semaforo_de_carrusel(entorno):  # noqa: F811
     # El de otro usuario no se puede marcar.
     with pytest.raises(Exception):
         mt.poner_semaforo("ana", f"car|{i}", "verde")
+
+
+def test_enlace_del_producto_sale_del_catalogo(monkeypatch):
+    """La copia del producto en el carrusel no lleva el enlace: se lee del catálogo."""
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    url = "https://www.tiktok.com/view/product/1729581324486220582"
+    monkeypatch.setattr(pov_repo, "load_folder", lambda f, c: {"productos": {"7": {"product_url": url}}})
+    docs = [{"producto": {"source": "carruseles_virales", "folder": "C2", "producto": "7"}},
+            {"producto": {"source": "carruseles_virales", "folder": "C2", "producto": "8"}}]
+    a, b = fotos._con_url(docs)
+    assert a["producto"]["product_url"] == url
+    assert not b["producto"].get("product_url")

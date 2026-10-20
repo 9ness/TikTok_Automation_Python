@@ -46,7 +46,30 @@ def _carruseles(usuario: str) -> list[dict]:
         estados = list(pool.map(carrusel.con_estado, validos))
     salida = [e for e in estados if e["hechas"] > 0]
     salida.sort(key=lambda d: d.get("creado_at") or 0)
-    return salida
+    return _con_url(salida)
+
+
+def _con_url(lista: list[dict]) -> list[dict]:
+    """El documento del carrusel guarda una copia del producto SIN el enlace
+    (se apunta en el catálogo al darlo de alta): se lee de ahí, una vez por
+    carpeta, para que la tarjeta lleve el 🛍️ a la ficha."""
+    from src.nicho_pov_bof.repos import product_repo as pov_repo
+
+    faltan = {(f, c) for f, c, p in map(_clave, lista)
+              if f and c and p}
+    urls: dict[tuple[str, str, str], str] = {}
+    for fuente, carpeta in faltan:
+        try:
+            prods = (pov_repo.load_folder(fuente, carpeta) or {}).get("productos") or {}
+        except Exception:  # noqa: BLE001 — sin enlace, la tarjeta sale sin 🛍️
+            continue
+        urls |= {(fuente, carpeta, str(k)): str(v.get("product_url") or "")
+                 for k, v in prods.items() if isinstance(v, dict) and v.get("product_url")}
+    for d in lista:
+        prod = d.get("producto")
+        if isinstance(prod, dict) and not prod.get("product_url") and _clave(d) in urls:
+            d["producto"] = {**prod, "product_url": urls[_clave(d)]}
+    return lista
 
 
 def _sin_stock(lista: list[dict]) -> set[tuple[str, str, str]]:
@@ -265,6 +288,7 @@ def marcar(usuario: str, id_: str, subido: bool | None = None,
         agotado = bool(sin_stock)
     else:
         agotado = _clave(doc) in _sin_stock([doc])
+    doc = _con_url([doc])[0]
     from src.mis_tandas import servicio
 
     return _publica(doc, agotado, servicio.semaforos(usuario))
