@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -140,6 +141,40 @@ def conectar_threads(body: TokenMetaIn, usuario: Annotated[str, Depends(get_web_
         raise APIError("Hace falta iniciar sesión", status_code=401)
     try:
         return conectar_meta.conectar_threads(body.token)
+    except conectar_meta.TokenInvalido as e:
+        raise APIError(str(e), status_code=400) from e
+
+
+class AppThreadsIn(BaseModel):
+    app_id: str
+    app_secret: str
+
+
+@router.get("/meta/threads/app")
+def estado_app_threads(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    if not usuario:
+        raise APIError("Hace falta iniciar sesión", status_code=401)
+    return conectar_meta.estado_app_threads()
+
+
+@router.post("/meta/threads/app")
+def guardar_app_threads(body: AppThreadsIn, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Identificador + clave secreta de la app de Threads. La clave no se devuelve nunca."""
+    if not usuario:
+        raise APIError("Hace falta iniciar sesión", status_code=401)
+    try:
+        return conectar_meta.guardar_app_threads(body.app_id, body.app_secret)
+    except conectar_meta.TokenInvalido as e:
+        raise APIError(str(e), status_code=400) from e
+
+
+@router.get("/meta/threads/autorizar")
+def autorizar_threads(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """URL de permiso de Threads; al volver, `/meta/threads/retorno` guarda el token."""
+    if not usuario:
+        raise APIError("Hace falta iniciar sesión", status_code=401)
+    try:
+        return {"url": conectar_meta.url_autorizar(usuario)}
     except conectar_meta.TokenInvalido as e:
         raise APIError(str(e), status_code=400) from e
 
@@ -338,3 +373,17 @@ def archivo_firmado(token: str) -> FileResponse:
     if not p.is_file():
         raise APIError("El fichero ya no existe", status_code=404)
     return FileResponse(p, filename=p.name, content_disposition_type="inline")
+
+
+@router_publico.get("/meta/threads/retorno")
+def retorno_threads(code: str = "", state: str = "", error_description: str = "") -> RedirectResponse:
+    """Vuelta de Threads (sin cookie: la prueba es el `state` firmado). Nunca enseña el token."""
+    if error_description or not code:
+        q = {"threads": "error", "msg": error_description or "Threads no ha dado el permiso"}
+    else:
+        try:
+            r = conectar_meta.completar_oauth(code, state)
+            q = {"threads": "ok", "cuenta": r["cuenta"], "usuario": r.get("usuario", "")}
+        except conectar_meta.TokenInvalido as e:
+            q = {"threads": "error", "msg": str(e)}
+    return RedirectResponse(f"/conectar-meta?{urlencode(q)}", status_code=303)

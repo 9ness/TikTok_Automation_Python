@@ -25,7 +25,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(RAIZ / ".env")
 
 from src.multiplataforma import publicador  # noqa: E402
-from src.multiplataforma.services import carruseles, ingesta, tandas  # noqa: E402
+from src.multiplataforma.services import carruseles, conectar_meta, ingesta, tandas  # noqa: E402
 
 
 def main() -> int:
@@ -46,6 +46,11 @@ def main() -> int:
             informe["auto_carruseles"] = carruseles.auto_encolar_todas(log=print)
         except Exception as e:  # noqa: BLE001 — no parar la publicación por esto
             informe["auto_carruseles"] = {"error": str(e)}
+    if not args.dry_run:
+        try:
+            informe["threads_renovados"] = conectar_meta.renovar_tokens_threads(log=print)
+        except Exception as e:  # noqa: BLE001 — no parar la publicación por esto
+            informe["threads_renovados"] = {"error": str(e)}
     informe["publicacion"] = publicador.publicar_pendientes(limite=args.limite, dry_run=dry, log=print)
     print(json.dumps(informe, ensure_ascii=False, indent=2, default=str))
     return 0
