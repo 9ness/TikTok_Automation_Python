@@ -720,7 +720,9 @@ async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") ->
     variantes, piezas, funciones) y no compensa arriesgar; `rojo` = hay que
     rehacerlo (marca también «rehacer» con el `motivo`). `color=""` lo quita.
     Pon SIEMPRE el `motivo` (una frase). Criterios: guía `mis-tandas.md` › Semáforo.
-    El color vale solo para ese montaje: si el vídeo se rehace, vuelve a «sin revisar»."""
+    El color vale solo para ese montaje: si el vídeo se rehace, vuelve a «sin revisar».
+    Carruseles (Mis tandas › Fotos): `id="car|<id del carrusel>"`; vuelve a «sin
+    revisar» si se resube una diapositiva, y el rojo no marca «rehacer»."""
     return _json(await Interno(_usuario(ctx)).post(
         "/api/v1/mis-tandas/semaforo", {"id": id, "color": color, "motivo": motivo, "por": "agente"}))
 

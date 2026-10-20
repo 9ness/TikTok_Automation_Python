@@ -79,7 +79,26 @@ def _cerrado(c: dict) -> bool:
     return bool(c["subido"] or c["sin_stock"])
 
 
-def _publica(d: dict, sin_stock: bool = False) -> dict:
+def _listo_at(d: dict) -> float:
+    """La última foto que se subió o se quemó (`version` = mtime). Si cambia,
+    el semáforo que se puso deja de valer, como al rehacer un vídeo."""
+    return float(max((x.get("version") or 0 for x in d.get("diapositivas") or []), default=0))
+
+
+def listo_at(usuario: str, id_: str) -> float:
+    """Para poner el semáforo: comprueba además que el carrusel es de ESE usuario."""
+    from src.replicar_viral import carrusel
+
+    return _listo_at(carrusel.con_estado(carrusel.ver(usuario or "ness", id_)))
+
+
+def _semaforo(d: dict, sem: dict) -> dict | None:
+    from src.mis_tandas import servicio
+
+    return servicio._semaforo_vigente(sem.get(servicio.CARRUSEL + d["id"]), {"video_listo_at": _listo_at(d)})
+
+
+def _publica(d: dict, sin_stock: bool = False, sem: dict | None = None) -> dict:
     prod = d.get("producto") or {}
     return {
         "id": d["id"],
@@ -100,6 +119,7 @@ def _publica(d: dict, sin_stock: bool = False) -> dict:
         "caption": d.get("caption", ""),
         "hashtags": d.get("hashtags") or [],
         "musica": d.get("musica") or {},
+        "semaforo": _semaforo(d, sem or {}),
     }
 
 
@@ -165,7 +185,10 @@ def tandas(usuario: str, todas: bool = False) -> dict:
     usuario = usuario or "ness"
     docs = _carruseles(usuario)
     agotados = _sin_stock(docs)
-    lista = [_publica(d, _clave(d) in agotados) for d in docs]
+    from src.mis_tandas import servicio
+
+    sem = servicio.semaforos(usuario)
+    lista = [_publica(d, _clave(d) in agotados, sem) for d in docs]
     dia = dt.datetime.now(_TZ).date()
     hoy = sum(
         1 for c in lista
@@ -183,6 +206,10 @@ def tandas(usuario: str, todas: bool = False) -> dict:
             "subidos": sum(1 for c in grupo if c["subido"]),
             "sin_stock": sum(1 for c in grupo if c["sin_stock"] and not c["subido"]),
             "completos": sum(1 for c in grupo if c["completo"]),
+            "semaforo": {col: sum(1 for c in grupo if (c["semaforo"] or {}).get("color") == col and not c["subido"])
+                         for col in config.SEMAFORO_COLORES},
+            "sin_revisar": sum(1 for c in grupo if not c["subido"] and not c["sin_stock"]
+                               and servicio.sin_revisar(c)),
             "abierta": abierta,
             "desde": min(c["creado_at"] for c in grupo),
             "hasta": max(c["creado_at"] for c in grupo),
@@ -238,7 +265,9 @@ def marcar(usuario: str, id_: str, subido: bool | None = None,
         agotado = bool(sin_stock)
     else:
         agotado = _clave(doc) in _sin_stock([doc])
-    return _publica(doc, agotado)
+    from src.mis_tandas import servicio
+
+    return _publica(doc, agotado, servicio.semaforos(usuario))
 
 
 def zip_tanda(usuario: str, numero: int, pendientes: bool = False) -> tuple[bytes, str]:
@@ -254,6 +283,10 @@ def zip_tanda(usuario: str, numero: int, pendientes: bool = False) -> tuple[byte
     grupos = [g for g, _ in _repartir(docs, usuario)]
     if not 1 <= int(numero) <= len(grupos):
         raise carrusel.ErrorReplica(f"No existe la tanda {numero} de fotos.", status=404)
+    from src.mis_tandas import servicio
+
+    sem = servicio.semaforos(usuario)
+    saltados = 0
     buf = io.BytesIO()
     metidos = 0
     # Fecha de captura DEcreciente (01 del primer carrusel = la más nueva): la
@@ -265,10 +298,17 @@ def zip_tanda(usuario: str, numero: int, pendientes: bool = False) -> tuple[byte
                 continue
             if _clave(doc) in agotados and not doc.get("subido"):
                 continue  # sin stock no se publica (como en los vídeos)
+            if not doc.get("subido") and servicio.sin_revisar({"semaforo": _semaforo(doc, sem)}):
+                saltados += 1
+                continue  # sin semáforo o en rojo no se baja para publicar
             n = carrusel.meter_en_zip(z, doc, f"{i:02d}_{carrusel.nombre_carrusel(doc)}", epoca)
             if n:
                 metidos += 1
                 epoca -= 2 * n
     if not metidos:
+        if saltados:
+            raise carrusel.ErrorReplica(
+                f"{saltados} carrusel(es) SIN REVISAR o en rojo: un carrusel no está terminado hasta que se "
+                "comprueba. Ponles el semáforo antes de bajarlos para publicar.", status=409)
         raise carrusel.ErrorReplica("No hay carruseles que bajar en esa tanda.", status=404)
     return buf.getvalue(), f"fotos_tanda_{int(numero):03d}.zip"

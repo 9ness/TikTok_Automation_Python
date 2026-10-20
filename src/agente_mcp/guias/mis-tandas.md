@@ -153,6 +153,11 @@ montarse el vídeo nuevo, se quita el «rehacer» y conserva su puesto en la tan
 > `mis_tandas`. La web ya no deja bajar para publicar un vídeo sin semáforo o en
 > rojo. Por saltarse esto: -24 a la Estrella de Belén (réplica de Navidad con
 > IA, se encendía sola y el Nacimiento aparecía de la nada) y la cuenta a 118.
+>
+> **Carruseles también** (20/10/2026): en Mis tandas › Fotos cada carrusel lleva
+> su semáforo con `semaforo_tanda(id="car|<id>")` (producto idéntico en todas
+> las diapositivas, texto sin precios, enchufado si es eléctrico). Sin él, el
+> ZIP de la tanda lo salta; resubir una diapositiva lo deja «sin revisar».
 
 Desde oct 2026 la cuenta de ness está en CRH **crítico** (140): cada sanción
 por «promoción de productos incoherente» cuesta 8-30 puntos y la deja más

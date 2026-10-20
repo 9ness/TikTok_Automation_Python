@@ -200,6 +200,10 @@ def semaforos(usuario: str) -> dict[str, dict]:
     return (r.get_json(config.SEMAFORO_KEY.format(usuario=usuario or "ness")) or {}).get("videos") or {}
 
 
+# Semáforo de un carrusel: `car|<id>` en el mismo documento que los vídeos.
+CARRUSEL = "car|"
+
+
 def _semaforo_vigente(s: dict | None, f: dict) -> dict | None:
     """El color solo vale para el montaje que se revisó."""
     if not s or abs(float(s.get("listo_at") or 0) - float(f.get("video_listo_at") or 0)) > 1:
@@ -222,7 +226,14 @@ def poner_semaforo(usuario: str, id_: str, color: str, motivo: str = "", por: st
     color = (color or "").strip().lower().replace("á", "a")
     if color and color not in config.SEMAFORO_COLORES:
         raise ErrorTanda(f"Color «{color}» no vale: verde, ambar, rojo o vacío para quitarlo.")
-    f = _fila_de(usuario, id_)
+    if id_.startswith(CARRUSEL):
+        # Carrusel de «Mis tandas › Fotos»: el color vale para ESAS fotos
+        # (`listo_at` = la última que se subió o se quemó). Sin «rehacer».
+        from src.mis_tandas import fotos
+
+        f = {"video_listo_at": fotos.listo_at(usuario, id_[len(CARRUSEL):])}
+    else:
+        f = _fila_de(usuario, id_)
     r = _redis()
     if not r.is_available():
         raise ErrorTanda("Redis no está disponible.", status=503)

@@ -106,12 +106,15 @@ suelta sobre la foto.
    con botón «Canción» para copiar el título y buscarlo en TikTok. Al lado va la
    miniatura del producto con «Ver producto» (su ficha de TikTok Shop) o «Título»
    para copiarlo si el catálogo no tiene la URL.
-4. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
+4. Antes de darlo por hecho, revísalo (todas las diapositivas contra la ficha)
+   y ponle semáforo: `semaforo_tanda(id="car|<id>", color, motivo)`. Sin
+   semáforo (o en rojo) no entra en el ZIP de Mis tandas › Fotos.
+5. Lo publica el operador (TikTok y, si toca, Instagram) con el caption y los
    hashtags (en TikTok, los MISMOS de los vídeos — configuración de hashtags
    del POV BOF — más los de moda si es ropa/calzado/bolsos; los de la IA,
    `hashtags_ia`, se usan en Meta), y lo marca **Subido** en Mis tandas › Fotos
    (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide).
-5. **Instagram/Facebook/Threads**: con su enlace de Amazon/SHEIN, se programa
+6. **Instagram/Facebook/Threads**: con su enlace de Amazon/SHEIN, se programa
    con `encolar_carrusel` (ver `guia("multiplataforma")` › Carruseles).
 
 ## Replicar otra vez / para otro usuario

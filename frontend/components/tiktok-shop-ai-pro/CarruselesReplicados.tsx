@@ -7,7 +7,14 @@ import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
 import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
 import { ProductoCarrusel } from "@/components/tiktok-shop-ai-pro/ProductoCarrusel";
-import { useCompletarTandaFotos, useMarcarFoto, useTandasFotos, urlZipTandaFotos } from "@/lib/queries/misTandas";
+import { SEMAFORO } from "@/components/tiktok-shop-ai-pro/MisTandas";
+import {
+  useCompletarTandaFotos,
+  useMarcarFoto,
+  useSemaforoTanda,
+  useTandasFotos,
+  urlZipTandaFotos,
+} from "@/lib/queries/misTandas";
 import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
 
 /** «sáb 3 oct» a partir de «2026-10-03». */
@@ -26,6 +33,7 @@ export function CarruselesReplicados() {
   const tandas = useTandasFotos(verCerradas);
   const marcar = useMarcarFoto();
   const completar = useCompletarTandaFotos();
+  const semaforo = useSemaforoTanda();
   const [aCompletar, setACompletar] = useState<number | null>(null);
   const [abierta, setAbierta] = useState<number | null>(null);
   const datos = tandas.data;
@@ -109,6 +117,24 @@ export function CarruselesReplicados() {
                           🚫 {t.sin_stock}
                         </span>
                       ) : null}
+                      {t.sin_revisar ? (
+                        <span
+                          title="Sin semáforo: no entran en el ZIP hasta revisarlos"
+                          className="rounded-full border border-muted-foreground/50 px-1.5 py-px text-[9px] font-semibold text-muted-foreground"
+                        >
+                          ⚪ {t.sin_revisar} sin revisar
+                        </span>
+                      ) : null}
+                      {t.semaforo?.ambar ? (
+                        <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold text-amber-500">
+                          🟡 {t.semaforo.ambar}
+                        </span>
+                      ) : null}
+                      {t.semaforo?.rojo ? (
+                        <span className="rounded-full bg-rose-500/15 px-1.5 py-px text-[9px] font-semibold text-rose-500">
+                          🔴 {t.semaforo.rojo}
+                        </span>
+                      ) : null}
                       {t.completos < t.total ? (
                         <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold text-amber-500">
                           {t.total - t.completos} a medias
@@ -170,6 +196,11 @@ export function CarruselesReplicados() {
                         >
                           {String(i + 1).padStart(2, "0")} · {c.titulo}
                         </p>
+                        {c.semaforo && c.semaforo.color !== "verde" ? (
+                          <p className={`break-words text-[10px] ${SEMAFORO[c.semaforo.color].texto}`}>
+                            {c.semaforo.color === "ambar" ? "🟡" : "🔴"} {c.semaforo.motivo || SEMAFORO[c.semaforo.color].nombre}
+                          </p>
+                        ) : null}
                         {c.sin_stock && !c.subido ? (
                           <p className="text-[10px] text-rose-500">
                             🚫 Sin stock: no se sube ni se baja con la tanda. Si el producto vuelve, pulsa 🚫 otra vez.
@@ -233,12 +264,35 @@ export function CarruselesReplicados() {
                               🚫
                             </button>
                           )}
+                          <span
+                            className={`flex shrink-0 items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5 ${
+                              c.subido && !c.sin_stock ? "ml-auto" : ""
+                            }`}
+                            title={c.semaforo ? undefined : "Sin revisar: no entra en el ZIP"}
+                          >
+                            {(["verde", "ambar", "rojo"] as const).map((col) => (
+                              <button
+                                key={col}
+                                type="button"
+                                disabled={semaforo.isPending}
+                                onClick={() =>
+                                  semaforo.mutate({
+                                    id: `car|${c.id}`,
+                                    color: c.semaforo?.color === col ? "" : col,
+                                    motivo: c.semaforo?.color === col ? "" : "marcado a mano",
+                                  })
+                                }
+                                title={c.semaforo?.color === col ? "Quitar el color" : SEMAFORO[col].nombre}
+                                className={`h-3.5 w-3.5 rounded-full ${SEMAFORO[col].punto} ${
+                                  c.semaforo?.color === col ? "ring-2 ring-foreground/60" : "opacity-30 hover:opacity-80"
+                                }`}
+                              />
+                            ))}
+                          </span>
                           <button
                             type="button"
                             onClick={() => marcar.mutate({ id: c.id, subido: !c.subido })}
                             className={`flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] ${
-                              c.subido && !c.sin_stock ? "ml-auto" : ""
-                            } ${
                               c.subido
                                 ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-500"
                                 : "border-border/60 text-muted-foreground hover:text-foreground"

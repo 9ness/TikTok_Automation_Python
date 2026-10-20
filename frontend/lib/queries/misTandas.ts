@@ -334,6 +334,8 @@ export interface CarruselTanda {
   caption: string;
   hashtags: string[];
   musica?: import("./replicarCarrusel").MusicaCarrusel;
+  /** Revisión antes de subir (id `car|<id>` en el semáforo); null = sin revisar. */
+  semaforo?: SemaforoVideo | null;
 }
 
 export interface TandaFotos {
@@ -346,6 +348,10 @@ export interface TandaFotos {
   desde: number;
   hasta: number;
   fecha?: string;
+  /** Carruseles NO subidos por color de semáforo. */
+  semaforo?: Partial<Record<ColorSemaforo, number>>;
+  /** No subidos ni sin stock que aún no tienen semáforo (o se tocaron después). */
+  sin_revisar?: number;
   items?: CarruselTanda[];
 }
 

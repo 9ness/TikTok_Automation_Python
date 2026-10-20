@@ -47,6 +47,13 @@ def _crear(n: int, usuario: str = "ness", con_foto: bool = True) -> list[str]:
     return ids
 
 
+def _revisar(ids: list[str]) -> None:
+    from src.mis_tandas import servicio as mt
+
+    for i in ids:
+        mt.poner_semaforo("ness", f"car|{i}", "verde", "test")
+
+
 def test_tandas_de_diez_con_su_contador(entorno):  # noqa: F811
     ids = _crear(12)
     _crear(1, con_foto=False)  # sin fotos no entra
@@ -81,6 +88,7 @@ def test_subir_no_cierra_solo_tanda_completada(entorno):  # noqa: F811
 
 def test_zip_de_la_tanda(entorno):  # noqa: F811
     ids = _crear(3)
+    _revisar(ids)
     fotos.marcar("ness", ids[0], True)
     datos, nombre = fotos.zip_tanda("ness", 1)
     assert nombre == "fotos_tanda_001.zip"
@@ -117,6 +125,7 @@ def test_api_fotos(entorno):  # noqa: F811
 
     c = TestClient(app)
     ids = _crear(2)
+    _revisar(ids)
     assert c.get("/api/v1/mis-tandas/fotos").json()["total"] == 2
     r = c.post("/api/v1/mis-tandas/fotos/estado", json={"id": ids[0], "subido": True})
     assert r.status_code == 200 and r.json()["subido"]
@@ -159,3 +168,29 @@ def test_sin_stock_es_del_producto(entorno):  # noqa: F811
         pass
     else:
         raise AssertionError("sin cambios tenía que fallar")
+
+
+def test_semaforo_de_carrusel(entorno):  # noqa: F811
+    """Un carrusel no se baja para publicar sin semáforo (como un vídeo); el
+    color se invalida si se resube una foto."""
+    import os
+    import time as _t
+
+    from src.mis_tandas import servicio as mt
+
+    (i,) = _crear(1)
+    with pytest.raises(carrusel.ErrorReplica) as e:
+        fotos.zip_tanda("ness", 1)
+    assert e.value.status == 409
+    assert mt.poner_semaforo("ness", f"car|{i}", "verde", "ok")["ok"]
+    c = fotos.tandas("ness")["tandas"][0]
+    assert c["items"][0]["semaforo"]["color"] == "verde" and c["sin_revisar"] == 0
+    assert fotos.zip_tanda("ness", 1)[0]
+    # Resubir la foto deja el carrusel otra vez sin revisar.
+    _t.sleep(1.1)
+    carrusel.subir_imagen("ness", i, 1, _jpeg())
+    c = fotos.tandas("ness")["tandas"][0]
+    assert c["items"][0]["semaforo"] is None and c["sin_revisar"] == 1
+    # El de otro usuario no se puede marcar.
+    with pytest.raises(Exception):
+        mt.poner_semaforo("ana", f"car|{i}", "verde")

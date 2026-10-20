@@ -48,7 +48,7 @@ const MOTIVOS = [
 ];
 
 /** Semáforo de revisión antes de subir (ver guía mis-tandas.md › Semáforo). */
-const SEMAFORO: Record<ColorSemaforo, { punto: string; texto: string; nombre: string }> = {
+export const SEMAFORO: Record<ColorSemaforo, { punto: string; texto: string; nombre: string }> = {
   verde: { punto: "bg-emerald-500", texto: "text-emerald-600 dark:text-emerald-400", nombre: "Sin dudas: se puede subir" },
   ambar: { punto: "bg-amber-400", texto: "text-amber-600 dark:text-amber-400", nombre: "Bien, pero producto complejo: mejor no arriesgar" },
   rojo: { punto: "bg-rose-500", texto: "text-rose-500", nombre: "Hay que rehacerlo" },
