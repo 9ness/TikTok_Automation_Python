@@ -1102,6 +1102,18 @@ async def actualizar_reembolsable(ctx: Context, carpeta: str, producto: str,
 
 
 @_herramienta(structured_output=False)
+async def poner_url_producto(ctx: Context, carpeta: str, producto: str, url: str,
+                             catalogo: str = "mis_productos") -> str:
+    """Pega a mano la ficha de TikTok Shop de un producto (la que da el
+    operador; vale el enlace corto `vm.tiktok.com/…`). Se guarda por producto
+    (tienda + título), así que sirve para todas sus carpetas y usuarios, y saca
+    el `product_id` al vuelo. `url=""` la quita. No gasta EchoTik.
+    `catalogo` = el `source` del producto (p. ej. `mis_productos`)."""
+    return _json(await Interno(_usuario(ctx)).post(f"{_POV}/url-producto", {
+        "source": catalogo, "folder": carpeta, "producto": producto, "url": url}))
+
+
+@_herramienta(structured_output=False)
 async def desmarcar_reembolsable(ctx: Context, carpeta: str, producto: str,
                                  catalogo: str = "mis_productos") -> str:
     """Quita la marca de reembolsable (vuelve a muestra normal). Solo si el
