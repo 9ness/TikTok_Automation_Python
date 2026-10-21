@@ -1,4 +1,10 @@
 ## Pendiente
+- [ ] **Plan fin de octubre (21/10)**: [`docs/PLAN_FINAL_OCTUBRE.md`](docs/PLAN_FINAL_OCTUBRE.md). Hay que hacer:
+  - 30 muestras «necesita contenido» con GenAI Pro, objetivo por producto de 5 IA + 1 viral (+2 físicos);
+  - 13 clips Omni de sitios antes del 24/10, con las tomas de Néstor en `_clips_reales/nestor2/sitios/`;
+  - productos físicos de Ana;
+  - ganchos de ropa «desmayo en tienda» y «paquete en paracaídas».
+- [ ] **Multiplataforma**: no se pueden editar ni borrar las publicaciones pendientes. Hay 8 con el ASIN mal y el suelo de gimnasio está duplicado (B07FS75ZGM).
 - [ ] **Flores de bloques (14/10)**: ficha 1729482526768667183 desaparecida → 4 réplicas (rv|3d4a8a04a43d, 2906fc99f609, 1141445404f8, da21ab817f58) marcadas sin stock. Falta encontrar sustituto (rosas AZULES en cúpula, base negra); desde el VPS la ficha y la búsqueda de TikTok Shop piden captcha/login.
 
 - [ ] **Pedir a Néstor planos grabados para replicar virales** (13/10). Lo que Omni no puede hacer porque deforma el texto de las páginas o hace falta el producto real:

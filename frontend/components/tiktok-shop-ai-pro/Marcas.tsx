@@ -38,6 +38,34 @@ const VACIAS: MarcasInfo = {
   contenido: null,
 };
 
+const FORMATOS_UI = [
+  { clave: "ia", icono: "🤖", nombre: "IA", defecto: 5 },
+  { clave: "viral", icono: "🔁", nombre: "Viral", defecto: 1 },
+  { clave: "fisico", icono: "🎥", nombre: "Físico", defecto: 0 },
+] as const;
+
+/** «🤖 IA 0/5 · 🔁 Viral 0/1»: vídeos subidos por formato; esmeralda al llegar. */
+function LineaFormatos({ info }: { info: MarcasInfo }) {
+  const visibles = FORMATOS_UI.map((f) => ({ f, c: info.formatos?.[f.clave] })).filter(
+    (x): x is { f: (typeof FORMATOS_UI)[number]; c: NonNullable<typeof x.c> } =>
+      !!x.c && (x.c.objetivo > 0 || x.c.subidos > 0),
+  );
+  if (!visibles.length) return null;
+  return (
+    <p className="flex w-full flex-wrap gap-x-2 text-[10px] sm:text-xs">
+      {visibles.map(({ f, c }) => (
+        <span
+          key={f.clave}
+          title={`Vídeos ${f.nombre} subidos / objetivo`}
+          className={c.hecho ? "font-semibold text-emerald-500" : "text-muted-foreground"}
+        >
+          {f.icono} {f.nombre} {c.subidos}/{c.objetivo}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 /** Diálogo de contenido + clips reales (lo que lleva un número o un texto). */
 function DialogoMarcas({
   abierto,
@@ -60,16 +88,26 @@ function DialogoMarcas({
   const [pide, setPide] = useState(false);
   const [videos, setVideos] = useState("1");
   const [clips, setClips] = useState("");
+  const [objs, setObjs] = useState<Record<string, string>>({ ia: "5", viral: "1", fisico: "0" });
 
   useEffect(() => {
     if (!abierto) return;
     setPide(!!info.contenido);
     setVideos(String(info.contenido?.videos ?? 1));
     setClips(info.clips_reales);
+    setObjs(
+      Object.fromEntries(
+        FORMATOS_UI.map((f) => [f.clave, String(info.formatos?.[f.clave]?.objetivo ?? f.defecto)]),
+      ),
+    );
   }, [abierto, info]);
 
   const nVideos = Number.parseInt(videos, 10);
-  const valido = !pide || (nVideos >= 1 && nVideos <= 20);
+  const objsOk = FORMATOS_UI.every((f) => {
+    const n = Number.parseInt(objs[f.clave] ?? "", 10);
+    return n >= 0 && n <= 20;
+  });
+  const valido = (!pide || (nVideos >= 1 && nVideos <= 20)) && objsOk;
   const guardar = () => {
     marcar.mutate(
       {
@@ -77,6 +115,9 @@ function DialogoMarcas({
         folder,
         producto,
         clips_reales: clips.trim(),
+        objetivo_ia: Number.parseInt(objs.ia ?? "", 10),
+        objetivo_viral: Number.parseInt(objs.viral ?? "", 10),
+        objetivo_fisico: Number.parseInt(objs.fisico ?? "", 10),
         ...(pide ? { contenido_videos: nVideos } : info.contenido ? { contenido: false } : {}),
       },
       {
@@ -135,6 +176,29 @@ function DialogoMarcas({
             className={campo}
           />
         </label>
+        <div className="space-y-1">
+          <span className="text-[11px] font-medium text-muted-foreground">
+            🎯 Vídeos a subir por formato (0 = no se pide)
+          </span>
+          <div className="grid grid-cols-3 gap-2">
+            {FORMATOS_UI.map((f) => (
+              <label key={f.clave} className="block space-y-0.5">
+                <span className="text-[10px] text-muted-foreground">
+                  {f.icono} {f.nombre} ({info.formatos?.[f.clave]?.subidos ?? 0} subidos)
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={20}
+                  value={objs[f.clave] ?? ""}
+                  onChange={(e) => setObjs((o) => ({ ...o, [f.clave]: e.target.value }))}
+                  className={campo}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
         <DialogFooter className="flex-col gap-2 sm:flex-row">
           <button
             type="button"
@@ -226,6 +290,7 @@ export function MarcasTarjeta({
       >
         🎄 {m.q4 ? "Q4" : "¿Q4?"}
       </button>
+      <LineaFormatos info={m} />
       {m.clips_reales && (
         <button
           type="button"

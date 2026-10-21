@@ -193,6 +193,12 @@ class ContenidoInfo(BaseModel):
     notas: str = ""
 
 
+class FormatoContador(BaseModel):
+    subidos: int = 0
+    objetivo: int = 0
+    hecho: bool = False
+
+
 class MarcasInfo(BaseModel):
     """Marcas de un producto de los catálogos del operador (varias a la vez)."""
 
@@ -203,6 +209,8 @@ class MarcasInfo(BaseModel):
     # Carpeta del Drive con las tomas reales de ese producto.
     clips_reales: str = ""
     contenido: ContenidoInfo | None = None
+    # Vídeos subidos por formato: {"ia": {...}, "viral": {...}, "fisico": {...}}.
+    formatos: dict[str, FormatoContador] = Field(default_factory=dict)
 
 
 class ProductoInfo(BaseModel):
@@ -701,6 +709,9 @@ class MarcarProductoRequest(BaseModel):
     contenido: bool | None = None
     contenido_videos: int | None = Field(default=None, ge=1, le=20)
     contenido_notas: str | None = None
+    objetivo_ia: int | None = Field(default=None, ge=0, le=20)
+    objetivo_viral: int | None = Field(default=None, ge=0, le=20)
+    objetivo_fisico: int | None = Field(default=None, ge=0, le=20)
 
 
 class MarcasItem(BaseModel):

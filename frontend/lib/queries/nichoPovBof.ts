@@ -1403,6 +1403,10 @@ export interface MarcarProductoReq {
   contenido?: boolean;
   contenido_videos?: number;
   contenido_notas?: string;
+  /** Vídeos que se quieren subir por formato (0..20). */
+  objetivo_ia?: number;
+  objetivo_viral?: number;
+  objetivo_fisico?: number;
 }
 
 export function useMarcarProducto() {

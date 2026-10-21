@@ -100,6 +100,9 @@ def video_subir(
     notas: Annotated[str, Form()] = "",
     replica_id: Annotated[str, Form()] = "",
     para: Annotated[str, Form()] = "",
+    catalogo: Annotated[str, Form()] = "",
+    carpeta: Annotated[str, Form()] = "",
+    producto_ref: Annotated[str, Form()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Alta del MP4 montado de una réplica (`modo` con_ia | sin_ia). Con
@@ -115,6 +118,7 @@ def video_subir(
             url_viral=url_viral, product_id=product_id, product_url=product_url, tienda=tienda,
             caption=caption, hashtags=_texto_a_lista(hashtags), prompts=_texto_a_lista(prompts),
             notas=notas, replica_id=replica_id,
+            catalogo=catalogo, carpeta=carpeta, producto_ref=producto_ref,
         )
         return video.resumen(doc)
     except Exception as e:  # noqa: BLE001
@@ -137,6 +141,9 @@ class VideoBandejaRequest(BaseModel):
     notas: str = ""
     replica_id: str = ""
     para: str = ""
+    catalogo: str = ""
+    carpeta: str = ""
+    producto_ref: str = ""
 
 
 @router.post("/video/bandeja")
@@ -150,6 +157,7 @@ def video_bandeja(body: VideoBandejaRequest, usuario: Annotated[str, Depends(get
             url_viral=body.url_viral, product_id=body.product_id, product_url=body.product_url,
             tienda=body.tienda, caption=body.caption, hashtags=body.hashtags, prompts=body.prompts,
             notas=body.notas, replica_id=body.replica_id,
+            catalogo=body.catalogo, carpeta=body.carpeta, producto_ref=body.producto_ref,
         )
         return video.resumen(doc)
     except Exception as e:  # noqa: BLE001

@@ -23,6 +23,17 @@ Todo va en el documento COMPARTIDO de la carpeta (el mismo de `product_url`):
 `subidos` guarda los ids de los vídeos (usuario|id de Mis tandas) y no un
 contador: marcar y desmarcar el mismo vídeo dos veces no descuenta doble.
 
+Contadores por FORMATO (siempre, esté o no activo `contenido`):
+
+    "formatos":  {"ia": [ids], "viral": [ids], "fisico": [ids]}
+    "objetivos": {"ia": 5, "viral": 1, "fisico": 0}     # editable 0..20
+
+`formato_de(nicho, modo)` clasifica un vídeo de Mis tandas: pov/mm/alea y largo
+(salvo estilo «viral») = `ia`; largo «viral» y rv `con_ia` = `viral`; rv
+`sin_ia` = `fisico`. La tarjeta enseña «IA 0/5 · Viral 0/1 · Físico 0/2».
+También son ids (idempotente), y `registrar_subido(formato=...)` los apunta
+en la misma escritura que `contenido`.
+
 Prioridad (`prioridades`): 1) necesita contenido con vídeos pendientes, el que
 menos le falta antes; 2) reembolsables en curso, el que más dinero da antes;
 3) el resto, primero los que funcionan en Q4.
@@ -41,6 +52,39 @@ FUENTES_MARCAS: tuple[str, ...] = tuple(config.CATALOGOS_OPERADOR)
 # Los que son físicos por definición: no hace falta marcarlos.
 FUENTES_FISICAS: tuple[str, ...] = ("productos_fisicos", "productos_fisicos_ana")
 MAX_VIDEOS = 20
+FORMATOS: tuple[str, ...] = ("ia", "viral", "fisico")
+OBJETIVOS_DEFECTO: dict[str, int] = {"ia": 5, "viral": 1, "fisico": 0}
+
+
+def formato_de(nicho: str, modo: str = "") -> str | None:
+    """Formato (`ia`/`viral`/`fisico`) de un vídeo de Mis tandas, o None."""
+    nicho, modo = str(nicho or ""), str(modo or "")
+    if nicho in ("pov", "mm", "alea"):
+        return "ia"
+    if nicho == "largo":
+        return "viral" if modo == "viral" else "ia"
+    if nicho == "rv":
+        if modo == "con_ia":
+            return "viral"
+        if modo == "sin_ia":
+            return "fisico"
+    return None
+
+
+def formatos_info(prod: dict | None) -> dict:
+    """Subidos / objetivo / hecho por formato."""
+    prod = prod or {}
+    ids = prod.get("formatos") if isinstance(prod.get("formatos"), dict) else {}
+    obj = prod.get("objetivos") if isinstance(prod.get("objetivos"), dict) else {}
+    out: dict = {}
+    for f in FORMATOS:
+        try:
+            objetivo = int(obj.get(f, OBJETIVOS_DEFECTO[f]))
+        except (TypeError, ValueError):
+            objetivo = OBJETIVOS_DEFECTO[f]
+        n = len(set(str(i) for i in (ids.get(f) or [])))
+        out[f] = {"subidos": n, "objetivo": objetivo, "hecho": objetivo > 0 and n >= objetivo}
+    return out
 
 
 def _ahora() -> float:
@@ -82,6 +126,7 @@ def info(source: str, prod: dict | None) -> dict:
         "q4": bool(prod.get("q4")),
         "clips_reales": str(prod.get("clips_reales") or ""),
         "contenido": contenido_info(prod.get("contenido")),
+        "formatos": formatos_info(prod),
     }
 
 
@@ -121,9 +166,13 @@ def marcar(
     fisico: bool | None = None, q4: bool | None = None,
     clips_reales: str | None = None,
     contenido: bool | None = None, contenido_videos=None, contenido_notas: str | None = None,
+    objetivo_ia: int | None = None, objetivo_viral: int | None = None,
+    objetivo_fisico: int | None = None,
     comprobar: bool = True,
 ) -> dict:
     """Pone o quita marcas. Solo cambia lo que se pasa (None = no tocar).
+
+    `objetivo_*` = cuántos vídeos de ese formato se quieren subir (0..20).
 
     `contenido_videos` sin `contenido` también lo activa. Volver a activar
     uno ya activo conserva los vídeos ya subidos (solo cambia cuántos pide).
@@ -135,6 +184,17 @@ def marcar(
     if contenido_videos is not None and contenido is None:
         contenido = True
     n_videos = _videos(contenido_videos) if contenido_videos is not None else None
+    nuevos_obj: dict[str, int] = {}
+    for f, v in (("ia", objetivo_ia), ("viral", objetivo_viral), ("fisico", objetivo_fisico)):
+        if v is None:
+            continue
+        try:
+            n = int(v)
+        except (TypeError, ValueError) as e:
+            raise ValueError("Los objetivos por formato tienen que ser números enteros.") from e
+        if not 0 <= n <= MAX_VIDEOS:
+            raise ValueError(f"El objetivo de {f} va de 0 a {MAX_VIDEOS}.")
+        nuevos_obj[f] = n
     with product_repo._cerrojo_carpeta(source, folder):
         actual = _leer(source, folder, producto)
         campos: dict = {}
@@ -160,36 +220,64 @@ def marcar(
         elif contenido_notas is not None and isinstance(actual.get("contenido"), dict) \
                 and actual["contenido"].get("activo"):
             campos["contenido"] = {**actual["contenido"], "notas": str(contenido_notas).strip()[:500]}
+        if nuevos_obj:
+            previo_obj = actual.get("objetivos") if isinstance(actual.get("objetivos"), dict) else {}
+            campos["objetivos"] = {**previo_obj, **nuevos_obj}
         if not campos:
             raise ValueError("No hay ninguna marca que cambiar.")
         prod = product_repo._update_product_sin_cerrojo(source, folder, producto, **campos)
     return _item(source, folder, producto, prod)
 
 
-def registrar_subido(source: str, folder: str, producto: str, video_id: str, subido: bool) -> dict | None:
+def registrar_subido(
+    source: str, folder: str, producto: str, video_id: str, subido: bool,
+    formato: str | None = None,
+) -> dict | None:
     """Un vídeo del producto se marcó (o desmarcó) como subido.
 
-    Solo hace algo si el producto necesita contenido. Idempotente: el mismo
-    vídeo no cuenta dos veces. Devuelve el contenido derivado o None.
+    Idempotente: el mismo vídeo no cuenta dos veces. Con `formato`, apunta o
+    quita el id en `formatos[formato]` SIEMPRE; `contenido` solo cambia si el
+    producto lo necesita. Todo en una escritura bajo el cerrojo. Devuelve el
+    contenido derivado o None.
     """
     if source not in FUENTES_MARCAS:
         return None
+    if formato is not None and formato not in FORMATOS:
+        formato = None
     producto = str(producto)
+    video_id = str(video_id)
     with product_repo._cerrojo_carpeta(source, folder):
         prod = _leer(source, folder, producto)
+        campos: dict = {}
+        if formato:
+            previos = prod.get("formatos") if isinstance(prod.get("formatos"), dict) else {}
+            lista = [str(s) for s in (previos.get(formato) or [])]
+            if subido and video_id not in lista:
+                lista.append(video_id)
+            elif not subido and video_id in lista:
+                lista.remove(video_id)
+            else:
+                lista = None
+            if lista is not None:
+                campos["formatos"] = {**previos, formato: lista}
         c = prod.get("contenido")
-        if not isinstance(c, dict) or not c.get("activo"):
-            return None
-        subidos = [str(s) for s in (c.get("subidos") or [])]
-        if subido and video_id not in subidos:
-            subidos.append(video_id)
-        elif not subido and video_id in subidos:
-            subidos.remove(video_id)
-        else:
-            return contenido_info(c)
-        nuevo = {**c, "subidos": subidos}
-        product_repo._update_product_sin_cerrojo(source, folder, producto, contenido=nuevo)
-    return contenido_info(nuevo)
+        res = None
+        if isinstance(c, dict) and c.get("activo"):
+            subidos = [str(s) for s in (c.get("subidos") or [])]
+            nuevo = None
+            if subido and video_id not in subidos:
+                subidos.append(video_id)
+                nuevo = {**c, "subidos": subidos}
+            elif not subido and video_id in subidos:
+                subidos.remove(video_id)
+                nuevo = {**c, "subidos": subidos}
+            if nuevo is not None:
+                campos["contenido"] = nuevo
+                c = nuevo
+            res = contenido_info(c)
+        if campos:
+            product_repo._update_product_sin_cerrojo(source, folder, producto, **campos)
+    return res
 
 
 def _grupo(item: dict) -> tuple:

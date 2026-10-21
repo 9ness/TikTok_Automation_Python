@@ -149,6 +149,13 @@ export interface ContenidoInfo {
   notas: string;
 }
 
+/** Contador de vídeos subidos de un formato (ia | viral | fisico). */
+export interface FormatoContador {
+  subidos: number;
+  objetivo: number;
+  hecho: boolean;
+}
+
 /** Marcas de un producto de los catálogos del operador (varias a la vez). */
 export interface MarcasInfo {
   fisico: boolean;
@@ -158,6 +165,8 @@ export interface MarcasInfo {
   /** Carpeta del Drive con las tomas reales del producto. */
   clips_reales: string;
   contenido: ContenidoInfo | null;
+  /** Subidos por formato; puede faltar en respuestas antiguas. */
+  formatos?: Partial<Record<"ia" | "viral" | "fisico", FormatoContador>>;
 }
 
 export interface MarcasItem {

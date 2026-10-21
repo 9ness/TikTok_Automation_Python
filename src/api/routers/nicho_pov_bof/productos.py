@@ -3131,6 +3131,8 @@ def marcar_producto(
             fisico=body.fisico, q4=body.q4, clips_reales=body.clips_reales,
             contenido=body.contenido, contenido_videos=body.contenido_videos,
             contenido_notas=body.contenido_notas,
+            objetivo_ia=body.objetivo_ia, objetivo_viral=body.objetivo_viral,
+            objetivo_fisico=body.objetivo_fisico,
         ))
     except ValueError as e:
         raise _bad_request(str(e)) from e

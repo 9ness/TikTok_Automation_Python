@@ -713,12 +713,29 @@ def _cuota(ref: str, usuario: str, subido: bool) -> None:
         pass
 
 
-def _contenido(fuente: str, carpeta: str, prod: str, usuario: str, id_: str, subido: bool) -> None:
-    """Descuenta (o devuelve) un vídeo al producto que «necesita contenido»."""
+def _ref_rv(usuario: str, rv_id: str) -> tuple[str, str, str, str] | None:
+    """(catálogo, carpeta, producto, modo) de una réplica atada a un producto."""
+    try:
+        from src.replicar_viral import video as rv_video
+
+        doc = rv_video.ver(usuario, rv_id)
+    except Exception:  # noqa: BLE001
+        return None
+    ref = doc.get("catalogo_ref") or {}
+    if not (ref.get("source") and ref.get("folder") and ref.get("producto")):
+        return None
+    return str(ref["source"]), str(ref["folder"]), str(ref["producto"]), str(doc.get("modo") or "")
+
+
+def _contenido(fuente: str, carpeta: str, prod: str, usuario: str, id_: str, subido: bool,
+               nicho: str = "", modo: str = "") -> None:
+    """Descuenta (o devuelve) un vídeo al producto que «necesita contenido»
+    y lo apunta en su contador por formato."""
     try:
         from src.nicho_pov_bof.services import marcas
 
-        marcas.registrar_subido(fuente, carpeta, prod, f"{usuario}|{id_}", subido)
+        marcas.registrar_subido(fuente, carpeta, prod, f"{usuario}|{id_}", subido,
+                                formato=marcas.formato_de(nicho, modo))
     except Exception:  # noqa: BLE001 — la marca no tumba el botón de subido
         pass
 
@@ -742,6 +759,9 @@ def marcar(
                                   rehacer=rehacer, rehacer_nota=rehacer_nota)
         if uploaded is not None:
             _cuota(f"replicar_viral|{p[1]}", usuario, bool(uploaded))
+            ref = _ref_rv(usuario, p[1])
+            if ref:
+                _contenido(ref[0], ref[1], ref[2], usuario, id_, bool(uploaded), "rv", ref[3])
     elif p[0] == "pov":
         _, fuente, carpeta, prod = p
         from src.nicho_pov_bof.repos import product_repo as pov_repo
@@ -756,7 +776,7 @@ def marcar(
             cambios["uploaded"] = bool(uploaded)
             cambios["uploaded_at"] = float(hecho.get("uploaded_at") or (time.time() if uploaded else 0))
             _cuota(f"pov_bof|{fuente}|{carpeta}|{prod}", usuario, bool(uploaded))
-            _contenido(fuente, carpeta, prod, usuario, id_, bool(uploaded))
+            _contenido(fuente, carpeta, prod, usuario, id_, bool(uploaded), "pov", "")
     elif p[0] == "largo":
         _, fuente, carpeta, prod, modo = p
         from src.nicho_pov_bof.repos import product_repo as pov_repo
@@ -782,7 +802,7 @@ def marcar(
             cambios["sin_stock"] = bool(sin_stock)
         if uploaded is not None:
             _cuota(f"pov_bof_largo|{fuente}|{carpeta}|{prod}", usuario, bool(uploaded))
-            _contenido(fuente, carpeta, prod, usuario, id_, bool(uploaded))
+            _contenido(fuente, carpeta, prod, usuario, id_, bool(uploaded), "largo", modo)
     else:
         carpeta, prod = p[1], p[2]
         if p[0] == "alea" and rehacer is not None:

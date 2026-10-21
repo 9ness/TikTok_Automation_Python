@@ -17,6 +17,11 @@ semáforo y época. El documento vive con las demás réplicas
 comparten guiones y carruseles. El MP4 va al Drive montado,
 `TIKTOK_SHOP_AI_PRO/Replicar_Viral/<usuario>/<id>.mp4` (nunca a
 `api_uploads/`, que se purga).
+
+Opcional: `catalogo`/`carpeta`/`producto_ref` atan la réplica a un producto de
+los catálogos del operador (`catalogo_ref`). Con eso, al marcarla subida en Mis
+tandas cuenta en el contador por formato de ese producto (con_ia = viral,
+sin_ia = físico; `nicho_pov_bof/services/marcas.py`).
 """
 
 from __future__ import annotations
@@ -133,12 +138,14 @@ def registrar(
     usuario: str, *, modo: str, origen: Path, titulo: str, url_viral: str = "",
     product_id: str = "", product_url: str = "", tienda: str = "", caption: str = "",
     hashtags=None, prompts=None, notas: str = "", replica_id: str = "",
+    catalogo: str = "", carpeta: str = "", producto_ref: str = "",
 ) -> dict:
     """Guarda el MP4 montado de una réplica. Con `replica_id` REEMPLAZA el
     vídeo de esa réplica (rehecho): sube su `video_listo_at` y quita el
     «rehacer», así sale de su tanda y entra en una nueva (como en los nichos)."""
     usuario = usuario or "ness"
     ahora = time.time()
+    ref = catalogo_ref(catalogo, carpeta, producto_ref)
     if replica_id:
         doc = ver(usuario, replica_id)
         if modo and modo not in MODOS:
@@ -162,6 +169,8 @@ def registrar(
             doc["prompts"] = _lista_txt(prompts)
         if notas:
             doc["notas"] = notas.strip()[:2000]
+        if ref:
+            doc["catalogo_ref"] = ref
         destino = ruta_video(usuario, doc["id"])
         _copiar(origen, destino)
         doc.update({"video_path": str(destino), "video_listo_at": ahora, "rehacer": False,
@@ -191,9 +200,26 @@ def registrar(
         "uploaded": False, "uploaded_at": 0.0, "sin_stock": False,
         "rehacer": False, "rehacer_nota": "", "rehecho": False,
     }
+    if ref:
+        doc["catalogo_ref"] = ref
     servicio.guardar(doc, indexar=False)
     _indexar(usuario, id_)
     return doc
+
+
+def catalogo_ref(catalogo: str = "", carpeta: str = "", producto: str = "") -> dict | None:
+    """El producto del catálogo del operador al que pertenece la réplica, o
+    None si no se dice. A medias (falta alguno) o de otro catálogo = error."""
+    from src.nicho_pov_bof.services import marcas
+
+    partes = [str(x or "").strip() for x in (catalogo, carpeta, producto)]
+    if not any(partes):
+        return None
+    if not all(partes):
+        raise ErrorReplica("Para atar la réplica a un producto hacen falta catalogo, carpeta y producto_ref.")
+    if partes[0] not in marcas.FUENTES_MARCAS:
+        raise ErrorReplica(f"Catálogo «{partes[0]}» no vale: {', '.join(marcas.FUENTES_MARCAS)}.")
+    return {"source": partes[0], "folder": partes[1], "producto": partes[2]}
 
 
 def ruta_bandeja(usuario: str, ruta_rel: str) -> Path:
@@ -251,6 +277,7 @@ def resumen(doc: dict) -> dict:
         "uploaded": bool(doc.get("uploaded")), "sin_stock": bool(doc.get("sin_stock")),
         "rehacer": bool(doc.get("rehacer")), "rehacer_nota": doc.get("rehacer_nota", ""),
         "rehecho": bool(doc.get("rehecho")),
+        "catalogo_ref": doc.get("catalogo_ref") or None,
         "id_tandas": f"rv|{doc.get('id', '')}",
         "existe": Path(doc.get("video_path") or "").is_file(),
     }

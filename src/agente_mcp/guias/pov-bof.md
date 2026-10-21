@@ -124,6 +124,12 @@ Un producto de «Muestras productos», «Tareas Productos», «Productos físico
 - **📁 Clips reales** (`clips_reales`): la carpeta del Drive con las tomas
   grabadas de ese producto (ruta del mount o enlace). Antes de montar un vídeo
   real, mira ahí.
+- **Contadores por formato** (`marcas.formatos`): cada vídeo marcado Subido se
+  cuenta en su formato —🤖 IA (POV, Largo, multimodo), 🔁 Viral (Largo «viral»
+  y réplica con IA), 🎥 Físico (réplica sin IA; las réplicas solo cuentan si
+  se registraron con `catalogo`/`carpeta`/`producto_ref`)— y la tarjeta enseña «IA 0/5 ·
+  Viral 0/1 · Físico 0/2». Objetivos por defecto 5/1/0, editables (0..20) con
+  `marcar_producto(..., objetivo_ia=, objetivo_viral=, objetivo_fisico=)`.
 Se marcan al darlo de alta en «Subir productos», en la fila «🏷️ Marcas» de la
 tarjeta (POV BOF y Largo) o con `marcar_producto(carpeta, producto,
 catalogo=..., fisico=, contenido_videos=, q4=, clips_reales=)`.

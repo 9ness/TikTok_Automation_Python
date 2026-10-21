@@ -128,3 +128,67 @@ def test_endpoints(app_client, fake):
     assert [i["producto"] for i in r.json()["items"]] == ["2"]
     r = app_client.get(f"{base}/prioridades?source=inventario_general")
     assert r.status_code == 400
+
+
+def test_formato_de_clasifica():
+    assert marcas.formato_de("pov", "") == "ia"
+    assert marcas.formato_de("mm", "x") == "ia"
+    assert marcas.formato_de("alea", "x") == "ia"
+    assert marcas.formato_de("largo", "dolor") == "ia"
+    assert marcas.formato_de("largo", "viral") == "viral"
+    assert marcas.formato_de("rv", "con_ia") == "viral"
+    assert marcas.formato_de("rv", "sin_ia") == "fisico"
+    assert marcas.formato_de("rv", "") is None
+
+
+def test_formatos_cuentan_idempotente_y_sin_contenido(fake):
+    marcas.registrar_subido("mis_productos", CARPETA, "3", "ness|a", True, formato="ia")
+    marcas.registrar_subido("mis_productos", CARPETA, "3", "ness|a", True, formato="ia")
+    marcas.registrar_subido("mis_productos", CARPETA, "3", "ness|b", True, formato="viral")
+    f = marcas.info("mis_productos", fake.data[KEY]["productos"]["3"])["formatos"]
+    assert f["ia"] == {"subidos": 1, "objetivo": 5, "hecho": False}
+    assert f["viral"] == {"subidos": 1, "objetivo": 1, "hecho": True}
+    assert f["fisico"] == {"subidos": 0, "objetivo": 0, "hecho": False}
+    marcas.registrar_subido("mis_productos", CARPETA, "3", "ness|a", False, formato="ia")
+    f = marcas.info("mis_productos", fake.data[KEY]["productos"]["3"])["formatos"]
+    assert f["ia"]["subidos"] == 0
+    assert "contenido" not in fake.data[KEY]["productos"]["3"]
+
+
+def test_formato_y_contenido_a_la_vez(fake):
+    marcas.marcar(CARPETA, "4", source="mis_productos", contenido_videos=2)
+    c = marcas.registrar_subido("mis_productos", CARPETA, "4", "ness|a", True, formato="ia")
+    assert c["pendientes"] == 1
+    prod = fake.data[KEY]["productos"]["4"]
+    assert prod["formatos"]["ia"] == ["ness|a"]
+
+
+def test_objetivos_editables(fake):
+    item = marcas.marcar(CARPETA, "5", source="mis_productos", objetivo_ia=2, objetivo_fisico=3)
+    f = item["marcas"]["formatos"]
+    assert f["ia"]["objetivo"] == 2 and f["fisico"]["objetivo"] == 3 and f["viral"]["objetivo"] == 1
+    marcas.registrar_subido("mis_productos", CARPETA, "5", "ness|a", True, formato="ia")
+    marcas.registrar_subido("mis_productos", CARPETA, "5", "ness|b", True, formato="ia")
+    f = marcas.info("mis_productos", fake.data[KEY]["productos"]["5"])["formatos"]
+    assert f["ia"]["hecho"] is True
+    with pytest.raises(ValueError):
+        marcas.marcar(CARPETA, "5", source="mis_productos", objetivo_ia=21)
+
+
+def test_rv_atada_cuenta_en_su_formato(fake, monkeypatch):
+    from src.mis_tandas import servicio
+    from src.replicar_viral import video as rv_video
+
+    assert rv_video.catalogo_ref() is None
+    with pytest.raises(Exception):
+        rv_video.catalogo_ref("mis_productos", CARPETA, "")
+    with pytest.raises(Exception):
+        rv_video.catalogo_ref("inventario_general", CARPETA, "3")
+    ref = rv_video.catalogo_ref("mis_productos", CARPETA, "3")
+    doc = {"id": "abc123abc123", "modo": "sin_ia", "catalogo_ref": ref}
+    monkeypatch.setattr(rv_video, "ver", lambda u, i: doc)
+    assert servicio._ref_rv("ness", "abc123abc123") == ("mis_productos", CARPETA, "3", "sin_ia")
+    r = servicio._ref_rv("ness", "abc123abc123")
+    servicio._contenido(r[0], r[1], r[2], "ness", "rv|abc123abc123", True, "rv", r[3])
+    f = marcas.info("mis_productos", fake.data[KEY]["productos"]["3"])["formatos"]
+    assert f["fisico"]["subidos"] == 1

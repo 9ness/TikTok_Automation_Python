@@ -784,6 +784,7 @@ async def registrar_replica_video(
     url: str = "", url_viral: str = "", product_id: str = "", product_url: str = "",
     tienda: str = "", caption: str = "", hashtags: list[str] | None = None,
     prompts: list[str] | None = None, notas: str = "", replica_id: str = "", para: str = "",
+    catalogo: str = "", carpeta: str = "", producto_ref: str = "",
 ) -> str:
     """Registra el MP4 YA MONTADO de un viral replicado («Replicar virales»):
     sale solo en `mis_tandas` (id `rv|<id>`) con descargar, subido, sin stock,
@@ -797,12 +798,17 @@ async def registrar_replica_video(
     `hashtags`, `prompts` (los que usaste en Omni, para poder rehacerlo), `notas`.
     `replica_id`: REEMPLAZA el vídeo de esa réplica (rehecha tras un 🔴): sale
     de su tanda y entra en una nueva. `para`: otro usuario (solo admin).
+    `catalogo`+`carpeta`+`producto_ref`: el producto de los catálogos del
+    operador (p. ej. `productos_fisicos`, carpeta, nº) — PÁSALOS siempre que
+    exista: al marcarlo subido cuenta en su contador por formato (con_ia =
+    Viral, sin_ia = Físico). Con `replica_id` también sirve para atarla después.
     Antes: el MP4 cumple la guía (`guia("replicar-virales")`): encuadre
     anti-marca, rótulo con gancho + nombre del producto, metadatos limpios."""
     u = _usuario(ctx)
     campos = {"modo": modo, "titulo": titulo, "url_viral": url_viral, "product_id": product_id,
               "product_url": product_url, "tienda": tienda, "caption": caption, "notas": notas,
-              "replica_id": replica_id, "para": para}
+              "replica_id": replica_id, "para": para,
+              "catalogo": catalogo, "carpeta": carpeta, "producto_ref": producto_ref}
     if ruta_bandeja and not (archivo_id or url):
         r = await Interno(u).post("/api/v1/replicar-viral/video/bandeja",
                                   {"ruta": ruta_bandeja, **campos, "hashtags": hashtags or [],
@@ -1112,7 +1118,10 @@ async def marcar_producto(ctx: Context, carpeta: str, producto: str,
                           contenido: bool | None = None,
                           q4: bool | None = None,
                           clips_reales: str | None = None,
-                          contenido_notas: str | None = None) -> str:
+                          contenido_notas: str | None = None,
+                          objetivo_ia: int | None = None,
+                          objetivo_viral: int | None = None,
+                          objetivo_fisico: int | None = None) -> str:
     """Marcas de un producto de los catálogos del operador (varias a la vez;
     lo que no pases no se toca):
     `fisico=True` = lo tiene en casa y se pueden grabar vídeos reales (los de
@@ -1121,11 +1130,16 @@ async def marcar_producto(ctx: Context, carpeta: str, producto: str,
     producto marcado como subido en Mis tandas descuenta uno y al llegar a cero
     pierde la prioridad; `contenido=False` lo quita; `q4=True` = funciona ahora
     en Q4; `clips_reales` = carpeta del Drive con sus tomas reales (ruta del
-    mount o enlace). La muestra reembolsable va aparte (`marcar_reembolsable`)."""
+    mount o enlace). `objetivo_ia`/`objetivo_viral`/`objetivo_fisico` (0..20) =
+    cuántos vídeos de cada formato se quieren subir (por defecto 5/1/0); la
+    tarjeta cuenta los subidos «IA 0/5 · Viral 0/1 · Físico 0/2» (`marcas.formatos`).
+    La muestra reembolsable va aparte (`marcar_reembolsable`)."""
     return _json(await Interno(_usuario(ctx)).post(f"{_POV}/marcas", {
         "source": catalogo, "folder": carpeta, "producto": producto, "fisico": fisico,
         "contenido_videos": contenido_videos, "contenido": contenido, "q4": q4,
-        "clips_reales": clips_reales, "contenido_notas": contenido_notas}))
+        "clips_reales": clips_reales, "contenido_notas": contenido_notas,
+        "objetivo_ia": objetivo_ia, "objetivo_viral": objetivo_viral,
+        "objetivo_fisico": objetivo_fisico}))
 
 
 @_herramienta(structured_output=False)

@@ -191,6 +191,7 @@ registrar_replica_video(
   caption="La lámpara que no sabías que necesitabas ✨",
   hashtags=["lampara", "deco", "tiktokshop"],
   prompts=["<prompt del clip 1>", "<prompt del clip 2>"],
+  catalogo="productos_fisicos", carpeta="<carpeta>", producto_ref="<nº>",
 )
 ```
 
@@ -201,6 +202,11 @@ registrar_replica_video(
   ellos no hay forma de rehacerlo.
 - También vale `archivo_id` (subido a `/subir`) o `url` en vez de `ruta_bandeja`.
 - `para="ana"` registra para otro usuario. Solo funciona con un token de admin.
+- `catalogo` + `carpeta` + `producto_ref`: si el producto está en un catálogo
+  del operador (Productos físicos, Muestras, Tareas…), pásalos SIEMPRE. Al
+  marcarlo subido cuenta en el contador por formato de ese producto (con_ia =
+  🔁 Viral, sin_ia = 🎥 Físico; guía `pov-bof.md` §7). Una réplica ya
+  registrada se ata después repitiendo la llamada con `replica_id`.
 
 Devuelve `id`, `id_tandas` (`rv|<id>`) y `descargar`. Después:
 
