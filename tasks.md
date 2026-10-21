@@ -69,7 +69,7 @@
 - [ ] Publicador automático en el VPS (job cada X h): IG Reels + reel de prueba, FB `video_reels` + 1.er comentario con enlace, Threads, Pinterest v5. Ver tabla en docs/clases/2026-10-07_clase_miercoles.md
 - [x] 8 oct: SHEIN afiliados de Ana dado de alta (programa propio, panel `m.shein.com/us/affiliate`, koc_id 4739881083). El enlace `onelink.shein.com/...` del botón «Ganar» abre en España en € y SÍ saca el contador de oferta 24 h → se usa TAL CUAL. Awin no hace falta.
 - [ ] (Ana) Vincular su TikTok en «Autorizar el retiro de comisiones» (para cobrar). Mirar el 9 oct en «Centro de Datos» que salió el clic de prueba.
-- [ ] (Néstor) App de desarrollador de Pinterest → pedir acceso Standard (sin él los pines son sandbox)
+- [ ] (Néstor) App de desarrollador de Pinterest → pedir acceso Standard (sin él los pines son sandbox). 21/10: solicitud ENVIADA (Ama Shop, correo de Ana); falta respuesta. Al aprobarse: conectar por OAuth como Threads + `pinterest_board_id` por cuenta
 
 
 Notas: [`docs/clases/2026-10-07_clase_miercoles.md`](docs/clases/2026-10-07_clase_miercoles.md) (§ «Qué podemos automatizar»).
