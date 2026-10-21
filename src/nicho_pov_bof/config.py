@@ -70,15 +70,19 @@ SOURCES: dict[str, dict[str, str]] = {
     # clave con la que están guardados en Redis y en Drive todos los productos
     # de hasta hoy. Cambiarlo obligaría a una migración para ganar un nombre
     # más bonito en el código.
+    # Son de la cuenta de Néstor (ness y nestor2 la comparten): Ana y Mauro
+    # no los ven, ni en los selectores ni en prioridades/reembolsables (21 oct 2026).
     "mis_productos": {
         "label": "Muestras productos",
         "folder": "mis_productos",
         "propia": "1",
+        "usuarios": "ness,nestor2",
     },
     "tareas_productos": {
         "label": "Tareas Productos",
         "folder": "tareas_productos",
         "propia": "1",
+        "usuarios": "ness,nestor2",
     },
     # Productos de TEMPORADA (Halloween, Black Friday, Navidad) sacados del
     # ranking de ventas de EchoTik del Q4 anterior y de lo que despega ahora,

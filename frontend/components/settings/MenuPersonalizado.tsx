@@ -74,7 +74,7 @@ export function MenuPersonalizado() {
 
   // El menú que le toca por ROL, sin filtrar por preferencias: lo escondido
   // tiene que seguir viéndose aquí para poder recuperarlo.
-  const base = navPara(me.data?.rol);
+  const base = navPara(me.data?.rol, me.data?.username);
   // …pero SÍ en el orden que tenga elegido, que es lo que se está tocando.
   const orden = ordenarComoLaSidebar(base, prefs);
 

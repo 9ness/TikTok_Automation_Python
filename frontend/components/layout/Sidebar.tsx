@@ -324,7 +324,14 @@ export function primeraPantalla(
   return `${BASE_AI_PRO}/nicho-pov-bof`;
 }
 
-export function navPara(rol: string | null | undefined): NavGroup[] {
+/** De los `pro`, quién sube productos propios: solo quien tiene catálogo de
+ *  físicos (Ana). Mauro no tiene ninguno y el menú solo le enseñaría lo de otros. */
+const PRO_SUBEN_PRODUCTOS = ["ana"];
+
+export function navPara(
+  rol: string | null | undefined,
+  usuario?: string | null,
+): NavGroup[] {
   if (rol !== "pro") {
     return NAV.map((n) =>
       esAiPro(n) && n.kind === "group"
@@ -340,7 +347,12 @@ export function navPara(rol: string | null | undefined): NavGroup[] {
       ? {
           ...n,
           items: ordenar(
-            n.items.filter((i) => ITEMS_PRO.includes(i.href)),
+            n.items.filter(
+              (i) =>
+                ITEMS_PRO.includes(i.href) &&
+                (i.href !== `${BASE_AI_PRO}/subir-productos` ||
+                  PRO_SUBEN_PRODUCTOS.includes(usuario ?? "")),
+            ),
             ITEMS_PRO,
           ),
         }
@@ -354,7 +366,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const prefs = useMenuPrefs();
   // Mientras carga, el menú de siempre: es un parpadeo menos molesto que una
   // sidebar vacía, y lo que se esconde no es secreto.
-  const nav = aplicarPrefs(navPara(me.data?.rol), prefs.data ?? MENU_PREFS_VACIAS);
+  const nav = aplicarPrefs(navPara(me.data?.rol, me.data?.username), prefs.data ?? MENU_PREFS_VACIAS);
   const puedeCambiar = Boolean(me.data?.puede_cambiar_usuario);
   const suplantando = Boolean(me.data?.admin_real);
   // Estado de cada grupo expandido — auto-abrir si la ruta actual cae dentro.
