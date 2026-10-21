@@ -818,6 +818,16 @@ async def _plan_ropa(c: Ctx, p: dict, out: dict) -> None:
 # ---------------------------------------------------------------------------
 # Subir un clip y montar
 # ---------------------------------------------------------------------------
+def _montaje_completo(flecha: bool | None) -> dict[str, bool]:
+    """Herramientas de edición del POV BOF / Largo, SIEMPRE explícitas.
+
+    En FastAPI 0.157 un `bool` de Form con default True vale False si el campo
+    no llega: sin esto todo vídeo montado por el MCP salía sin gancho, título,
+    CTA, flecha ni subtítulos (y la regla anti-sanción los pide)."""
+    return {"con_gancho": True, "con_titulo": True, "con_cta": True,
+            "con_flecha": True if flecha is None else flecha, "con_subtitulos": True}
+
+
 async def subir_clip(c: Ctx, prod: str, clip: int, datos: bytes, nombre: str,
                      voz: str = "auto", flecha: bool | None = None, inserto: int = 0) -> dict:
     p = await producto(c, prod)
@@ -830,20 +840,21 @@ async def subir_clip(c: Ctx, prod: str, clip: int, datos: bytes, nombre: str,
             raise ErrorApp(f"Este guion tiene {len(golpes)} golpe(s): inserto debe ir de 1 a {len(golpes)}.")
         return await c.api.post_form(f"{LARGO}/clip/upload", {
             "source": c.catalogo, "folder": c.carpeta, "producto": pid, "slot": 1,
-            "sexo": voz or "auto", "inserto": inserto}, fichero)
+            "sexo": voz or "auto", "inserto": inserto, **_montaje_completo(flecha)}, fichero)
     if t == "largo":
         n = int(p.get("clips_necesarios") or 2)
         if not 1 <= clip <= n:
             raise ErrorApp(f"Este producto lleva {n} clips: clip debe ir de 1 a {n}.")
         return await c.api.post_form(f"{LARGO}/clip/upload", {
             "source": c.catalogo, "folder": c.carpeta, "producto": pid, "slot": clip,
-            "sexo": voz or "auto"}, fichero)
+            "sexo": voz or "auto", **_montaje_completo(flecha)}, fichero)
     if t == "pov":
         n = int(p.get("clips_necesarios") or 1)
         slot = 0 if n <= 1 else clip
         return await c.api.post_form(f"{POV}/video/upload", {
             "source": c.catalogo, "folder": c.carpeta, "producto": pid,
-            "sexo": voz or "auto", "slot": slot}, fichero)
+            "sexo": voz or "auto", "slot": slot, "con_textos": True,
+            **_montaje_completo(flecha)}, fichero)
     if t == "ugc":
         return await c.api.post_form(f"{UGC}/clips/subir", {
             "source": c.catalogo, "folder": c.carpeta, "producto": pid,

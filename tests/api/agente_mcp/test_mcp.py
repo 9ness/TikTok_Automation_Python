@@ -205,3 +205,31 @@ def test_registrar_replica_video_desde_la_bandeja(app_client, usuarios, tmp_path
 
     res = _rpc(app_client, url, "tools/call", {"name": "listar_replicas_video", "arguments": {}})
     assert [i["id"] for i in json.loads(res["content"][0]["text"])["items"]] == [doc["id"]]
+
+
+class ApiSubida(ApiFalsa):
+    def __init__(self, respuestas):
+        super().__init__(respuestas)
+        self.formularios = []
+
+    async def post_form(self, ruta, datos, fichero):
+        self.formularios.append((ruta, datos))
+        return {"ok": True}
+
+
+@pytest.mark.parametrize("menu,ruta_lista,ruta_subida", [
+    ("pov_bof_largo", f"{menus.LARGO}/productos", f"{menus.LARGO}/clip/upload"),
+    ("pov_bof", f"{menus.POV}/productos", f"{menus.POV}/video/upload"),
+])
+def test_subir_clip_manda_explicitas_las_herramientas_de_montaje(menu, ruta_lista, ruta_subida):
+    # FastAPI pone a False un bool de Form con default True si no llega: el
+    # MCP tiene que mandarlos todos o el vídeo sale sin textos ni subtítulos.
+    api = ApiSubida({ruta_lista: {"items": [{"producto": "3", "clips_necesarios": 2}]}})
+    c = menus.Ctx(menus.MENUS[menu], api, "mis_productos", "Carpeta_1")
+    asyncio.run(menus.subir_clip(c, "3", 1, b"x", "clip_1.mp4"))
+    ruta, datos = api.formularios[0]
+    assert ruta == ruta_subida
+    for k in ("con_gancho", "con_titulo", "con_cta", "con_flecha", "con_subtitulos"):
+        assert datos[k] is True, k
+    asyncio.run(menus.subir_clip(c, "3", 2, b"x", "clip_2.mp4", flecha=False))
+    assert api.formularios[1][1]["con_flecha"] is False
