@@ -30,6 +30,15 @@
 - [ ] **Filtro «4K» HECHO, apagado (13/10)**: `FILTRO_4K=1` en .env lo enciende para todos los montajes; falta que Néstor vea `pruebas_edicion/filtro_4k/` y decida. Antes: es apariencia (quita el velo blanquecino del render IA), no resolución. Propuesta: paso opcional en `_normalize_resolution` (`nicho_pov_bof/pipeline/video_editor.py`) con `scale=…:flags=lanczos`, `hqdn3d` suave, `unsharp=5:5:0.5` y `eq=contrast=1.05:saturation=1.06:gamma=0.98`; probar con 3 clips Omni comparando con CapCut lado a lado antes de activarlo por defecto (y no pasarse: el «8K» suaviza la piel).
 - [ ] Solo si se decide integrarlo: entrada de transferencia continua con audio convertido en montaje/Mis tandas; verificar subtítulos del guion locutado, nombre y metadatos. El Largo descarta audio: no subir ahí un hablado esperando conservarlo. Cambios de prompts/schemas requieren autorización y sus tipos/docs/MCP.
 
+## 🎞️ Replicar virales para Q4 (clase 21 oct 2026)
+
+Notas: [`docs/clases/2026-10-21_clase_miercoles.md`](docs/clases/2026-10-21_clase_miercoles.md).
+- [ ] 👤 Néstor: elegir qué cuentas de la lista (§3: @xjmhrsnaoh8, @demitkshop_fyp, @tjqj7322u6l, @topzetashop) se siguen cada semana y pasar los enlaces de los virales con carrito y faceless.
+- [ ] Replicar con `replicar_viral` + estilo `viral` del Largo (2 clips GenAI Pro/Magnific + Fish), adaptando el guion a 12-16 s. Primer candidato: las bayetas de microfibra (Live&Beauty en ES).
+- [ ] 👤 Moda hombre: ¿meter MEI qu shop (packs de chándal y cargo) en un catálogo del operador y replicar sus formatos (Tienda Colores, «4-Pack»)?
+- [ ] Formato libro (contenido real para nestor2): foto de una frase → texto → voz → Néstor graba el dedo señalando. Hace falta que Néstor tenga libros.
+- [ ] Dreamina / Seedance 2.0 Mini (15 s por 75 cr): solo probarlo si hace falta un clip de 15 s hablado. No contratar sin Néstor.
+
 ## 🚲 Bici eléctrica HillMiles MileCity1 (669 €, muestra gratuita) — vender 3 (13 oct 2026)
 - Alta: Muestras productos › Mis Productos 5 › nº 8. Textos extraídos; 5 guiones (dolor, precio, acción, épico, inversa) a 30 s = 3 clips de 10 s (Omni 1.1, GenAI Pro).
 - [x] 13/10 · Capturas (23) como fotos extra `8(2)…8(22)` + dossier en Drive `TIKTOK_SHOP_AI_PRO/_agente/ness/bici_hillmiles_milecity1/` (`FICHA_BICI_HILLMILES_MILECITY1.md` con specs, contradicciones ficha↔manual, objeciones e ideas de guiones reales; `manual_MileCity1.pdf`; `capturas/`).
