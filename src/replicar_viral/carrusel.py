@@ -470,6 +470,19 @@ def cambiar_texto(usuario: str, id_: str, n: int, texto: str) -> dict:
     return con_estado(doc)
 
 
+def cambiar_caption(usuario: str, id_: str, caption: str) -> dict:
+    """Cambia el caption del carrusel (el de TikTok y la base del de Meta).
+    Las publicaciones de Meta ya en cola las actualiza el router aparte."""
+    usuario = usuario or "ness"
+    caption = sin_cupones_afirmados((caption or "").strip())
+    if not caption:
+        raise ErrorReplica("caption: no puede quedar vacío")
+    doc = ver(usuario, id_)
+    doc["caption"] = caption
+    servicio.guardar(doc, indexar=False)
+    return con_estado(doc)
+
+
 def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None) -> dict:
     """Letra del carrusel entero (para parecerse al viral: máquina de escribir,
     manuscrita, píldora blanca…; ver `texto_foto.ESTILOS`) y, si se da, altura

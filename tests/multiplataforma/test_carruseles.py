@@ -160,6 +160,13 @@ def test_cuenta_por_nicho():
     assert carruseles.cuenta_para("Paraguas automático") == "viva_shop"
     assert carruseles.cuenta_para("Aigostar Foco proyector LED con panel solar") == "viva_shop"
     assert carruseles.cuenta_para("MIKOMIKA Cajas de zapatos plegables") == "viva_shop"
+    # casos de los carruseles de @kubreflexiones (20/10/2026)
+    assert carruseles.cuenta_para("X SMILE Kit limpieza de zapatillas") == "viva_shop"
+    assert carruseles.cuenta_para("NIVEA Calendario de adviento para la piel") == "viva_salud"
+    assert carruseles.cuenta_para("medicube Set Poros-fectos limpieza profunda") == "viva_salud"
+    assert carruseles.cuenta_para("Limpiador dental eléctrico con kit de herramientas") == "viva_salud"
+    assert carruseles.cuenta_para("Naturivo Gominolas Equilibrio Femenino") == "viva_salud"
+    assert carruseles.cuenta_para("L'Oréal Men Expert Desodorante Roll-On y Gel de Ducha") == "viva_salud"
 
 
 def test_auto_encola_terminados_con_enlace(replica, cuenta, monkeypatch):
@@ -168,7 +175,7 @@ def test_auto_encola_terminados_con_enlace(replica, cuenta, monkeypatch):
     filas = [{"id": "abc123", "diapositivas": 3, "hechas": 3, "producto": replica["producto"]},
              {"id": "medias", "diapositivas": 3, "hechas": 1, "producto": replica["producto"]},
              {"id": "sinlink", "diapositivas": 2, "hechas": 2, "producto": {"titulo": "Lámpara LED", "tienda": "Y"}}]
-    monkeypatch.setattr(servicio, "lista", lambda u, t="": filas if u == "ness" else [])
+    monkeypatch.setattr(servicio, "lista", lambda u, t="", limite=50: filas if u == "ness" else [])
     from src.multiplataforma.services import tandas
 
     key = tandas.producto_key({"titulo": "Paraguas automático", "tienda": "Tienda X"})
@@ -180,3 +187,17 @@ def test_auto_encola_terminados_con_enlace(replica, cuenta, monkeypatch):
     # una hora después no repite el ya encolado
     inf = carruseles.auto_encolar_todas(ahora=AHORA + 3700)
     assert inf["encolados"] == []
+
+
+def test_actualizar_caption_de_la_cola(replica, cuenta):
+    inf = carruseles.encolar("viva_shop", "abc123", asin="B0ABC12345", ahora=AHORA)
+    pub = publicaciones_repo.get(inf["publicacion"]["id"])
+    pub.estado["threads"] = config.ESTADO_PUBLICADO
+    viejo_threads = pub.textos["threads"]
+    publicaciones_repo.guardar(pub)
+    assert carruseles.actualizar_caption("abc123", "Paraguas automático. Míralo en el carrito.") == [pub.id]
+    pub = publicaciones_repo.get(pub.id)
+    assert pub.caption == "Paraguas automático."
+    assert pub.textos["instagram"].startswith("Paraguas automático.") and "Un paraguas" not in pub.textos["instagram"]
+    assert pub.textos["threads"] == viejo_threads  # ya publicada: no se toca
+    assert carruseles.actualizar_caption("otro", "x") == []

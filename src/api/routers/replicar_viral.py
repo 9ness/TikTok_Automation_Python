@@ -306,6 +306,22 @@ def carrusel_texto(
         raise _error(e) from e
 
 
+@router.post("/carrusel/{id_}/caption")
+def carrusel_caption(
+    id_: str, caption: Annotated[str, Body(embed=True)] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Cambia el caption del carrusel y el de sus publicaciones de Meta aún en cola."""
+    from src.multiplataforma.services import carruseles as mp_carruseles
+
+    try:
+        doc = carrusel.cambiar_caption(usuario, id_, caption)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+    doc["meta_actualizadas"] = mp_carruseles.actualizar_caption(id_, doc.get("caption", ""))
+    return doc
+
+
 @router.post("/carrusel/{id_}/estilo")
 def carrusel_estilo(
     id_: str, estilo: Annotated[str, Body(embed=True)] = "",

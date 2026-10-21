@@ -257,17 +257,19 @@ def guardar(doc: dict, *, indexar: bool = True) -> None:
     r.set_json(INDICE.format(usuario=usuario), indice)
 
 
-def lista(usuario: str, tipo: str = "") -> list[dict]:
-    """Resumen de las últimas réplicas. `tipo`: "video" o "carrusel" (sin él,
-    todas). Las de vídeo no llevan el campo: son las de antes del carrusel."""
+def lista(usuario: str, tipo: str = "", limite: int = 50) -> list[dict]:
+    """Resumen de las últimas `limite` réplicas (0 = todas). `tipo`: "video" o
+    "carrusel" (sin él, todas). Las de vídeo no llevan el campo: son las de
+    antes del carrusel."""
     r = _redis()
     if not r.is_available():
         return []
     ids = (r.get_json(INDICE.format(usuario=usuario or "ness")) or {}).get("ids") or []
     if not ids:
         return []
-    docs = r.mget_json([CLAVE.format(id=i) for i in ids[:50]]) if hasattr(r, "mget_json") else [
-        r.get_json(CLAVE.format(id=i)) for i in ids[:50]]
+    ids = ids[:limite] if limite else ids
+    docs = r.mget_json([CLAVE.format(id=i) for i in ids]) if hasattr(r, "mget_json") else [
+        r.get_json(CLAVE.format(id=i)) for i in ids]
     salida = []
     for d in docs:
         if not isinstance(d, dict):

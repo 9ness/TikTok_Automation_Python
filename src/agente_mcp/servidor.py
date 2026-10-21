@@ -910,7 +910,7 @@ async def subir_imagen_carrusel(ctx: Context, id: str, n: int, archivo_id: str =
 @_herramienta(structured_output=False)
 async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
                              texto: str | None = None, estilo_texto: str = "",
-                             texto_y: float = 0) -> str:
+                             texto_y: float = 0, caption: str | None = None) -> str:
     """Un carrusel replicado: diapositivas con su texto, si ya tienen foto,
     `hechas`/`total`, y `zip` = enlace para bajar TODAS de golpe (con su texto
     quemado) + caption.txt. Sin `id`: la lista de carruseles replicados.
@@ -921,11 +921,18 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
     (tiktok —por defecto, blanca con contorno—, clasico, pildora —negra sobre
     píldora blanca—, pildora_negra, maquina, elegante, manuscrita,
     rotulador, impacto) y `texto_y` la altura del texto (0.05 arriba … 0.95
-    abajo; 0 = la de siempre). Vuelve a quemar todas."""
+    abajo; 0 = la de siempre). Vuelve a quemar todas.
+    `caption`: cambia el caption del carrusel (el de TikTok y la base del de
+    Meta) y el de sus publicaciones de Meta que sigan en cola; los ids
+    tocados vuelven en `meta_actualizadas`."""
     u = _usuario(ctx)
     api = Interno(u)
     if not id:
         return _json(await api.get("/api/v1/replicar-viral", tipo="carrusel"))
+    meta = None
+    if caption is not None:
+        meta = (await api.post(f"/api/v1/replicar-viral/carrusel/{id}/caption",
+                               {"caption": caption})).get("meta_actualizadas", [])
     if estilo_texto:
         body: dict = {"estilo": estilo_texto}
         if texto_y:
@@ -936,7 +943,10 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
                              {"texto": texto})
     else:
         doc = await api.get(f"/api/v1/replicar-viral/carrusel/{id}")
-    return _json(_enlaces_carrusel(u, doc))
+    out = _enlaces_carrusel(u, doc)
+    if meta is not None:
+        out["meta_actualizadas"] = meta
+    return _json(out)
 
 
 async def _foto_de(u: str, valor: str, que: str) -> tuple[bytes, str]:

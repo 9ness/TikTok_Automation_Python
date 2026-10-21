@@ -175,11 +175,35 @@ def encolar(slug: str, carrusel_id: str, *, usuario: str = "", asin: str = "", s
             "musica_sugerida": (doc.get("musica") or {}).get("meta") or {}}
 
 
+def actualizar_caption(carrusel_id: str, caption: str) -> list[str]:
+    """Rehace el texto de las publicaciones de ese carrusel que siguen en cola
+    (en las plataformas ya publicadas no se toca). Devuelve los ids actualizados."""
+    texto = caption_meta(caption)
+    hechas = []
+    for pub in publicaciones_repo.pendientes():
+        if pub.tipo != TIPO or pub.carrusel_id != carrusel_id:
+            continue
+        pend = [p for p in pub.plataformas if pub.estado.get(p) not in config.ESTADOS_FINALES]
+        if not pend:
+            continue
+        t = textos.construir(titulo="", caption=texto, enlace=pub.enlace, hashtags=pub.hashtags,
+                             plataformas=pub.plataformas)
+        pub.caption = texto
+        pub.textos = {p: t["textos"][p] if p in pend else pub.textos.get(p, t["textos"][p])
+                      for p in pub.plataformas}
+        pub.comentario = t["comentario"]
+        publicaciones_repo.guardar(pub)
+        hechas.append(pub.id)
+    return hechas
+
+
 # ---------------------------------------------------------------------------
 # Programarlos solos (lo llama el tick)
 # ---------------------------------------------------------------------------
 _HOGAR = (r"\b(cajas?|organizador\w*|zapatero|estanter\w*|armario|foco|focos|proyector|panel|lampara|"
           r"mesa|mueble|tocador|escritorio)\b")
+# «Kit limpieza de zapatillas»: casa con «zapatillas» pero no es moda (no hay en SHEIN)
+_NO_MODA = r"\b(limpieza|limpiador\w*|cepillo|kit)\b"
 
 
 def cuenta_para(titulo: str, cuentas: dict[str, str] | None = None) -> str:
@@ -191,6 +215,8 @@ def cuenta_para(titulo: str, cuentas: dict[str, str] | None = None) -> str:
     cat = _t.categoria_link(titulo)
     t = tandas._norm(titulo)
     if re.search(_HOGAR, t):  # «cajas de zapatos», «foco … solar»: son de casa
+        return cuentas["resto"]
+    if cat in config.CATEGORIAS_MODA and re.search(_NO_MODA, t):
         return cuentas["resto"]
     if cat in config.CATEGORIAS_MODA and not re.search(r"\b(hombre|men|mens|masculin[oa])\b", t):
         return cuentas["moda"]
@@ -220,7 +246,7 @@ def auto_encolar_todas(*, ahora: float | None = None, cada_s: int = 3600, log=la
     ya = {p.carrusel_id for p in publicaciones_repo.todas(limite=10**6) if p.tipo == TIPO}
     out: dict = {"encolados": [], "sin_enlace": [], "errores": []}
     for dueno in sorted({c.dueno for c in activas.values() if c.dueno}):
-        for f in servicio.lista(dueno, TIPO):
+        for f in servicio.lista(dueno, TIPO, limite=0):  # todas, no solo las 50 últimas
             if f["id"] in ya or not f.get("diapositivas") or f.get("hechas", 0) < f["diapositivas"]:
                 continue
             prod = f.get("producto") or {}

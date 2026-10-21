@@ -55,6 +55,7 @@ Si `apto` es `false`, díselo al operador y no sigas sin su «sí».
 Revisa los textos: sin promesas de salud ni resultados, nada que no diga la
 ficha, y **cupones nunca afirmados** («revisa si tienes cupones», jamás «tu
 cupón»). Si hay que corregir uno: `descargar_carrusel(id, texto_n=N, texto=…)`.
+El caption se cambia con `descargar_carrusel(id, caption=…)` (Néstor, 20/10: **solo el nombre del producto**); también rehace el de sus publicaciones de Meta que sigan en cola (`meta_actualizadas`).
 
 ## 3. Generar (en la WEB, nunca por API)
 
