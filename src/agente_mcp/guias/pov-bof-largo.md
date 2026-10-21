@@ -116,6 +116,9 @@ no el tope:
      `imagen_1.png`.
    - **Flow**: vídeo, FRAME INICIAL = `imagen_1.png`, 8 o 10 s, pega el
      «Prompt vídeo».
+   - **Clips de 6 s** (oct 2026): 2 × 6 s = vídeo de 12 s, para los de sitio
+     real de Casca Chollos con Omni de Magnific (160 cr/s). Pon `clip_s=6`
+     en la carpeta y el guion se escribe para 12 s.
 
    Revisa cada clip (el producto no se deforma, la mano no lo toca) →
    `clip_1.mp4`, `clip_2.mp4`…
@@ -383,4 +386,4 @@ Slugs de catálogo: `inventario_general`, `productos_web`, `mis_productos`
 
 ## Con el MCP
 
-Con el MCP: `menu="pov_bof_largo"` · `preparar_carpeta(..., clip_s=8|10, estilo_guion="precio"|"dolor")`. `subir_clip(clip=N, voz="auto")` por cada hueco; con el último se monta solo. Con el MCP **sí** se pueden hacer los productos de 5 clips (la pantalla solo enseña 4 huecos).
+Con el MCP: `menu="pov_bof_largo"` · `preparar_carpeta(..., clip_s=6|8|10, estilo_guion="precio"|"dolor")`. `subir_clip(clip=N, voz="auto")` por cada hueco; con el último se monta solo. Con el MCP **sí** se pueden hacer los productos de 5 clips (la pantalla solo enseña 4 huecos).

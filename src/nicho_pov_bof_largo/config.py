@@ -72,7 +72,9 @@ CLIP_MAX_S = round(CLIP_TARGET_S * ESTIRADO_CLIP, 1)
 # Duraciones que el operador puede elegir. La plataforma de vídeo ha dado clips
 # de 8 y de 10 según la época y la herramienta, y de eso depende cuántos pedir:
 # el mismo guion de 20s son 3 clips de 8s o 2 de 10s.
-CLIPS_DURACIONES = (8, 10)
+# SEIS desde oct 2026: Omni de Magnific cobra 160 créditos por segundo, y dos
+# clips de 6 s (vídeo de 12 s) son los vídeos de sitio real de Casca Chollos.
+CLIPS_DURACIONES = (6, 8, 10)
 
 
 def clip_max_s(clip_s: float = 0.0) -> float:

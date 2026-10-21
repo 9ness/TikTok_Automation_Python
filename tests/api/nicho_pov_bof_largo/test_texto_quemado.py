@@ -106,6 +106,9 @@ class TestCuantoDuraElVideo:
         assert config.opciones_guion(8) == ((2, 16), (3, 24), (4, 32), (5, 40))
         # Con clips de 10s hay una opción menos: el tope son 40 segundos.
         assert config.opciones_guion(10) == ((2, 20), (3, 30), (4, 40))
+        # Clips de 6s (Omni de Magnific, 160 cr/s): dos clips son 12s.
+        assert config.opciones_guion(6)[0] == (2, 12)
+        assert 6 in config.CLIPS_DURACIONES
 
     def test_lo_que_se_pide_y_el_metraje_son_el_mismo_numero(self):
         """Era el fallo de los segundos absolutos.
@@ -116,7 +119,7 @@ class TestCuantoDuraElVideo:
         """
         from src.nicho_pov_bof_largo import config
 
-        for clip_s in (8, 10):
+        for clip_s in (6, 8, 10):
             for clips, segundos in config.opciones_guion(clip_s):
                 metraje = clips * clip_s
                 suelo, techo = config.ventana_video(segundos, metraje)

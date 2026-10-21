@@ -1194,7 +1194,7 @@ export default function PovBofLargoPage() {
                 no tarjeta a tarjeta. */}
             <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
               <span>Clips de toda la carpeta:</span>
-              {[8, 10].map((s) => (
+              {[6, 8, 10].map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -2467,11 +2467,11 @@ function ProductoCard({
           móvil estrecho salen tres botones apretados; encima con cuatro ya eran
           dos filas de dos, así que la pantalla cambiaba de forma según el
           producto. Dos columnas es igual en todos los casos (2, 2+1, 2+2). */}
-      {/* 8 o 10 segundos, pegado a los huecos porque es lo que cambia: con
+      {/* 6, 8 o 10 segundos, pegado a los huecos porque es lo que cambia: con
           clips de 10s el mismo guion pide uno menos. */}
       <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
         <span>Clips de</span>
-        {[8, 10].map((s) => (
+        {[6, 8, 10].map((s) => (
           <button
             key={s}
             type="button"
