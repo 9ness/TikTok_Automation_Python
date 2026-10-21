@@ -713,6 +713,16 @@ def _cuota(ref: str, usuario: str, subido: bool) -> None:
         pass
 
 
+def _contenido(fuente: str, carpeta: str, prod: str, usuario: str, id_: str, subido: bool) -> None:
+    """Descuenta (o devuelve) un vídeo al producto que «necesita contenido»."""
+    try:
+        from src.nicho_pov_bof.services import marcas
+
+        marcas.registrar_subido(fuente, carpeta, prod, f"{usuario}|{id_}", subido)
+    except Exception:  # noqa: BLE001 — la marca no tumba el botón de subido
+        pass
+
+
 def marcar(
     usuario: str, id_: str, *, uploaded: bool | None = None,
     sin_stock: bool | None = None, rehacer: bool | None = None,
@@ -746,6 +756,7 @@ def marcar(
             cambios["uploaded"] = bool(uploaded)
             cambios["uploaded_at"] = float(hecho.get("uploaded_at") or (time.time() if uploaded else 0))
             _cuota(f"pov_bof|{fuente}|{carpeta}|{prod}", usuario, bool(uploaded))
+            _contenido(fuente, carpeta, prod, usuario, id_, bool(uploaded))
     elif p[0] == "largo":
         _, fuente, carpeta, prod, modo = p
         from src.nicho_pov_bof.repos import product_repo as pov_repo
@@ -771,6 +782,7 @@ def marcar(
             cambios["sin_stock"] = bool(sin_stock)
         if uploaded is not None:
             _cuota(f"pov_bof_largo|{fuente}|{carpeta}|{prod}", usuario, bool(uploaded))
+            _contenido(fuente, carpeta, prod, usuario, id_, bool(uploaded))
     else:
         carpeta, prod = p[1], p[2]
         if p[0] == "alea" and rehacer is not None:

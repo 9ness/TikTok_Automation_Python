@@ -16,6 +16,7 @@ automatización de los vídeos por producto.
 - GET  /api/v1/nicho-pov-bof/vendidos        → productos vendidos (referencia)
 - GET  /api/v1/nicho-pov-bof/reembolsables   → muestras reembolsables (Muestras y Productos físicos)
 - POST /api/v1/nicho-pov-bof/reembolsable/{marcar,actualizar,desmarcar}
+- POST /api/v1/nicho-pov-bof/marcas · GET /api/v1/nicho-pov-bof/prioridades
 
 Fase 1 (navegación de carpetas/fotos) vive en `folders.py`, sobre el mismo
 router prefix — este módulo se registra aparte para no mezclar los dos
@@ -38,7 +39,10 @@ from src.api.exceptions import APIError, PhotoNotFoundError
 from src.api.schemas.nicho_pov_bof import (
     ActualizarReembolsableRequest,
     DesmarcarReembolsableRequest,
+    MarcarProductoRequest,
     MarcarReembolsableRequest,
+    MarcasItem,
+    PrioridadesResponse,
     ReembolsableItem,
     ReembolsablesResponse,
     GuardarUrlRequest,
@@ -409,6 +413,7 @@ def _producto_info(
         url_ventas_total=int(prod.get("url_ventas_total") or 0),
         montando=producto in _productos_montandose(queue, source, folder),
         reembolso=_reembolso_de(source, prod),
+        marcas=_marcas_de(source, prod),
     )
 
 
@@ -420,6 +425,15 @@ def _reembolso_de(source: str, prod: dict) -> dict | None:
     if source not in reembolsables.FUENTES_REEMBOLSO:
         return None
     return reembolsables.info(prod.get("reembolso"))
+
+
+def _marcas_de(source: str, prod: dict) -> dict | None:
+    """Físico / necesita contenido / Q4 / clips reales (`services/marcas.py`)."""
+    from src.nicho_pov_bof.services import marcas
+
+    if source not in marcas.FUENTES_MARCAS:
+        return None
+    return marcas.info(source, prod)
 
 
 def _productos_montandose(queue: JobQueue | None, source: str, folder: str) -> set[str]:
@@ -593,6 +607,7 @@ def _list_productos(
                 url_ventas_total=int(guardado.get("url_ventas_total") or 0),
                 montando=producto in montandose,
                 reembolso=_reembolso_de(source, guardado),
+                marcas=_marcas_de(source, guardado),
             )
         )
 
@@ -1471,6 +1486,11 @@ async def crear_mi_producto(
     reembolsable: Annotated[bool, Form()] = False,
     ventas_objetivo: Annotated[int, Form()] = 0,
     dias: Annotated[int, Form()] = 0,
+    importe: Annotated[float, Form()] = 0,
+    fisico: Annotated[bool, Form()] = False,
+    contenido_videos: Annotated[int, Form()] = 0,
+    q4: Annotated[bool, Form()] = False,
+    clips_reales: Annotated[str, Form()] = "",
 ) -> dict:
     """Alta de un producto PROPIO subiendo sus dos fotos.
 
@@ -1499,11 +1519,13 @@ async def crear_mi_producto(
                 "Solo las muestras de «Muestras productos» o «Productos físicos» "
                 "pueden ser reembolsables."
             )
-        if ventas_objetivo < 1 or dias < 0:
+        if ventas_objetivo < 1 or dias < 0 or importe < 0:
             raise _bad_request(
-                "Para una muestra reembolsable indica ventas necesarias (1 o más) "
-                "y los días que quedan."
+                "Para una muestra reembolsable indica ventas necesarias (1 o más), "
+                "los días que quedan y el dinero que devuelven (0 o más)."
             )
+    if not 0 <= contenido_videos <= 20:
+        raise _bad_request("Los vídeos que pide la tienda van de 1 a 20 (0 = no lo pide).")
 
     async def _leer(archivo: UploadFile, que: str) -> bytes:
         if not archivo:
@@ -1581,11 +1603,26 @@ async def crear_mi_producto(
         try:
             hecho = reembolsables.marcar(
                 str(creado.get("carpeta") or ""), str(creado.get("producto") or ""),
-                ventas_objetivo, dias, 0, source=source, comprobar=False,
+                ventas_objetivo, dias, 0, source=source, comprobar=False, importe=importe,
             )
             creado = {**creado, "reembolso": hecho.get("reembolso")}
         except Exception as e:  # noqa: BLE001 — las fotos ya están; se marca en la tarjeta
             creado = {**creado, "reembolso_error": str(e)}
+
+    if fisico or contenido_videos or q4 or clips_reales.strip():
+        from src.nicho_pov_bof.services import marcas
+
+        try:
+            hecho = marcas.marcar(
+                str(creado.get("carpeta") or ""), str(creado.get("producto") or ""),
+                source=source, comprobar=False,
+                fisico=True if fisico else None, q4=True if q4 else None,
+                clips_reales=clips_reales.strip() or None,
+                contenido_videos=contenido_videos or None,
+            )
+            creado = {**creado, "marcas": hecho.get("marcas")}
+        except Exception as e:  # noqa: BLE001 — las fotos ya están; se marca en la tarjeta
+            creado = {**creado, "marcas_error": str(e)}
 
     return {"source": source, **creado}
 
@@ -3053,7 +3090,7 @@ def marcar_reembolsable(
 
     return _reembolso_op(
         usuario, reembolsables.marcar, body.folder, body.producto, body.ventas_objetivo,
-        body.dias, body.ventas, body.notas, source=body.source,
+        body.dias, body.ventas, body.notas, source=body.source, importe=body.importe,
     )
 
 
@@ -3070,8 +3107,59 @@ def actualizar_reembolsable(
         usuario, reembolsables.actualizar, body.folder, body.producto,
         ventas=body.ventas, dias=body.dias, ventas_objetivo=body.ventas_objetivo,
         notas=body.notas, revisado=body.revisado, sumar_ventas=body.sumar_ventas,
-        source=body.source,
+        source=body.source, importe=body.importe,
     )
+
+
+# ---------------------------------------------------------------------------
+# MARCAS de producto (físico, necesita contenido, Q4, clips reales) y la lista
+# de PRIORIDADES (`services/marcas.py`)
+# ---------------------------------------------------------------------------
+@router.post("/marcas", response_model=MarcasItem)
+def marcar_producto(
+    body: MarcarProductoRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> MarcasItem:
+    """Pone o quita marcas de un producto; lo que no se manda no se toca."""
+    from src.nicho_pov_bof.services import marcas
+
+    if not nicho_config.ve_catalogo(body.source, usuario):
+        raise _bad_request(f"{body.source!r} no es un catálogo tuyo.")
+    try:
+        return MarcasItem(**marcas.marcar(
+            body.folder, body.producto, source=body.source,
+            fisico=body.fisico, q4=body.q4, clips_reales=body.clips_reales,
+            contenido=body.contenido, contenido_videos=body.contenido_videos,
+            contenido_notas=body.contenido_notas,
+        ))
+    except ValueError as e:
+        raise _bad_request(str(e)) from e
+
+
+@router.get("/prioridades", response_model=PrioridadesResponse)
+def listar_prioridades(
+    source: Annotated[str | None, Query()] = None,
+    solo_fisicos: Annotated[bool, Query()] = False,
+    incluir_resto: Annotated[bool, Query()] = False,
+    limite: Annotated[int, Query(ge=0, le=500)] = 0,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> PrioridadesResponse:
+    """Qué producto toca: 1) necesita contenido (el que menos le falta antes),
+    2) reembolsables en curso (el que más dinero da antes), 3) el resto (con
+    `incluir_resto`; primero los que funcionan en Q4)."""
+    from src.nicho_pov_bof.services import marcas
+
+    if source:
+        if source not in marcas.FUENTES_MARCAS:
+            raise _bad_request(f"{source!r} no tiene marcas.")
+        if not nicho_config.ve_catalogo(source, usuario):
+            raise _bad_request(f"{source!r} no es un catálogo tuyo.")
+        fuentes = [source]
+    else:
+        fuentes = [f for f in marcas.FUENTES_MARCAS if nicho_config.ve_catalogo(f, usuario)]
+    return PrioridadesResponse(**marcas.prioridades(
+        fuentes=fuentes, solo_fisicos=solo_fisicos, incluir_resto=incluir_resto, limite=limite,
+    ))
 
 
 @router.post("/reembolsable/desmarcar", response_model=ReembolsableItem)

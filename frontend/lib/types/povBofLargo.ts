@@ -3,7 +3,7 @@
  * Reflejan `src/api/schemas/nicho_pov_bof_largo/models.py`.
  */
 
-import type { ReembolsoInfo } from "./nichoPovBof";
+import type { MarcasInfo, ReembolsoInfo } from "./nichoPovBof";
 
 export interface VozLargo {
   id: string;
@@ -54,6 +54,8 @@ export interface ProductoLargo {
   vendido_at: number;
   /** Muestra reembolsable (Muestras productos y Productos físicos). */
   reembolso?: ReembolsoInfo | null;
+  /** Físico / necesita contenido / Q4 / clips reales (catálogos del operador). */
+  marcas?: MarcasInfo | null;
   /** Precio leído por el POV BOF (0 = no detectado) y el de antes del descuento. */
   precio: number;
   precio_lista: number;

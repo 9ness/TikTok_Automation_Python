@@ -24,6 +24,8 @@ import type {
   ProductoItem,
   ProductoRecuperado,
   ProductoUrlRequest,
+  MarcasItem,
+  PrioridadesResponse,
   ReembolsableItem,
   ReembolsablesResponse,
   ReembolsoInfo,
@@ -50,6 +52,7 @@ export const nichoPovBofKeys = {
     [...nichoPovBofKeys.all, "buscar", source, q] as const,
   recuperados: () => [...nichoPovBofKeys.all, "recuperados"] as const,
   reembolsables: () => [...nichoPovBofKeys.all, "reembolsables"] as const,
+  prioridades: (q: string) => [...nichoPovBofKeys.all, "prioridades", q] as const,
 };
 
 /** Busca un producto por nombre, tienda o carpeta en TODAS las carpetas.
@@ -335,6 +338,8 @@ export function useCrearMiProducto() {
       reembolso?: ReembolsoInfo | null;
       /** Las fotos entraron pero no se pudo marcar como reembolsable. */
       reembolso_error?: string;
+      /** Las fotos entraron pero no se pudieron poner las marcas. */
+      marcas_error?: string;
     },
     Error,
     {
@@ -349,10 +354,12 @@ export function useCrearMiProducto() {
       /** Carpeta destino: vacía = la que toca; "__nueva__" = abre otra. */
       carpeta?: string;
       /** Muestras / Productos físicos: nace marcada como muestra reembolsable. */
-      reembolso?: { ventas_objetivo: number; dias: number } | null;
+      reembolso?: { ventas_objetivo: number; dias: number; importe?: number } | null;
+      /** Marcas con las que nace (físico, necesita contenido N, Q4, clips reales). */
+      marcas?: AltaMarcas | null;
     }
   >({
-    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl, carpeta, reembolso }) => {
+    mutationFn: async ({ fotoLimpia, fotoFicha, fotosExtra, source = "mis_productos", productUrl, carpeta, reembolso, marcas }) => {
       const fd = new FormData();
       fd.append("foto_limpia", fotoLimpia);
       if (fotoFicha) fd.append("foto_ficha", fotoFicha);
@@ -363,6 +370,13 @@ export function useCrearMiProducto() {
         fd.append("reembolsable", "true");
         fd.append("ventas_objetivo", String(reembolso.ventas_objetivo));
         fd.append("dias", String(reembolso.dias));
+        if (reembolso.importe) fd.append("importe", String(reembolso.importe));
+      }
+      if (marcas && admiteMarcas(source)) {
+        if (marcas.fisico) fd.append("fisico", "true");
+        if (marcas.contenido_videos) fd.append("contenido_videos", String(marcas.contenido_videos));
+        if (marcas.q4) fd.append("q4", "true");
+        if (marcas.clips_reales?.trim()) fd.append("clips_reales", marcas.clips_reales.trim());
       }
       return api.post(`${ROOT}/mis-productos?source=${encodeURIComponent(source)}`, fd);
     },
@@ -1280,6 +1294,7 @@ export interface MarcarReembolsableReq {
   ventas_objetivo: number;
   dias: number;
   ventas?: number;
+  importe?: number;
   notas?: string;
 }
 
@@ -1292,6 +1307,7 @@ export interface ActualizarReembolsableReq {
   sumar_ventas?: number;
   dias?: number;
   ventas_objetivo?: number;
+  importe?: number;
   notas?: string;
   revisado?: boolean;
 }
@@ -1313,6 +1329,7 @@ function useAlCambiarReembolso() {
       (old) => (old?.items ? { ...old, items: old.items.map(parchea) } : old),
     );
     void qc.invalidateQueries({ queryKey: nichoPovBofKeys.reembolsables() });
+    void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "prioridades"] });
   };
 }
 
@@ -1349,5 +1366,80 @@ export function useDesmarcarReembolsable() {
         ...body,
       }),
     onSuccess: alCambiar,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// MARCAS de producto (físico, necesita contenido, Q4, clips reales) y
+// PRIORIDADES (`services/marcas.py`)
+// ---------------------------------------------------------------------------
+
+/** Catálogos del operador: los únicos con marcas (`marcas.FUENTES_MARCAS`). */
+export const FUENTES_MARCAS = [
+  "mis_productos", "tareas_productos", "temporada_q4", "carruseles_virales",
+  "productos_fisicos", "productos_fisicos_ana",
+];
+
+export function admiteMarcas(source: string | null | undefined): boolean {
+  return !!source && FUENTES_MARCAS.includes(source);
+}
+
+export interface AltaMarcas {
+  fisico?: boolean;
+  /** 0/ausente = no pide contenido. */
+  contenido_videos?: number;
+  q4?: boolean;
+  clips_reales?: string;
+}
+
+export interface MarcarProductoReq {
+  source: string;
+  folder: string;
+  producto: string;
+  fisico?: boolean;
+  q4?: boolean;
+  clips_reales?: string;
+  /** false lo quita; contenido_videos lo activa. */
+  contenido?: boolean;
+  contenido_videos?: number;
+  contenido_notas?: string;
+}
+
+export function useMarcarProducto() {
+  const qc = useQueryClient();
+  return useMutation<MarcasItem, Error, MarcarProductoReq>({
+    mutationFn: (body) => api.post<MarcasItem>(`${ROOT}/marcas`, body),
+    onSuccess: (r) => {
+      const parchea = <T extends { producto: string; marcas?: unknown }>(p: T): T =>
+        p.producto === r.producto ? { ...p, marcas: r.marcas } : p;
+      qc.setQueryData<ProductoItem[]>(
+        nichoPovBofKeys.productos(r.source, r.folder),
+        (old) => old?.map(parchea),
+      );
+      qc.setQueriesData<{ items: { producto: string; marcas?: unknown }[] }>(
+        { queryKey: ["pov-bof-largo", "productos", r.source, r.folder] },
+        (old) => (old?.items ? { ...old, items: old.items.map(parchea) } : old),
+      );
+      void qc.invalidateQueries({ queryKey: [...nichoPovBofKeys.all, "prioridades"] });
+    },
+  });
+}
+
+/** Qué producto toca: necesita contenido → reembolsables por dinero → resto. */
+export function usePrioridades(
+  opts: { source?: string; soloFisicos?: boolean; incluirResto?: boolean; limite?: number } = {},
+  activo = true,
+) {
+  const q = new URLSearchParams();
+  if (opts.source) q.set("source", opts.source);
+  if (opts.soloFisicos) q.set("solo_fisicos", "true");
+  if (opts.incluirResto) q.set("incluir_resto", "true");
+  if (opts.limite) q.set("limite", String(opts.limite));
+  const qs = q.toString();
+  return useQuery<PrioridadesResponse>({
+    queryKey: nichoPovBofKeys.prioridades(qs),
+    queryFn: () => api.get<PrioridadesResponse>(`${ROOT}/prioridades${qs ? `?${qs}` : ""}`),
+    enabled: activo,
+    staleTime: 60_000,
   });
 }

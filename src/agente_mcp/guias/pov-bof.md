@@ -91,7 +91,8 @@ En la tarjeta sale el badge
 ⛔ vencido) y arriba la caja «💸 Muestras reembolsables» con todas las de los
 catálogos que ve la cuenta, cada una con su catálogo (tocarla abre su carpeta).
 - **Marcar:** en la tarjeta «💸 ¿Reembolsable?» (ventas necesarias + días que
-  quedan), o al darla de alta en **«Subir productos»** eligiendo «Productos
+  quedan + **dinero que devuelven**, `importe` en €: es lo que ordena la
+  prioridad — una de 45 días que da 30 céntimos importa menos que una de 10 €), o al darla de alta en **«Subir productos»** eligiendo «Productos
   físicos» o «Muestras productos» y el check «Muestra reembolsable» (nace con
   0 ventas). Por MCP no hay alta de productos: el operador la sube y tú la
   marcas con `marcar_reembolsable(..., catalogo="productos_fisicos")` (por
@@ -106,9 +107,33 @@ catálogos que ve la cuenta, cada una con su catálogo (tocarla abre su carpeta)
 - Herramientas MCP: `reembolsables(catalogo="")` (lista de todos los
   catálogos que ve la cuenta, primero las que toca revisar; cada item trae
   `source` y `catalogo`), `marcar_reembolsable(carpeta, producto,
-  ventas_objetivo, dias, catalogo=...)`, `actualizar_reembolsable(...,
-  catalogo=...)`, `desmarcar_reembolsable(..., catalogo=...)` — pasa siempre
+  ventas_objetivo, dias, importe=..., catalogo=...)`, `actualizar_reembolsable(...,
+  sumar_ventas=1 | importe=..., catalogo=...)` («he vendido una más» = `sumar_ventas=1`), `desmarcar_reembolsable(..., catalogo=...)` — pasa siempre
   como `catalogo` el `source` del item.
+
+### 7. Marcas de producto y prioridades (todos los catálogos del operador)
+Un producto de «Muestras productos», «Tareas Productos», «Productos físicos»,
+«Temporada Q4»… puede llevar VARIAS marcas a la vez (`services/marcas.py`):
+- **🎥 Físico** (`fisico`): lo tiene en casa → se puede grabar real (aunque
+  también se le puede hacer IA). Los de «Productos físicos» lo son siempre.
+- **📣 Necesita contenido** (`contenido_videos=N`, 1 por defecto, 3 si la tienda
+  lo pide): cada vídeo del producto marcado **Subido en Mis tandas** (POV BOF o
+  Largo) descuenta uno; al llegar a 0 sale «✅ contenido hecho» y pierde la
+  prioridad. Desmarcar el subido lo devuelve.
+- **🎄 Q4** (`q4`): funciona ahora en Q4 (desempata el resto).
+- **📁 Clips reales** (`clips_reales`): la carpeta del Drive con las tomas
+  grabadas de ese producto (ruta del mount o enlace). Antes de montar un vídeo
+  real, mira ahí.
+Se marcan al darlo de alta en «Subir productos», en la fila «🏷️ Marcas» de la
+tarjeta (POV BOF y Largo) o con `marcar_producto(carpeta, producto,
+catalogo=..., fisico=, contenido_videos=, q4=, clips_reales=)`.
+
+**Qué hacer primero:** `prioridades(catalogo="", solo_fisicos=False,
+incluir_resto=False)` (y la caja «🎯 Prioridades» de «Subir productos»):
+1) necesita contenido, el que menos vídeos le faltan antes; 2) reembolsables en
+curso, el que más dinero devuelve antes; 3) con `incluir_resto`, el resto, primero
+los de Q4. Cada item trae `grupo` y `motivo`. Para grabar en real:
+`solo_fisicos=True`.
 
 ## Trampas
 
@@ -126,6 +151,7 @@ catálogos que ve la cuenta, cada una con su catálogo (tocarla abre su carpeta)
 - `GET /api/v1/nicho-pov-bof/prompts` → `imagen`, `video`.
 - `GET /api/v1/nicho-pov-bof/folders?source=<catálogo>`
 - `GET /api/v1/nicho-pov-bof/reembolsables[?source=…]` (y `POST /reembolsable/{marcar,actualizar,desmarcar}` con `source` en el cuerpo, por defecto `mis_productos`)
+- `GET /api/v1/nicho-pov-bof/prioridades[?source=…&solo_fisicos=&incluir_resto=&limite=]` · `POST /api/v1/nicho-pov-bof/marcas`
 
 Slugs de catálogo: `mis_productos`, `tareas_productos`, `productos_fisicos`
 (ness/nestor2) y `productos_fisicos_ana` (Ana) — lo que tienen en casa y graban de verdad —, `productos_web`,

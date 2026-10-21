@@ -13,8 +13,11 @@ El dato va en el propio producto (campo `reembolso` del documento COMPARTIDO
 de la carpeta, el mismo que guarda `product_url` o `sin_stock`):
 
     {"activo": bool, "ventas_objetivo": int>=1, "ventas": int>=0,
-     "fecha_limite": "AAAA-MM-DD", "marcado_at": ts, "revisado_at": ts,
-     "notas": str}
+     "fecha_limite": "AAAA-MM-DD", "importe": euros>=0, "marcado_at": ts,
+     "revisado_at": ts, "notas": str}
+
+`importe` = lo que devuelve la tienda al cumplir: es lo que ordena la
+prioridad (una de 45 días que da 30 céntimos importa menos que una de 10 €).
 
 Se guarda la FECHA límite y no los días: así la cuenta atrás está siempre al
 día sin tener que reescribir nada. Lo que se deriva (días restantes, estado,
@@ -72,6 +75,16 @@ def _entero(valor, nombre: str, minimo: int) -> int:
     return n
 
 
+def _importe(valor) -> float:
+    try:
+        n = round(float(str(valor).replace(",", ".").replace("€", "").strip() or 0), 2)
+    except (TypeError, ValueError) as e:
+        raise ValueError("El dinero del reembolso tiene que ser un número (euros).") from e
+    if n < 0:
+        raise ValueError("El dinero del reembolso no puede ser negativo.")
+    return n
+
+
 def _fecha_limite(dias: int) -> str:
     return (hoy() + timedelta(days=dias)).isoformat()
 
@@ -103,6 +116,7 @@ def info(reembolso: dict | None, *, ahora: float | None = None) -> dict | None:
         "ventas_objetivo": objetivo,
         "ventas": ventas,
         "fecha_limite": fecha,
+        "importe": float(reembolso.get("importe") or 0),
         "marcado_at": float(reembolso.get("marcado_at") or 0),
         "revisado_at": revisado,
         "notas": str(reembolso.get("notas") or ""),
@@ -149,13 +163,14 @@ def _item(source: str, folder: str, producto: str, prod: dict) -> dict:
 
 def marcar(
     folder: str, producto: str, ventas_objetivo, dias, ventas=0, notas: str = "",
-    *, source: str = SOURCE, comprobar: bool = True,
+    *, source: str = SOURCE, comprobar: bool = True, importe=0,
 ) -> dict:
     """Marca (o vuelve a marcar desde cero) un producto como reembolsable."""
     _exige_fuente(source)
     objetivo = _entero(ventas_objetivo, "Las ventas necesarias", 1)
     n_dias = _entero(dias, "Los días", 0)
     n_ventas = _entero(ventas, "Las ventas actuales", 0)
+    euros = _importe(importe)
     if comprobar and not _existe(folder, producto, source):
         raise ValueError(f"No hay producto {producto} en la carpeta {folder!r}.")
     ahora = _ahora()
@@ -165,6 +180,7 @@ def marcar(
             "ventas_objetivo": objetivo,
             "ventas": n_ventas,
             "fecha_limite": _fecha_limite(n_dias),
+            "importe": euros,
             "marcado_at": ahora,
             "revisado_at": ahora,
             "notas": str(notas or "").strip()[:500],
@@ -174,7 +190,7 @@ def marcar(
 def actualizar(
     folder: str, producto: str, ventas=None, dias=None, ventas_objetivo=None,
     notas: str | None = None, revisado: bool = True, sumar_ventas: int = 0,
-    *, source: str = SOURCE,
+    *, source: str = SOURCE, importe=None,
 ) -> dict:
     """Cambia ventas / días / objetivo / notas de uno ya marcado.
 
@@ -204,6 +220,8 @@ def actualizar(
             nuevo["fecha_limite"] = _fecha_limite(_entero(dias, "Los días", 0))
         if notas is not None:
             nuevo["notas"] = str(notas).strip()[:500]
+        if importe is not None:
+            nuevo["importe"] = _importe(importe)
         if revisado:
             nuevo["revisado_at"] = _ahora()
         return _guardar(source, folder, producto, nuevo)
@@ -223,7 +241,7 @@ def desmarcar(folder: str, producto: str, *, source: str = SOURCE) -> dict:
 
 def _orden(item: dict) -> tuple:
     r = item["reembolso"]
-    return (not r["toca_revisar"], r["estado"] != "en_curso", r["dias_restantes"])
+    return (not r["toca_revisar"], r["estado"] != "en_curso", -r["importe"], r["dias_restantes"])
 
 
 def listar(
@@ -233,8 +251,8 @@ def listar(
     fuentes: list[str] | tuple[str, ...] | None = None,
 ) -> dict:
     """Los reembolsables de los catálogos con muestras: primero los que toca
-    revisar, luego los en curso por días restantes, y al final cumplidos y
-    vencidos.
+    revisar, luego los en curso por dinero (el que más da, antes) y días
+    restantes, y al final cumplidos y vencidos.
 
     Sin `source` recorre `fuentes` (por defecto todas las de
     FUENTES_REEMBOLSO); con `source`, solo esa. `carpetas` (solo con una

@@ -208,7 +208,10 @@ vídeos).
 
 1. `guia()` y `guia(menu)` → estas instrucciones.
 2. `menus_disponibles()` → menús, modos y opciones válidas.
-3. `carpetas(menu, catalogo)` → carpetas y su progreso. Acepta nombres
+3. En los catálogos del operador (Muestras, Tareas, Productos físicos…), si
+   no te dicen qué producto: `prioridades()` → qué toca primero (necesita
+   contenido → reembolsables por dinero → resto); ver `pov-bof.md` §7.
+   `carpetas(menu, catalogo)` → carpetas y su progreso. Acepta nombres
    aproximados («inventario», «carpeta 24»).
 4. `productos(menu, catalogo, carpeta, …)` → estado de cada producto.
 5. `preparar_carpeta(…)` → textos y guiones que falten (devuelve un

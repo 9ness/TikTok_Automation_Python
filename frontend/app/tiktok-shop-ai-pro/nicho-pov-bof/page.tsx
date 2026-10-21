@@ -84,6 +84,7 @@ import {
 } from "@/lib/queries/nichoPovBof";
 import { AltaMiProducto } from "@/components/tiktok-shop-ai-pro/AltaMiProducto";
 import { CajaReembolsables, ReembolsoTarjeta } from "@/components/tiktok-shop-ai-pro/Reembolsable";
+import { MarcasTarjeta } from "@/components/tiktok-shop-ai-pro/Marcas";
 import { BotonDescarga } from "@/components/tiktok-shop-ai-pro/BotonDescarga";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 import { ChipAjuste } from "@/components/tiktok-shop-ai-pro/ChipAjuste";
@@ -2143,6 +2144,13 @@ function ProductoCard({
             producto={producto.producto}
             titulo={producto.titulo ?? ""}
             info={producto.reembolso}
+          />
+          <MarcasTarjeta
+            source={source}
+            folder={producto.folder || folder || ""}
+            producto={producto.producto}
+            titulo={producto.titulo ?? ""}
+            info={producto.marcas}
           />
           {/* Solo con el título leído: sin texto no hay con qué comparar y
               decir "exclusivo" sería inventárselo. */}

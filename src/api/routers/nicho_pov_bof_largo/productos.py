@@ -574,6 +574,7 @@ def _listar(
     from src.nicho_pov_bof.pipeline.video_editor import caption_arriesgado, textos_fijos
     from src.nicho_pov_bof.services import audience, drive_client, photo_pairing
     from src.nicho_pov_bof.services import emojis as emojis_svc
+    from src.nicho_pov_bof.services import marcas as marcas_svc
     from src.nicho_pov_bof.services import reembolsables, top_vendidos
 
     try:
@@ -698,6 +699,10 @@ def _listar(
             reembolso=(
                 reembolsables.info(textos.get("reembolso"))
                 if source in reembolsables.FUENTES_REEMBOLSO else None
+            ),
+            marcas=(
+                marcas_svc.info(source, textos)
+                if source in marcas_svc.FUENTES_MARCAS else None
             ),
             insertos_subidos=[
                 n for n in range(1, config.INSERTOS_MAXIMOS + 1)

@@ -4,6 +4,7 @@ import { Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AltaMiProducto } from "@/components/tiktok-shop-ai-pro/AltaMiProducto";
+import { CajaPrioridades } from "@/components/tiktok-shop-ai-pro/Marcas";
 import { CajaReembolsables } from "@/components/tiktok-shop-ai-pro/Reembolsable";
 import { Caja, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { useFolders, useSources } from "@/lib/queries/nichoPovBof";
@@ -124,6 +125,7 @@ export default function SubirProductosPage() {
         </p>
       </Caja>
 
+      <CajaPrioridades />
       <CajaReembolsables source={source} />
 
       {source && (

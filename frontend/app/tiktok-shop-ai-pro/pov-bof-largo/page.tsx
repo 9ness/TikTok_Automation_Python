@@ -121,6 +121,7 @@ import { useRefrescarAlVolver } from "@/lib/hooks/useRefrescarAlVolver";
 import { useAlTerminarJob } from "@/lib/hooks/useAlTerminarJob";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 import { CajaReembolsables, ReembolsoTarjeta } from "@/components/tiktok-shop-ai-pro/Reembolsable";
+import { MarcasTarjeta } from "@/components/tiktok-shop-ai-pro/Marcas";
 import { InsertosEpicos } from "@/components/tiktok-shop-ai-pro/InsertosEpicos";
 
 /** La de temporada: productos del Inventario copiados para la campaña (ver `productos_q4.py`). */
@@ -2009,6 +2010,7 @@ function ProductoCard({
             titulo={p.titulo}
             info={p.reembolso}
           />
+          <MarcasTarjeta source={source} folder={folder} producto={p.producto} titulo={p.titulo} info={p.marcas} />
           {esTopVendidos && p.ventas > 0 && (
             <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-semibold text-emerald-500">

@@ -39,6 +39,10 @@ function err(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
 }
 
+export function euros(n: number): string {
+  return `${n.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+}
+
 function textoDias(r: ReembolsoInfo): string {
   if (r.dias_restantes < 0) return `venció hace ${-r.dias_restantes} d`;
   if (r.dias_restantes === 0) return "vence hoy";
@@ -84,7 +88,8 @@ export function BadgeReembolso({ info, className = "" }: { info: ReembolsoInfo; 
     >
       <span className="shrink-0">{t.icono}</span>
       <span className="truncate">
-        {t.etiqueta} · {info.ventas}/{info.ventas_objetivo} ventas
+        {t.etiqueta}
+        {info.importe ? ` · ${euros(info.importe)}` : ""} · {info.ventas}/{info.ventas_objetivo} ventas
         {info.estado === "en_curso" || info.estado === "vencido" ? ` · ${textoDias(info)}` : ""}
       </span>
     </span>
@@ -115,6 +120,7 @@ function DialogoReembolso({
   const [objetivo, setObjetivo] = useState("1");
   const [dias, setDias] = useState("");
   const [ventas, setVentas] = useState("0");
+  const [importe, setImporte] = useState("");
   const [notas, setNotas] = useState("");
   const [confirmarQuitar, setConfirmarQuitar] = useState(false);
 
@@ -123,6 +129,7 @@ function DialogoReembolso({
     setObjetivo(String(info?.ventas_objetivo ?? 1));
     setDias(info ? String(Math.max(0, info.dias_restantes)) : "");
     setVentas(String(info?.ventas ?? 0));
+    setImporte(info?.importe ? String(info.importe) : "");
     setNotas(info?.notas ?? "");
     setConfirmarQuitar(false);
   }, [abierto, info]);
@@ -131,7 +138,8 @@ function DialogoReembolso({
   const nObjetivo = Number.parseInt(objetivo, 10);
   const nDias = Number.parseInt(dias, 10);
   const nVentas = Number.parseInt(ventas || "0", 10);
-  const valido = nObjetivo >= 1 && nDias >= 0 && nVentas >= 0;
+  const nImporte = Number.parseFloat((importe || "0").replace(",", "."));
+  const valido = nObjetivo >= 1 && nDias >= 0 && nVentas >= 0 && nImporte >= 0;
 
   const guardar = () => {
     if (!valido) {
@@ -141,7 +149,7 @@ function DialogoReembolso({
     const fin = { onSuccess: () => { toast.success("Guardado"); onCerrar(); }, onError: (e: unknown) => toast.error(err(e)) };
     if (!info) {
       marcar.mutate(
-        { source, folder, producto, ventas_objetivo: nObjetivo, dias: nDias, ventas: nVentas, notas },
+        { source, folder, producto, ventas_objetivo: nObjetivo, dias: nDias, ventas: nVentas, importe: nImporte, notas },
         fin,
       );
       return;
@@ -153,6 +161,7 @@ function DialogoReembolso({
         producto,
         ventas_objetivo: nObjetivo,
         ventas: nVentas,
+        importe: nImporte,
         notas,
         // Solo se recalcula la fecha si se tocan los días: abrir y guardar no
         // debe mover la fecha límite.
@@ -191,6 +200,10 @@ function DialogoReembolso({
           <label className="space-y-1">
             <span className="text-[11px] font-medium text-muted-foreground">Ventas que lleva</span>
             <input type="number" inputMode="numeric" min={0} value={ventas} onChange={(e) => setVentas(e.target.value)} className={campo} />
+          </label>
+          <label className="space-y-1">
+            <span className="text-[11px] font-medium text-muted-foreground">Dinero que devuelven (€)</span>
+            <input type="text" inputMode="decimal" value={importe} placeholder="12,50" onChange={(e) => setImporte(e.target.value)} className={campo} />
           </label>
           {info && (
             <div className="space-y-1">
@@ -357,7 +370,7 @@ export function CajaReembolsables({
     <Caja
       icono="💸"
       titulo="Muestras reembolsables"
-      hint={`X ventas antes de una fecha. Revísalas cada ${d.revisar_cada_dias} días; si no venden, más versiones o un viral.`}
+      hint={`X ventas antes de una fecha; primero las que más dinero devuelven. Revísalas cada ${d.revisar_cada_dias} días; si no venden, más versiones o un viral.`}
       extra={
         d.toca_revisar ? (
           <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-500">

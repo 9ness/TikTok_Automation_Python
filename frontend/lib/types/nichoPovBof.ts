@@ -125,6 +125,8 @@ export interface ReembolsoInfo {
   ventas: number;
   /** AAAA-MM-DD (hora de España). */
   fecha_limite: string;
+  /** Euros que devuelve la tienda al cumplir: ordena la prioridad. */
+  importe: number;
   marcado_at: number;
   revisado_at: number;
   notas: string;
@@ -133,6 +135,52 @@ export interface ReembolsoInfo {
   estado: "en_curso" | "cumplido" | "vencido";
   /** En curso y sin revisar en los últimos `revisar_cada_dias` días. */
   toca_revisar: boolean;
+}
+
+/** «Necesita contenido»: la tienda pide `videos`; cada vídeo marcado subido
+ *  en Mis tandas descuenta uno (`services/marcas.py`). */
+export interface ContenidoInfo {
+  activo: boolean;
+  videos: number;
+  subidos: number;
+  pendientes: number;
+  hecho: boolean;
+  marcado_at: number;
+  notas: string;
+}
+
+/** Marcas de un producto de los catálogos del operador (varias a la vez). */
+export interface MarcasInfo {
+  fisico: boolean;
+  /** Físico porque está en «Productos físicos» (no se desmarca). */
+  fisico_por_catalogo: boolean;
+  q4: boolean;
+  /** Carpeta del Drive con las tomas reales del producto. */
+  clips_reales: string;
+  contenido: ContenidoInfo | null;
+}
+
+export interface MarcasItem {
+  source: string;
+  catalogo?: string;
+  folder: string;
+  producto: string;
+  titulo: string;
+  tienda: string;
+  product_url?: string;
+  marcas: MarcasInfo;
+  reembolso: ReembolsoInfo | null;
+  /** Solo en /prioridades. */
+  grupo?: "contenido" | "reembolso" | "resto" | "";
+  motivo?: string;
+}
+
+export interface PrioridadesResponse {
+  items: MarcasItem[];
+  total: number;
+  contenido: number;
+  reembolso: number;
+  resto: number;
 }
 
 export interface ReembolsableItem {
@@ -229,6 +277,8 @@ export interface ProductoItem {
   montando?: boolean;
   /** Solo en Muestras / Productos físicos: null/ausente si es una muestra normal. */
   reembolso?: ReembolsoInfo | null;
+  /** Solo en los catálogos del operador. */
+  marcas?: MarcasInfo | null;
   /** Voz que encaja con el producto; solo es el valor inicial de la ficha. */
   sexo_sugerido?: "hombre" | "mujer";
   /** Aviso si no se pudo confirmar cuál de las fotos es la del producto. */

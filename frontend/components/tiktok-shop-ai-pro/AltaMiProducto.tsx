@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/lib/api";
 import { enLaApp } from "@/lib/entorno-app";
-import { admiteReembolso, useCrearMiProducto } from "@/lib/queries/nichoPovBof";
+import { admiteMarcas, admiteReembolso, useCrearMiProducto, type AltaMarcas } from "@/lib/queries/nichoPovBof";
 
 /** Alta de un producto PROPIO subiendo sus fotos: la limpia, la captura de la
  *  ficha y las capturas extra (características, medidas, qué trae).
@@ -55,12 +55,41 @@ export function AltaMiProducto({
   const [reembolsable, setReembolsable] = useState(false);
   const [ventasObj, setVentasObj] = useState("1");
   const [diasReemb, setDiasReemb] = useState("");
+  const [importeReemb, setImporteReemb] = useState("");
   const reembolso =
     puedeReembolso && reembolsable
-      ? { ventas_objetivo: Number.parseInt(ventasObj, 10), dias: Number.parseInt(diasReemb, 10) }
+      ? {
+          ventas_objetivo: Number.parseInt(ventasObj, 10),
+          dias: Number.parseInt(diasReemb, 10),
+          importe: Number.parseFloat((importeReemb || "0").replace(",", ".")),
+        }
       : null;
   const reembolsoMal =
-    !!reembolso && !(reembolso.ventas_objetivo >= 1 && reembolso.dias >= 0);
+    !!reembolso &&
+    !(reembolso.ventas_objetivo >= 1 && reembolso.dias >= 0 && reembolso.importe >= 0);
+  // Marcas (varias a la vez): físico, necesita contenido N vídeos, Q4. Como el
+  // reembolso, se quedan puestas entre altas de la misma tanda.
+  const puedeMarcas = admiteMarcas(source);
+  const fisicoPorCatalogo = source.startsWith("productos_fisicos");
+  const [fisico, setFisico] = useState(false);
+  const [pideContenido, setPideContenido] = useState(false);
+  const [videosContenido, setVideosContenido] = useState("1");
+  const [q4, setQ4] = useState(false);
+  const nVideos = Number.parseInt(videosContenido, 10);
+  const marcas: AltaMarcas | null = puedeMarcas
+    ? {
+        fisico: fisico && !fisicoPorCatalogo,
+        contenido_videos: pideContenido ? nVideos : 0,
+        q4,
+      }
+    : null;
+  const marcasMal = pideContenido && !(nVideos >= 1 && nVideos <= 20);
+  const textoMarcas = (m: AltaMarcas | null) =>
+    m
+      ? [m.fisico ? "🎥" : "", m.contenido_videos ? `📣 ${m.contenido_videos}` : "", m.q4 ? "🎄" : ""]
+          .filter(Boolean)
+          .join(" ")
+      : "";
   const [abierto, setAbierto] = useState(abiertoInicial);
   // El WebView de la APK devuelve la selección VACÍA cuando el input lleva
   // `multiple`: se eligen las cuatro capturas y no llega ninguna, sin error
@@ -80,7 +109,8 @@ export function AltaMiProducto({
       ficha: File | null;
       extras: File[];
       url: string;
-      reembolso: { ventas_objetivo: number; dias: number } | null;
+      reembolso: { ventas_objetivo: number; dias: number; importe?: number } | null;
+      marcas: AltaMarcas | null;
     }[]
   >([]);
   const [subiendoLote, setSubiendoLote] = useState(0);
@@ -101,10 +131,14 @@ export function AltaMiProducto({
       return;
     }
     if (reembolsoMal) {
-      toast.error("Muestra reembolsable: pon ventas necesarias (1 o más) y los días que quedan.");
+      toast.error("Muestra reembolsable: pon ventas necesarias (1 o más), los días que quedan y el dinero (0 o más).");
       return;
     }
-    setCola((prev) => [...prev, { limpia, ficha, extras, url, reembolso }]);
+    if (marcasMal) {
+      toast.error("Necesita contenido: los vídeos que pide la tienda van de 1 a 20.");
+      return;
+    }
+    setCola((prev) => [...prev, { limpia, ficha, extras, url, reembolso, marcas }]);
     limpiarCampos();
   }
 
@@ -127,8 +161,10 @@ export function AltaMiProducto({
           productUrl: item.url,
           carpeta: destino,
           reembolso: item.reembolso,
+          marcas: item.marcas,
         });
         if (r.reembolso_error) toast.error(`Producto ${r.producto}: no se marcó como reembolsable (${r.reembolso_error})`);
+        if (r.marcas_error) toast.error(`Producto ${r.producto}: no se pusieron las marcas (${r.marcas_error})`);
         ultimaCarpeta = r.carpeta;
         if (destino === "__nueva__") destino = r.carpeta;
         setCola((prev) => prev.filter((x) => x !== item));
@@ -152,15 +188,21 @@ export function AltaMiProducto({
       return;
     }
     if (reembolsoMal) {
-      toast.error("Muestra reembolsable: pon ventas necesarias (1 o más) y los días que quedan.");
+      toast.error("Muestra reembolsable: pon ventas necesarias (1 o más), los días que quedan y el dinero (0 o más).");
+      return;
+    }
+    if (marcasMal) {
+      toast.error("Necesita contenido: los vídeos que pide la tienda van de 1 a 20.");
       return;
     }
     crear.mutate(
-      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url, carpeta, reembolso },
+      { fotoLimpia: limpia, fotoFicha: ficha, fotosExtra: extras, source, productUrl: url, carpeta, reembolso, marcas },
       {
         onSuccess: (r) => {
           if (r.reembolso_error)
             toast.error(`No se marcó como reembolsable: ${r.reembolso_error}. Hazlo desde su tarjeta.`);
+          if (r.marcas_error)
+            toast.error(`No se pusieron las marcas: ${r.marcas_error}. Hazlo desde su tarjeta.`);
           toast.success(
             `Producto ${r.producto} añadido a «${r.carpeta}»` +
               (extras.length ? ` · ${extras.length} captura(s) más` : ""),
@@ -317,7 +359,73 @@ export function AltaMiProducto({
                   className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
                 />
               </label>
+              <label className="col-span-2 space-y-0.5">
+                <span className="text-[10px] text-muted-foreground">
+                  Dinero que devuelven (€) — ordena la prioridad
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={importeReemb}
+                  placeholder="12,50"
+                  onChange={(e) => setImporteReemb(e.target.value)}
+                  className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
+                />
+              </label>
             </div>
+          )}
+        </div>
+      )}
+      {/* Marcas (Marcas.tsx): se pueden cambiar después en la tarjeta del
+          producto o por MCP (`marcar_producto`). */}
+      {puedeMarcas && (
+        <div className="space-y-1.5 rounded-lg border border-dashed border-border/60 p-2.5">
+          <p className="text-[11px] font-semibold">🏷️ Marcas (opcional)</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px]">
+              <input
+                type="checkbox"
+                checked={fisicoPorCatalogo || fisico}
+                disabled={fisicoPorCatalogo}
+                onChange={(e) => setFisico(e.target.checked)}
+                className="h-4 w-4 accent-cyan-600"
+              />
+              🎥 Físico (lo tengo para grabar)
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px]">
+              <input
+                type="checkbox"
+                checked={pideContenido}
+                onChange={(e) => setPideContenido(e.target.checked)}
+                className="h-4 w-4 accent-amber-500"
+              />
+              📣 Necesita contenido
+            </label>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px]">
+              <input
+                type="checkbox"
+                checked={q4}
+                onChange={(e) => setQ4(e.target.checked)}
+                className="h-4 w-4"
+              />
+              🎄 Funciona en Q4
+            </label>
+          </div>
+          {pideContenido && (
+            <label className="block space-y-0.5">
+              <span className="text-[10px] text-muted-foreground">
+                Vídeos que pide la tienda (cada uno marcado «Subido» en Mis tandas descuenta)
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={20}
+                value={videosContenido}
+                onChange={(e) => setVideosContenido(e.target.value)}
+                className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[11px] sm:text-xs"
+              />
+            </label>
           )}
         </div>
       )}
@@ -362,6 +470,7 @@ export function AltaMiProducto({
                   {item.extras.length ? ` + ${item.extras.length} captura(s)` : ""}
                   {item.url ? " + URL" : ""}
                   {item.reembolso ? ` · 💸 ${item.reembolso.ventas_objetivo} ventas/${item.reembolso.dias} d` : ""}
+                  {textoMarcas(item.marcas) ? ` · ${textoMarcas(item.marcas)}` : ""}
                 </span>
                 {!subiendoLote && (
                   <button

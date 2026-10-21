@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from src.api.schemas.nicho_pov_bof.models import ReembolsoInfo
+from src.api.schemas.nicho_pov_bof.models import MarcasInfo, ReembolsoInfo
 
 
 class VozLargo(BaseModel):
@@ -63,6 +63,8 @@ class ProductoLargo(BaseModel):
     # Muestra reembolsable (Muestras y Productos físicos, dato compartido con el
     # POV BOF). None si es una muestra normal.
     reembolso: ReembolsoInfo | None = None
+    # Físico / necesita contenido / Q4 / clips reales (catálogos del operador).
+    marcas: MarcasInfo | None = None
     vendido_at: float = 0
     # Precio y modo de guion — el dato lo extrae el POV BOF, aquí se lee.
     precio: float = 0

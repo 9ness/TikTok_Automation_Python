@@ -67,9 +67,14 @@ Resubir lo montado a Instagram/Facebook/Threads/Pinterest con enlace de
 afiliado (SHEIN/Amazon): `guia("multiplataforma")` → `productos_sin_enlace` →
 `guardar_enlace` → `encolar_tandas` → `cola_multiplataforma`. Esos enlaces
 NUNCA van a TikTok (allí va el carrito de TikTok Shop).
-Muestras REEMBOLSABLES («Muestras productos» y «Productos físicos»: X ventas en un plazo): llama a
-`reembolsables` al empezar, revisa las que toca y propone más vídeos o virales
-para las que no venden (`marcar_reembolsable`, `actualizar_reembolsable`).
+Qué producto hacer en los catálogos del operador: `prioridades` (1º «necesita
+contenido», 2º reembolsables por dinero, 3º el resto con Q4 primero). Marcas de
+producto (físico, necesita contenido N vídeos, Q4, carpeta de clips reales):
+`marcar_producto`; el contenido se descuenta solo al marcar subido en Mis tandas.
+Muestras REEMBOLSABLES («Muestras productos» y «Productos físicos»: X ventas en un plazo,
+con el dinero que devuelven): llama a `reembolsables` al empezar, revisa las que
+toca y propone más vídeos o virales para las que no venden (`marcar_reembolsable`,
+`actualizar_reembolsable`; «he vendido una más» = `sumar_ventas=1`).
 Del 11 nov al 16 dic hay campañas (Black Friday, Navidad): llama a `campanas`
 antes de escribir guiones o elegir productos y orienta el ángulo si toca, sin
 prometer nunca ofertas que la ficha no tenga.
@@ -1041,8 +1046,8 @@ async def reembolsables(ctx: Context, catalogo: str = "") -> str:
     operador tiene en casa): la tienda devuelve la muestra si el producto
     llega a X ventas antes de una fecha. Sin `catalogo` salen las de todos los
     catálogos que ve el usuario; cada una trae su `source` y `catalogo`. Úsala como RECORDATORIO al empezar: primero salen las que toca
-    revisar (`toca_revisar`, sin revisar en 3 días), luego por días que
-    faltan. Por cada una: ventas/ventas_objetivo, dias_restantes, estado
+    revisar (`toca_revisar`, sin revisar en 3 días), luego las en curso por
+    dinero que devuelven (`importe`, la que más da antes) y días que faltan. Por cada una: ventas/ventas_objetivo, dias_restantes, estado
     (en_curso | cumplido | vencido). Pregunta al operador si ha habido ventas
     y apúntalas con `actualizar_reembolsable`; si va floja, propón más
     versiones del vídeo o un viral que replicar (`replicar_viral`)."""
@@ -1055,17 +1060,19 @@ async def reembolsables(ctx: Context, catalogo: str = "") -> str:
 @_herramienta(structured_output=False)
 async def marcar_reembolsable(ctx: Context, carpeta: str, producto: str,
                               ventas_objetivo: int, dias: int, ventas: int = 0,
-                              notas: str = "", catalogo: str = "mis_productos") -> str:
+                              notas: str = "", catalogo: str = "mis_productos",
+                              importe: float = 0) -> str:
     """Marca un producto como muestra REEMBOLSABLE:
     `ventas_objetivo` = ventas necesarias para el reembolso (1, 2, 3…),
     `dias` = días que quedan para cumplirlo (110, 80…; la app guarda la fecha
-    límite = hoy + días), `ventas` = las que ya lleva. Volver a marcarlo lo
+    límite = hoy + días), `ventas` = las que ya lleva, `importe` = euros que
+    devuelve la tienda al cumplir (ordena la prioridad). Volver a marcarlo lo
     reinicia. `catalogo`: mis_productos (por defecto, solo IA),
     productos_fisicos (ness/nestor2, lo que tiene en casa) o
     productos_fisicos_ana."""
     return _json(await Interno(_usuario(ctx)).post(f"{_POV}/reembolsable/marcar", {
         "source": catalogo, "folder": carpeta, "producto": producto, "ventas_objetivo": ventas_objetivo,
-        "dias": dias, "ventas": ventas, "notas": notas}))
+        "dias": dias, "ventas": ventas, "notas": notas, "importe": importe}))
 
 
 @_herramienta(structured_output=False)
@@ -1074,16 +1081,18 @@ async def actualizar_reembolsable(ctx: Context, carpeta: str, producto: str,
                                   dias: int | None = None,
                                   ventas_objetivo: int | None = None,
                                   notas: str | None = None,
-                                  catalogo: str = "mis_productos") -> str:
+                                  catalogo: str = "mis_productos",
+                                  importe: float | None = None) -> str:
     """Apunta la revisión de una muestra reembolsable. `ventas` = TOTAL que
     lleva; `sumar_ventas=1` suma una. `dias` recalcula la fecha límite desde
-    hoy. Llamarla sin cambiar nada = «revisado, sin ventas nuevas» (sella la
+    hoy. `importe` cambia el dinero que devuelven. Llamarla sin cambiar nada = «revisado, sin ventas nuevas» (sella la
     revisión y deja de salir en `toca_revisar` durante 3 días). `catalogo` =
     el `source` que trae el item en `reembolsables`."""
     return _json(await Interno(_usuario(ctx)).post(f"{_POV}/reembolsable/actualizar", {
         "source": catalogo, "folder": carpeta, "producto": producto, "ventas": ventas,
         "sumar_ventas": sumar_ventas, "dias": dias,
-        "ventas_objetivo": ventas_objetivo, "notas": notas, "revisado": True}))
+        "ventas_objetivo": ventas_objetivo, "notas": notas, "importe": importe,
+        "revisado": True}))
 
 
 @_herramienta(structured_output=False)
@@ -1093,6 +1102,49 @@ async def desmarcar_reembolsable(ctx: Context, carpeta: str, producto: str,
     operador lo pide. `catalogo` = el `source` del item."""
     return _json(await Interno(_usuario(ctx)).post(f"{_POV}/reembolsable/desmarcar", {
         "source": catalogo, "folder": carpeta, "producto": producto}))
+
+
+@_herramienta(structured_output=False)
+async def marcar_producto(ctx: Context, carpeta: str, producto: str,
+                          catalogo: str = "mis_productos",
+                          fisico: bool | None = None,
+                          contenido_videos: int | None = None,
+                          contenido: bool | None = None,
+                          q4: bool | None = None,
+                          clips_reales: str | None = None,
+                          contenido_notas: str | None = None) -> str:
+    """Marcas de un producto de los catálogos del operador (varias a la vez;
+    lo que no pases no se toca):
+    `fisico=True` = lo tiene en casa y se pueden grabar vídeos reales (los de
+    «Productos físicos» ya lo son); `contenido_videos=N` = «necesita contenido»:
+    la tienda pide N vídeos (1 normalmente, 3 si lo piden) — cada vídeo de ese
+    producto marcado como subido en Mis tandas descuenta uno y al llegar a cero
+    pierde la prioridad; `contenido=False` lo quita; `q4=True` = funciona ahora
+    en Q4; `clips_reales` = carpeta del Drive con sus tomas reales (ruta del
+    mount o enlace). La muestra reembolsable va aparte (`marcar_reembolsable`)."""
+    return _json(await Interno(_usuario(ctx)).post(f"{_POV}/marcas", {
+        "source": catalogo, "folder": carpeta, "producto": producto, "fisico": fisico,
+        "contenido_videos": contenido_videos, "contenido": contenido, "q4": q4,
+        "clips_reales": clips_reales, "contenido_notas": contenido_notas}))
+
+
+@_herramienta(structured_output=False)
+async def prioridades(ctx: Context, catalogo: str = "", solo_fisicos: bool = False,
+                      incluir_resto: bool = False, limite: int = 30) -> str:
+    """Qué producto toca hacer, en orden: 1) «necesita contenido» con vídeos
+    pendientes (el que menos le falta antes), 2) muestras reembolsables en
+    curso (la que más dinero devuelve antes), 3) con `incluir_resto`, el resto
+    (primero los que funcionan en Q4). Cada item trae `grupo`, `motivo`,
+    `marcas` (fisico, clips_reales…) y `reembolso`. `solo_fisicos=True` para
+    elegir qué grabar en real (Casca Chollos / nestor2). Sin `catalogo`, todos
+    los catálogos del operador que ve el usuario."""
+    from urllib.parse import urlencode
+
+    q = {"solo_fisicos": str(solo_fisicos).lower(), "incluir_resto": str(incluir_resto).lower(),
+         "limite": max(0, int(limite))}
+    if catalogo:
+        q["source"] = catalogo
+    return _json(await Interno(_usuario(ctx)).get(f"{_POV}/prioridades?{urlencode(q)}"))
 
 
 # ---------------------------------------------------------------------------

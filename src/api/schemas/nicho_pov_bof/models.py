@@ -168,6 +168,8 @@ class ReembolsoInfo(BaseModel):
     ventas_objetivo: int = 1
     ventas: int = 0
     fecha_limite: str = ""
+    # Euros que devuelve la tienda al cumplir: ordena la prioridad.
+    importe: float = 0
     marcado_at: float = 0
     revisado_at: float = 0
     notas: str = ""
@@ -176,6 +178,31 @@ class ReembolsoInfo(BaseModel):
     estado: str = "en_curso"
     # En curso y sin revisar en los últimos REVISAR_CADA_DIAS días.
     toca_revisar: bool = False
+
+
+class ContenidoInfo(BaseModel):
+    """«Necesita contenido»: la tienda pide `videos` y cada vídeo marcado como
+    subido en Mis tandas descuenta uno (`services/marcas.py`)."""
+
+    activo: bool = True
+    videos: int = 1
+    subidos: int = 0
+    pendientes: int = 1
+    hecho: bool = False
+    marcado_at: float = 0
+    notas: str = ""
+
+
+class MarcasInfo(BaseModel):
+    """Marcas de un producto de los catálogos del operador (varias a la vez)."""
+
+    fisico: bool = False
+    # Físico porque está en «Productos físicos» (no se puede desmarcar).
+    fisico_por_catalogo: bool = False
+    q4: bool = False
+    # Carpeta del Drive con las tomas reales de ese producto.
+    clips_reales: str = ""
+    contenido: ContenidoInfo | None = None
 
 
 class ProductoInfo(BaseModel):
@@ -306,6 +333,8 @@ class ProductoInfo(BaseModel):
     url_ventas_total: int = 0
     # Solo en Muestras / Productos físicos: None si es una muestra normal.
     reembolso: ReembolsoInfo | None = None
+    # Solo en los catálogos del operador (None en los del Drive del curso).
+    marcas: MarcasInfo | None = None
 
 
 class ProductosListResponse(BaseModel):
@@ -639,6 +668,7 @@ class MarcarReembolsableRequest(BaseModel):
     ventas_objetivo: int = Field(ge=1)
     dias: int = Field(ge=0)
     ventas: int = Field(default=0, ge=0)
+    importe: float = Field(default=0, ge=0)
     notas: str = ""
 
 
@@ -653,8 +683,47 @@ class ActualizarReembolsableRequest(BaseModel):
     sumar_ventas: int = 0
     dias: int | None = Field(default=None, ge=0)
     ventas_objetivo: int | None = Field(default=None, ge=1)
+    importe: float | None = Field(default=None, ge=0)
     notas: str | None = None
     revisado: bool = True
+
+
+class MarcarProductoRequest(BaseModel):
+    """Lo que no se manda (None) no se toca. `contenido_videos` también activa
+    «necesita contenido»; `contenido=False` lo quita."""
+
+    source: str = "mis_productos"
+    folder: str
+    producto: str
+    fisico: bool | None = None
+    q4: bool | None = None
+    clips_reales: str | None = None
+    contenido: bool | None = None
+    contenido_videos: int | None = Field(default=None, ge=1, le=20)
+    contenido_notas: str | None = None
+
+
+class MarcasItem(BaseModel):
+    source: str = "mis_productos"
+    catalogo: str = ""
+    folder: str
+    producto: str
+    titulo: str = ""
+    tienda: str = ""
+    product_url: str = ""
+    marcas: MarcasInfo = Field(default_factory=MarcasInfo)
+    reembolso: ReembolsoInfo | None = None
+    # Solo en /prioridades: contenido | reembolso | resto, y la razón en corto.
+    grupo: str = ""
+    motivo: str = ""
+
+
+class PrioridadesResponse(BaseModel):
+    items: list[MarcasItem] = Field(default_factory=list)
+    total: int = 0
+    contenido: int = 0
+    reembolso: int = 0
+    resto: int = 0
 
 
 class DesmarcarReembolsableRequest(BaseModel):
