@@ -86,6 +86,7 @@ function ThreadsOAuth() {
   const [secreto, setSecreto] = useState("");
   const [estado, setEstado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [enlace, setEnlace] = useState("");
 
   async function cargar() {
     try {
@@ -135,6 +136,24 @@ function ThreadsOAuth() {
     }
   }
 
+  // Si el botón acaba en el perfil o en la app de Threads, se pega el enlace en la barra
+  // de direcciones de ESTE navegador: así no lo intercepta nadie.
+  async function copiarEnlace() {
+    setEstado(null);
+    try {
+      const r = await api.get<{ url: string }>("/api/v1/multiplataforma/meta/threads/autorizar");
+      setEnlace(r.url);
+      try {
+        await navigator.clipboard.writeText(r.url);
+        setEstado({ ok: true, texto: "Enlace copiado: pégalo en la barra de direcciones de este navegador (vale 30 min)" });
+      } catch {
+        setEstado({ ok: true, texto: "Mantén pulsado el enlace de abajo, cópialo y pégalo en la barra de direcciones" });
+      }
+    } catch (e) {
+      setEstado({ ok: false, texto: e instanceof ApiError ? e.message : String(e) });
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -143,7 +162,7 @@ function ThreadsOAuth() {
       <CardContent className="space-y-3">
         <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground sm:text-sm">
           <li>En este mismo navegador, abre threads.com y entra con la cuenta que toca (usuario y contraseña de su Instagram).</li>
-          <li>Vuelve aquí y pulsa «Conectar Threads» → «Continuar como …».</li>
+          <li>Vuelve aquí y pulsa «Conectar Threads» → «Continuar como …». Si acabas en el perfil o en la app, pulsa «Copiar enlace» y pégalo en la barra de direcciones.</li>
           <li>Sale en verde la cuenta conectada. Cierra sesión en threads.com y repite con la siguiente.</li>
         </ol>
         {app && app.cuentas.length > 0 && (
@@ -158,6 +177,10 @@ function ThreadsOAuth() {
         <Button onClick={conectar} disabled={!app?.configurada || ocupado} className="w-full sm:w-auto">
           {ocupado ? "Abriendo…" : "Conectar Threads"}
         </Button>
+        <Button variant="outline" onClick={copiarEnlace} disabled={!app?.configurada} className="w-full sm:ml-2 sm:w-auto">
+          Copiar enlace
+        </Button>
+        {enlace && <p className="select-all break-all rounded border p-2 font-mono text-[10px] sm:text-xs">{enlace}</p>}
         {app && (!app.configurada || editarApp) ? (
           <div className="space-y-2 rounded border p-3">
             <p className="break-all text-xs text-muted-foreground">

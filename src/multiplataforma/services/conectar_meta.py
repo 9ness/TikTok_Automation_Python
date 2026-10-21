@@ -164,7 +164,7 @@ def url_autorizar(usuario: str) -> str:
         "response_type": "code",
         "state": _firmar_state({"u": usuario, "t": int(time.time())}),
     }
-    return "https://threads.net/oauth/authorize?" + urlencode(params)
+    return "https://www.threads.com/oauth/authorize?" + urlencode(params)
 
 
 def completar_oauth(code: str, state: str) -> dict:
