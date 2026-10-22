@@ -152,6 +152,36 @@ cada tanda.
 Se registra como `sin_ia` si todo lo que enseña el producto es real (el
 gancho no lo enseña) y `con_ia` si algún plano del producto es generado.
 
+**Variante «cambiar el producto en una toma real» (camas, 22/10/2026).**
+Néstor graba su propio mueble (su cama, levantando el canapé, apretando el
+colchón…) y Omni lo SUSTITUYE por el producto vendido del catálogo; la mano, el
+cuarto y el movimiento se quedan. Se monta como un vídeo normal del POV BOF
+Largo (dos clips de 6 s), no como réplica. Pasos en Magnific
+(`/app/ai-video-generator`, sesión del Chrome 9222; si sale «Log in», Néstor
+entra con Google por Accesos › Navegador remoto):
+1. Corta trozos de 6 s de la toma, uno por clip, y no repitas ninguno entre vídeos.
+2. **Recarga la página antes de cada clip**: es lo único que vacía las
+   referencias (ni «Remove @vid1» ni la X van fiables).
+3. Comprueba el modelo: si vuelve a «Auto» (1080 / 5"), elige
+   **Gemini Omni 1.1** y ponlo a **720p / 6" / 9:16**. Botón «Generate 960»: 960
+   créditos el clip.
+4. Add media → el trozo (@vid1) → la foto limpia (@img1) → en el clip 2, un
+   fotograma del clip 1 YA GENERADO (@img2). Sin @img2, el clip 2 cambió el
+   dibujo y el color del colchón (hexágonos → rombos, gris → blanco).
+5. Prompt: «Replace the bed in @vid1 with … from @img1 … Keep everything else
+   from @vid1 exactly as it is (room, hand with the same bracelet, movement,
+   camera, light)», describe el producto (color, dibujo, laterales, grosor), cita
+   @img2 («the same … already filmed in this room») y cierra con «Nothing moves
+   by itself, no text, no logos». Si se ve el bajo del canapé, descríbelo igual
+   en los dos clips (somier de láminas en marco de metal negro): si no, cada clip
+   inventa uno.
+6. Si falta duración, usa **rebote** (el final invertido), nunca cámara lenta.
+7. Para subirlo: en aleatorios, antes de `/clip/upload` pon el estilo del
+   catálogo (`/estilo-guion`) en el mismo estilo con el que se escribió el guion
+   del producto; si no, da «Primero escribe el guion». Sube clip 1 y clip 2
+   seguidos (al llegar el 2 se monta). Un guion de menos de ~200 car. a veces
+   pide 3 clips: rehazlo hasta que `clips_necesarios` sea 2.
+
 ### Variante ropa (Ana, su catálogo «📦 Productos físicos», `productos_fisicos_ana`)
 
 Vídeo de 12-15 s, muy variado:
