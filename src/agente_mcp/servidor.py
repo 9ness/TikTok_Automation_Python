@@ -921,7 +921,8 @@ async def subir_imagen_carrusel(ctx: Context, id: str, n: int, archivo_id: str =
 @_herramienta(structured_output=False)
 async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
                              texto: str | None = None, estilo_texto: str = "",
-                             texto_y: float = 0, caption: str | None = None) -> str:
+                             texto_y: float = 0, texto_tam: float = 0,
+                             caption: str | None = None) -> str:
     """Un carrusel replicado: diapositivas con su texto, si ya tienen foto,
     `hechas`/`total`, y `zip` = enlace para bajar TODAS de golpe (con su texto
     quemado) + caption.txt. Sin `id`: la lista de carruseles replicados.
@@ -929,10 +930,14 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
     `texto_n` + `texto`. Solo si el operador lo pide o el texto incumple las
     reglas (promesas, cupones afirmados).
     `estilo_texto`: la letra de TODO el carrusel, la que más se parezca al viral
-    (tiktok —por defecto, blanca con contorno—, clasico, pildora —negra sobre
-    píldora blanca—, pildora_negra, maquina, elegante, manuscrita,
-    rotulador, impacto) y `texto_y` la altura del texto (0.05 arriba … 0.95
-    abajo; 0 = la de siempre). Vuelve a quemar todas.
+    (tiktok —por defecto, blanca con contorno—, tiktok_sans —la letra nativa de
+    TikTok—, fondo_negro / fondo_blanco / fondo_trans —el texto «con fondo» de
+    TikTok, caja unida—, snap —barra de Snapchat de lado a lado—, clasico, pildora —negra sobre píldora blanca—,
+    pildora_negra, maquina, elegante, manuscrita, rotulador, impacto),
+    `texto_y` la altura del texto (0.05 arriba … 0.95 abajo; 0 = la de
+    siempre) y `texto_tam` el multiplicador de tamaño (0.5-1.6; 0 = el del
+    estilo; los virales suelen llevar letra más pequeña: ~0.7-0.8).
+    Vuelve a quemar todas.
     `caption`: cambia el caption del carrusel (el de TikTok y la base del de
     Meta) y el de sus publicaciones de Meta que sigan en cola; los ids
     tocados vuelven en `meta_actualizadas`."""
@@ -948,6 +953,8 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
         body: dict = {"estilo": estilo_texto}
         if texto_y:
             body["y"] = texto_y
+        if texto_tam:
+            body["tam"] = texto_tam
         await api.post(f"/api/v1/replicar-viral/carrusel/{id}/estilo", body)
     if texto_n and texto is not None:
         doc = await api.post(f"/api/v1/replicar-viral/carrusel/{id}/texto/{int(texto_n)}",

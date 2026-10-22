@@ -443,7 +443,8 @@ def _quemar(usuario: str, id_: str, n: int, texto: str, doc: dict | None = None)
         return
     est = (doc or {}).get("estilo_texto") or {}
     if texto.strip():
-        texto_foto.quemar(base, texto, destino, estilo=est.get("nombre", ""), y_rel=est.get("y"))
+        texto_foto.quemar(base, texto, destino, estilo=est.get("nombre", ""), y_rel=est.get("y"),
+                          tam_rel=est.get("tam"))
     elif destino.exists():
         destino.unlink()
     olvidar_disco(usuario, id_)
@@ -483,10 +484,12 @@ def cambiar_caption(usuario: str, id_: str, caption: str) -> dict:
     return con_estado(doc)
 
 
-def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None) -> dict:
+def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None,
+                   tam: float | None = None) -> dict:
     """Letra del carrusel entero (para parecerse al viral: máquina de escribir,
     manuscrita, píldora blanca…; ver `texto_foto.ESTILOS`) y, si se da, altura
-    del texto (0-1 sobre el alto). Vuelve a quemar todas las que tengan foto."""
+    del texto (0-1 sobre el alto) y `tam` (multiplicador 0.5-1.6 del tamaño
+    del estilo). Vuelve a quemar todas las que tengan foto."""
     from src.nicho_carruseles.services import texto_foto
 
     usuario = usuario or "ness"
@@ -500,6 +503,11 @@ def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None) 
         if not 0.05 <= float(y) <= 0.95:
             raise ErrorReplica("y: entre 0.05 (arriba) y 0.95 (abajo)")
         est["y"] = float(y)
+    if tam is not None:
+        try:
+            est["tam"] = texto_foto.tam_valido(tam)
+        except ValueError as e:
+            raise ErrorReplica(str(e)) from e
     doc["estilo_texto"] = est
     servicio.guardar(doc, indexar=False)
     for d in doc.get("diapositivas") or []:

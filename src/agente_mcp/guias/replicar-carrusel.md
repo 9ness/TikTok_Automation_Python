@@ -74,12 +74,27 @@ original en encuadre y emoción pero en otro sitio.
 Por defecto el texto sale como el nativo de TikTok (blanco, contorno negro).
 Mira las fotos del viral (`original` de cada diapositiva) y elige la letra que
 más se le parezca, para TODO el carrusel:
-`descargar_carrusel(id, estilo_texto=…, texto_y=…)` — `tiktok`, `clasico`
+`descargar_carrusel(id, estilo_texto=…, texto_y=…, texto_tam=…)` — `tiktok`, `clasico`
 (TikTok sin contorno grueso), `pildora` (negra sobre píldora blanca),
 `pildora_negra` (blanca sobre píldora oscura), `maquina` (máquina de
 escribir), `elegante` (serif gruesa), `manuscrita`, `rotulador`, `impacto`
 (mayúsculas condensadas). `texto_y` = altura del bloque (0.05 arriba … 0.95
-abajo; si el viral lo lleva abajo, ~0.75). Vuelve a quemar todas las fotos.
+abajo; si el viral lo lleva abajo, ~0.75).)
+`texto_tam` = multiplicador del tamaño (0.5-1.6; sin él, el del estilo; los
+virales suelen llevar la letra pequeña: prueba ~0.7-0.8). Vuelve a quemar todas
+las fotos.
+
+Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
+- `tiktok_sans` — letra blanca, contorno fino y sombra, SIN caja. El texto
+  clásico de TikTok sobre la foto.
+- `fondo_negro` — blanca sobre caja negra opaca, líneas unidas en una sola forma
+  (el «texto con fondo» de TikTok). Si el viral lleva el texto sobre una barra
+  negra.
+- `fondo_blanco` — negra sobre caja blanca opaca unida (fondo blanco de TikTok).
+- `fondo_trans` — blanca sobre caja negra semitransparente unida.
+- `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
+**Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan.
+Los tres `fondo_*` salen ya a ~0.78 del tamaño base; afina con `texto_tam`.
 **Que se lea siempre**: comprueba la hoja final; si el texto pisa algo claro y
 se pierde, cambia `texto_y` o usa `pildora`/`pildora_negra`. Nunca letra oscura
 suelta sobre la foto.
