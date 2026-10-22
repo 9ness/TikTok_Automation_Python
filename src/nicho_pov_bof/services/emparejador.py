@@ -181,7 +181,7 @@ def emparejar(
     y él la rellena, que es mejor que no poder subir nada.
     """
     from src.nicho_pov_bof.services import drive_client, photo_pairing
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     vacio = [{"video": i, "producto": "", "por_que": ""} for i in range(len(videos))]
     if not videos or not productos:

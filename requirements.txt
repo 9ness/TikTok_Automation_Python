@@ -17,6 +17,8 @@ python-dotenv
 Pillow
 numpy<2.0.0
 openai
+# Claude: textos y guiones de Tiktok Shop AI Pro (src/tiktok_shop/api/claude.py).
+anthropic>=2.0
 requests
 # DuckDuckGo image search para auto-rellenar fotos candidatas del producto
 # en TikTok Shop. Sin API key. Sucesor de duckduckgo-search.

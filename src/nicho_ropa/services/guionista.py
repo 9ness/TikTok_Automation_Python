@@ -304,7 +304,7 @@ def _clips_que_caben(
     segundos: int, on_log: OnLog,
 ) -> list[str]:
     """Una reescritura para los clips que se pasan; si aun así no, se cortan."""
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     # Dos topes: el blando (lo que se pide, con un segundo de respiro) y el
     # duro (lo que de verdad cabe en el clip, medio segundo de respiro). Entre
@@ -334,6 +334,7 @@ def _clips_que_caben(
         datos = generate_json(
             prompt + _formato_clips(len(clips), tope, segundos) + aviso,
             descripcion, images=None,
+            tarea="guion",
         )
         nuevos = [_limpiar_dice(str(c)) for c in (datos or {}).get("clips") or []]
         if len(nuevos) == len(clips) and all(nuevos):
@@ -388,7 +389,7 @@ def escribir(
     on_log: OnLog = _noop,
 ) -> dict:
     """`{dice, video, videos[, colores]}` para una prenda. Lanza si Gemini no lo escribe."""
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     descripcion = f"Producto: {titulo.strip()}."
     if precio:
@@ -468,7 +469,7 @@ def _acortar(
     prompt: str, descripcion: str, imagenes, dice: str, tope: int,
 ) -> dict:
     """Segunda pasada SOLO por longitud. `{}` si no sale más corta."""
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     # Se le pide por debajo del tope: pidiendo justo el tope aterriza encima.
     pedido = int(tope * 0.9)
@@ -480,7 +481,7 @@ def _acortar(
         "acción del final: quita una característica entera antes que recortar "
         "por el medio — lo lee una voz en alto y una frase a trozos se oye."
     )
-    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes)
+    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes, tarea="guion")
     if not isinstance(datos, dict):
         return {}
     nueva = _limpiar_dice(str(datos.get("dice") or ""))
@@ -531,7 +532,7 @@ def _json_o_sin_fotos(
     ultimo: Exception | None = None
     for i, (texto, fotos, como) in enumerate(intentos):
         try:
-            return generate_json(texto, descripcion, images=fotos)
+            return generate_json(texto, descripcion, images=fotos, tarea="guion")
         except GeminiBlockedError as e:
             ultimo = e
             if i + 1 < len(intentos):
@@ -545,7 +546,7 @@ def _escribir_por_clips(
     colores_fijos: list[str] | None = None,
 ) -> dict:
     """Un texto por clip, cada uno con su tope y sus tiempos."""
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     datos = _json_o_sin_fotos(
         generate_json, prompt, descripcion, imagenes, on_log,

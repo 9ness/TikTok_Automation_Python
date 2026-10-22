@@ -687,6 +687,10 @@ PIXABAY_API_KEY=...
 # VIRALIZACION_REDIS_PREFIX=viralizacion:   # default
 # CUENTA_PILOTO_REDIS_PREFIX=cuenta_piloto:  # default
 # FISH_API_KEY=sk-fish-...                   # TTS del POV BOF Largo
+# ANTHROPIC_API_KEY_AI_PRO=sk-ant-...       # textos/guiones de AI Pro (src/tiktok_shop/api/claude.py:
+#                                          #   Haiku texto, Sonnet bajo fotos, Sonnet medio guiones; Gemini de respaldo)
+# AI_PRO_LLM=gemini                         # vuelve todo AI Pro a Gemini sin tocar código
+# ANTHROPIC_API_KEY_EDITOR_AUTO=sk-ant-...  # reservada para Editor Auto (aún usa OpenAI)
 # NICHO_POV_BOF_LARGO_REDIS_PREFIX=nicho_pov_bof_largo:  # default
 # ZOOM_MARCA_AGUA=1.05                       # ampliación que se come la marca
 # ESQUINA_MARCA_AGUA=abajo-derecha           #   de agua del generador de vídeo

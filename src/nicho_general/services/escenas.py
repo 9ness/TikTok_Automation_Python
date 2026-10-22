@@ -222,7 +222,7 @@ def escribir(
     BOF Largo. Aquí sí se reintenta —allí no— porque allí el montaje cuadra el
     vídeo a la voz y un clip de Omni dura lo que dura.
     """
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     descripcion = f"Producto: {titulo.strip()}."
     if tienda:
@@ -243,6 +243,7 @@ def escribir(
     )
     datos = generate_json(
         prompt, descripcion, images=[str(f) for f in (fotos or [])] or None,
+        tarea="guion",
     )
     if not isinstance(datos, dict):
         raise ValueError(
@@ -339,7 +340,7 @@ def _acortar(
     secas otra vez devolvía guiones igual de largos, porque el modelo no sabe
     que ya falló.
     """
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     cuentas = "; ".join(
         f'escena {e["n"]}: {e["caracteres"]} caracteres' for e in escenas
@@ -354,6 +355,7 @@ def _acortar(
     datos = generate_json(
         prompt + aviso, descripcion,
         images=[str(f) for f in (fotos or [])] or None,
+        tarea="guion",
     )
     nuevas = (datos or {}).get("escenas") if isinstance(datos, dict) else None
     if not isinstance(nuevas, list) or len(nuevas) != len(escenas):

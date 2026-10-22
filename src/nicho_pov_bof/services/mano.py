@@ -228,7 +228,7 @@ def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
     No lanza nunca: si falla ffmpeg o Gemini se devuelve vacío y quien llama
     decide (en el montaje, la voz de mujer, que es la de por defecto).
     """
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     vacio = {"sexo": "", "votos": 0, "total": 0, "pistas": ""}
     videos = [Path(v) for v in (video if isinstance(video, (list, tuple)) else [video])]

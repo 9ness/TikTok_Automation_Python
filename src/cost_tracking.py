@@ -645,6 +645,39 @@ def record_gemini(
     return cost
 
 
+# Claude API (oct 2026) — (input, output) por 1M tokens. La escritura en caché
+# cuesta 1,25x la entrada y la lectura 0,1x. Desconocido → tarifa de Sonnet.
+_CLAUDE_RATES_PER_1M: dict[str, tuple[float, float]] = {
+    "claude-haiku-5-5":  (0.10, 0.50),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-opus-5-5":   (4.00, 20.00),
+}
+
+
+def record_claude(
+    *, input_tokens: int, output_tokens: int, model: str,
+    cache_write_tokens: int = 0, cache_read_tokens: int = 0, detail: str | None = None,
+) -> float:
+    """Registra una llamada a la Claude API (`output_tokens` incluye el pensamiento)."""
+    in_rate, out_rate = _CLAUDE_RATES_PER_1M.get(model, _CLAUDE_RATES_PER_1M["claude-sonnet-5-5"])
+    cost = (
+        input_tokens * in_rate
+        + cache_write_tokens * in_rate * 1.25
+        + cache_read_tokens * in_rate * 0.1
+        + output_tokens * out_rate
+    ) / 1_000_000
+    total_in = input_tokens + cache_write_tokens + cache_read_tokens
+    _add_line(CostLine(
+        kind="claude",
+        units=float(total_in + output_tokens),
+        unit_label="tokens",
+        cost_usd=cost,
+        detail=f"{model} · in={total_in} (caché {cache_read_tokens}) out={output_tokens}"
+               + (f" · {detail}" if detail else ""),
+    ))
+    return cost
+
+
 def record_custom(
     *, kind: str, units: float, unit_label: str, cost_usd: float, detail: str | None = None,
 ) -> float:

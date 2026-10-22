@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Callable
 
 from src.nicho_carruseles import config
-from src.tiktok_shop.api.gemini import generate_json
+from src.tiktok_shop.api.claude import generate_json
 
 OnLog = Callable[[str], None]
 _noop: OnLog = lambda _: None

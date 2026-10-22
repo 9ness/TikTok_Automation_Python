@@ -189,7 +189,7 @@ def _normalizar(resultado: dict, n_diapos: int, formato: str) -> dict:
 def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
              replica_de: str = "") -> dict:
     from src.cost_tracking import finalize_and_persist, start_job
-    from src.tiktok_shop.api.gemini import generate_text
+    from src.tiktok_shop.api.claude import generate_text
 
     usuario = usuario or "ness"
     if not url:
@@ -227,7 +227,7 @@ def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
         )
         try:
             crudo = generate_text(
-                sistema, mensaje, model=servicio.MODELO, expect_json=True,
+                sistema, mensaje, model=servicio.MODELO, expect_json=True, tarea="guion",
                 images=[str(p) for p in origs] + ([str(foto)] if foto else []),
                 temperature=0.6, max_output_tokens=8192, max_retries_on_quota=1,
             )

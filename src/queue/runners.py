@@ -3391,7 +3391,7 @@ def run_nicho_pov_bof_revisar(job: Job, on_log: OnLog, on_progress: OnProgress) 
     from src.nicho_pov_bof import config as pov_config
     from src.nicho_pov_bof.repos import product_repo
     from src.nicho_pov_bof.services import drive_client, photo_pairing, text_extractor
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     p = job.params or {}
     source = str(p.get("source") or "")

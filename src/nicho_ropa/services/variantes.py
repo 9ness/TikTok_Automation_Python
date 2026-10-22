@@ -98,7 +98,7 @@ def extraer(captura: Path) -> dict:
     petición entera y no salió ningún guion. Lanza si Gemini no contesta.
     """
     from src.nicho_ropa.services.guionista import limpiar_colores, limpiar_hex
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     prompt = config._limpio("variantes_colores.md")
     datos = generate_json(prompt, "Lee el selector de color de esta captura.", images=[str(captura)])
@@ -117,7 +117,7 @@ def colores_de_fotos(fotos: list[Path]) -> dict:
     puesto el resto del vídeo). Lanza si Gemini no contesta.
     """
     from src.nicho_ropa.services.guionista import _color_de_la_lista, limpiar_colores, limpiar_hex
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     prompt = config._limpio("colores_de_fotos.md")
     datos = generate_json(

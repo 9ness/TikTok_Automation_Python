@@ -69,7 +69,7 @@ def escribir(
     parametriza aquí en vez de duplicar la función: lo único distinto es el
     texto que se manda y con qué se compara el largo.
     """
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     descripcion = f"Producto: {titulo.strip()}."
     if tienda:
@@ -84,6 +84,7 @@ def escribir(
         (prompt or config.prompt_guion(plazos)) + _FORMATO,
         descripcion,
         images=imagenes,
+        tarea="guion",
     )
     if not isinstance(datos, dict):
         raise ValueError(f"Gemini devolvió algo que no es un objeto: {type(datos).__name__}")
@@ -159,7 +160,7 @@ def _acortar(
     Se le enseña lo que escribió y por cuánto se pasó: pedirlo a secas otra vez
     devuelve un guion igual de largo, porque el modelo no sabe que ya falló.
     """
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     # Se le pide MENOS de lo que cabe. Medido: pidiéndole 356 devolvió 375 —a
     # cinco caracteres de no caber en dos clips de 8 s—, y esa diferencia
@@ -187,7 +188,7 @@ def _acortar(
             if "[[GOLPE" in guion else ""
         )
     )
-    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes)
+    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes, tarea="guion")
     if not isinstance(datos, dict):
         return ""
     nuevo = " ".join(str(datos.get("guion") or "").split())

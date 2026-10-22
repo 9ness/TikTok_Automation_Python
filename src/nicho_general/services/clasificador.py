@@ -46,7 +46,7 @@ def clasificar(
     inventarse un nicho: el caller decide si lo deja pendiente o lo manda a
     `generico`.
     """
-    from src.tiktok_shop.api.gemini import generate_json
+    from src.tiktok_shop.api.claude import generate_json
 
     productos = {k: v for k, v in productos.items() if (v or "").strip()}
     if not productos:
