@@ -105,7 +105,7 @@ def video_subir(
     producto_ref: Annotated[str, Form()] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Alta del MP4 montado de una réplica (`modo` con_ia | sin_ia). Con
+    """Alta del MP4 montado de una réplica (`modo` con_ia | genjutsu | sin_ia). Con
     `replica_id` reemplaza el vídeo de esa réplica (rehecho). `para`: otro
     usuario (solo admin). `hashtags`/`prompts`: JSON o uno por línea."""
     tmp = Path(tempfile.mkdtemp(prefix="replica_video_"))

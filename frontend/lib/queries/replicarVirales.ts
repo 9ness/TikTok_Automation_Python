@@ -11,7 +11,7 @@ import { conClave } from "@/lib/queries/replicarCarrusel";
 
 const ROOT = "/api/v1/replicar-viral/video";
 
-export type ModoReplicaVideo = "con_ia" | "sin_ia";
+export type ModoReplicaVideo = "con_ia" | "genjutsu" | "sin_ia";
 
 export interface ReplicaVideo {
   id: string;

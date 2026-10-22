@@ -6,6 +6,8 @@ viral por su cuenta y lo que llega es el vídeo terminado. Dos modos:
 
 - `con_ia`: clips generados con IA (Omni de GenAI Pro, 10 s, con la foto del
   producto como ingrediente), encuadre anti-marca, rótulo y metadatos limpios.
+- `genjutsu`: igual que `con_ia` pero el viral entero rehecho con Genjutsu de
+  Higgsfield (cambio de producto sobre el vídeo original). Cuenta como Viral.
 - `sin_ia`: vídeo real (grabado) o montaje sin IA del viral con nuestro
   producto.
 
@@ -20,8 +22,8 @@ comparten guiones y carruseles. El MP4 va al Drive montado,
 
 Opcional: `catalogo`/`carpeta`/`producto_ref` atan la réplica a un producto de
 los catálogos del operador (`catalogo_ref`). Con eso, al marcarla subida en Mis
-tandas cuenta en el contador por formato de ese producto (con_ia = viral,
-sin_ia = físico; `nicho_pov_bof/services/marcas.py`).
+tandas cuenta en el contador por formato de ese producto (con_ia y
+genjutsu = viral, sin_ia = físico; `nicho_pov_bof/services/marcas.py`).
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ INDICE_VIDEOS = "replicar_viral:videos:{usuario}"
 TIPO = "video"
 MODOS: dict[str, str] = {
     "con_ia": "🤖 Con IA (Omni)",
+    "genjutsu": "🌀 Con IA (Genjutsu)",
     "sin_ia": "🎥 Sin IA (real)",
 }
 EXT_VIDEO = (".mp4", ".mov", ".m4v")

@@ -20,6 +20,7 @@ import {
 
 const MODOS: { clave: ModoReplicaVideo; label: string; hint: string }[] = [
   { clave: "con_ia", label: "🤖 Con IA (Omni)", hint: "Clips de 10 s en Omni (GenAI Pro) con la foto del producto como ingrediente." },
+  { clave: "genjutsu", label: "🌀 Con IA (Genjutsu)", hint: "El viral entero rehecho con Genjutsu de Higgsfield, cambiando su producto por el nuestro." },
   { clave: "sin_ia", label: "🎥 Sin IA (real)", hint: "Vídeo grabado o montaje sin IA del viral con nuestro producto." },
 ];
 
@@ -58,14 +59,14 @@ export default function ReplicarViralesPage() {
           <GuiaIA guia="replicar-virales" />
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-          El vídeo se monta fuera (con IA en Omni o sin IA, grabado) y aquí se registra con el nombre y
+          El vídeo se monta fuera (con IA en Omni o Genjutsu, o sin IA, grabado) y aquí se registra con el nombre y
           el enlace del producto. Sale solo en <b>Mis tandas</b>, con su semáforo, para publicarlo.
         </p>
       </header>
 
       <Caja icono="📁" titulo="Dónde trabajas" hint="Elige el modo de la réplica." extra={`${hechas}/${total}`}>
         <Sub>Modo</Sub>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
           {MODOS.map((m) => (
             <button
               key={m.clave}

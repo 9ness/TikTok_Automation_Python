@@ -788,8 +788,8 @@ async def registrar_replica_video(
 ) -> str:
     """Registra el MP4 YA MONTADO de un viral replicado («Replicar virales»):
     sale solo en `mis_tandas` (id `rv|<id>`) con descargar, subido, sin stock,
-    rehacer, semáforo y época. `modo`: `con_ia` (clips de Omni/GenAI Pro) o
-    `sin_ia` (vídeo real o montaje sin IA). UNA fuente del vídeo:
+    rehacer, semáforo y época. `modo`: `con_ia` (clips de Omni/GenAI Pro), `genjutsu`
+    (el viral rehecho con Genjutsu de Higgsfield) o `sin_ia` (vídeo real o montaje sin IA). UNA fuente del vídeo:
     `ruta_bandeja` (relativa a tu bandeja `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`,
     lo recomendable: no se sube nada), `archivo_id` (subido a /subir) o `url`.
     `titulo` = nombre del producto (obligatorio, el mismo que va quemado en el
@@ -800,8 +800,8 @@ async def registrar_replica_video(
     de su tanda y entra en una nueva. `para`: otro usuario (solo admin).
     `catalogo`+`carpeta`+`producto_ref`: el producto de los catálogos del
     operador (p. ej. `productos_fisicos`, carpeta, nº) — PÁSALOS siempre que
-    exista: al marcarlo subido cuenta en su contador por formato (con_ia =
-    Viral, sin_ia = Físico). Con `replica_id` también sirve para atarla después.
+    exista: al marcarlo subido cuenta en su contador por formato (con_ia y
+    genjutsu = Viral, sin_ia = Físico). Con `replica_id` también sirve para atarla después.
     Antes: el MP4 cumple la guía (`guia("replicar-virales")`): encuadre
     anti-marca, rótulo con gancho + nombre del producto, metadatos limpios."""
     u = _usuario(ctx)
@@ -830,7 +830,7 @@ async def listar_replicas_video(ctx: Context, modo: str = "", id: str = "") -> s
     """Las réplicas en vídeo registradas (lo último primero), con su estado
     (subido, sin stock, rehacer + nota), `id_tandas` (el id en `mis_tandas`
     para `semaforo_tanda`/`marcar_tanda`/`epoca_video`) y `descargar`.
-    `modo`: con_ia | sin_ia. Con `id`: esa réplica entera, con sus `prompts`."""
+    `modo`: con_ia | genjutsu | sin_ia. Con `id`: esa réplica entera, con sus `prompts`."""
     u = _usuario(ctx)
     api = Interno(u)
     if id:

@@ -66,6 +66,7 @@ const MODOS_ALEA: Record<string, string> = {
 /** Modos de «Replicar virales» (MP4 ya montado por el agente). */
 export const MODOS_RV: Record<string, string> = {
   con_ia: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
+  genjutsu: "bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300",
   sin_ia: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
 };
 

@@ -27,11 +27,12 @@ No es `replicar_viral` (guía [`replicar-viral.md`](replicar-viral.md)): esa
 herramienta solo escribe el guion de voz y los prompts de dos clips mudos, y el
 vídeo se monta en el POV BOF Largo. Si el encargo encaja ahí, hazlo ahí.
 
-Hay dos modos (`modo`):
+Hay tres modos (`modo`):
 
 | Modo | Qué es |
 |---|---|
 | `con_ia` | Clips generados con **Omni** (GenAI Pro · Omni 1.1, 10 s), con la foto del producto como ingrediente |
+| `genjutsu` | El viral entero rehecho con **Genjutsu de Higgsfield** (se cambia su producto por el nuestro). Sale con su color propio en Mis tandas |
 | `sin_ia` | Vídeo **real** (grabado) o montaje sin IA del viral con nuestro producto |
 
 Antes de empezar, confirma con el operador lo de siempre: que el viral sigue
@@ -204,8 +205,8 @@ registrar_replica_video(
 - `para="ana"` registra para otro usuario. Solo funciona con un token de admin.
 - `catalogo` + `carpeta` + `producto_ref`: si el producto está en un catálogo
   del operador (Productos físicos, Muestras, Tareas…), pásalos SIEMPRE. Al
-  marcarlo subido cuenta en el contador por formato de ese producto (con_ia =
-  🔁 Viral, sin_ia = 🎥 Físico; guía `pov-bof.md` §7). Una réplica ya
+  marcarlo subido cuenta en el contador por formato de ese producto (con_ia y
+  genjutsu = 🔁 Viral, sin_ia = 🎥 Físico; guía `pov-bof.md` §7). Una réplica ya
   registrada se ata después repitiendo la llamada con `replica_id`.
 
 Devuelve `id`, `id_tandas` (`rv|<id>`) y `descargar`. Después:
