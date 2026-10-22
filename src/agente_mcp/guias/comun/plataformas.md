@@ -15,7 +15,7 @@ abierta en el navegador). Luego el clip vuelve a la app para que lo edite.
 | Plataforma | Voz | Duración | Calidad | Coste |
 |---|---|---|---|---|
 | Google Flow (Omni) | ✅ | 8 s o 10 s | 720p → reescalar a 1080p | 12 créditos (8 s) · 15 créditos (10 s) |
-| **GenAI Pro · Omni 1.1** (desde 7/10/2026) | ✅ | **10 s** | **1080p** (1080×1920) | **1 crédito con marca de agua** (3 sin ella: NO) |
+| **GenAI Pro · Omni 1.1** (desde 7/10/2026) | ✅ | **10 s** | **1080p** (1080×1920) | **3 créditos** (desde 22/10/2026 no deja «con marca»; antes 1) |
 | GenAI Pro · Veo (antiguo) | ❌ | hasta 8 s | 720p | 1 crédito |
 | Magnific (spaces) | ❌ | 8 s o 10 s | la del space | lo que marque su web |
 
@@ -86,6 +86,11 @@ Ajustes, siempre los mismos:
 
 - Modelo **Omni 1.1** · **Portrait 9:16** · **1080p** · **10 s** · **CON marca
   de agua** (1 crédito; sin marca son 3 y no compensa).
+- **22/10/2026: el botón «Watermark» sale DESHABILITADO** en todos los modos y
+  resoluciones: un clip de 10 s cuesta **3 créditos** (2 en 720p). Néstor aprobó
+  seguir en 1080p a 3. Avisa del coste nuevo al pedir el «sí»; si vuelve a
+  dejar elegir «Watermark», úsalo. Ojo: el panel arranca en **Landscape**,
+  pon Portrait cada vez.
 - **La marca de agua la quita la app sola al montar**: es una estrellita
   abajo a la derecha y el montaje reconoce los clips de Omni (vienen firmados
   `encoder=Google`) y amplía un 14% recortando por abajo. **No la tapes ni la
