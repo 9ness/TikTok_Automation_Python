@@ -50,6 +50,8 @@ ESTILOS: dict[str, dict] = {
                       "pildora": (0, 0, 0, 170), "mayus": False, "tam": 0.85, "sombra": False},
     "tiktok_sans": {"fuente": "TikTokSans-Bold.ttf", "color": (255, 255, 255), "borde": 0.03,
                     "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
+    "tiktok_medio": {"fuente": "TikTokSans-Medium.ttf", "color": (255, 255, 255), "borde": 0.03,
+                     "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
     "fondo_negro": {"fuente": "TikTokSans-SemiBold.ttf", "color": (255, 255, 255), "borde": 0.0,
                     "pildora": (0, 0, 0, 255), "unida": True, "mayus": False, "tam": 0.78,
                     "sombra": False},

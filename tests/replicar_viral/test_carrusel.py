@@ -219,6 +219,22 @@ def test_cambiar_estilo_requema_todas_y_se_guarda(entorno):
         carrusel.cambiar_estilo("ness", id_, "maquina", y=2)
 
 
+def test_estilo_de_una_diapositiva_manda_y_se_borra_con_el_general(entorno):
+    doc = _replicar()
+    id_ = doc["id"]
+    for d in doc["diapositivas"]:
+        carrusel.subir_imagen("ness", id_, d["n"], _jpeg())
+    carrusel.cambiar_estilo("ness", id_, "snap", y=0.55)
+    otra = carrusel.ruta_foto("ness", id_, 1, "txt").read_bytes()
+    n2 = doc["diapositivas"][-1]["n"]
+    st = carrusel.cambiar_estilo("ness", id_, "tiktok_medio", tam=0.5, n=n2)
+    assert st["estilo_texto"] == {"nombre": "snap", "y": 0.55}
+    assert st["diapositivas"][-1]["estilo_texto"] == {"nombre": "tiktok_medio", "tam": 0.5}
+    assert carrusel.ruta_foto("ness", id_, 1, "txt").read_bytes() == otra
+    st = carrusel.cambiar_estilo("ness", id_, "tiktok")
+    assert all("estilo_texto" not in d for d in st["diapositivas"])
+
+
 @pytest.mark.parametrize("estilo", ["tiktok", "clasico", "pildora", "pildora_negra", "maquina",
                                     "elegante", "manuscrita", "rotulador", "impacto"])
 def test_todos_los_estilos_queman(tmp_path, estilo):

@@ -442,6 +442,9 @@ def _quemar(usuario: str, id_: str, n: int, texto: str, doc: dict | None = None)
     if not base:
         return
     est = (doc or {}).get("estilo_texto") or {}
+    for d in (doc or {}).get("diapositivas") or []:
+        if d.get("n") == int(n) and d.get("estilo_texto"):
+            est = d["estilo_texto"]
     if texto.strip():
         texto_foto.quemar(base, texto, destino, estilo=est.get("nombre", ""), y_rel=est.get("y"),
                           tam_rel=est.get("tam"))
@@ -485,11 +488,12 @@ def cambiar_caption(usuario: str, id_: str, caption: str) -> dict:
 
 
 def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None,
-                   tam: float | None = None) -> dict:
+                   tam: float | None = None, n: int | None = None) -> dict:
     """Letra del carrusel entero (para parecerse al viral: máquina de escribir,
     manuscrita, píldora blanca…; ver `texto_foto.ESTILOS`) y, si se da, altura
     del texto (0-1 sobre el alto) y `tam` (multiplicador 0.5-1.6 del tamaño
-    del estilo). Vuelve a quemar todas las que tengan foto."""
+    del estilo). Vuelve a quemar todas las que tengan foto. Con `n`, el estilo
+    es solo de esa diapositiva (y manda sobre el del carrusel)."""
     from src.nicho_carruseles.services import texto_foto
 
     usuario = usuario or "ness"
@@ -508,7 +512,17 @@ def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None,
             est["tam"] = texto_foto.tam_valido(tam)
         except ValueError as e:
             raise ErrorReplica(str(e)) from e
+    if n:
+        # Solo esa diapositiva: hay virales que mezclan letras (barra de
+        # Snapchat en la 1ª y letra de TikTok en la 2ª…).
+        d = _diapo(doc, n)
+        d["estilo_texto"] = est
+        servicio.guardar(doc, indexar=False)
+        _quemar(usuario, id_, d["n"], d.get("texto") or "", doc)
+        return con_estado(doc)
     doc["estilo_texto"] = est
+    for d in doc.get("diapositivas") or []:
+        d.pop("estilo_texto", None)
     servicio.guardar(doc, indexar=False)
     for d in doc.get("diapositivas") or []:
         _quemar(usuario, id_, d["n"], d.get("texto") or "", doc)

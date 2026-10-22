@@ -335,11 +335,13 @@ def carrusel_estilo(
     id_: str, estilo: Annotated[str, Body(embed=True)] = "",
     y: Annotated[float | None, Body(embed=True)] = None,
     tam: Annotated[float | None, Body(embed=True)] = None,
+    n: Annotated[int | None, Body(embed=True)] = None,
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
-    """Letra del carrusel (`texto_foto.ESTILOS`), altura (`y`) y tamaño (`tam`, 0.5-1.6); se vuelven a quemar todas."""
+    """Letra del carrusel (`texto_foto.ESTILOS`), altura (`y`) y tamaño (`tam`, 0.5-1.6); se vuelven a quemar todas.
+    Con `n`, solo la de esa diapositiva."""
     try:
-        return carrusel.cambiar_estilo(usuario, id_, estilo, y, tam)
+        return carrusel.cambiar_estilo(usuario, id_, estilo, y, tam, n)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 

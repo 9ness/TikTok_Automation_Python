@@ -87,13 +87,15 @@ las fotos.
 Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
 - `tiktok_sans` — letra blanca, contorno fino y sombra, SIN caja. El texto
   clásico de TikTok sobre la foto.
+- `tiktok_medio` — la misma, más fina (medium): la de los textos normales de
+  TikTok, pequeños y sin negrita. Suele ir con `texto_tam` 0.5.
 - `fondo_negro` — blanca sobre caja negra opaca, líneas unidas en una sola forma
   (el «texto con fondo» de TikTok). Si el viral lleva el texto sobre una barra
   negra.
 - `fondo_blanco` — negra sobre caja blanca opaca unida (fondo blanco de TikTok).
 - `fondo_trans` — blanca sobre caja negra semitransparente unida.
 - `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
-**Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan.
+**Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan. Si el viral MEZCLA letras (barra de Snapchat en la 1ª y texto normal en la 2ª), pon primero el estilo general y luego el de esa diapositiva con `estilo_n`; compara TODAS, no solo la 1ª. Fíjate también en los cortes de línea del viral y cópialos con `\n` en el texto.
 Los tres `fondo_*` salen ya a ~0.78 del tamaño base; afina con `texto_tam`.
 **Que se lea siempre**: comprueba la hoja final; si el texto pisa algo claro y
 se pierde, cambia `texto_y` o usa `pildora`/`pildora_negra`. Nunca letra oscura
