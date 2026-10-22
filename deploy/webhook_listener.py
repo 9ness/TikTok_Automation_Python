@@ -40,6 +40,8 @@ Endpoints:
     POST /admin/claude-login/iniciar|codigo|cancelar — renovar esa sesión desde la web
     GET  /admin/navegador/clave   — contraseña de la pantalla (solo admin)
     POST /admin/navegador/on|off  — encender / apagar ese Chrome (`/usr/local/bin/navegador`)
+    GET  /admin/claves            — variables de los .env de ~/proyectos, enmascaradas
+    POST /admin/claves            — {proyecto, variable, valor}: guarda y prueba (`claves_proyectos.py`)
 """
 
 import hashlib
@@ -53,6 +55,8 @@ import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+import claves_proyectos  # mismo directorio (deploy/): sys.path[0] es la carpeta del script
 
 
 LOG = logging.getLogger("webhook")
@@ -282,6 +286,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_claude_remotas(None)
             return
 
+        if path == "/admin/claves":
+            if not self._check_admin_auth():
+                return
+            self._json_response(200, {"proyectos": claves_proyectos.listar()})
+            return
+
         if path == "/admin/navegador/clave":
             if not self._check_admin_auth():
                 return
@@ -346,6 +356,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_navegador(path.rsplit("/", 1)[1])
             return
 
+        if path == "/admin/claves":
+            self._handle_claves()
+            return
+
         self.send_error(404)
 
     # ------------------------------------------------------------------
@@ -399,6 +413,29 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._json_response(500, {"error": f"claude-login {accion}: {e}"})
             return
         self._json_response(200, data)
+
+    def _handle_claves(self) -> None:
+        """Guarda una clave en el .env de un proyecto. El valor NUNCA se loguea."""
+        if not self._check_admin_auth():
+            return
+        cuerpo = self._parse_json_body()
+        if not isinstance(cuerpo, dict):
+            self._json_response(400, {"error": "cuerpo no válido"})
+            return
+        proyecto = str(cuerpo.get("proyecto", ""))
+        variable = str(cuerpo.get("variable", ""))
+        try:
+            r = claves_proyectos.guardar(proyecto, variable, str(cuerpo.get("valor", "")))
+        except claves_proyectos.ClaveError as e:
+            LOG.warning("claves: %s/%s rechazada: %s", proyecto, variable, e)
+            self._json_response(400, {"error": str(e)})
+            return
+        except OSError as e:
+            LOG.error("claves: %s/%s error de disco: %s", proyecto, variable, e.strerror)
+            self._json_response(500, {"error": f"No se pudo escribir: {e.strerror}"})
+            return
+        LOG.info("claves: %s/%s %s (prueba=%s)", proyecto, variable, r["accion"], r["prueba"])
+        self._json_response(200, r)
 
     def _handle_navegador(self, accion: str) -> None:
         """Enciende/apaga el Chrome remoto y devuelve su estado (JSON)."""

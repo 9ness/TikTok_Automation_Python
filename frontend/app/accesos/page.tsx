@@ -2,6 +2,7 @@
 
 import { ExternalLink } from "lucide-react";
 
+import { ClavesApi } from "@/components/settings/ClavesApi";
 import { NavegadorRemoto } from "@/components/settings/NavegadorRemoto";
 import { SesionClaudeVps } from "@/components/settings/SesionClaudeVps";
 import { SesionesRemotas } from "@/components/settings/SesionesRemotas";
@@ -53,6 +54,9 @@ export default function AccesosPage() {
 
           {/* Qué proyectos tienen Claude remoto abierto. */}
           <SesionesRemotas />
+
+          {/* Claves API de los proyectos de ~/proyectos (versión web de `clave`). */}
+          <ClavesApi />
 
           <Card>
             <CardHeader className="pb-2">

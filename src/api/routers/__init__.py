@@ -66,6 +66,7 @@ from .mis_tandas import router as mis_tandas_router
 from .replicar_viral import router as replicar_viral_router
 from .deploy import router as deploy_router
 from .navegador import router as navegador_router
+from .claves import router as claves_router
 from .claude_vps import router as claude_vps_router
 from .cuotas import cuotas_router
 from .diagnostics import router as diagnostics_router
@@ -99,6 +100,7 @@ __all__ = [
     "replicar_viral_router",
     "deploy_router",
     "navegador_router",
+    "claves_router",
     "claude_vps_router",
     "cuotas_router",
     "diagnostics_router",
