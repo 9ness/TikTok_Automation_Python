@@ -20,7 +20,7 @@ src/editor_auto/
 ├── tools/                BaseTool + REGISTRY + impls
 │   ├── base.py           contrato (Protocol)
 │   ├── subs_auto.py      subtítulos karaoke (reusa src/subtitles.py)
-│   └── silence_cutter.py Silero VAD + OpenAI GPT-4o (transcript clean-up)
+│   └── silence_cutter.py Silero VAD + Claude Haiku / OpenAI (transcript clean-up)
 ├── services/
 │   └── flow_orchestrator.py  reordena por position_weight + ejecuta
 ├── pipeline/
@@ -86,7 +86,7 @@ editable por usuario sin tablas separadas.
 
 | Tool ID | Peso | API externas | Coste | Notas |
 |---|---|---|---|---|
-| `silence_cutter` | 10 | Silero VAD (local) + OpenAI gpt-4o | gpt-4o tokens | Cortes A/V con concat MoviePy |
+| `silence_cutter` | 10 | Silero VAD (local) + Claude Haiku (OpenAI de respaldo) | tokens Claude/OpenAI | Cortes A/V con concat MoviePy |
 | `subs_auto`      | 90 | faster-whisper (local) | — | Reusa `src/subtitles*.py` |
 
 **Position weight**: menor peso = se ejecuta antes. `silence_cutter`
@@ -127,7 +127,10 @@ Para añadir una herramienta nueva:
 # TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
 
-# OpenAI (silence_cutter usa gpt-4o por defecto)
+# IA del cortador: Claude Haiku primero, OpenAI de respaldo (oct 2026)
+ANTHROPIC_API_KEY_EDITOR_AUTO=sk-ant-...
+# EDITOR_AUTO_LLM=openai               # vuelve a OpenAI sin tocar código
+# EDITOR_AUTO_CLAUDE_MODEL=claude-sonnet-5-5   # otro modelo, para comparar
 OPENAI_API_KEY=sk-...
 ```
 
@@ -135,9 +138,13 @@ Reusa `UPSTASH_REDIS_REST_URL/_TOKEN` ya compartidas entre programas.
 
 ## Cost tracking
 
-- Las llamadas a `OpenAI Chat Completions` desde `silence_cutter`
-  pasan por `src/editor_auto/api/openai_client.py:analyze_transcript_json`
-  que registra `record_openai_chat()` con tokens reales del provider.
+- Todas las llamadas de IA de `silence_cutter` pasan por
+  `src/editor_auto/api/openai_client.py:analyze_transcript_json`, que va
+  primero a `claude_client.py` (Haiku 5.5, `record_claude()`) y, si Claude
+  falla, a OpenAI (`record_openai_chat()`), con tokens reales del provider.
+  A/B del corpus de regresión (23/10/2026): Haiku 92/87/92/100 frente a
+  OpenAI 100/87/100/100 (lo que resta es quitar ruido de fondo repetido),
+  a ~0,006 $ el vídeo frente a ~0,12.
 - `cost_tracking.py` añadió rates para `gpt-4o` ($2.50/$10.00 por 1M
   input/output tokens) — match por prefix del nombre del modelo.
 - `Whisper local` (`faster-whisper`) y `Silero VAD` corren en local y

@@ -66,10 +66,10 @@ Fases tal cual salen en `diagnostic["phases"]` (orden real de ejecución):
 | `inter_word_gap` | corta huecos entre palabras ≥ umbral (conv 0.8s) | silencio |
 | `amplitude` | corta por debajo del umbral de ruido | silencio |
 | `acoustic_combined` | fusiona silero+amplitude+gap | silencio |
-| `ai_holistic` | limpieza holística (gpt-5.4, 2 pasadas) | **contenido** |
-| `ai` | analista de cortes (gpt-5.4) — incluye `noise_gap` | contenido / pausa |
+| `ai_holistic` | limpieza holística (IA\*, 2 pasadas) | **contenido** |
+| `ai` | analista de cortes (IA\*) — incluye `noise_gap` | contenido / pausa |
 | `ngram_repetition` | quita frases repetidas | **contenido** |
-| `ai_pass2_false_starts` | falsos inicios (gpt-5.4) | **contenido** |
+| `ai_pass2_false_starts` | falsos inicios (IA\*) | **contenido** |
 | `word_protection_from_acoustic` | re-anexa palabras que un corte acústico se comió | (protección) |
 | `voiced_edge_rescue` | extiende bordes de keep a la voz contigua (energía) | (protección) |
 | `silero_island_rescue` | **rescata islas de voz claras dentro de un `noise_gap`** | (protección) |
@@ -77,7 +77,9 @@ Fases tal cual salen en `diagnostic["phases"]` (orden real de ejecución):
 | (render ffmpeg) | aplica los keeps | — |
 | `post_render_audit` | re-analiza el MP4 (silencios/sueltas/residuo) → score | — |
 | deep audit | **re-transcribe el OUTPUT** y compara con lo esperado | — |
-| coherence judge | gpt-5.4 juzga si el render tiene SENTIDO | — |
+| coherence judge | la IA\* juzga si el render tiene SENTIDO | — |
+
+\* Desde el 23/10/2026 la IA es Claude Haiku (`api/claude_client.py`) y gpt-5.4/gpt-4o solo de respaldo si Claude falla; `EDITOR_AUTO_LLM=openai` vuelve a OpenAI. El `model=` de cada llamada solo vale para OpenAI.
 | `self_heal` | corrige los fallos del audit y re-renderiza | — |
 | `false_start_output_sweep` | barre falsos inicios sobre el output | contenido |
 

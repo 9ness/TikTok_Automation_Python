@@ -1,9 +1,10 @@
-"""Wrapper OpenAI Chat Completions con cost tracking integrado.
+"""Wrapper de las llamadas de texto del Editor Auto, con cost tracking.
 
-Centraliza las llamadas a OpenAI del programa Editor Auto. Único uso
-actual: análisis de transcripts para detectar frases sucias en
-`silence_cutter`. Modelo por defecto = `gpt-4o` (más caro pero el mejor
-para detección semántica fina en castellano).
+Centraliza las llamadas de IA del programa Editor Auto. Único uso actual:
+análisis de transcripts para detectar frases sucias en `silence_cutter`.
+Desde oct 2026 va PRIMERO a Claude (`claude_client`, clave
+`ANTHROPIC_API_KEY_EDITOR_AUTO`) y OpenAI queda de respaldo si Claude falla.
+El `model` que pasan los callers (gpt-4o / gpt-5.4) solo vale para OpenAI.
 """
 
 from __future__ import annotations
@@ -13,13 +14,14 @@ import os
 from typing import Any
 
 from src import cost_tracking
+from src.editor_auto.api import claude_client
 
 
 DEFAULT_MODEL = "gpt-4o"
 
 
 def is_configured() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY"))
+    return claude_client.activo() or bool(os.getenv("OPENAI_API_KEY"))
 
 
 def analyze_transcript_json(
@@ -39,9 +41,19 @@ def analyze_transcript_json(
     Lanza `RuntimeError` si OpenAI no está configurada, `ValueError` si la
     respuesta no es JSON parseable.
     """
-    if not is_configured():
+    if claude_client.activo():
+        try:
+            return claude_client.analyze_transcript_json(
+                system_prompt=system_prompt, user_payload=user_payload,
+            )
+        except Exception as e:  # noqa: BLE001
+            if not os.getenv("OPENAI_API_KEY"):
+                raise
+            print(f"[editor_auto] Claude falló → respaldo OpenAI: {str(e)[:200]}")
+    if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError(
-            "OPENAI_API_KEY no configurada — silence_cutter requiere OpenAI."
+            "Ni ANTHROPIC_API_KEY_EDITOR_AUTO ni OPENAI_API_KEY configuradas — "
+            "silence_cutter requiere una IA."
         )
 
     from openai import OpenAI

@@ -678,7 +678,7 @@ PIXABAY_API_KEY=...
 # no se define (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR").
 # TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
-# OPENAI_API_KEY ya definida arriba — silence_cutter usa gpt-4o (mejor calidad)
+# ANTHROPIC_API_KEY_EDITOR_AUTO — silence_cutter usa Claude Haiku (OpenAI de respaldo)
 
 # === Programa 4 — Tiktok Shop AI Pro (Viralización) ===
 # Path raíz LOCAL (no Drive) de assets: gancho/audios/paisajes/música.
@@ -690,7 +690,8 @@ PIXABAY_API_KEY=...
 # ANTHROPIC_API_KEY_AI_PRO=sk-ant-...       # textos/guiones de AI Pro (src/tiktok_shop/api/claude.py:
 #                                          #   Haiku texto, Sonnet bajo fotos, Sonnet medio guiones; Gemini de respaldo)
 # AI_PRO_LLM=gemini                         # vuelve todo AI Pro a Gemini sin tocar código
-# ANTHROPIC_API_KEY_EDITOR_AUTO=sk-ant-...  # reservada para Editor Auto (aún usa OpenAI)
+# ANTHROPIC_API_KEY_EDITOR_AUTO=sk-ant-...  # IA del cortador (src/editor_auto/api/claude_client.py, Haiku;
+#                                          #   OpenAI de respaldo; EDITOR_AUTO_LLM=openai vuelve a OpenAI)
 # NICHO_POV_BOF_LARGO_REDIS_PREFIX=nicho_pov_bof_largo:  # default
 # ZOOM_MARCA_AGUA=1.05                       # ampliación que se come la marca
 # ESQUINA_MARCA_AGUA=abajo-derecha           #   de agua del generador de vídeo
@@ -776,7 +777,7 @@ herramientas del mismo grupo en el futuro.
 | [`CLAUDE.md`](CLAUDE.md) | Este archivo — contexto general, programas, env vars, convenciones |
 | [`ADDING_PROGRAM.md`](ADDING_PROGRAM.md) | **Checklist para añadir un programa nuevo** (touchpoints API + runner + Redis + frontend + cost + deploy + tests + docs) |
 | [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura completa, esquemas Redis, prompts, Pilot Program |
-| [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + OpenAI GPT-4o |
+| [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + Claude Haiku (OpenAI de respaldo) |
 | [`TTSHOP_AI_PRO_WEB.md`](TTSHOP_AI_PRO_WEB.md) | **La web del curso** — cómo funciona `ttshopaiproapp.com`, de donde salen prompts, ZIP y fichas. Está tras login del operador: ningún agente puede mirarla, así que lo que se sepa se escribe ahí |
 | [`APELACIONES.md`](APELACIONES.md) | Cómo apelar sanciones de TikTok Shop («promoción incoherente»): pruebas, forma del texto, qué no decir, casos aprobados |
 | [`UI_NICHOS.md`](UI_NICHOS.md) | **Estándar visual de las pantallas de nicho** (Programa 4) — anatomía de pantalla y de tarjeta, colores con significado, piezas que se reutilizan. Obligatorio antes de crear o retocar una |
