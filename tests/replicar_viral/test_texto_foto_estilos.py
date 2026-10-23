@@ -7,7 +7,7 @@ from PIL import Image
 
 from src.nicho_carruseles.services import texto_foto
 
-NUEVOS = ["tiktok_sans", "fondo_negro", "fondo_blanco", "fondo_trans", "snap", "tiktok_medio", "tiktok_amarillo"]
+NUEVOS = ["tiktok_sans", "fondo_negro", "fondo_blanco", "fondo_trans", "snap", "tiktok_medio", "tiktok_amarillo", "fondo_rosa"]
 TEXTO = "¿Dónde puedo conseguir\neste conjunto? 😍"
 
 

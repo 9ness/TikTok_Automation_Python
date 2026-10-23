@@ -96,6 +96,7 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
   negra.
 - `fondo_blanco` — negra sobre caja blanca opaca unida (fondo blanco de TikTok).
 - `fondo_trans` — blanca sobre caja negra semitransparente unida.
+- `fondo_rosa` — fucsia sobre caja rosa claro unida (virales de maquillaje y belleza).
 - `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
 **Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan. Si el viral MEZCLA letras (barra de Snapchat en la 1ª y texto normal en la 2ª), pon primero el estilo general y luego el de esa diapositiva con `estilo_n`; compara TODAS, no solo la 1ª. Fíjate también en los cortes de línea del viral y cópialos con `\n` en el texto.
 Los tres `fondo_*` salen ya a ~0.78 del tamaño base; afina con `texto_tam`.
