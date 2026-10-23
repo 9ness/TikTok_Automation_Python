@@ -329,3 +329,25 @@ def test_foto_links_de_carrusel_sin_fila(cuenta, drive, monkeypatch):
     enlaces_repo.borrar("ama_shop", k)
     with pytest.raises(tandas.ErrorTandas):
         tandas.foto_publica("ama_shop", k, 192)
+
+
+def test_duenos_extra_suman_sus_videos_y_su_foto(drive, monkeypatch):
+    """Una cuenta con dueños extra (nestor2, mauro en las de ness) lista también
+    sus vídeos y sus réplicas; la foto se pide al usuario de esa fila."""
+    from src.mis_tandas import fuentes, servicio
+
+    por_usuario = {"ness": [_fila(drive, "largo|inv|C1|1|", "Lámpara")],
+                   "nestor2": [_fila(drive, "largo|inv|C1|2|", "Taladro")]}
+    monkeypatch.setattr(fuentes, "todas", lambda u: (list(por_usuario.get(u, [])), [], []))
+    monkeypatch.setattr(fuentes, "replicas_video",
+                        lambda u: [_fila(drive, "rv|abc", "Cojín", nicho="rv")] if u == "nestor2" else [])
+    monkeypatch.setattr(servicio, "ocultos", lambda u: set())
+    pedidas = []
+    monkeypatch.setattr(servicio, "foto", lambda u, i, a: pedidas.append((u, i)) or drive / "f.jpg")
+    c = cuentas_repo.guardar(CuentaDestino(slug="viva_shop", dueno="ness", duenos_extra=["nestor2", "ness"]))
+    assert c.duenos() == ["ness", "nestor2"]
+    prods = {p["titulo"]: p for p in tandas.productos("viva_shop")["productos"]}
+    assert set(prods) == {"Lámpara", "Taladro", "Cojín"}
+    tandas.foto_interna(c, prods["Taladro"]["fila_id"])
+    tandas.foto_interna(c, prods["Lámpara"]["fila_id"])
+    assert pedidas == [("nestor2", "largo|inv|C1|2|"), ("ness", "largo|inv|C1|1|")]

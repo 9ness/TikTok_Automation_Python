@@ -42,7 +42,14 @@ class CuentaDestino:
     # Encolado automático de Mis tandas (`tandas.auto_encolar`): días de vídeos
     # de producto que el tick mantiene en cola. 0 = solo a mano.
     auto_tandas: int = 0
+    # Más usuarios cuyos vídeos de Mis tandas también salen en esta cuenta
+    # (p. ej. nestor2 y mauro en las de ness). `dueno` sigue siendo el principal.
+    duenos_extra: list[str] = field(default_factory=list)
     creada_en: float = field(default_factory=time.time)
+
+    def duenos(self) -> list[str]:
+        out = [self.dueno] if self.dueno else []
+        return out + [u for u in self.duenos_extra or [] if u and u not in out]
 
     def destino(self, plataforma: str) -> str:
         return {

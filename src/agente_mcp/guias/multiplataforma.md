@@ -14,6 +14,9 @@ encontrar ese enlace, guardarlo y encolar los vídeos.
 |---|---|---|
 | `ama_shop` | `ana` (moda) | **SHEIN**: el enlace del panel de afiliados de Ana, tal cual (`https://onelink.shein.com/...`) |
 | `viva_shop` | `ness` (Pisada Viva) | **Amazon**: solo el **ASIN**; la app construye el enlace con el tag de la cuenta |
+| `viva_salud` | `ness` (salud/belleza) | **Amazon** (ASIN) |
+
+`viva_shop` y `viva_salud` suman además los vídeos de **nestor2** y **mauro** (`duenos_extra`), y todas las réplicas virales ya montadas de sus dueños.
 
 `cuentas_multiplataforma()` da la lista viva (slug, dueño, tag, ritmo, horas).
 

@@ -245,7 +245,7 @@ def auto_encolar_todas(*, ahora: float | None = None, cada_s: int = 3600, log=la
     # una sola pasada por la cola (de_cuenta la lee entera en cada llamada)
     ya = {p.carrusel_id for p in publicaciones_repo.todas(limite=10**6) if p.tipo == TIPO}
     out: dict = {"encolados": [], "sin_enlace": [], "errores": []}
-    for dueno in sorted({c.dueno for c in activas.values() if c.dueno}):
+    for dueno in sorted({u for c in activas.values() for u in c.duenos()}):
         for f in servicio.lista(dueno, TIPO, limite=0):  # todas, no solo las 50 últimas
             if f["id"] in ya or not f.get("diapositivas") or f.get("hechas", 0) < f["diapositivas"]:
                 continue

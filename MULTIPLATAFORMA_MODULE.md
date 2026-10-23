@@ -193,7 +193,13 @@ symlinks ni `..`— bajo la raíz Multiplataforma, la del Programa 4
 Los gestiona SOLO el agente por MCP (guía
 [`src/agente_mcp/guias/multiplataforma.md`](src/agente_mcp/guias/multiplataforma.md)):
 no hay pantalla en la app. La cuenta necesita `dueno` (usuario cuyas tandas se
-resuben: `ama_shop`→ana, `viva_shop`→ness).
+resuben: `ama_shop`→ana, `viva_shop`→ness) y puede sumar `duenos_extra`
+(`viva_shop`/`viva_salud` → nestor2, mauro): sus filas llevan el usuario
+delante del id (`nestor2::pov|…`) para sacar la foto. Entran también las
+réplicas virales ya montadas (`fuentes.replicas_video`, ids `rv|…`).
+Desde la terminal del VPS: `scripts/multiplataforma_enlaces.py`
+(`pendientes` · `carruseles` · `guardar` · `encolar`, dentro del contenedor),
+pensado para el agente diario que busca los enlaces.
 
 - `GET /cuentas/{slug}/productos?sin_enlace=1` — productos agrupados por
   `producto_key` (vídeos, subidos a TikTok, en cola, estado del enlace).

@@ -84,18 +84,37 @@ def cuenta_o_error(slug: str) -> CuentaDestino:
 
 
 def filas(dueno: str) -> list[dict]:
-    """Vídeos montados del dueño (POV + Largo, Multimodo, Aleatorios), sin
-    los que ha quitado de Mis tandas."""
+    """Vídeos montados del dueño (POV + Largo, Multimodo, Aleatorios y réplicas
+    virales ya montadas), sin los que ha quitado de Mis tandas."""
     from src.mis_tandas import fuentes
 
     pov, mm, alea = fuentes.todas(dueno)
+    try:
+        rv = fuentes.replicas_video(dueno)
+    except Exception:  # noqa: BLE001 — sin réplicas, el resto sigue
+        rv = []
     try:
         from src.mis_tandas import servicio
 
         fuera = servicio.ocultos(dueno)
     except Exception:  # noqa: BLE001 — sin la lista de ocultos, salen todos
         fuera = set()
-    return [f for f in pov + mm + alea if f.get("video_path") and f["id"] not in fuera]
+    return [f for f in pov + mm + alea + rv if f.get("video_path") and f["id"] not in fuera]
+
+
+SEP_DUENO = "::"
+
+
+def filas_cuenta(c: CuentaDestino) -> list[dict]:
+    """Las filas de TODOS los dueños de la cuenta. Las de un dueño extra llevan
+    el usuario delante del id (`nestor2::pov|…`) para sacar luego su foto."""
+    out = []
+    for u in c.duenos():
+        for f in filas(u):
+            if u != c.dueno:
+                f = {**f, "id": f"{u}{SEP_DUENO}{f['id']}"}
+            out.append(f)
+    return out
 
 
 def _cola_por_producto(slug: str) -> dict[str, list[Publicacion]]:
@@ -125,7 +144,7 @@ def productos(slug: str, *, sin_enlace: bool = False) -> dict:
     guardados = enlaces_repo.todos(slug)
     cola = _cola_por_producto(slug)
     grupos: dict[str, dict] = {}
-    for f in filas(c.dueno):
+    for f in filas_cuenta(c):
         k = producto_key(f)
         g = grupos.get(k)
         if g is None:
@@ -204,7 +223,7 @@ def guardar_enlace(slug: str, producto_key_: str, *, shein: str = "", asin: str 
     if precio:
         datos["precio"] = str(precio).strip()[:20]
     # Título y fila de Mis tandas, si el producto está ahí (para /links).
-    for f in filas(c.dueno):
+    for f in filas_cuenta(c):
         if producto_key(f) == producto_key_:
             datos.setdefault("titulo", f.get("titulo") or "")
             datos["tienda"] = f.get("tienda", "")
@@ -238,7 +257,7 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
                                                                    "fuera_temporada": 0}}
     mes = time.localtime(ahora).tm_mon
     candidatas = []
-    for f in filas(c.dueno):
+    for f in filas_cuenta(c):
         if f["video_path"] in ya:
             informe["omitidas"]["ya_encolados"] += 1
             continue
@@ -528,6 +547,7 @@ def foto_interna(c: CuentaDestino, fila_id: str, ancho: int = 400) -> Path:
     from src.mis_tandas import servicio
 
     try:
-        return servicio.foto(c.dueno, fila_id, ancho)
+        usuario, _, id_ = fila_id.rpartition(SEP_DUENO)
+        return servicio.foto(usuario or c.dueno, id_, ancho)
     except servicio.ErrorTanda as err:
         raise ErrorTandas(str(err), status=err.status) from err
