@@ -92,6 +92,22 @@ TEMPORADAS: dict[str, tuple[int, ...]] = {
     "invierno": (10, 11, 12, 1, 2, 3),
     "navidad": (11, 12),
 }
+# Prioridad de la cola de producto (Q4 2026): lo de la época que se acaba
+# antes, primero. La época sale de Mis tandas (`mis_tandas:epoca:<usuario>`).
+# Fuera de su ventana (día-mes, inclusive) un vídeo va al final de la cola.
+PRIORIDAD_REPLICA = 0  # réplicas virales recién montadas: cuanto antes
+PRIORIDAD_EPOCA: dict[str, int] = {"halloween": 1, "black_friday": 2, "navidad": 3,
+                                   "otono": 4, "invierno": 4, "neutro": 5}
+VENTANA_EPOCA: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
+    "halloween": ((1, 10), (31, 10)),
+    "black_friday": ((15, 10), (1, 12)),
+    "navidad": ((15, 10), (6, 1)),
+    "otono": ((15, 9), (20, 12)),
+    "invierno": ((15, 11), (28, 2)),
+}
+PRIORIDAD_FUERA = 9
+# Semáforo de Mis tandas: lo 🟢 antes que lo no revisado y que lo 🟡; lo 🔴 no se encola.
+PRIORIDAD_SEMAFORO: dict[str, int] = {"verde": 0, "": 1, "ambar": 2}
 HASHTAGS_DEFECTO = ["hogar", "casa", "ideasparacasa"]
 # Si el título no encaja en ninguna fila, cada cuenta cae en los suyos (viva_salud
 # no puede salir con #hogar). Las que no estén aquí usan HASHTAGS_DEFECTO.

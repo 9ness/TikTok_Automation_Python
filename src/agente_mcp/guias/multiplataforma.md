@@ -18,6 +18,8 @@ encontrar ese enlace, guardarlo y encolar los vídeos.
 
 `viva_shop` y `viva_salud` suman además los vídeos de **nestor2** y **mauro** (`duenos_extra`), y todas las réplicas virales ya montadas de sus dueños.
 
+**Orden por época** (`priorizar_epocas` en la cuenta): el tick, una vez por hora, rehace la cola (`tandas.replanificar`) sin huecos y con el ritmo y las horas de la cuenta. Producto va por prioridad: réplicas virales → Halloween → Black Friday → Navidad → otoño/invierno → neutro (época de Mis tandas), y dentro, semáforo verde antes que sin revisar y ámbar. Fuera de su ventana (`config.VENTANA_EPOCA`) una época no se encola y lo ya encolado pasa al final. Rojo nunca se encola. Los mudos «Solo Meta» de Ana entran revisados aunque no estén en TikTok. No toca lo ya empezado ni lo que sale en menos de 45 min.
+
 `cuentas_multiplataforma()` da la lista viva (slug, dueño, tag, ritmo, horas).
 
 ## Reglas que no se saltan

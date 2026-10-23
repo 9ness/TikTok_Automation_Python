@@ -41,6 +41,11 @@ def main() -> int:
         informe["ingesta"] = ingesta.ingestar_todas(log=print)
         # vídeos de producto recién subidos a TikTok con enlace → a la cola
         informe["auto_tandas"] = tandas.auto_encolar_todas(log=print)
+        # cola sin huecos y por época (Halloween, Black Friday, Navidad…) en las cuentas con priorizar_epocas
+        try:
+            informe["replanificar"] = tandas.replanificar_todas(log=print)
+        except Exception as e:  # noqa: BLE001 — no parar la publicación por esto
+            informe["replanificar"] = [{"error": str(e)}]
         # carruseles terminados en «Replicar carrusel» → a la cuenta de su nicho
         try:
             informe["auto_carruseles"] = carruseles.auto_encolar_todas(log=print)

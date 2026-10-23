@@ -351,3 +351,59 @@ def test_duenos_extra_suman_sus_videos_y_su_foto(drive, monkeypatch):
     tandas.foto_interna(c, prods["Taladro"]["fila_id"])
     tandas.foto_interna(c, prods["Lámpara"]["fila_id"])
     assert pedidas == [("nestor2", "largo|inv|C1|2|"), ("ness", "largo|inv|C1|1|")]
+
+
+def test_prioridad_por_epoca_y_replica():
+    hoy = dt.date(2026, 10, 23)
+    rv = {"nicho": "rv", "epoca": "neutro"}
+    hall = {"nicho": "largo", "epoca": "halloween", "semaforo": "verde"}
+    bf = {"nicho": "largo", "epoca": "black_friday"}
+    neutro = {"nicho": "largo", "epoca": "neutro", "semaforo": "verde"}
+    orden = sorted([neutro, bf, hall, rv], key=lambda f: tandas.prioridad(f, hoy))
+    assert orden == [rv, hall, bf, neutro]
+    # pasado Halloween, sus vídeos se van al final
+    assert tandas.prioridad(hall, dt.date(2026, 11, 5))[0] == config.PRIORIDAD_FUERA
+    # la navidad cruza el año
+    assert tandas.en_ventana("navidad", dt.date(2027, 1, 3))
+    assert not tandas.en_ventana("navidad", dt.date(2027, 3, 1))
+
+
+def test_encolar_salta_rojo_y_admite_solo_meta(filas, drive, cuenta, monkeypatch):
+    from src.mis_tandas import servicio
+
+    filas += [_fila(drive, "largo|inv|C1|1|", "Vestido verde"),
+              _fila(drive, "largo|inv|C1|2|", "Bolso negro", uploaded=False),
+              _fila(drive, "largo|inv|C1|3|", "Falda roja")]
+    monkeypatch.setattr(servicio, "semaforos", lambda u: {"largo|inv|C1|2|": "verde", "largo|inv|C1|3|": "rojo"})
+    monkeypatch.setattr(servicio, "_semaforo_vigente", lambda s, f: {"color": s} if s else None)
+    monkeypatch.setattr(servicio, "habla", lambda f: False)
+    for f in tandas.productos("ama_shop")["productos"]:
+        tandas.guardar_enlace("ama_shop", f["producto_key"], shein=SHEIN)
+    inf = tandas.encolar("ama_shop", ahora=AHORA)
+    titulos = {p["titulo"] for p in inf["encoladas"]}
+    assert titulos == {"Vestido verde", "Bolso negro"}  # el mudo sin subir pero revisado entra
+    assert inf["omitidas"]["rojo"] == 1
+
+
+def test_replanificar_quita_huecos_y_ordena_por_epoca(filas, drive, cuenta, monkeypatch):
+    from src.mis_tandas import servicio
+
+    filas += [_fila(drive, "largo|inv|C1|1|", "Manta neutra"),
+              _fila(drive, "largo|inv|C1|2|", "Disfraz bruja"),
+              _fila(drive, "rv|abc", "Réplica viral", nicho="rv")]
+    monkeypatch.setattr(servicio, "epocas", lambda u: {"largo|inv|C1|2|": "halloween"})
+    cuentas_repo.guardar(CuentaDestino(slug="ama_shop", nombre="Ama Shop", dueno="ana",
+                                       ritmo={"producto": 1}, horas={"producto": ["20:30"]}))
+    lejos = AHORA + 20 * 86400
+    for i, f in enumerate(filas):  # encoladas a 20 días vista y en el peor orden
+        publicaciones_repo.encolar(Publicacion(cuenta="ama_shop", video_path=f["video_path"], tipo="producto",
+                                               producto_ref=f["titulo"], plataformas=["instagram"],
+                                               programada_en=lejos + i * 86400, origen="tandas"))
+    inf = tandas.replanificar("ama_shop", ahora=AHORA)
+    assert inf["movidas"] == 3
+    cola = sorted((p for p in publicaciones_repo.de_cuenta("ama_shop")), key=lambda p: p.programada_en)
+    assert [p.producto_ref for p in cola] == ["Réplica viral", "Disfraz bruja", "Manta neutra"]
+    primero = dt.datetime.fromtimestamp(cola[0].programada_en, TZ)
+    assert primero.date() == dt.date(2026, 10, 8) and primero.hour in (20, 21)
+    # idempotente
+    assert tandas.replanificar("ama_shop", ahora=AHORA)["movidas"] == 0

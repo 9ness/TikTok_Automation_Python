@@ -201,6 +201,8 @@ Desde la terminal del VPS: `scripts/multiplataforma_enlaces.py`
 (`pendientes` · `carruseles` · `guardar` · `encolar`, dentro del contenedor),
 pensado para el agente diario que busca los enlaces.
 
+**Orden por época** (`priorizar_epocas` en la cuenta): el tick, una vez por hora, rehace la cola (`tandas.replanificar`) sin huecos y con el ritmo y las horas de la cuenta. Producto va por prioridad: réplicas virales → Halloween → Black Friday → Navidad → otoño/invierno → neutro (época de Mis tandas), y dentro, semáforo verde antes que sin revisar y ámbar. Fuera de su ventana (`config.VENTANA_EPOCA`) una época no se encola y lo ya encolado pasa al final. Rojo nunca se encola. Los mudos «Solo Meta» de Ana entran revisados aunque no estén en TikTok. No toca lo ya empezado ni lo que sale en menos de 45 min.
+
 - `GET /cuentas/{slug}/productos?sin_enlace=1` — productos agrupados por
   `producto_key` (vídeos, subidos a TikTok, en cola, estado del enlace).
 - `GET /cuentas/{slug}/productos/{producto_key}/foto` (con auth).

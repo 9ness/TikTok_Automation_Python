@@ -21,10 +21,13 @@ título (textos sin extraer) cae al sitio en el catálogo.
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
+import json
 import logging
 import time
 import unicodedata
+import zoneinfo
 from pathlib import Path
 
 from src.multiplataforma import config
@@ -93,13 +96,28 @@ def filas(dueno: str) -> list[dict]:
         rv = fuentes.replicas_video(dueno)
     except Exception:  # noqa: BLE001 — sin réplicas, el resto sigue
         rv = []
-    try:
-        from src.mis_tandas import servicio
+    from src.mis_tandas import servicio
 
+    try:
         fuera = servicio.ocultos(dueno)
     except Exception:  # noqa: BLE001 — sin la lista de ocultos, salen todos
         fuera = set()
-    return [f for f in pov + mm + alea + rv if f.get("video_path") and f["id"] not in fuera]
+    try:
+        epo, sem = servicio.epocas(dueno), servicio.semaforos(dueno)
+    except Exception:  # noqa: BLE001 — sin época ni semáforo: neutro y sin revisar
+        epo, sem = {}, {}
+    from src.mis_tandas import config as tandas_config
+
+    out = []
+    for f in pov + mm + alea + rv:
+        if not f.get("video_path") or f["id"] in fuera:
+            continue
+        f["epoca"] = epo.get(f["id"]) or servicio._epoca_defecto(f)
+        f["semaforo"] = (servicio._semaforo_vigente(sem.get(f["id"]), f) or {}).get("color", "")
+        # Cuentas que en TikTok solo suben hablados: sus mudos van solo a Meta.
+        f["solo_meta"] = dueno in tandas_config.SOLO_HABLADOS and not servicio.habla(f)
+        out.append(f)
+    return out
 
 
 SEP_DUENO = "::"
@@ -254,15 +272,23 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
 
     informe: dict = {"cuenta": slug, "encoladas": [], "omitidas": {"sin_enlace": 0, "no_subidos": 0,
                                                                    "ya_encolados": 0, "ruta_no_valida": 0,
-                                                                   "fuera_temporada": 0}}
+                                                                   "fuera_temporada": 0, "rojo": 0}}
     mes = time.localtime(ahora).tm_mon
     candidatas = []
     for f in filas_cuenta(c):
         if f["video_path"] in ya:
             informe["omitidas"]["ya_encolados"] += 1
             continue
-        if not incluir_no_subidos and not f.get("uploaded"):
+        if f.get("semaforo") == "rojo":
+            informe["omitidas"]["rojo"] += 1
+            continue
+        # Los mudos de «Solo Meta» no se suben a TikTok: basta con que estén revisados.
+        meta_ok = f.get("solo_meta") and f.get("semaforo") in ("verde", "ambar")
+        if not incluir_no_subidos and not f.get("uploaded") and not meta_ok:
             informe["omitidas"]["no_subidos"] += 1
+            continue
+        if prioridad(f, dt.datetime.fromtimestamp(ahora, _zona()).date())[0] == config.PRIORIDAD_FUERA:
+            informe["omitidas"]["fuera_temporada"] += 1
             continue
         k = producto_key(f)
         e = guardados.get(k) or {}
@@ -277,7 +303,9 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
             informe["omitidas"]["ruta_no_valida"] += 1
             continue
         candidatas.append((f, k, e))
-    candidatas.sort(key=lambda t: (float(t[0].get("uploaded_at") or 0) or float(t[0].get("video_listo_at") or 0)))
+    hoy = dt.datetime.fromtimestamp(ahora, _zona()).date()
+    candidatas.sort(key=lambda t: (prioridad(t[0], hoy),
+                                   float(t[0].get("uploaded_at") or 0) or float(t[0].get("video_listo_at") or 0)))
     if limite > 0:
         candidatas = candidatas[:limite]
 
@@ -306,6 +334,109 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
                                      "musica": f"{mus['estilo']}/{mus['pista']}" if mus else ""})
     informe["total"] = len(informe["encoladas"])
     return informe
+
+
+# ---------------------------------------------------------------------------
+# Prioridad por época y replanificación de la cola
+# ---------------------------------------------------------------------------
+def _zona() -> zoneinfo.ZoneInfo:
+    return zoneinfo.ZoneInfo(config.ZONA_HORARIA)
+
+
+def en_ventana(epoca: str, hoy: dt.date) -> bool:
+    v = config.VENTANA_EPOCA.get(epoca)
+    if not v:
+        return True
+    (d1, m1), (d2, m2) = v
+    a, b, x = (m1, d1), (m2, d2), (hoy.month, hoy.day)
+    return a <= x <= b if a <= b else (x >= a or x <= b)
+
+
+def prioridad(f: dict, hoy: dt.date) -> tuple[int, int]:
+    """(época, semáforo): menor sale antes. Réplicas virales primero; luego la
+    época que se acaba antes; fuera de su ventana, al final."""
+    sem = config.PRIORIDAD_SEMAFORO.get(f.get("semaforo") or "", 1)
+    if f.get("nicho") == "rv":
+        return config.PRIORIDAD_REPLICA, sem
+    ep = f.get("epoca") or "neutro"
+    if not en_ventana(ep, hoy):
+        return config.PRIORIDAD_FUERA, sem
+    return config.PRIORIDAD_EPOCA.get(ep, config.PRIORIDAD_EPOCA["neutro"]), sem
+
+
+def _original(path: str) -> str:
+    """La copia con música guarda al lado un .json con el vídeo original."""
+    try:
+        meta = Path(path).with_suffix(".json")
+        if meta.is_file():
+            return str(json.loads(meta.read_text("utf-8")).get("original") or "")
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
+def _empezada(p: Publicacion) -> bool:
+    return any(p.estado.get(pl) == config.ESTADO_PUBLICADO
+               or ((p.resultados.get(pl) or {}) and not (p.resultados.get(pl) or {}).get("dry_run"))
+               for pl in p.plataformas)
+
+
+def replanificar(slug: str, *, ahora: float | None = None, margen_s: int = 2700) -> dict:
+    """Vuelve a repartir la cola de la cuenta desde ahora, sin huecos, con su
+    ritmo y sus horas. En `producto`, por prioridad (`prioridad`); en el resto,
+    en el orden que ya tenían. No toca lo que ya ha empezado a publicarse ni lo
+    que sale en los próximos `margen_s` (el tick puede estar con ello)."""
+    c = cuenta_o_error(slug)
+    ahora = time.time() if ahora is None else ahora
+    hoy = dt.datetime.fromtimestamp(ahora, _zona()).date()
+    info: dict[str, dict] = {}
+    if c.dueno:
+        info = {f["video_path"]: f for f in filas_cuenta(c)}
+    pendientes = [p for p in publicaciones_repo.de_cuenta(slug) if not p.terminada and not _empezada(p)]
+    out: dict = {"cuenta": slug, "movidas": 0}
+    for tipo in config.TIPOS:
+        pubs = [p for p in pendientes if p.tipo == tipo]
+        if not pubs:
+            continue
+        fijas = [p for p in pubs if p.programada_en <= ahora + margen_s]
+        mover = [p for p in pubs if p.programada_en > ahora + margen_s]
+        if tipo == TIPO:
+            mover.sort(key=lambda p: (prioridad(info.get(p.video_path) or info.get(_original(p.video_path)) or {}, hoy),
+                                      p.programada_en))
+        else:
+            mover.sort(key=lambda p: p.programada_en)
+        ritmo = int((c.ritmo or {}).get(tipo, config.RITMO_DEFAULT.get(tipo, 1))) or 1
+        horas = (c.horas or {}).get(tipo) or config.HORAS_DEFAULT.get(tipo, ["12:00"])
+        reloj = ingesta.huecos(ritmo, horas, max([ahora] + [p.programada_en for p in fijas]), semilla=slug)
+        for p in mover:
+            t = next(reloj)
+            if abs(t - p.programada_en) > 1:
+                p.programada_en = t
+                publicaciones_repo.guardar(p)
+                out["movidas"] += 1
+        out[tipo] = len(pubs)
+    return out
+
+
+def replanificar_todas(*, ahora: float | None = None, cada_s: int = 3600, log=lambda _: None) -> list[dict]:
+    """Lo llama el tick: como mucho una vez por hora, solo cuentas con `priorizar_epocas`."""
+    ahora = time.time() if ahora is None else ahora
+    r = redis_base.get_redis()
+    if ahora - float((r.get_json("replanificar") or {}).get("at") or 0) < cada_s:
+        return [{"motivo": "reciente"}]
+    r.set_json("replanificar", {"at": ahora})
+    out = []
+    for c in cuentas_repo.listar():
+        if not (c.activa and c.priorizar_epocas):
+            continue
+        try:
+            inf = replanificar(c.slug, ahora=ahora)
+        except Exception as e:  # noqa: BLE001 — una cuenta rota no para el tick
+            inf = {"cuenta": c.slug, "error": str(e)}
+        if inf.get("movidas") or inf.get("error"):
+            log(f"[replanificar] {c.slug}: {inf.get('movidas', 0)} movidas {inf.get('error', '')}")
+        out.append(inf)
+    return out
 
 
 def _hashtags(titulo: str, enlace: str, slug: str = "") -> list[str]:
