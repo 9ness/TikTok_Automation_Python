@@ -131,6 +131,15 @@ publican con `services/carruseles.py:encolar(slug, carrusel_id, asin|shein, capt
   `sin_enlace` del tick.log y entran en cuanto se guarde el enlace. IG no
   deja programar por API: lo «programado» es la hora a la que el tick publica.
 
+## Agente diario de enlaces (23/10/2026)
+
+`~/multiplataforma/clasificar.sh` (cron 07:07 UTC, log `clasificar.log`, informe
+`clasificar_informe.md`): `claude -p` en modo `dontAsk` con lista blanca (script
+`scripts/multiplataforma_enlaces.py`, Chrome del VPS, su informe). Busca ASIN /
+enlace SHEIN de `pendientes` y `carruseles`, `guardar` y `encolar`; el tick
+reordena por época. Las tres cuentas tienen `priorizar_epocas` y `auto_tandas=7`;
+Viva Shop/Salud con `duenos_extra=[nestor2, mauro]`.
+
 ## Reglas del tick
 
 - Coge las publicaciones con `programada_en <= ahora` (orden ascendente), hasta `limite`.
