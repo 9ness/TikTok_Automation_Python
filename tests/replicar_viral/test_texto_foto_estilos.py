@@ -56,3 +56,11 @@ def test_espacios_duros_separan_dos_etiquetas():
     font = ImageFont.truetype(texto_foto._font_path("TikTokSans-Medium.ttf"), 40)
     lineas = texto_foto._repartir("Mi   mamá" + " " * 8 + "Yo", font, 2000, 40, 4)
     assert lineas == ["Mi mamá" + " " * 8 + "Yo"]
+
+
+def test_espacios_duros_al_borde_de_linea_desplazan_la_etiqueta():
+    """Relleno con U+00A0 al final/principio: una etiqueta a la izquierda y otra a la derecha."""
+    from PIL import ImageFont
+    font = ImageFont.truetype(texto_foto._font_path("TikTokSans-Medium.ttf"), 40)
+    n = "\u00a0" * 6
+    assert texto_foto._repartir("Hola" + n + "\n" + n + "Adiós", font, 2000, 40, 4) == ["Hola" + n, n + "Adiós"]

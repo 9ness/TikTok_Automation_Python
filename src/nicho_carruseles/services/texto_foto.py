@@ -126,7 +126,7 @@ def _repartir(texto: str, font: ImageFont.FreeTypeFont, max_w: float,
             continue
         actual = ""
         for palabra in bloque.split(" "):
-            prueba = f"{actual} {palabra}".strip()
+            prueba = f"{actual} {palabra}".strip(" ")
             if _seg_width(_split_runs(prueba), font, d0, emoji_size, gap) <= max_w or not actual:
                 actual = prueba
             else:
@@ -162,7 +162,7 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
     versiones con texto viven en su propia carpeta (`config.SUBCARPETAS`). Si se
     quemara encima, cambiar el mensaje dejaría los dos textos superpuestos.
     """
-    texto = (texto or "").strip()
+    texto = (texto or "").strip(" \n\t")
     if not texto:
         raise ValueError("no hay texto que escribir en la foto")
     est = ESTILOS[estilo_valido(estilo)]
