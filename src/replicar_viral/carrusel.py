@@ -468,7 +468,7 @@ def cambiar_texto(usuario: str, id_: str, n: int, texto: str) -> dict:
     usuario = usuario or "ness"
     doc = ver(usuario, id_)
     d = _diapo(doc, n)
-    d["texto"] = sin_cupones_afirmados((texto or "").strip())
+    d["texto"] = sin_cupones_afirmados((texto or "").strip(" \n\t\r"))
     servicio.guardar(doc, indexar=False)
     _quemar(usuario, id_, n, d["texto"], doc)
     return con_estado(doc)
