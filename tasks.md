@@ -106,6 +106,7 @@ Notas: [`docs/clases/2026-10-07_clase_miercoles.md`](docs/clases/2026-10-07_clas
 
 Notas de la clase: [`docs/clases/2026-09-30_clase_miercoles.md`](docs/clases/2026-09-30_clase_miercoles.md).
 - [ ] Social1 Pro: prueba de 7 días desde el 2 oct, renovación YA cancelada por el operador (acceso hasta el 9 oct). Social1 bloquea el Chrome del VPS (Vercel «Code 11»): la búsqueda la hace el operador desde el móvil y pasa enlaces.
+  - 23/10: el Chrome del VPS (IP residencial ES) ya abre Social1, pero SIN sesión: solo España «Today», puestos 61-75; periodo, categorías y demás páginas piden email. 👤 Néstor crea cuenta nueva (prueba) para buscar réplicas de AmaShop. El enlace de TikTok de cada tarjeta sale del botón «abrir» (pestaña nueva).
 - [ ] Con los enlaces: virales de ES/EE. UU. SIN persona hablando a cámara (mudos o voz en off), con carrito activo, casados con productos NUESTROS del mismo estilo (lo que se vea en los clips tiene que ser el producto enlazado). Formato: 2 clips mudos de 8 s (GenAI Pro / Magnific) + voz Fish. TikTok bloquea la descarga desde la IP del VPS (yt-dlp); probar Lovetik.
 - [ ] Si sale bien: estilo «Replicar viral» en el POV BOF Largo (Gemini analiza el vídeo → plan de escenas + guion adaptado → prompts de los 2 clips + guion para Fish).
 - [ ] Carruseles virales (ej. lámpara de olas de @alexdeals_, refs en `TIKTOK_SHOP_AI_PRO/_clases/referencias/` del Drive): solo en cuentas fuera de estado crítico de CRH (@pisadaviva ~120 el 19/09), pocos al día.
