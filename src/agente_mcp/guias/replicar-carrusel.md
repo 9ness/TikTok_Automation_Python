@@ -55,7 +55,9 @@ Si `apto` es `false`, díselo al operador y no sigas sin su «sí».
 Revisa los textos: sin promesas de salud ni resultados, nada que no diga la
 ficha, y **cupones nunca afirmados** («revisa si tienes cupones», jamás «tu
 cupón»). Si hay que corregir uno: `descargar_carrusel(id, texto_n=N, texto=…)`.
-El caption se cambia con `descargar_carrusel(id, caption=…)` (Néstor, 20/10: **solo el nombre del producto**); también rehace el de sus publicaciones de Meta que sigan en cola (`meta_actualizadas`).
+El caption se cambia con `descargar_carrusel(id, caption=…)`; también rehace el de sus publicaciones de Meta que sigan en cola (`meta_actualizadas`).
+**Caption (Néstor, 23/10 — el de los carruseles que mejor salieron):** UNA o dos frases en primera persona o de gancho, en el tono del viral, que nombran el producto (marca + qué es + qué incluye) y cierran con «Lo tienes en el carrito naranja 🧡» y/o «Revisa si tienes cupones». Sin precios, cifras, stock ni urgencia. Ej.: «Pack rutina de Maybelline con máscara, corrector y labial. Revisa si tienes cupones disponibles 🧡» · «Convierte tu dormitorio en un cielo de estrellas antes de dormir 🌌 Lo tienes en el carrito naranja.»
+**Textos de las diapositivas:** los del viral, CASI literales (mismo gancho, mismos emojis, mismos cortes de línea), quitando precios, «menos de X €», «queda poco stock», «corre que vuelan» y lo que la ficha no diga (cambia «temas» por «discos» si la ficha dice discos).
 
 ## 3. Generar (en la WEB, nunca por API)
 
@@ -88,7 +90,7 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
 - `tiktok_sans` — letra blanca, contorno fino y sombra, SIN caja. El texto
   clásico de TikTok sobre la foto.
 - `tiktok_medio` — la misma, más fina (medium): la de los textos normales de
-  TikTok, pequeños y sin negrita. Suele ir con `texto_tam` 0.5.
+  TikTok, pequeños y sin negrita. Medido en los virales: `texto_tam` 0.75 (texto pequeño a media altura) a 0.95 (gancho arriba).
 - `tiktok_amarillo` — la letra de TikTok en amarillo con contorno oscuro
   (el texto amarillo de muchos virales de hogar y regalos).
 - `fondo_negro` — blanca sobre caja negra opaca, líneas unidas en una sola forma
@@ -100,6 +102,12 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
 - `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
 **Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan. Si el viral MEZCLA letras (barra de Snapchat en la 1ª y texto normal en la 2ª), pon primero el estilo general y luego el de esa diapositiva con `estilo_n`; compara TODAS, no solo la 1ª. Fíjate también en los cortes de línea del viral y cópialos con `\n` en el texto.
 Los tres `fondo_*` salen ya a ~0.78 del tamaño base; afina con `texto_tam`.
+**Cómo se clava (lo que funcionó, 23/10):**
+- Compara SIEMPRE el carrusel entero: fila de arriba el viral, abajo el nuestro ya quemado (baja el ZIP y monta la hoja). Ajusta hasta que, de un vistazo, no se distingan letra, tamaño, altura y cortes.
+- Altura y tamaño **por diapositiva** si el viral los cambia (gancho arriba en la 1ª, texto a media altura en las demás): estilo general con `descargar_carrusel(id, estilo_texto, texto_y, texto_tam)` y luego cada una con `estilo_n=N` + `texto_y` + `texto_tam`.
+- **Dos textos en la misma diapositiva** (uno arriba y otro abajo, típico del CTA final): un solo texto con líneas vacías en medio (líneas con un espacio duro U+00A0); sube o baja el número de líneas hasta que cada bloque quede a la altura del viral.
+- Valores que salieron bien: proyector (texto pequeño medio) `tiktok_medio` 0.75 a y≈0.4-0.6; boxeo (gancho arriba) `tiktok_medio` 0.95 a y≈0.17; maquillaje `fondo_rosa` 0.9 a y≈0.8; proteína/belleza `tiktok_sans` 0.7-0.95.
+- **Consistencia antes que texto:** todas las diapositivas con la foto del producto como referencia y el producto IDÉNTICO a la ficha (forma, piezas, cómo se conecta: si va directo al enchufe por USB, nada de base ni cable aparte). Si una sale distinta, se REGENERA esa diapositiva añadiendo al prompt la descripción exacta de la pieza que falló; Nano Banana en Flow es ilimitado, no se aprueba nada «casi igual».
 **Que se lea siempre**: comprueba la hoja final; si el texto pisa algo claro y
 se pierde, cambia `texto_y` o usa `pildora`/`pildora_negra`. Nunca letra oscura
 suelta sobre la foto.
@@ -119,6 +127,7 @@ suelta sobre la foto.
    - `musica.tiktok` — la canción del viral (`titulo`, `autor`, `enlace` al
      sonido). Es la que se pone en TikTok, a mano, al publicar. Casi siempre es
      un «original sound» de una cuenta de edits: **solo vale en TikTok**.
+     La app la adjunta SOLA al crear la réplica (la del viral, original o canción con nombre): no hay que buscarla; usa siempre esa al publicar en TikTok.
    - `musica.meta` — para Instagram/Facebook/Threads: una pista Mixkit sin
      copyright del banco de Multiplataforma (`estilo`, `pista`, `fichero`
      relativo a `Multiplataforma/`, `url`). Fija por carrusel: úsala tal cual,
