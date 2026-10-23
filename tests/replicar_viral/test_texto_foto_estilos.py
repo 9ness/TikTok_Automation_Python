@@ -48,3 +48,11 @@ def test_tam_cambia_el_texto_y_se_valida(foto, tmp_path):
             texto_foto.quemar(foto, "Hola", tmp_path / "m.jpg", tam_rel=malo)
     assert texto_foto.tam_valido(None) is None
     assert texto_foto.tam_valido(1.0) == 1.0
+
+
+def test_espacios_duros_separan_dos_etiquetas():
+    """«Mi mamá      Yo»: los espacios normales se juntan, los duros no."""
+    from PIL import ImageFont
+    font = ImageFont.truetype(texto_foto._font_path("TikTokSans-Medium.ttf"), 40)
+    lineas = texto_foto._repartir("Mi   mamá" + " " * 8 + "Yo", font, 2000, 40, 4)
+    assert lineas == ["Mi mamá" + " " * 8 + "Yo"]

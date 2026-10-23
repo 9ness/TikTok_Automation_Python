@@ -15,6 +15,7 @@ resuelve en décimas de segundo. Encolarlo solo añadiría la espera de un worke
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -118,7 +119,9 @@ def _repartir(texto: str, font: ImageFont.FreeTypeFont, max_w: float,
     d0 = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
     lineas: list[str] = []
     for bloque in texto.split("\n"):
-        bloque = " ".join(bloque.split())
+        # Solo se juntan los espacios normales: los duros (U+00A0) se respetan
+        # para separar dos etiquetas en la misma línea («Mi mamá      Yo»).
+        bloque = re.sub(r"[ \t\r\f\v]+", " ", bloque).strip(" ")
         if not bloque:
             continue
         actual = ""
