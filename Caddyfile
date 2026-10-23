@@ -158,6 +158,11 @@
 	}
 	# Dirección corta para la bio: `/<cuenta>` → `/links/<cuenta>`, y su
 	# política de privacidad `/<cuenta>/privacidad` (la piden Pinterest y Meta).
+	# Portada: solo la verificación del dominio en Pinterest (cuenta nueveness).
+	handle / {
+		header Content-Type "text/html; charset=utf-8"
+		respond `<!doctype html><html><head><meta name="p:domain_verify" content="1da35908609d90091916ad204581adc6"/><title>Links</title></head><body></body></html>` 200
+	}
 	@corto path_regexp corto ^/([a-z0-9_-]+)(/privacidad)?$
 	rewrite @corto /links/{re.corto.1}{re.corto.2}
 	@pagina path /links/* /_next/* /favicon.ico /icon.png /brand/*
