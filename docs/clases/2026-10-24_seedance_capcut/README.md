@@ -76,7 +76,26 @@ Se genera en **una sola toma de 15 s con Seedance 2.0 Fast**, dentro de **CapCut
 - `seedance_2_0_mini`;
 - `seedance_2_5`, hasta 30 s.
 
-Se puede hacer el mismo formato desde su web o el MCP **sin otra suscripción**. El MCP no da el precio en créditos sin lanzar el trabajo: hay que mirarlo en la web de Higgsfield antes de generar el primero. Genjutsu a 480p sale a 3 cr/s, así que un Seedance Fast de 15 s debería salir bastante más barato.
+Se puede hacer el mismo formato desde su web o el MCP **sin otra suscripción**. El MCP no da el precio; en la web el botón Generar lo enseña antes de lanzar.
+
+**Precios en Higgsfield (web «Crear vídeo», 15 s, bitrate Alta, con el descuento de octubre; entre paréntesis, el precio sin descuento), 24/10/2026:**
+
+| Modelo | 480p | 720p |
+|---|---|---|
+| Seedance 2.0 (std) | 45 (90) | 68 (90) |
+| **Seedance 2.0 Fast** (el de Jonny) | 15 (23) | **38 (53)** |
+| Seedance 2.0 Mini | 8 (15) | 15 (38) |
+
+El de 8 s en std 720p cuesta 36 cr. Fast y Mini avisan «no disponible en EE. UU.», pero el Chrome del VPS sale por IP de España y deja elegirlos.
+
+**Jonny trabaja a 720p** (se ve en los fotogramas del móvil y de la web).
+
+**Comparación:**
+
+- **Higgsfield Ultra:** unos 3.000 cr/mes que **comparte con Genjutsu**, que es lo que usamos para las réplicas virales. A 38 cr salen ≈ 79 vídeos Fast de 720p al mes, pero entonces no queda nada para Genjutsu.
+- **CapCut Ultra:** 7.483 cr/mes, y a 75 cr por vídeo son ≈ 100 vídeos, con presupuesto propio.
+
+**Conclusión:** para hacer volumen con Seedance (virales de Navidad de Casca Chollos y réplicas de Ana) compensa **CapCut Ultra**, y los créditos de Higgsfield se quedan para Genjutsu. Higgsfield Fast 720p vale para probar el formato en 1-2 vídeos antes de pagar.
 
 Además, Néstor no usa CapCut, así que el arreglo de la voz lo haría el agente:
 
@@ -99,5 +118,5 @@ Además, Néstor no usa CapCut, así que el arreglo de la voz lo haría el agent
 
 ## Pendiente (decide Néstor)
 
-1. ¿Probamos el formato con Seedance de **Higgsfield** (lo que ya pagamos) en 1 vídeo de Ana, antes de plantear CapCut Ultra?
+1. Néstor se inclina por **CapCut Ultra** (24/10). Antes de pagarlo, se puede hacer una prueba de 1 vídeo en Higgsfield Seedance 2.0 Fast 720p (38 cr).
 2. Si funciona: crear el estilo «Revelación» en Moda Mujer · Multimodo, con su MCP y su guía, igual que se hizo con los otros formatos.
