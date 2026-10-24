@@ -1192,3 +1192,5 @@
 - 2026-10-23 · Carrusel: dos etiquetas en la misma línea («Mi mamá      Yo») se juntaban porque _repartir colapsaba todo espacio → solo se colapsan los normales; con U+00A0 se respetan
 - 2026-10-23 · Flow cambió las URLs de imagen a `flow.google.com/asb/…=s512-rw` (tamaño completo con `=s0`) y las nuevas solo salen tras recargar la página → bajar con reload + md5 de la URL base; ojo, la misma imagen puede volver con otra URL (duplicados).
 - 2026-10-23 · Tras reiniciar navegador-chrome, Flow puede abrir en modo Vídeo/Omni (gasta puntos) → antes de generar comprobar Imagen + 3:4 + Nano Banana 2.1 (flow_cv.py aborta si los ajustes no cuadran)
+- 2026-10-23 · Flow (Chrome VPS): bajar un clip leyendo performance.getEntriesByType falla en cuanto el búfer de recursos se llena o el vídeo sale de caché → usar el botón Descargar › 720p: cae en /mnt/HC_Volume_106974679/navegador/descargas/
+- 2026-10-24 · Montaje ffmpeg: loudnorm + amix con música en el mismo filter_complex dejó el audio 3 s más corto que el vídeo (sin voz al final) → normalizar voz, preparar música y mezclar en pasos separados y medir la duración del audio
