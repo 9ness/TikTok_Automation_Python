@@ -1209,3 +1209,4 @@
 - 2026-10-24 · Bandeja del MCP en el mount es ~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente/<u>/ (no ~/gdrive/TIKTOK_SHOP_AI_PRO) → si no, registrar_replica_video da 404 «No está en la bandeja»
 - 2026-10-24 · Threads OAuth con la app nueva de Ana: el /me devolvía otro id (los ids de Threads van por app) y no casaba con `threads_user_id` → se casa también por el usuario de IG y se guarda el id nuevo. Y httpx en INFO dejaba en `docker logs` URLs con tokens y la clave secreta de la app → logger httpx a WARNING.
 - 2026-10-24 · GenAI Pro: mientras la tarjeta dice «Generating...», el primer <video> del DOM es de una tanda anterior (se bajó uno de 8 s/720p por error) → esperar a que desaparezca «Generating...» y coger entonces el primero (el de 1080p acaba en `_video_resolution_1080p.mp4`).
+- 2026-10-24 · Mis tandas: la época (/mis-tandas/epoca) solo vale para vídeos; con car|<id> da 400 «Vídeo desconocido» → a los carruseles solo semáforo.
