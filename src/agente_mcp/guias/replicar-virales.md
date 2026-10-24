@@ -194,7 +194,9 @@ Vídeo de 12-15 s, muy variado:
 3. **La chica probándosela frente al espejo, ~4 s en varias tomas** distintas
    (IA con la foto limpia como ingrediente: diseño, color, estampado, corte y
    largo idénticos a la foto).
-4. La música la pone Ana al publicar (en ropa no ha habido sanciones por
+4. La música la pone Ana al publicar: Mis tandas enlaza el **sonido del viral
+   original** (chip 🎵 azul de la fila `rv|`, sale solo si la réplica se
+   registró con `url_viral`; se lee de tikwm y queda en `musica.tiktok`) (en ropa no ha habido sanciones por
    producto incoherente, de momento sin «comprobar vídeo»). El semáforo en Mis
    tandas sigue siendo obligatorio.
 

@@ -643,6 +643,19 @@ export function MisTandas() {
                               <Copy className="h-2.5 w-2.5 shrink-0" />
                             </button>
                           ) : null}
+                          {v.sonido?.enlace ? (
+                            <a
+                              href={v.sonido.enlace}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Sonido del viral original${v.sonido.autor ? ` · ${v.sonido.autor}` : ""}`}
+                              className="flex min-w-0 max-w-full items-center gap-1 rounded bg-sky-500/10 px-1.5 py-1 text-left text-[10px] text-sky-300 hover:bg-sky-500/20"
+                            >
+                              <span className="shrink-0">🎵</span>
+                              <span className="min-w-0 break-words leading-tight">{v.sonido.titulo || "Sonido del viral"}</span>
+                              <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+                            </a>
+                          ) : null}
                           {v.pantalla ? (
                             <Link
                               href={v.pantalla as never}

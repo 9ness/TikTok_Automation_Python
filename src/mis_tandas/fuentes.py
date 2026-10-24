@@ -81,7 +81,7 @@ def _fila(**kw) -> dict:
         "uploaded": False, "uploaded_at": 0.0, "sin_stock": False,
         "rehacer": False, "rehacer_nota": "", "rehecho": False,
         "puede_rehacer": False, "video_path": "", "video_listo_at": 0.0,
-        "orden_at": 0.0, "flecha": False, "musica": None,
+        "orden_at": 0.0, "flecha": False, "musica": None, "sonido": None,
         "formato": "",
     }
     base.update(kw)
@@ -420,5 +420,7 @@ def replicas_video(usuario: str) -> list[dict]:
             video_listo_at=_num(d.get("video_listo_at")),
             orden_at=_num(d.get("creado_at") or d.get("video_listo_at")),
             formato=str(d.get("modo") or ""),
+            # El sonido del viral original (enlace de TikTok), como en los carruseles.
+            sonido=(d.get("musica") or {}).get("tiktok") or None,
         ))
     return filas

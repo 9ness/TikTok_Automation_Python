@@ -137,6 +137,24 @@ def ver(usuario: str, id_: str) -> dict:
     return doc
 
 
+def con_sonido(doc: dict, forzar: bool = False) -> dict:
+    """Guarda en `doc["musica"]` el sonido del viral (tikwm con `doc["url"]`),
+    para enlazarlo en Mis tandas. Sin URL o si tikwm falla, lo deja como está."""
+    if not doc.get("url") or ((doc.get("musica") or {}).get("tiktok") and not forzar):
+        return doc
+    if forzar:
+        doc.pop("musica", None)
+    try:
+        from src.replicar_viral import musica
+
+        m = musica.completa(doc)
+        if m.get("tiktok"):
+            doc["musica"] = m
+    except Exception:  # noqa: BLE001 — sin sonido, la réplica vale igual
+        pass
+    return doc
+
+
 def registrar(
     usuario: str, *, modo: str, origen: Path, titulo: str, url_viral: str = "",
     product_id: str = "", product_url: str = "", tienda: str = "", caption: str = "",
@@ -163,7 +181,11 @@ def registrar(
         if product_id or product_url:
             prod["product_id"], prod["product_url"] = product_url_de(product_id, product_url)
         if url_viral:
+            cambia = doc.get("url") != url_viral.strip()
             doc["url"] = url_viral.strip()
+            con_sonido(doc, forzar=cambia)
+        else:
+            con_sonido(doc)
         if caption:
             doc["caption"] = caption.strip()[:2200]
         if hashtags:
@@ -205,6 +227,7 @@ def registrar(
     }
     if ref:
         doc["catalogo_ref"] = ref
+    con_sonido(doc)
     servicio.guardar(doc, indexar=False)
     _indexar(usuario, id_)
     return doc

@@ -43,6 +43,8 @@ export interface VideoTanda {
   /** Primer día en que se puede publicar (carpetas especiales), o "". */
   desde: string;
   musica: { busqueda: string; alternativas: string[]; estilo: string } | null;
+  /** Sonido del viral original (réplicas `rv|`): enlace a su página en TikTok. */
+  sonido?: { titulo: string; autor: string; original: boolean; id: string; enlace: string } | null;
   /** Revisión antes de subir (de ESTE montaje); null = sin revisar. */
   semaforo?: SemaforoVideo | null;
   /** Cuándo publicarlo (TikTok y Meta). */

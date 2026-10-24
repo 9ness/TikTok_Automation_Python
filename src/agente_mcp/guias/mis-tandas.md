@@ -97,6 +97,8 @@ contador `subidos/total`. En Fotos están los **carruseles replicados**
 (`replicar-carrusel.md`) del usuario, en sus PROPIAS tandas de diez
 (`src/mis_tandas/fotos.py`): no cuentan como vídeos (cuentan para el tope
 diario de CARRUSELES).
+Las réplicas de vídeo (`rv|`) también enlazan el sonido del viral original (chip 🎵 azul → página del sonido en TikTok), campo `sonido` de la fila.
+
 Un carrusel entra en cuanto tiene una foto subida, en orden de creación, y
 cada tanda abierta lleva su día (hoy, mañana…). Cada tanda baja en un ZIP
 (una carpeta `NN_<producto>` por carrusel con las fotos y `caption.txt`; si ya
