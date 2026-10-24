@@ -1,4 +1,5 @@
 ## Pendiente
+- [ ] (Néstor decide, 24/10, curso Skool «Crea con Seedance») Probar el formato «Revelación 15 s» (ropa de varios colores) con el Seedance 2.0 Fast de Higgsfield, que ya pagamos, en 1 vídeo de Ana antes de plantear CapCut Ultra (68 €/mes). Ver [`docs/clases/2026-10-24_seedance_capcut/`](docs/clases/2026-10-24_seedance_capcut/README.md)
 - [ ] **Plan fin de octubre (21/10)**: [`docs/PLAN_FINAL_OCTUBRE.md`](docs/PLAN_FINAL_OCTUBRE.md). Hay que hacer:
   - 30 muestras «necesita contenido» con GenAI Pro, objetivo por producto de 5 IA + 1 viral (+2 físicos);
   - 13 clips Omni de sitios antes del 24/10, con las tomas de Néstor en `_clips_reales/nestor2/sitios/`;
