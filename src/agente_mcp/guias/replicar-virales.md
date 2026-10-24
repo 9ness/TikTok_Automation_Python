@@ -184,6 +184,10 @@ entra con Google por Accesos › Navegador remoto):
 
 ### Variante ropa (Ana, su catálogo «📦 Productos físicos», `productos_fisicos_ana`)
 
+> **Hasta el 31/10/2026 (Ana limitada a 1 vídeo/día, 3.ª vez):** manda el plan
+> `_agente/ana/PLAN_SUBIDAS_25-31oct.md`. Solo tomas reales (una larga por prenda, Ana NO se la prueba),
+> gancho IA de 2-3 s solo en los 3 días marcados y SIN el paso 3 (chica IA en el espejo).
+
 Vídeo de 12-15 s, muy variado:
 1. **Gancho IA en una tienda, 2-3 s**, sin la prenda: dos chicas se desmayan,
    se quedan boquiabiertas, se giran de golpe… + gancho de texto fuerte.
