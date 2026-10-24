@@ -38,6 +38,7 @@ _Escrito el 21/10. Lo que hace Néstor va con **(tú)**; el resto lo hace el age
 - **(tú)** Sube sus capturas desde su cuenta, en Subir productos › «Productos físicos» de Ana: foto limpia + ficha + URL.
 - El agente los prepara igual que los de Casca Chollos: gancho IA + sus tomas reales.
 - Ana va con cuidado: estuvo sancionada por baja calidad, así que 1-2 vídeos al día, todos en verde.
+- **24/10: 3.ª limitación, 1 vídeo/día hasta el 31/10.** Hasta entonces SOLO vídeos reales de su ropa física, sin IA. Plan día a día y qué grabar: `_agente/ana/PLAN_SUBIDAS_25-31oct.md` (Drive).
 
 ## 4. Ganchos de ropa física (cuentas de ropa)
 - **A · «Desmayo en la tienda».** Una chica se desmaya en una tienda de ropa y la otra señala las cajas o la ropa.

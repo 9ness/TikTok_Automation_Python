@@ -1,4 +1,5 @@
 ## Pendiente
+- [ ] 👤 **Ana limitada hasta el 31/10 (3.ª vez, 24/10)**: grabar 1 vídeo REAL al día de su ropa física y subirlo a `_agente/_clips_reales/ana/`; el agente lo monta. Plan: `_agente/ana/PLAN_SUBIDAS_25-31oct.md` (Drive). Nada de IA en Ana hasta entonces.
 - [ ] (Néstor decide, 24/10, curso Skool «Crea con Seedance») Probar el formato «Revelación 15 s» (ropa de varios colores) con el Seedance 2.0 Fast de Higgsfield, que ya pagamos, en 1 vídeo de Ana antes de plantear CapCut Ultra (68 €/mes). Ver [`docs/clases/2026-10-24_seedance_capcut/`](docs/clases/2026-10-24_seedance_capcut/README.md)
 - [ ] **Plan fin de octubre (21/10)**: [`docs/PLAN_FINAL_OCTUBRE.md`](docs/PLAN_FINAL_OCTUBRE.md). Hay que hacer:
   - 30 muestras «necesita contenido» con GenAI Pro, objetivo por producto de 5 IA + 1 viral (+2 físicos);
