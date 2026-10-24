@@ -97,6 +97,22 @@ El de 8 s en std 720p cuesta 36 cr. Fast y Mini avisan «no disponible en EE. UU
 
 **Conclusión:** para hacer volumen con Seedance (virales de Navidad de Casca Chollos y réplicas de Ana) compensa **CapCut Ultra**, y los créditos de Higgsfield se quedan para Genjutsu. Higgsfield Fast 720p vale para probar el formato en 1-2 vídeos antes de pagar.
 
+### Prueba real en Higgsfield (24/10/2026): réplica de un viral con dos voces
+
+- **Viral:** [@adrianaa.ams](https://www.tiktok.com/@adrianaa.ams/video/7682445449680129302), pantalón bombacho, 22 s, unas 890K vistas, con «$ Ad» en Social1 (Ropa de mujer, últimos 7 días).
+  - Es una pareja que discute: él graba y solo se le oye; ella habla a cámara.
+- **Cómo:** Seedance 2.0 Fast, 720p, 9:16, 15 s, **38 cr**, UNA generación.
+  - Referencias: la chica de Ana (`nueva_1`, hecha con IA) y la foto del pantalón **recortada sin la cara de la modelo**, porque Higgsfield obliga a certificar el consentimiento de cada cara.
+  - Prompt: el guion del viral reducido a 15 s, con los tramos de tiempo, «él fuera de cámara, solo su voz» y «sin texto ni música».
+- **Resultado:** bueno a la primera.
+  - Dice el guion entero dentro de los 15 s, y las dos voces se distinguen: él a 140-210 Hz y ella a 260-300 Hz.
+  - Mientras habla él, ella reacciona y no vocaliza. Se ve la mano de él señalando.
+  - El pantalón es fiel a la foto: cintura fruncida, puños y color.
+  - Fallos: la camiseta sale de la foto de la chica (cuello alto blanco) y no la de tirantes rosa que pedía el prompt, y pronuncia «lo pigo» en vez de «lo pillo».
+- **Si una voz sale mal:** se puede arreglar con **Fish Voice Changer**, que cambia el timbre y conserva el ritmo y los labios (guía `genjutsu-higgsfield.md` §7).
+- **Ficheros:** el vídeo y el original están en Drive, en `TIKTOK_SHOP_AI_PRO/Pruebas_Seedance/`. Prompt y referencias, en `/mnt/HC_Volume_106974679/navegador/trabajo/seedance_prueba/`.
+- **Conclusión:** un viral sencillo (una persona, un sitio, ≤ 15 s, aunque haya una segunda voz en off) se replica con Seedance en una sola toma, sin montaje de clips y más barato que Genjutsu (unos 45 cr por 15 s a 480p). Para hacer volumen, CapCut Ultra sigue saliendo mejor (ver arriba).
+
 Además, Néstor no usa CapCut, así que el arreglo de la voz lo haría el agente:
 
 - separar la voz de los efectos con un separador de pistas;
