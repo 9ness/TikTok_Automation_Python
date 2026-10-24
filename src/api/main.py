@@ -121,6 +121,9 @@ logging.basicConfig(
     format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
 )
 logger = logging.getLogger("api")
+# httpx loguea en INFO la URL entera de cada petición, y las de Meta llevan
+# tokens y la clave secreta de la app en la query: fuera de los logs.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @asynccontextmanager

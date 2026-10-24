@@ -82,6 +82,22 @@ def conectar_threads(token: str) -> dict:
             cuentas_repo.set_tokens(c.slug, {"threads": token})
             _marcar_renovado(c.slug)
             return {"cuenta": c.slug, "usuario": yo.get("username", "")}
+    # El id de Threads depende de la app: con una app nueva no casa con el
+    # guardado. Threads usa el mismo usuario que Instagram, así que se casa por él.
+    usuario = str(yo.get("username") or "").lower()
+    for c in cuentas_repo.listar():
+        if not (usuario and c.ig_user_id and c.token("instagram")):
+            continue
+        try:
+            ig = _get(f"{config.graph_base()}/{c.ig_user_id}", {"access_token": c.token("instagram"), "fields": "username"})
+        except TokenInvalido:
+            continue
+        if str(ig.get("username") or "").lower() == usuario:
+            c.threads_user_id = str(yo.get("id"))
+            cuentas_repo.guardar(c)
+            cuentas_repo.set_tokens(c.slug, {"threads": token})
+            _marcar_renovado(c.slug)
+            return {"cuenta": c.slug, "usuario": yo.get("username", "")}
     raise TokenInvalido(f"El token es de @{yo.get('username', '?')}, que no es ninguna de nuestras cuentas")
 
 
