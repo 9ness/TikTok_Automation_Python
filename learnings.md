@@ -1226,3 +1226,4 @@
 - 2026-10-25 · GenAI Pro (Veo lite) falla en rachas de 5-10 min («Generation failed, please try again», se reembolsa): los mismos clips salen bien más tarde → relanzar de 2 en 2 con 150 s de pausa, no cambiar prompt.
 - 2026-10-25 · POV BOF Largo: el estilo de guion (precio/dolor/inversa) va EN LA CLAVE del documento de producto → no cambiar el estilo del catálogo hasta haber subido todos los clips del grupo actual o quedan invisibles.
 - 2026-10-25 · Veo con producto + accesorios sueltos (baterías, gafas con LED, robot) tiende a tocarlos/encenderlos aunque el prompt lo prohíba → pedir mano baja que solo señala («never reaches the product») y revisar 7-10 fotogramas.
+- 2026-10-25 · semaforo_tanda/epoca_video del MCP con token de ness dan 404 en réplicas registradas con para=nestor2 (no tienen `para`) → ponerlos con docker exec tiktok-api y src.mis_tandas.servicio.poner_semaforo/poner_epoca('nestor2', ...)
