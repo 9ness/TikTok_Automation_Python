@@ -87,11 +87,21 @@ def comprobar(product_id: str) -> dict:
     return {"product_id": product_id, "estado": estado}
 
 
+def cerrar() -> None:
+    """Al acabar no se deja TikTok abierto: cerrarlo, ir al inicio y apagar la pantalla."""
+    _adb("shell", "am", "force-stop", PAQUETE)
+    _adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    _adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
+
+
 def main() -> None:
-    for i, pid in enumerate(sys.argv[1:]):
-        if i and i % REINICIAR_CADA == 0:
-            reiniciar_tiktok()
-        print(json.dumps(comprobar(pid), ensure_ascii=False), flush=True)
+    try:
+        for i, pid in enumerate(sys.argv[1:]):
+            if i and i % REINICIAR_CADA == 0:
+                reiniciar_tiktok()
+            print(json.dumps(comprobar(pid), ensure_ascii=False), flush=True)
+    finally:
+        cerrar()
 
 
 if __name__ == "__main__":
