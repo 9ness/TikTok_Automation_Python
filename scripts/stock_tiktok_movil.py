@@ -23,6 +23,8 @@ import time
 
 SERIAL = os.environ.get("MOVIL_ADB", "100.115.12.26:5555")
 ESPERA_S = 12
+PAQUETE = "com.zhiliaoapp.musically"
+REINICIAR_CADA = 15  # TikTok se atasca con muchas fichas seguidas
 
 
 def _adb(*args: str, timeout: int = 30) -> str:
@@ -36,7 +38,20 @@ def _textos() -> list[str]:
     return [t.strip() for t in re.findall(r'text="([^"]+)"', xml) if t.strip()]
 
 
-def comprobar(product_id: str) -> dict:
+def _colgado(textos: list[str]) -> bool:
+    foco = _adb("shell", "dumpsys", "window")
+    return "Not Responding" in foco or any("no responde" in t.lower() for t in textos)
+
+
+def reiniciar_tiktok() -> None:
+    """Forzar detención: quita la ventana de «TikTok no responde» y la memoria acumulada."""
+    _adb("shell", "am", "force-stop", PAQUETE)
+    time.sleep(2)
+    _adb("shell", "monkey", "-p", PAQUETE, "-c", "android.intent.category.LAUNCHER", "1")
+    time.sleep(10)
+
+
+def _leer(product_id: str) -> str:
     _adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
     _adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
          "-d", f"'snssdk1233://ec/pdp?product_id={product_id}'")
@@ -44,6 +59,9 @@ def comprobar(product_id: str) -> dict:
     for _ in range(3):
         time.sleep(ESPERA_S)
         textos = _textos()
+        if _colgado(textos):
+            reiniciar_tiktok()
+            return "colgado"
         if any("Comprar" in t or "agotado" in t.lower() or "disponible" in t.lower() for t in textos):
             break
     unido = " | ".join(textos).lower()
@@ -56,11 +74,23 @@ def comprobar(product_id: str) -> dict:
     else:
         estado = "desconocido"
     _adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    return estado
+
+
+def comprobar(product_id: str) -> dict:
+    """Lo que no sea agotado/en_stock se repite tras forzar la detención: con
+    TikTok atascado salen «no disponible» falsos."""
+    estado = _leer(product_id)
+    if estado not in ("agotado", "en_stock"):
+        reiniciar_tiktok()
+        estado = _leer(product_id)
     return {"product_id": product_id, "estado": estado}
 
 
 def main() -> None:
-    for pid in sys.argv[1:]:
+    for i, pid in enumerate(sys.argv[1:]):
+        if i and i % REINICIAR_CADA == 0:
+            reiniciar_tiktok()
         print(json.dumps(comprobar(pid), ensure_ascii=False), flush=True)
 
 
