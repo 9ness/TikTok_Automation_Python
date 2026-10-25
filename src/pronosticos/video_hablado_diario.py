@@ -1,11 +1,14 @@
 """Vídeo hablado diario de C1, de punta a punta y sin tocar nada a mano.
 
 Formato @analisis_yeison (oct-2026) con VARIOS partidos (3-4) en ~35 s y para
-público de México: abre con la cifra («Cinco mil es lo que nos vamos a llevar
-mañana con la Europa League», sin moneda ni apuesta) y una tarjeta blanca con
-todos los partidos; luego los cuenta uno a uno («Primero… Segundo… Y el
-último…»), cada uno con su banda de marcador, y el CTA del canal antes del
-último. Una sola foto de fondo en todo el vídeo. Horas en hora de México.
+público de México: abre con «Tres partidazos este martes con la Champions League,
+y te cuento cómo los vemos» (sin dinero desde el 25-oct: TikTok retiró un vídeo) mientras se ve una tarjeta blanca con todos los partidos (no
+se leen en voz alta). Luego cada partido es UNA frase de contexto (resumen de su
+`reason` de Redis con Gemini, sin inventar) + «Vamos con <UN pick>», con su
+banda de marcador: «Arrancamos con…», el del medio sin conector, el CTA del
+perfil y «Ya para cerrar con broche de oro, vemos que…». Así son los guiones de
+Yeison (dos vídeos de referencia, 19-oct). Voz acelerada (`VELOCIDAD_VOZ`). Una
+sola foto de fondo en todo el vídeo. Horas en hora de México.
 
 1. **Picks**: los MISMOS del carrusel de mañana (`betai:daily_bets_tiktok:YYYY-MM`,
    campo = fecha): combinadas «viral» de 2 picks del mismo partido. El vídeo
@@ -16,7 +19,7 @@ todos los partidos; luego los cuenta uno a uno («Primero… Segundo… Y el
 3. **Guion**: plantilla (sin IA, así no se inventa nada). Números en letra
    para que la voz no los lea mal.
 4. **Voz** con Fish (`VOCES`), **marcas** con Whisper (palabras
-   «primero», «también», «segundo»…, «canal», «guárdalo», buscadas
+   «primero», «también», «segundo»…, «perfil», «guárdalo», buscadas
    EN ORDEN) y **montaje** con `video_hablado.renderizar`.
 
 Salida en `--salida`: `video_hablado.mp4`, `guion.txt`, `titulo.txt`,
@@ -64,9 +67,13 @@ VOCES = {
     "esqueleto": "a335d470fff248e8890dce6550a2874b",         # 128 Hz
     "mascota_amigable": "e8c9e4c2c1e249e7807160f02ff6ccdf",  # 180 Hz
     "viejo_narrador2": "b625b5d09d834becb5ccfa0b20c9bc4a",   # 99 Hz
+    # «Adam» de la biblioteca pública: la misma que usa @analisis_yeison (huella de voz 0,86-0,88, 22-oct)
+    "adam2": "785d81f7fff943849fc0f077212f7cbd",
 }
-# Elegidas por el usuario el 14-oct-2026 (VIEJO_1 y la del primer vídeo de la mascota).
-VOZ_POR_DEFECTO = {"viejo": "viejo_anciano", "mascota": "dewey_juvenil"}
+# Elegidas por el usuario: mascota el 14-oct-2026; viejo = adam2 desde el 22-oct (antes viejo_anciano).
+VOZ_POR_DEFECTO = {"viejo": "adam2", "mascota": "dewey_juvenil"}
+# Sin música de fondo (22-oct): el usuario la pone en TikTok. MUSICA_VIDEO_HABLADO=1 la vuelve a meter.
+CON_MUSICA = os.environ.get("MUSICA_VIDEO_HABLADO", "") == "1"
 
 # Gesto forzado en cada marca, por personaje. Al decir un pick el muñeco SEÑALA
 # EL ESCUDO del equipo del pick en el marcador: local = izquierda (`izq`),
@@ -91,15 +98,18 @@ def lado_pick(s: dict, c: dict, i: int) -> str:
 # Público: México (14-oct-2026). Horas en CDMX y dinero en cifra redonda SIN
 # nombrar moneda ni apuesta, como Yeison: «Cinco mil es lo que nos vamos a llevar…».
 ZONA_REDIS, ZONA_PUBLICO = "Europe/Madrid", "America/Mexico_City"
-LIGAS = {"UEFA Europa League": "la Europa League", "UEFA Champions League": "la Champions",
+LIGAS = {"UEFA Europa League": "la Europa League", "UEFA Champions League": "la Champions League",
          "UEFA Europa Conference League": "la Conference League", "CONMEBOL Libertadores": "la Libertadores",
          "CONMEBOL Sudamericana": "la Sudamericana", "La Liga": "LaLiga", "Premier League": "la Premier",
          "Serie A": "la Serie A", "Bundesliga": "la Bundesliga", "Ligue 1": "la Ligue 1"}
 EUROPEAS = {"UEFA Europa League", "UEFA Champions League", "UEFA Europa Conference League", "La Liga",
             "Premier League", "Serie A", "Bundesliga", "Ligue 1", "Primeira Liga", "Eredivisie"}
 
-CTA = "Lo mejor no lo pongo aquí: está en nuestro canal, enlace en el perfil."
-CIERRE = "Guárdalo, y mañana me cuentas."
+# Sin «canal» ni «acceder» (25-oct): ofrecer acceso a picks es lo que TikTok castiga como servicio regulado.
+CTA = "Antes de seguir, en nuestro perfil tienes más análisis como este."
+DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+# Voz más rápida que la de Fish tal cual (pedido del usuario, 19-oct): atempo de ffmpeg, sin cambiar el tono.
+VELOCIDAD_VOZ = float(os.environ.get("VELOCIDAD_VOZ_VIDEO_HABLADO", "1.12"))
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +298,7 @@ NOMBRE_CORTO = {
     "manchester city": "City", "manchester united": "United", "atletico madrid": "Atlético",
     "atletico de madrid": "Atlético", "real madrid": "Madrid", "paris saint germain": "PSG",
     "bayern": "Bayern", "inter milan": "Inter", "ac milan": "Milan", "borussia dortmund": "Dortmund",
+    "rayo vallecano": "Rayo", "aek athens fc": "AEK", "aek athens": "AEK", "gil vicente": "Gil Vicente",
 }
 
 
@@ -312,41 +323,111 @@ def cantidad(cuota: float) -> int:
     return min(10000, max(5000, int(cuota * 1000 // 1000 * 1000)))
 
 
-def competicion(partidos: list[dict]) -> str:
-    ligas = {c["liga"] for c in partidos}
-    if len(ligas) == 1 and next(iter(ligas)) in LIGAS:
-        return f"con {LIGAS[next(iter(ligas))]}"
-    if ligas <= EUROPEAS:
-        return "con el fútbol europeo"
-    return "con estos partidos"
+def apertura(partidos: list[dict], fecha: str) -> str:
+    """«Tres partidazos este martes con la Champions League, y te cuento cómo los vemos.»
+    (la mayoría, 2 de 3, de la misma competición conocida; pedido del usuario el
+    19-oct) o «… con esta jornada del lunes …».
+    Antes abría con la cifra de Yeison («Cinco mil es lo que nos vamos a llevar…»), pero
+    TikTok retiró el vídeo del Clásico (82k visitas, 25-oct) por «bienes y servicios
+    regulados»: nada de dinero ni ganancias en la voz."""
+    from collections import Counter
+    n = NUMEROS.get(len(partidos), str(len(partidos)))
+    dia = DIAS[date.fromisoformat(fecha).weekday()]
+    liga, veces = Counter(c["liga"] for c in partidos).most_common(1)[0]
+    if liga in LIGAS and veces * 2 > len(partidos):
+        cola = f"este {dia} con {LIGAS[liga]}"
+    else:
+        cola = f"con esta jornada del {dia}"
+    return f"{n.capitalize()} partidazos {cola}, y te cuento cómo los vemos."
 
 
-def guion(partidos: list[dict]) -> tuple[str, list[tuple[str, str, int | None]]]:
-    """Texto del vídeo y sus marcas en orden: (palabra clave, gesto, escena o None).
+def pick_vamos(pick: str, local: str, visitante: str) -> str:
+    """El pick como lo dice Yeison detrás de «Vamos con…»."""
+    h = pick_hablado(pick, local, visitante)
+    if h.startswith("gana el "):
+        return f"la victoria del {h[8:]}"
+    if h.startswith(("más de", "menos de")):
+        return h if " del " in h else f"{h} en el partido"
+    return f"que {h}"
+
+
+ROLES = {0: "inicio", -1: "cierre"}
+_SISTEMA_CONTEXTO = """Escribes guiones de TikTok de pronósticos de fútbol para público de México, con el estilo del creador @analisis_yeison.
+Para cada partido recibes los dos equipos (con el nombre que debes usar), el pronóstico que se dirá DESPUÉS de tu frase y un análisis.
+Escribe UNA frase de contexto por partido que justifique ese pronóstico, sacada SOLO del análisis.
+Reglas:
+- No inventes nada que no esté en el análisis (ni lesiones, ni posiciones en la tabla, ni rachas, ni resultados, ni cifras).
+- Entre 10 y 16 palabras. Habla como un amigo que sabe de fútbol contándolo en voz alta: palabras de la calle, nada de jerga de analista (prohibido «ejercerá», «volumen», «fricción», «transiciones», «bloque bajo», «verticalidad», «inercia»). Español neutro de México. Sin cifras, sin porcentajes, sin cuotas, sin emojis.
+- Una idea por frase, la más clara del análisis (quién llega mejor, quién ataca, quién se cierra, si habrá goles o no).
+- Usa los nombres de los equipos EXACTAMENTE como te los dan. No digas el pronóstico (se dice después). Sin punto final.
+- rol "inicio": empieza por el nombre de un equipo (o «<local> y <visitante>» si hablas de los dos) seguido de ", que" (va detrás de «Arrancamos con»). Ej.: "Tottenham, que está pasando por su peor momento, con grandes problemas en defensa" o "PSG y Barcelona, que llegan con los dos ataques encendidos"
+- rol "medio": frase completa con mayúscula inicial. Ej.: "Bodo Glimt en casa se hace muy fuerte, mientras que al Dortmund fuera le cuesta mucho y cede muchos espacios"
+- rol "cierre": empieza por "vemos que" en minúscula (va detrás de «Ya para cerrar con broche de oro,»). Ej.: "vemos que ambos equipos llegan en un buen estado de forma y aquí la localía podría marcar la diferencia"
+Devuelve JSON: {"frases": ["...", "..."]} en el mismo orden."""
+
+
+def contextos(partidos: list[dict], corto: list[tuple[str, str]]) -> list[str]:
+    """Una frase de contexto por partido (Gemini resume su `reason`; si falla, una genérica)."""
+    n = len(partidos)
+    roles = [ROLES.get(k, ROLES[-1] if k == n - 1 else "medio") for k in range(n)]
+    datos = [{"equipos": list(corto[k]), "pronostico": pick_vamos(c["picks"][0]["pick"], c["local"], c["visitante"]),
+              "rol": roles[k], "analisis": c.get("reason", "")} for k, c in enumerate(partidos)]
+    frases: list[str] = []
+    try:
+        from src.tiktok_shop.api.gemini import generate_json
+        res = generate_json(_SISTEMA_CONTEXTO, json.dumps(datos, ensure_ascii=False), temperature=0.5,
+                            max_output_tokens=4096)
+        frases = [str(f).strip().rstrip(".") for f in (res.get("frases") or [])]
+    except Exception as e:
+        print(f"[guion] Gemini falló ({e}); uso frases genéricas")
+    out = []
+    for k, (l, v) in enumerate(corto):
+        f = frases[k] if k < len(frases) and frases[k] else ""
+        rol = roles[k]
+        if rol == "inicio" and not (f.startswith(l) or f.startswith(v)):
+            f = f"{l} contra {v}, un partido que pinta muy bien para lo nuestro"
+        elif rol == "cierre":
+            if not f:
+                f = f"vemos que el {l} contra {v} pinta muy bien para lo nuestro"
+            elif not f.lower().startswith("vemos que"):
+                f = "vemos que " + f[0].lower() + f[1:]
+            else:
+                f = "v" + f[1:]
+        elif rol == "medio" and not f:
+            f = f"En el {l} contra {v} lo tenemos claro"
+        out.append(f)
+    return out
+
+
+def guion(partidos: list[dict], fecha: str) -> tuple[str, list[tuple[str, str, int | None]]]:
+    """Texto del vídeo y sus marcas en orden: (palabra(s) clave, gesto, escena o None).
 
     Escena 0 = tarjeta con todos los partidos (desde el principio); la escena
-    k+1 (banda del partido k) entra en su «Primero / Segundo / Y el último»."""
+    k+1 (banda del partido k) entra al empezar su frase de contexto. Un solo
+    pick por partido (el primero del carrusel), dicho tras «Vamos con»."""
     n = len(partidos)
-    cuota = math.prod(c["cuota"] for c in partidos)
-    corto = {id(c): (_clave_equipo(c["local"]), _clave_equipo(c["visitante"])) for c in partidos}
-    nombres = [f"{corto[id(c)][0]} contra {corto[id(c)][1]}" for c in partidos]
-    lista = ", ".join(nombres[:-1]) + f" y {nombres[-1]}"
-    frases = [f"{en_letra(cantidad(cuota)).capitalize()} es lo que nos vamos a llevar mañana {competicion(partidos)}.",
-              f"Son {NUMEROS.get(n, str(n))} partidos: {lista}."]
+    for c in partidos:
+        c["cuota_dicha"] = float(c["picks"][0].get("odd") or c["cuota"])
+    corto = [(_clave_equipo(c["local"]), _clave_equipo(c["visitante"])) for c in partidos]
+    ctx = contextos(partidos, corto)
+    frases = [apertura(partidos, fecha)]
     claves: list[tuple[str, str, int | None]] = []
     for k, c in enumerate(partidos):
-        ordinal = "Y el último" if k == n - 1 and n > 2 else ORDINALES[k]
-        ps = [pick_hablado(s["pick"], c["local"], c["visitante"]) for s in c["picks"]]
-        cuerpo = ps[0] + (f", y también {ps[1]}" if len(ps) > 1 else "")
-        frases.append(f"{ordinal}, {corto[id(c)][0]} contra {corto[id(c)][1]}: {cuerpo}.")
-        claves.append(("ultimo" if ordinal == "Y el último" else ordinal, f"pick:{k}:0", k + 1))
-        if len(ps) > 1:
-            claves.append(("tambien", f"pick:{k}:1", None))
+        pick = pick_vamos(c["picks"][0]["pick"], c["local"], c["visitante"])
+        if k == 0:
+            frases.append(f"Arrancamos con {ctx[k]}.")
+            claves.append(("arrancamos", "", 1))
+        elif k == n - 1 and n > 1:
+            frases.append(f"Ya para cerrar con broche de oro, {ctx[k]}.")
+            claves.append(("broche", "guárdalo", k + 1))
+        else:
+            frases.append(f"{ctx[k]}.")
+            claves.append((" ".join(ctx[k].split()[:2]), "", k + 1))
+        frases.append(f"Vamos con {pick}.")
+        claves.append(("vamos", f"pick:{k}:0", None))
         if k == n - 2:
             frases.append(CTA)
-            claves.append(("canal", "canal", None))
-    frases.append(CIERRE)
-    claves.append(("guardalo", "guárdalo", None))
+            claves.append(("perfil", "canal", None))
     return " ".join(frases), claves
 
 
@@ -369,6 +450,13 @@ def locutar(texto: str, voz: str, salida: str) -> None:
                 raise
             print(f"[voz] Fish falló ({e}); reintento en {5 * 2 ** intento} s")
             time.sleep(5 * 2 ** intento)
+    if abs(VELOCIDAD_VOZ - 1.0) > 0.01:
+        import subprocess
+        tmp = salida + ".lenta.mp3"
+        os.replace(salida, tmp)
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp, "-filter:a", f"atempo={VELOCIDAD_VOZ}",
+                        "-b:a", "192k", salida], check=True)
+        os.remove(tmp)
     try:
         from src import cost_tracking
         b = len(texto.encode("utf-8"))
@@ -392,10 +480,16 @@ def marcas_whisper(audio: str, texto: str, claves: list[tuple[str, str, int | No
     oidas = [(_norm(w.word), w.start) for s in segs for w in s.words]
     escritas = [_norm(w) for w in texto.split()]
     res, io, ie, t_prev = [], 0, 0, 0.0
+    palabras_oidas = [w for w, _ in oidas]
+
+    def casa(lista: list[str], x: int, ks: list[str]) -> bool:
+        """¿Empiezan en `x` las palabras clave seguidas? (prefijo de 6 letras de cada una)"""
+        return x + len(ks) <= len(lista) and all(lista[x + i].startswith(kk) for i, kk in enumerate(ks))
+
     for clave, gesto, escena in claves:
-        k = _norm(clave)[:6]
-        j = next((x for x in range(io, len(oidas)) if oidas[x][0].startswith(k)), None)
-        je = next((x for x in range(ie, len(escritas)) if escritas[x].startswith(k)), None)
+        ks = [_norm(w)[:6] for w in clave.split() if _norm(w)] or [""]
+        j = next((x for x in range(io, len(oidas)) if casa(palabras_oidas, x, ks)), None)
+        je = next((x for x in range(ie, len(escritas)) if casa(escritas, x, ks)), None)
         if je is not None:
             ie = je + 1
         if j is not None:
@@ -419,15 +513,30 @@ def textos_tiktok(partidos: list[dict], out: Path, fecha: str, r: UpstashRedis |
     except Exception:
         soc = {}
     vers = soc.get("versions") or []
-    texto = (vers[1] if len(vers) > 1 else vers[0] if vers else {}).get("content", "") if soc.get("date") == fecha else ""
+    ver = (vers[1] if len(vers) > 1 else vers[0] if vers else {}) if soc.get("date") == fecha else {}
+    texto = re.sub(r"(?<!\S)#\w+", "", ver.get("content", ""))   # sin hashtags, también los de dentro de un párrafo
+    texto = re.sub(r"[ \t]+\n", "\n", texto)
     bloques = [b.strip() for b in texto.strip().split("\n\n") if b.strip()]
-    if bloques and len(bloques[0]) < 100 and "\n" not in bloques[0]:
-        bloques = bloques[1:]   # titular de la IA
+    if bloques:   # titular de la IA («EL RADAR TÁCTICO…»), suelto o pegado al primer párrafo
+        primera, _, resto = bloques[0].partition("\n")
+        letras = [c for c in primera if c.isalpha()]
+        gritado = len(letras) >= 6 and sum(c.isupper() for c in letras) / len(letras) > 0.7
+        titular = _norm(primera) == _norm(ver.get("title", "")) or (
+            len(primera) < 100 and " vs " not in primera and gritado)
+        if titular:
+            bloques = ([resto.strip()] if resto.strip() else []) + bloques[1:]
     es_partido = [" vs " in b.split("\n")[0] for b in bloques]
+
+    def claves_de(c: dict) -> list[str]:
+        ks = [_norm(_clave_equipo(c["local"]))]
+        ks += [_norm(w) for w in re.findall(r"\w+", c["local"].split("(")[0]) if len(w) >= 4]
+        return [k for k in ks if k]
+
     elegidos = []
     for c in partidos:
-        k = _norm(_clave_equipo(c["local"]))
-        b = next((b for b, p in zip(bloques, es_partido) if p and k in _norm(b.split("\n")[0])), None)
+        ks = claves_de(c)
+        b = next((b for b, p in zip(bloques, es_partido)
+                  if p and any(k in _norm(b.split("\n")[0]).replace("-", "") for k in ks)), None)
         if b:
             elegidos.append(b)
     if len(elegidos) == len(partidos) and any(es_partido):
@@ -498,7 +607,7 @@ def main() -> None:
     for c in partidos:
         print(f"[partido] {c['hora']} (México) {c['local']} vs {c['visitante']} · {[s['pick'] for s in c['picks']]}")
     print(f"[foto] {foto}")
-    texto, claves = guion(partidos)
+    texto, claves = guion(partidos, fecha)
     (out / "guion.txt").write_text(texto + "\n", encoding="utf-8")
     print(f"[guion] {len(texto.split())} palabras · {texto}")
     if a.solo_guion:
@@ -547,7 +656,7 @@ def main() -> None:
         pj = PersonajeViejo()
     musica = CLIPS / "sfx" / "fondo.mp3"
     alturas = renderizar(str(audio), escenas, pj, str(out / "video_hablado.mp4"), marcas=marcas,
-                         musica=str(musica) if musica.exists() else None,
+                         musica=str(musica) if CON_MUSICA and musica.exists() else None,
                          semilla=int(fecha.replace("-", "")) % 997)
     textos_tiktok(partidos, out, fecha)
     (out / "meta.json").write_text(json.dumps({

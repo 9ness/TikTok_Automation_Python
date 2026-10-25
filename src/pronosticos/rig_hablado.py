@@ -173,11 +173,11 @@ def planificar(voz: Voz, personaje, marcas: list[tuple[float, str]] | None = Non
     dur = n / fps
 
     # --- gestos -----------------------------------------------------------
-    forzadas = sorted(marcas or [])
+    forzadas = sorted(marcas or [], key=lambda m: m[0])
     cambios: list[tuple[float, str]] = [(0.0, personaje.reposo)]
     actual = personaje.reposo
     ult_cambio = -10.0
-    eventos = sorted([(t, None) for t in voz.frases] + [(t, p) for t, p in forzadas])
+    eventos = sorted([(t, None) for t in voz.frases] + [(t, p) for t, p in forzadas], key=lambda e: (e[0], e[1] is not None))
     for t, forzada in eventos:
         if forzada is None:
             if t - ult_cambio < min_hold:
