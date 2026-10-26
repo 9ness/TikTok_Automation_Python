@@ -10,18 +10,19 @@ abierta en el navegador). Luego el clip vuelve a la app para que lo edite.
 |---|---|---|
 | **Todas las imágenes** | **Google Flow** · modelo Nano Banana 2 · 9:16 | Salvo Creativos Pro, que va en 3:4 |
 | Clip que **habla** (la voz va dentro del clip) | **GenAI Pro · Omni 1.1** (o Google Flow · Omni) | Omni locuta. 10 s |
-| Clip **mudo** (la voz la pone la app, o va sin voz) | **GenAI Pro · Omni 1.1** (preferente), Google Flow o Magnific | Ver tabla de abajo |
+| Clip **mudo** (la voz la pone la app, o va sin voz) | **GenAI Pro · Veo** (1 crédito) | **No uses Omni**: su ventaja es el sonido y aquí se descarta. Ver tabla de abajo |
 
 | Plataforma | Voz | Duración | Calidad | Coste |
 |---|---|---|---|---|
 | Google Flow (Omni) | ✅ | 8 s o 10 s | 720p → reescalar a 1080p | 12 créditos (8 s) · 15 créditos (10 s) |
 | **GenAI Pro · Omni 1.1** (desde 7/10/2026) | ✅ | **10 s** | **1080p** (1080×1920) | **3 créditos** (desde 22/10/2026 no deja «con marca»; antes 1) |
-| GenAI Pro · Veo (antiguo) | ❌ | hasta 8 s | 720p | 1 crédito |
+| **GenAI Pro · Veo** (el de los mudos/POV) | ❌ | hasta 8 s | 720p | **1 crédito** |
 | Magnific (spaces) | ❌ | 8 s o 10 s | la del space | lo que marque su web |
 
 Qué menú admite qué:
 
-- **POV BOF, POV BOF Largo**: la voz la pone la app → Omni 1.1 de GenAI Pro (o cualquiera).
+- **POV BOF, POV BOF Largo, Tareas Productos y todo POV**: la voz la pone la app → **Veo de GenAI Pro (1 crédito)**, clips de 8 s (`clip_s=8`). Omni aquí es tirar créditos: el triple sin marca y su audio se descarta (Néstor, 26/10/2026: se gastaron ~81 cr en 12 vídeos que con Veo eran ~27).
+- **Omni solo en clips que HABLAN**, y **con marca de agua (1 crédito)**. Sin marca son 3: si «Watermark» no se deja elegir, no pagues 3 sin preguntar.
 - **Moda (formatos hablados), UGC**: la voz va en el clip → Omni (GenAI Pro o Flow).
 - **Moda (formatos mudos 🔇), Marca Personal**: cualquiera de las tres.
 
@@ -87,7 +88,7 @@ Ajustes, siempre los mismos:
 - Modelo **Omni 1.1** · **Portrait 9:16** · **1080p** · **10 s** · **CON marca
   de agua** (1 crédito; sin marca son 3 y no compensa).
 - **22/10/2026: el botón «Watermark» sale DESHABILITADO** en todos los modos y
-  resoluciones: un clip de 10 s cuesta **3 créditos** (2 en 720p). Néstor aprobó
+  resoluciones: un clip de 10 s cuesta **3 créditos** (2 en 720p). Eso es SOLO para clips que hablan; los mudos/POV van en Veo a 1. Néstor aprobó
   seguir en 1080p a 3. Avisa del coste nuevo al pedir el «sí»; si vuelve a
   dejar elegir «Watermark», úsalo. Ojo: el panel arranca en **Landscape**,
   pon Portrait cada vez.
@@ -115,7 +116,7 @@ Ajustes, siempre los mismos:
   Frames, pero los ajustes vuelven a los de por defecto (No watermark · 8 s ·
   720p): ponlos cada vez.
 
-### Veo (antiguo)
+### Veo — los clips mudos / POV (1 crédito)
 
 Solo vídeo, **mudo**. Ajustes, siempre los mismos:
 
