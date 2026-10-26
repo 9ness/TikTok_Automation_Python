@@ -514,18 +514,27 @@ def textos_tiktok(partidos: list[dict], out: Path, fecha: str, r: UpstashRedis |
         soc = {}
     vers = soc.get("versions") or []
     ver = (vers[1] if len(vers) > 1 else vers[0] if vers else {}) if soc.get("date") == fecha else {}
-    texto = re.sub(r"(?<!\S)#\w+", "", ver.get("content", ""))   # sin hashtags, también los de dentro de un párrafo
-    texto = re.sub(r"[ \t]+\n", "\n", texto)
-    bloques = [b.strip() for b in texto.strip().split("\n\n") if b.strip()]
-    if bloques:   # titular de la IA («EL RADAR TÁCTICO…»), suelto o pegado al primer párrafo
-        primera, _, resto = bloques[0].partition("\n")
+    texto = ver.get("content", "")
+    # Sin hashtags: las líneas de hashtags fuera enteras (la IA escribe «#AS Roma» con
+    # espacio y quedaba un «Roma» suelto) y luego los de dentro de un párrafo.
+    texto = "\n".join(l for l in texto.split("\n") if not l.lstrip().startswith("#"))
+    texto = re.sub(r"(?<!\S)#\w+", "", texto)
+    texto = re.sub(r"[ \t]+\n", "\n", texto).strip()
+    if texto:   # titular de la IA («EL RADAR TÁCTICO…»), suelto o pegado al primer párrafo
+        primera, _, resto = texto.partition("\n")
         letras = [c for c in primera if c.isalpha()]
         gritado = len(letras) >= 6 and sum(c.isupper() for c in letras) / len(letras) > 0.7
         titular = _norm(primera) == _norm(ver.get("title", "")) or (
             len(primera) < 100 and " vs " not in primera and gritado)
-        if titular:
-            bloques = ([resto.strip()] if resto.strip() else []) + bloques[1:]
-    es_partido = [" vs " in b.split("\n")[0] for b in bloques]
+        if titular and resto.strip():
+            texto = resto.strip()
+    # Secciones: entre líneas ━━━ (entrada · un partido por sección · cierre). Sin
+    # separadores, cada bloque de párrafo es una sección (formato antiguo).
+    SEP = "━━━━━━━━━━━━━━"
+    secciones = [c.strip() for c in re.split(r"\n\s*━{5,}\s*(?:\n|$)", texto) if c.strip()]
+    if len(secciones) < 2:
+        secciones = [b.strip() for b in texto.split("\n\n") if b.strip()]
+    es_partido = [" vs " in b.split("\n")[0] for b in secciones]
 
     def claves_de(c: dict) -> list[str]:
         ks = [_norm(_clave_equipo(c["local"]))]
@@ -535,7 +544,7 @@ def textos_tiktok(partidos: list[dict], out: Path, fecha: str, r: UpstashRedis |
     elegidos = []
     for c in partidos:
         ks = claves_de(c)
-        b = next((b for b, p in zip(bloques, es_partido)
+        b = next((b for b, p in zip(secciones, es_partido)
                   if p and any(k in _norm(b.split("\n")[0]).replace("-", "") for k in ks)), None)
         if b:
             elegidos.append(b)
@@ -543,8 +552,8 @@ def textos_tiktok(partidos: list[dict], out: Path, fecha: str, r: UpstashRedis |
         primero = es_partido.index(True)
         ultimo = len(es_partido) - 1 - es_partido[::-1].index(True)
         intro = [re.sub(r"\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b", n, b, count=1)
-                 for b in bloques[:primero]]
-        desc = "\n\n".join(intro + elegidos + bloques[ultimo + 1:])
+                 for b in secciones[:primero]]
+        desc = f"\n\n{SEP}\n\n".join(intro + elegidos + secciones[ultimo + 1:])
         # la caption de la IA a veces se equivoca de día («este viernes» para un sábado)
         dia = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")[date.fromisoformat(fecha).weekday()]
         desc = re.sub(r"\b(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\b", dia, desc)
