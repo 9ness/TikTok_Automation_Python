@@ -234,6 +234,14 @@ productos concretos); las de GMV de 1.000 €, directos o similares, no.
   hay enlace. `anadir=True` suma productos; `borrar=True` la quita.
 - Los productos de una tarea se dan de alta en «Tareas Productos»
   (`tareas_productos`) con foto limpia + ficha y se hacen en formato POV.
+- **Recolección en UNA pasada por producto** (móvil por ADB): los productos se
+  sacan del CARRUSEL de la propia tarea (Paso 1; no siempre están en el
+  escaparate ni en el buscador del pool). Con la ficha abierta, en el mismo
+  momento: captura foto limpia + ficha, Compartir › «Copiar enlace» (pegarlo en
+  la lupa y leerlo con `uiautomator dump`) y `poner_url_producto` en cuanto exista
+  el producto. Volver luego a por las URL cuesta otra vuelta entera al carrusel.
+  La página de la tarea es un webview sin texto en el dump: para ver el carrusel
+  entero, capturas en mosaico.
 - No cambia tandas ni orden: es una etiqueta. En la web, chips «Todas · <tarea>
   subidos/requeridos · ⏳ · Sin tarea» enseñan solo sus vídeos de todas las
   tandas abiertas (y bajar Todos/Pendientes baja solo esos). Con filtro no sale
