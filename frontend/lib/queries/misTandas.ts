@@ -264,9 +264,27 @@ function aplicar(d: MisTandasResponse | undefined, c: Cambio, producto?: VideoTa
       rehacer: items.filter((v) => v.rehacer && !v.uploaded).length,
     };
   });
+  // El contador de cada tarea (chip 🎯) también se mueve al marcar subido:
+  // si no, se queda con el número de la última lectura hasta recargar.
+  const previo = d.tandas.flatMap((t) => t.items).find((v) => v.id === c.id) ?? producto;
+  const delta = c.uploaded !== undefined && previo ? Number(c.uploaded) - Number(!!previo.uploaded) : 0;
+  const suyas = new Set(previo?.tareas ?? []);
+  const tareas_activas = delta && d.tareas_activas
+    ? d.tareas_activas.map((x) => {
+        if (!suyas.has(x.id)) return x;
+        const subidos = Math.max(0, x.subidos + delta);
+        return {
+          ...x,
+          subidos,
+          pendientes: Math.max(0, x.pendientes - delta),
+          faltan: Math.max(0, (x.videos_requeridos || 0) - subidos),
+        };
+      })
+    : d.tareas_activas;
   return {
     ...d,
     tandas,
+    tareas_activas,
     subidos: d.subidos + tandas.reduce((n, t) => n + t.subidos, 0) - d.tandas.reduce((n, t) => n + t.subidos, 0),
   };
 }
