@@ -233,7 +233,9 @@ productos concretos); las de GMV de 1.000 €, directos o similares, no.
   ese producto, de cualquier nicho); `refs` = `source|carpeta|producto` si aún no
   hay enlace. `anadir=True` suma productos; `borrar=True` la quita.
 - Los productos de una tarea se dan de alta en «Tareas Productos»
-  (`tareas_productos`) con foto limpia + ficha y se hacen en formato POV.
+  (`tareas_productos`) con foto limpia + ficha y se hacen en formato POV. El tipo
+  de guion se ELIGE POR PRODUCTO (urgencia de precio del POV BOF, o dolor /
+  venta inversa / acción / épico del POV BOF Largo), no uno para toda la tanda.
 - **Recolección en UNA pasada por producto** (móvil por ADB): los productos se
   sacan del CARRUSEL de la propia tarea (Paso 1; no siempre están en el
   escaparate ni en el buscador del pool). Con la ficha abierta, en el mismo
