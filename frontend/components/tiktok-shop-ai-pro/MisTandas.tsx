@@ -320,8 +320,8 @@ export function MisTandas() {
               ...tareasActivas.map((x) => ({
                 id: x.id,
                 etiqueta: `${x.nombre} · ${x.subidos}/${x.videos_requeridos || x.videos}${
-                  x.horas_restantes != null ? ` · ⏳ ${tiempoRestante(x.horas_restantes)}` : ""
-                }`,
+                  x.videos_requeridos ? (x.faltan ? ` · faltan ${x.faltan}` : " · ✅ hecha") : ""
+                }${x.horas_restantes != null ? ` · ⏳ ${tiempoRestante(x.horas_restantes)}` : ""}`,
                 titulo: [x.recompensa, x.notas, `${x.pendientes} pendientes de subir`,
                   x.productos_sin_video.length ? `${x.productos_sin_video.length} producto(s) sin vídeo aún` : ""]
                   .filter(Boolean)

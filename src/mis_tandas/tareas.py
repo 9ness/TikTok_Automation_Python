@@ -65,10 +65,17 @@ def _fin_ts(t: dict) -> float | None:
 
 
 def listar(usuario: str) -> list[dict]:
+    """Las tareas del usuario. Son TEMPORALES: la que ya ha pasado su `fin` se
+    borra de Redis al leerla, y con ella su filtro y su etiqueta en los vídeos."""
     r = _redis()
     if not r.is_available():
         return []
-    return list((r.get_json(TAREAS_KEY.format(usuario=usuario or "ness")) or {}).get("tareas") or [])
+    todas = list((r.get_json(TAREAS_KEY.format(usuario=usuario or "ness")) or {}).get("tareas") or [])
+    ahora = time.time()
+    vivas = [t for t in todas if (_fin_ts(t) or ahora + 1) > ahora]
+    if len(vivas) != len(todas):
+        _guardar(usuario, vivas)
+    return vivas
 
 
 def _guardar(usuario: str, tareas: list[dict]) -> None:
@@ -169,6 +176,8 @@ def resumen(tareas: list[dict], filas: list[dict], ahora: float | None = None) -
             "pendientes": sum(1 for f in suyas if not f["uploaded"] and not f["sin_stock"]),
             "productos": len(t.get("productos", [])) + len(t.get("refs", [])),
             "productos_sin_video": [p for p in t.get("productos", []) if p not in con_video],
+            "faltan": max(0, int(t.get("videos_requeridos") or 0) - sum(
+                1 for f in suyas if f["uploaded"] and (f.get("uploaded_at") or 0) >= desde)),
             "horas_restantes": round((fin - ahora) / 3600, 1) if fin else None,
         })
     salida.sort(key=lambda x: (x["horas_restantes"] is None, x["horas_restantes"] or 0))

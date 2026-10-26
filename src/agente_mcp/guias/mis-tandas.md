@@ -240,7 +240,8 @@ productos concretos); las de GMV de 1.000 €, directos o similares, no.
   «Tanda completada».
 - Progreso (`mis_tandas` › `tareas_activas`): `subidos` cuenta solo lo marcado
   subido DESDE que se apuntó la tarea (o desde `desde`); `productos_sin_video`
-  dice qué falta montar. Las vencidas o `archivada` dejan de salir.
+  dice qué falta montar y `faltan` los vídeos por subir. Son TEMPORALES: al pasar
+  su `fin` se borran solas (filtro, etiquetas y Redis); `archivada` la esconde antes.
 - Redis `mis_tandas:tareas:<usuario>` (`src/mis_tandas/tareas.py`).
 
 ## Lo que no entra (todavía)

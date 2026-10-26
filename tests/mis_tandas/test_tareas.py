@@ -50,12 +50,14 @@ def test_casado_por_id_y_por_ref_y_progreso(r):
         f["tareas"] = tareas.de_fila(f, [t])
     assert [f["id"] for f in filas if f["tareas"]] == ["a", "b", "c"]
     (res,) = tareas.resumen([t], filas)
-    assert res["subidos"] == 1 and res["pendientes"] == 1 and res["videos"] == 3
+    assert res["subidos"] == 1 and res["pendientes"] == 1 and res["videos"] == 3 and res["faltan"] == 1
     assert res["productos_sin_video"] == [] and res["horas_restantes"] > 0
 
 
-def test_vencida_no_sale(r):
+def test_vencida_desaparece_sola(r):
     t = tareas.guardar("ness", {"nombre": "Vieja", "fin": "2020-01-01T00:00"})
+    tareas.guardar("ness", {"nombre": "Viva", "fin": "2099-01-01T00:00"})
     assert not tareas.activa(t) and tareas.resumen([t], []) == []
-    tareas.borrar("ness", t["id"])
-    assert tareas.listar("ness") == []
+    # al leer se borra de Redis: no se acumulan tareas pasadas
+    assert [x["id"] for x in tareas.listar("ness")] == ["viva"]
+    assert [x["id"] for x in r.get_json(tareas.TAREAS_KEY.format(usuario="ness"))["tareas"]] == ["viva"]

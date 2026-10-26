@@ -66,6 +66,8 @@ export interface TareaActiva {
   videos: number;
   subidos: number;
   pendientes: number;
+  /** Vídeos que faltan por subir para cumplirla. */
+  faltan: number;
   productos: number;
   productos_sin_video: string[];
   horas_restantes: number | null;
