@@ -131,8 +131,15 @@ def mcp(herramienta: str, argumentos: dict) -> dict:
     return json.loads(texto)
 
 
+CACHE = TMP / "tandas.json"
+
+
 def carrusel(cid: str) -> dict:
-    datos = mcp("mis_tandas", {"fotos": True})
+    """De la caché del lote si existe (una sola llamada al MCP para todos)."""
+    if CACHE.exists():
+        datos = json.loads(CACHE.read_text())
+    else:
+        datos = mcp("mis_tandas", {"fotos": True})
     for t in datos["tandas"]:
         for c in t.get("items", t.get("carruseles", [])):
             if c.get("id") == cid:
@@ -157,18 +164,46 @@ def nombre_enlace(c: dict) -> str:
     return out
 
 
+def bajar_fotos(c: dict, d: Path) -> None:
+    """El ZIP lo arma la app al vuelo: ~2 min. Por eso el lote los baja todos a la vez."""
+    zipdata = urllib.request.urlopen(c["zip"], timeout=400).read()
+    with zipfile.ZipFile(io.BytesIO(zipdata)) as z:
+        fotos = sorted(n for n in z.namelist() if n.lower().endswith((".jpg", ".jpeg", ".png")))
+        for i, n in enumerate(fotos, 1):
+            (d / f"{i:02d}{Path(n).suffix.lower()}").write_bytes(z.read(n))
+
+
 # ---------------------------------------------------------------- fases
+def lote() -> None:
+    """Una llamada a Mis tandas + todos los ZIP pendientes en paralelo, antes de tocar el móvil."""
+    from concurrent.futures import ThreadPoolExecutor
+    datos = mcp("mis_tandas", {"fotos": True})
+    CACHE.write_text(json.dumps(datos, ensure_ascii=False))
+    pend = [c for t in datos["tandas"] for c in t.get("items", t.get("carruseles", []))
+            if not c.get("subido") and not c.get("sin_stock")]
+
+    def uno(c: dict) -> str:
+        d = TMP / c["id"]
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "datos.json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
+        if not any(d.glob("0*")):
+            bajar_fotos(c, d)
+        pid = c["product_url"].rstrip("/").split("/")[-1]
+        return f"{c['id']} · {len(list(d.glob('0*')))} fotos · {pid} · {c['musica']['tiktok']['titulo']} · {' '.join(c['titulo'].split())}"
+
+    with ThreadPoolExecutor(8) as ex:
+        for linea in ex.map(uno, pend):
+            print(linea)
+
+
 def preparar(cid: str) -> None:
     (TMP / f"inicio_{cid}").write_text(str(time.time()))
     c = carrusel(cid)
     d = TMP / cid
     d.mkdir(parents=True, exist_ok=True)
     (d / "datos.json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
-    zipdata = urllib.request.urlopen(c["zip"], timeout=400).read()
-    with zipfile.ZipFile(io.BytesIO(zipdata)) as z:
-        fotos = sorted(n for n in z.namelist() if n.lower().endswith((".jpg", ".jpeg", ".png")))
-        for i, n in enumerate(fotos, 1):
-            (d / f"{i:02d}{Path(n).suffix.lower()}").write_bytes(z.read(n))
+    if not any(d.glob("0*")):
+        bajar_fotos(c, d)
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
     print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']}")
 
@@ -350,4 +385,4 @@ def limpiar() -> None:
 if __name__ == "__main__":
     (TMP / "sh").mkdir(parents=True, exist_ok=True)
     fase, *resto = sys.argv[1:]
-    {"preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[fase](*resto)
+    {"lote": lote, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[fase](*resto)

@@ -1,5 +1,4 @@
 ## Pendiente
-- [ ] Mis tandas (fotos): botón «copiar ID del producto» junto al del enlace, para buscarlo por ID en el escaparate al subir (26/10). Y comprobar stock antes de subir carruseles (la cámara retro fd1425a70773 estaba agotada).
 - [ ] 👤 **Ana limitada hasta el 31/10 (3.ª vez, 24/10)**: grabar 1 vídeo REAL al día de su ropa física y subirlo a `_agente/_clips_reales/ana/`; el agente lo monta. Plan: `_agente/ana/PLAN_SUBIDAS_25-31oct.md` (Drive). Nada de IA en Ana hasta entonces.
 - [ ] (Néstor decide, 24/10, curso Skool «Crea con Seedance») Probar el formato «Revelación 15 s» (ropa de varios colores) con el Seedance 2.0 Fast de Higgsfield, que ya pagamos, en 1 vídeo de Ana antes de plantear CapCut Ultra (68 €/mes). Ver [`docs/clases/2026-10-24_seedance_capcut/`](docs/clases/2026-10-24_seedance_capcut/README.md)
 - [ ] **Plan fin de octubre (21/10)**: [`docs/PLAN_FINAL_OCTUBRE.md`](docs/PLAN_FINAL_OCTUBRE.md). Hay que hacer:
@@ -672,6 +671,7 @@ recorta los audios largos en vez de tocar el render.
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
 - [x] 2026-10-15 · Réplicas Q4 juguetes/tecnología de Casca Chollos: Néstor confirma ficha del arbolito (1729930618957568103) y semáforos → 22 en 🟢 (las 4 de flores siguen sin stock).
+- [x] 26/10 · Mis tandas: botón «ID» (copia el ID de 19 cifras del producto) junto al 🛍️, en fotos y vídeos. El stock se mira en el Mi 8 con `scripts/stock_tiktok_movil.py`.
 - [x] 2026-10-15 · R36S: las 4 réplicas ya enlazan la ficha nueva 1729945657638623436 (lo cambió otra sesión). Mopa JUPPLIES (Carpeta_11/1, Acción) rehecha con Omni → 🟢.
 - [x] (14/10/2026) **Diagnóstico y corrección del orden de fotos en Mis tandas**: Hzuaneri Mueble TV (`e8eb2afcad62`), peticiones reales sin `t` recibían JPEG sin fecha EXIF. El endpoint ahora fecha también las descargas de clientes antiguos con una base estable del carrusel y 2 s menos por diapositiva; preserva `t` y vistas previas. 36 tests pasan en contenedor aislado sin red, y fechas del producto real ordenan 1–8. Commit/push y despliegue autorizados por el operador. Las copias ya descargadas no se cambian.
 - [x] (14/10/2026) **Asistentes de consultas Ana/Néstor en Telegram**: Codex con `gpt-6.1-sol`, esfuerzo `medium` y búsqueda web activa por defecto (también al compartir al grupo). Configuración en `~/asistentes-telegram/{bot.py,personas.json}` e instrucciones `consultas-*/AGENTS.md`; memoria compartida por archivos, hilos separados por motor. Pruebas de routing/reanudación/CLI pasan; ejecución real del helper CDP comprobada (Chrome apagado); ambos servicios reiniciados y activos. Sin commits ni push.

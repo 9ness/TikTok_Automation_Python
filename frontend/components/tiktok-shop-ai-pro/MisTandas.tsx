@@ -31,7 +31,7 @@ import {
   familiaModo,
 } from "@/lib/tiktok-shop-ai-pro/coloresModo";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
-import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { CopyChip, idProducto } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 
@@ -690,6 +690,7 @@ export function MisTandas() {
                           >
                             <Download className="h-3 w-3" />
                           </a>
+                          <CopyChip label="ID" text={idProducto(v.product_url)} />
                           {v.product_url ? (
                             <a
                               href={v.product_url}

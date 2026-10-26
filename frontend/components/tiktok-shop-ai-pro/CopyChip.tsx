@@ -52,3 +52,10 @@ export function CopyChip({
     </button>
   );
 }
+
+/** ID de 19 cifras de una ficha de TikTok Shop (`/view/product/<id>`), o "" si
+ *  el enlace es corto (vm.tiktok.com). Con él se busca el producto en el
+ *  escaparate al publicar y se está seguro de que es ese. */
+export function idProducto(url?: string | null): string {
+  return url?.match(/\/product\/(\d{15,22})/)?.[1] ?? "";
+}

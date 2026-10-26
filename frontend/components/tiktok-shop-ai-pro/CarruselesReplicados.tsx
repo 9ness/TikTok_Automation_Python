@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Download, Loader2 } from "lucide-react";
 
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
-import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { CopyChip, idProducto } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { MusicaCarrusel } from "@/components/tiktok-shop-ai-pro/MusicaCarrusel";
 import { ProductoCarrusel } from "@/components/tiktok-shop-ai-pro/ProductoCarrusel";
 import { SEMAFORO } from "@/components/tiktok-shop-ai-pro/MisTandas";
@@ -235,6 +235,7 @@ export function CarruselesReplicados() {
                           >
                             Abrir
                           </a>
+                          <CopyChip label="ID" text={idProducto(c.product_url)} />
                           {c.product_url ? (
                             <a
                               href={c.product_url}
