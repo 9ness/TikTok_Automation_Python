@@ -629,6 +629,14 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     for v in meta_items + [v for t in salida for v in t.get("items", [])]:
         v["epoca"] = epo.get(v["id"]) or _epoca_defecto(v)
         v["habla"] = habla(v)
+    # Tareas de Campañas de creadores: etiqueta por vídeo + progreso.
+    from src.mis_tandas import tareas as tareas_mod
+
+    lista_tareas = [t for t in tareas_mod.listar(usuario) if tareas_mod.activa(t)]
+    tareas_de = {f["id"]: tareas_mod.de_fila(f, lista_tareas) for f in lista} if lista_tareas else {}
+    esperando = [_publica(f) for f in sin_stock]
+    for v in meta_items + esperando + [v for t in salida for v in t.get("items", [])]:
+        v["tareas"] = tareas_de.get(v["id"], [])
     for t in salida:
         for v in t.get("items", []):
             v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
@@ -648,7 +656,9 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         "abiertas": abiertas_vistas,
         "ocultos": sum(1 for f in completa if f["id"] in escondidos),
         "ocultos_items": [_publica(f) for f in completa if f["id"] in escondidos] if ver_ocultos else [],
-        "esperando_stock": [_publica(f) for f in sin_stock],
+        "esperando_stock": esperando,
+        "tareas_activas": tareas_mod.resumen(
+            lista_tareas, [{**f, "tareas": tareas_de.get(f["id"], [])} for f in lista]) if lista_tareas else [],
         # Mudos sin subir de una cuenta `SOLO_HABLADOS`: no van a TikTok (Meta).
         "solo_meta": meta_items,
         "sin_revisar": sum(t.get("sin_revisar", 0) for t in salida if t.get("abierta")),

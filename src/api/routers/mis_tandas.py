@@ -255,3 +255,59 @@ def get_zip_fotos(
     return Response(datos, media_type="application/zip",
                     headers={"Content-Disposition": f'attachment; filename="{nombre}"',
                              "Cache-Control": "no-store"})
+
+
+# ---------------------------------------------------------------------------
+# Tareas de «Campañas de creadores» (`src/mis_tandas/tareas.py`): etiquetan
+# vídeos por producto para filtrar y llevar la cuenta de lo subido.
+# ---------------------------------------------------------------------------
+class TareaRequest(BaseModel):
+    id: str = ""
+    nombre: str | None = None
+    recompensa: str | None = None
+    fin: str | None = None
+    desde: str | None = None
+    videos_requeridos: int | None = None
+    productos: list[str] | None = None
+    refs: list[str] | None = None
+    notas: str | None = None
+    archivada: bool | None = None
+    anadir: bool = False
+
+
+def _error_tarea(e: Exception) -> APIError:
+    from src.mis_tandas.tareas import ErrorTarea
+
+    if isinstance(e, ErrorTarea):
+        return APIError(str(e), status_code=e.status)
+    return _error(e)
+
+
+@router.get("/tareas")
+def get_tareas(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Todas las tareas guardadas (también las vencidas/archivadas)."""
+    from src.mis_tandas import tareas
+
+    return {"tareas": tareas.listar(usuario)}
+
+
+@router.post("/tareas")
+def post_tarea(body: TareaRequest, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Crea o actualiza (por `id`) una tarea. `anadir` suma productos/refs."""
+    from src.mis_tandas import tareas
+
+    try:
+        t = tareas.guardar(usuario, body.model_dump(exclude_none=True))
+    except Exception as e:  # noqa: BLE001
+        raise _error_tarea(e) from e
+    return {"ok": True, "tarea": t}
+
+
+@router.delete("/tareas/{id_}")
+def delete_tarea(id_: str, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    from src.mis_tandas import tareas
+
+    try:
+        return tareas.borrar(usuario, id_)
+    except Exception as e:  # noqa: BLE001
+        raise _error_tarea(e) from e

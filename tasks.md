@@ -1,4 +1,5 @@
 ## Pendiente
+- [ ] **Tareas de Campañas de creadores (26/10)**: ver en el OPPO las 4 realistas (envío rápido 100 €, y los 3 retos de 30 €), apuntarlas con `guardar_tarea`, dar de alta los productos en «Tareas Productos» y montar hasta 23 vídeos POV (primero la de 100 €). Esperando que Néstor active la depuración inalámbrica.
 - [ ] 👤 **Ana limitada hasta el 31/10 (3.ª vez, 24/10)**: grabar 1 vídeo REAL al día de su ropa física y subirlo a `_agente/_clips_reales/ana/`; el agente lo monta. Plan: `_agente/ana/PLAN_SUBIDAS_25-31oct.md` (Drive). Nada de IA en Ana hasta entonces.
 - [ ] (Néstor decide, 24/10, curso Skool «Crea con Seedance») Probar el formato «Revelación 15 s» (ropa de varios colores) con el Seedance 2.0 Fast de Higgsfield, que ya pagamos, en 1 vídeo de Ana antes de plantear CapCut Ultra (68 €/mes). Ver [`docs/clases/2026-10-24_seedance_capcut/`](docs/clases/2026-10-24_seedance_capcut/README.md)
 - [ ] **Plan fin de octubre (21/10)**: [`docs/PLAN_FINAL_OCTUBRE.md`](docs/PLAN_FINAL_OCTUBRE.md). Hay que hacer:
@@ -670,6 +671,7 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] 26/10 · Mis tandas: filtro 🎯 por tarea de Campañas de creadores (chips con subidos/requeridos y horas que quedan, etiqueta por vídeo, MCP `guardar_tarea`/`tareas_tiktok`).
 - [x] 2026-10-15 · Réplicas Q4 juguetes/tecnología de Casca Chollos: Néstor confirma ficha del arbolito (1729930618957568103) y semáforos → 22 en 🟢 (las 4 de flores siguen sin stock).
 - [x] 26/10 · Mis tandas: botón «ID» (copia el ID de 19 cifras del producto) junto al 🛍️, en fotos y vídeos. El stock se mira en el Mi 8 con `scripts/stock_tiktok_movil.py`.
 - [x] 2026-10-15 · R36S: las 4 réplicas ya enlazan la ficha nueva 1729945657638623436 (lo cambió otra sesión). Mopa JUPPLIES (Carpeta_11/1, Acción) rehecha con Omni → 🟢.

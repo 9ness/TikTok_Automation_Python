@@ -222,6 +222,27 @@ nuevo. Subido, sin stock y rehacer se guardan en el documento de la réplica
 `replica_id`. La miniatura es un fotograma del vídeo y el caption lleva sus
 propios hashtags.
 
+## Tareas de Campañas de creadores (filtro 🎯)
+
+TikTok › perfil › Campañas de creadores da cupones/dinero por subir N vídeos de
+ciertos productos antes de una fecha. Solo se apuntan las REALISTAS (N vídeos de
+productos concretos); las de GMV de 1.000 €, directos o similares, no.
+
+- Alta: `guardar_tarea(nombre, recompensa, fin, videos_requeridos, productos)` —
+  `productos` son IDs de TikTok o enlaces a la ficha (casa con CUALQUIER vídeo de
+  ese producto, de cualquier nicho); `refs` = `source|carpeta|producto` si aún no
+  hay enlace. `anadir=True` suma productos; `borrar=True` la quita.
+- Los productos de una tarea se dan de alta en «Tareas Productos»
+  (`tareas_productos`) con foto limpia + ficha y se hacen en formato POV.
+- No cambia tandas ni orden: es una etiqueta. En la web, chips «Todas · <tarea>
+  subidos/requeridos · ⏳ · Sin tarea» enseñan solo sus vídeos de todas las
+  tandas abiertas (y bajar Todos/Pendientes baja solo esos). Con filtro no sale
+  «Tanda completada».
+- Progreso (`mis_tandas` › `tareas_activas`): `subidos` cuenta solo lo marcado
+  subido DESDE que se apuntó la tarea (o desde `desde`); `productos_sin_video`
+  dice qué falta montar. Las vencidas o `archivada` dejan de salir.
+- Redis `mis_tandas:tareas:<usuario>` (`src/mis_tandas/tareas.py`).
+
 ## Lo que no entra (todavía)
 
 UGC (Nicho General), BOF Cinematográfico, Cuenta Piloto, Ropa con Personas,

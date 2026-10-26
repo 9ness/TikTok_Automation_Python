@@ -747,6 +747,42 @@ async def epoca_video(ctx: Context, id: str, epoca: str) -> str:
 
 
 @_herramienta(structured_output=False)
+async def tareas_tiktok(ctx: Context) -> str:
+    """Tareas de «Campañas de creadores» de TikTok guardadas para el usuario
+    (cupones/dinero por subir N vídeos de ciertos productos antes de una fecha).
+    Su progreso (subidos desde que se apuntó / requeridos, pendientes, horas
+    que quedan, productos sin vídeo aún) sale en `mis_tandas` › `tareas_activas`,
+    y cada vídeo trae `tareas` (ids). Guía `mis-tandas.md` › Tareas."""
+    return _json(await Interno(_usuario(ctx)).get("/api/v1/mis-tandas/tareas"))
+
+
+@_herramienta(structured_output=False)
+async def guardar_tarea(ctx: Context, nombre: str = "", id: str = "", recompensa: str | None = None,
+                        fin: str | None = None, videos_requeridos: int | None = None,
+                        productos: list[str] | None = None, refs: list[str] | None = None,
+                        notas: str | None = None, anadir: bool = False,
+                        archivada: bool | None = None, borrar: bool = False) -> str:
+    """Crea o actualiza (por `id`; sin `id` lo saca del `nombre`) una tarea de
+    Campañas de creadores. `fin` ISO hora de Madrid («2026-10-30T17:00»);
+    `productos`: IDs de producto de TikTok o enlaces a su ficha (así casa con
+    cualquier vídeo de ese producto, de cualquier nicho); `refs`:
+    «source|carpeta|producto» del catálogo si aún no tiene enlace.
+    `anadir=True` suma productos/refs a los que ya tenía. `borrar=True` la quita.
+    Solo tareas realistas (N vídeos de productos concretos), no las de GMV o directos."""
+    api = Interno(_usuario(ctx))
+    if borrar:
+        if not id:
+            raise ErrorApp("Para borrar hace falta el `id` de la tarea.")
+        return _json(await api.delete(f"/api/v1/mis-tandas/tareas/{id}"))
+    body = {k: v for k, v in {
+        "id": id, "nombre": nombre or None, "recompensa": recompensa, "fin": fin,
+        "videos_requeridos": videos_requeridos, "productos": productos, "refs": refs,
+        "notas": notas, "archivada": archivada}.items() if v is not None}
+    body["anadir"] = anadir
+    return _json(await api.post("/api/v1/mis-tandas/tareas", body))
+
+
+@_herramienta(structured_output=False)
 async def replicar_viral(ctx: Context, catalogo: str, carpeta: str, producto: str,
                          url: str = "", archivo_id: str = "") -> str:
     """Copia la FÓRMULA de un vídeo viral de TikTok con un producto nuestro

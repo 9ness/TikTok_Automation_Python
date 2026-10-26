@@ -96,6 +96,12 @@ function SelectorEpoca({ v }: { v: VideoTanda }) {
   );
 }
 
+const SIN_TAREA = "__sin_tarea__";
+
+function tiempoRestante(horas: number): string {
+  return horas < 24 ? `${Math.max(0, Math.round(horas))} h` : `${Math.floor(horas / 24)} d ${Math.round(horas % 24)} h`;
+}
+
 function fechaCorta(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
   return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }).replace(".", "");
@@ -189,8 +195,15 @@ export function MisTandas() {
   const listaOcultos = useOcultosTandas(verOcultos);
   const [progreso, setProgreso] = useState("");
   const [abierta, setAbierta] = useState<number | null>(null);
+  // Filtro por tarea de Campañas de creadores: "" todas, SIN_TAREA o el id.
+  const [filtro, setFiltro] = useState("");
 
   const datos = tandas.data;
+  const tareasActivas = datos?.tareas_activas ?? [];
+  const filtroReal = filtro === SIN_TAREA || tareasActivas.some((x) => x.id === filtro) ? filtro : "";
+  const pasa = (v: VideoTanda) =>
+    !filtroReal || (filtroReal === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(filtroReal));
+  const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
   const primeraPendiente = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
   const abiertaReal = abierta ?? primeraPendiente;
 
@@ -213,6 +226,7 @@ export function MisTandas() {
     setBajando(clave);
     const candidatos = t.items
       .map((v, i) => ({ v, i }))
+      .filter(({ v }) => pasa(v))
       .filter(({ v }) => (soloPendientes ? !v.uploaded && !v.sin_stock : !(v.sin_stock && !v.uploaded)));
     // Un vídeo no está terminado hasta que se comprueba: lo que no tiene
     // semáforo (o está en rojo) no se baja en bloque.
@@ -294,6 +308,44 @@ export function MisTandas() {
           </button>
         ) : null}
       </div>
+
+      {tareasActivas.length ? (
+        <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
+          <p className="mb-1 text-[10px] text-muted-foreground">
+            🎯 Tareas de Campañas de creadores: toca una para ver solo sus vídeos (de todas las tandas).
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {[
+              { id: "", etiqueta: "Todas" },
+              ...tareasActivas.map((x) => ({
+                id: x.id,
+                etiqueta: `${x.nombre} · ${x.subidos}/${x.videos_requeridos || x.videos}${
+                  x.horas_restantes != null ? ` · ⏳ ${tiempoRestante(x.horas_restantes)}` : ""
+                }`,
+                titulo: [x.recompensa, x.notas, `${x.pendientes} pendientes de subir`,
+                  x.productos_sin_video.length ? `${x.productos_sin_video.length} producto(s) sin vídeo aún` : ""]
+                  .filter(Boolean)
+                  .join(" · "),
+              })),
+              { id: SIN_TAREA, etiqueta: "Sin tarea" },
+            ].map((c) => (
+              <button
+                key={c.id || "todas"}
+                type="button"
+                onClick={() => setFiltro(c.id)}
+                title={"titulo" in c ? c.titulo : undefined}
+                className={`max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${
+                  filtroReal === c.id
+                    ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                    : "border-border/60 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {c.etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {verOcultos ? (
         <div className="mb-2 rounded-lg border border-rose-500/30 bg-rose-500/5 p-2">
@@ -429,7 +481,10 @@ export function MisTandas() {
         <div className="space-y-1.5">
           {datos.tandas.map((t) => {
             const completa = !t.abierta;
-            const abiertaEsta = abiertaReal === t.numero;
+            const visibles = t.items.filter(pasa);
+            if (filtroReal && !visibles.length) return null;
+            // Con filtro se ven todas las tandas que tengan algo de la tarea.
+            const abiertaEsta = filtroReal ? abierta !== t.numero : abiertaReal === t.numero;
             return (
               <div
                 key={t.numero}
@@ -438,11 +493,18 @@ export function MisTandas() {
                 <div className="flex items-center gap-2 px-2 py-1.5">
                   <button
                     type="button"
-                    onClick={() => setAbierta(abiertaEsta ? -1 : t.numero)}
+                    onClick={() =>
+                      filtroReal ? setAbierta(abiertaEsta ? t.numero : null) : setAbierta(abiertaEsta ? -1 : t.numero)
+                    }
                     className="min-w-0 flex-1 text-left"
                   >
                     <span className="text-xs font-semibold sm:text-sm">
                       {abiertaEsta ? "▾" : "▸"} Tanda {t.numero}
+                      {filtroReal ? (
+                        <span className="ml-1 text-[10px] font-normal text-amber-500">
+                          · {visibles.length} de {t.items.length} {filtroReal === SIN_TAREA ? "sin tarea" : "de la tarea"}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-1">
                       <span
@@ -503,7 +565,7 @@ export function MisTandas() {
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-stretch gap-1">
-                    {t.abierta ? (
+                    {t.abierta && !filtroReal ? (
                       <button
                         type="button"
                         disabled={completar.isPending}
@@ -535,12 +597,12 @@ export function MisTandas() {
                     ) : null}
                     {(
                       [
-                        [false, "Todos", t.items.filter((v) => !(v.sin_stock && !v.uploaded)).length],
-                        [true, "Pendientes", t.items.filter((v) => !v.uploaded && !v.sin_stock).length],
+                        [false, "Todos", visibles.filter((v) => !(v.sin_stock && !v.uploaded)).length],
+                        [true, "Pendientes", visibles.filter((v) => !v.uploaded && !v.sin_stock).length],
                       ] as const
                     ).map(([solo, etiqueta, cuantos]) => {
                       const clave = `${t.numero}|${solo ? "pendientes" : "todos"}`;
-                      if (solo && (cuantos === 0 || cuantos === t.items.length)) return null;
+                      if (solo && (cuantos === 0 || cuantos === visibles.length)) return null;
                       return (
                         <button
                           key={clave}
@@ -563,7 +625,7 @@ export function MisTandas() {
                 </div>
                 {abiertaEsta && (
                   <ul className="divide-y divide-border/40 border-t border-border/40">
-                    {t.items.map((v, i) => (
+                    {t.items.map((v, i) => !pasa(v) ? null : (
                       <li
                         key={v.id}
                         className={`flex flex-col gap-1 px-2 py-1.5 ${v.sin_stock && !v.uploaded ? "bg-rose-500/5" : ""}`}
@@ -598,6 +660,15 @@ export function MisTandas() {
                                 📁 {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
                               </span>
                               <MontadoEl ts={v.video_listo_at} />
+                              {(v.tareas ?? []).map((id) => (
+                                <span
+                                  key={id}
+                                  title="Cuenta para esta tarea de Campañas de creadores"
+                                  className="rounded bg-amber-500/15 px-1.5 py-px text-[9px] font-semibold text-amber-600 dark:text-amber-400"
+                                >
+                                  🎯 {nombreTarea(id)}
+                                </span>
+                              ))}
                               <SelectorEpoca v={v} />
                               {v.desde ? (
                                 <span

@@ -51,6 +51,24 @@ export interface VideoTanda {
   epoca?: Epoca;
   /** Lleva voz (los mudos no van a TikTok en las cuentas «solo hablados»). */
   habla?: boolean;
+  /** Ids de las tareas de Campañas de creadores en las que cuenta. */
+  tareas?: string[];
+}
+
+/** Tarea de «Campañas de creadores» con su progreso (`src/mis_tandas/tareas.py`). */
+export interface TareaActiva {
+  id: string;
+  nombre: string;
+  recompensa?: string;
+  fin?: string;
+  notas?: string;
+  videos_requeridos: number;
+  videos: number;
+  subidos: number;
+  pendientes: number;
+  productos: number;
+  productos_sin_video: string[];
+  horas_restantes: number | null;
 }
 
 export type Epoca = "neutro" | "otono" | "halloween" | "black_friday" | "invierno" | "navidad";
@@ -99,6 +117,8 @@ export interface MisTandasResponse {
   solo_meta?: VideoTanda[];
   /** Suma de `sin_revisar` de las tandas abiertas. */
   sin_revisar?: number;
+  /** Tareas de Campañas de creadores sin vencer, la que antes acaba primero. */
+  tareas_activas?: TareaActiva[];
   tandas: Tanda[];
 }
 
