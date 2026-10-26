@@ -236,6 +236,9 @@ productos concretos); las de GMV de 1.000 €, directos o similares, no.
   (`tareas_productos`) con foto limpia + ficha y se hacen en formato POV. El tipo
   de guion se ELIGE POR PRODUCTO (urgencia de precio del POV BOF, o dolor /
   venta inversa / acción / épico del POV BOF Largo), no uno para toda la tanda.
+  Con clips de Veo de 8 s el guion dura ~16 s (2 clips) o ~24 s (3), nunca 10-12 s.
+- TikTok cuenta cada vídeo solo si el producto es de la lista de la tarea y dura
+  ≥ 10 s, y el progreso tarda en actualizarse (subidos 12 → marcaba 6, luego 7).
 - **Recolección en UNA pasada por producto** (móvil por ADB): los productos se
   sacan del CARRUSEL de la propia tarea (Paso 1; no siempre están en el
   escaparate ni en el buscador del pool). Con la ficha abierta, en el mismo
