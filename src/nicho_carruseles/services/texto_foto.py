@@ -47,6 +47,13 @@ ESTILOS: dict[str, dict] = {
                 "pildora": None, "mayus": False, "tam": 0.95, "sombra": True},
     "pildora": {"fuente": "Rubik-Bold.ttf", "color": (20, 20, 20), "borde": 0.0,
                 "pildora": (255, 255, 255, 255), "mayus": False, "tam": 0.85, "sombra": False},
+    # Píldora blanca con la letra NATIVA de TikTok (la del texto «con fondo» de
+    # la app en muchos virales: «Juste ici⤵️», «S'il porte une doudoune…»).
+    "pildora_tiktok": {"fuente": "TikTokSans-Medium.ttf", "color": (20, 20, 20), "borde": 0.0,
+                       "pildora": (255, 255, 255, 255), "mayus": False, "tam": 0.85, "sombra": False},
+    # Píldora blanca con letra condensada en mayúsculas («EN PROMO‼️», «DISPO ICI👀»).
+    "pildora_impacto": {"fuente": "anton.ttf", "color": (20, 20, 20), "borde": 0.0,
+                        "pildora": (255, 255, 255, 255), "mayus": True, "tam": 0.85, "sombra": False},
     "pildora_negra": {"fuente": "Rubik-Bold.ttf", "color": (255, 255, 255), "borde": 0.0,
                       "pildora": (0, 0, 0, 170), "mayus": False, "tam": 0.85, "sombra": False},
     "tiktok_sans": {"fuente": "TikTokSans-Bold.ttf", "color": (255, 255, 255), "borde": 0.03,
@@ -84,6 +91,9 @@ ESTILOS: dict[str, dict] = {
                    "pildora": None, "mayus": False, "tam": 1.2, "sombra": True},
     "rotulador": {"fuente": "PermanentMarker-Regular.ttf", "color": (255, 255, 255), "borde": 0.05,
                   "pildora": None, "mayus": False, "tam": 0.95, "sombra": True},
+    # Condensada blanca SIN contorno grueso, solo sombra («L'ENSEMBLE EST…»).
+    "impacto_fino": {"fuente": "anton.ttf", "color": (255, 255, 255), "borde": 0.025,
+                     "pildora": None, "mayus": True, "tam": 1.0, "sombra": True},
     "impacto": {"fuente": "anton.ttf", "color": (255, 255, 255), "borde": 0.1,
                 "pildora": None, "mayus": True, "tam": 1.05, "sombra": True},
 }

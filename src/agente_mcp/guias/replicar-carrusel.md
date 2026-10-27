@@ -154,8 +154,11 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
 - `fondo_blanco` — negra sobre caja blanca opaca unida (fondo blanco de TikTok).
 - `fondo_trans` — blanca sobre caja negra semitransparente unida.
 - `fondo_rosa` — fucsia sobre caja rosa claro unida (virales de maquillaje y belleza).
+- `pildora_tiktok` — negra con la letra de TikTok (medium) sobre píldora blanca por línea: el texto «con fondo» de la app en la mayoría de virales («Juste ici⤵️», «S'il porte une doudoune…»). NO uses `pildora` (Rubik, otra letra) si el viral lleva la de TikTok.
+- `pildora_impacto` — mayúsculas condensadas negras sobre píldora blanca («EN PROMO‼️», «DISPO ICI👀»).
+- `impacto_fino` — mayúsculas condensadas blancas solo con sombra (sin el contorno gordo de `impacto`).
 - `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
-**Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan. Si el viral MEZCLA letras (barra de Snapchat en la 1ª y texto normal en la 2ª), pon primero el estilo general y luego el de esa diapositiva con `estilo_n`; compara TODAS, no solo la 1ª. Fíjate también en los cortes de línea del viral y cópialos con `\n` en el texto.
+**Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10 y 27/10: «eso influye mucho»; la letra más parecida Y el mismo aspecto: píldora si el viral lleva píldora, misma fuente dentro de la píldora, mayúsculas si van en mayúsculas): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan. Si el viral MEZCLA letras (barra de Snapchat en la 1ª y texto normal en la 2ª), pon primero el estilo general y luego el de esa diapositiva con `estilo_n`; compara TODAS, no solo la 1ª. Fíjate también en los cortes de línea del viral y cópialos con `\n` en el texto.
 Los tres `fondo_*` salen ya a ~0.78 del tamaño base; afina con `texto_tam`.
 **Cómo se clava (lo que funcionó, 23/10):**
 - Compara SIEMPRE el carrusel entero: fila de arriba el viral, abajo el nuestro ya quemado (baja el ZIP y monta la hoja). Ajusta hasta que, de un vistazo, no se distingan letra, tamaño, altura y cortes.
