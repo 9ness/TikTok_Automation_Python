@@ -298,7 +298,7 @@ def _lazo(ancho: int, pal: dict, colas: bool = True) -> Image.Image:
 # Rótulo
 # ---------------------------------------------------------------------------
 _MAX_W = W - 160          # el rótulo entero, emojis incluidos
-_MAX_H = int(H * 0.22)    # de 0.15 a ~0.37: no baja hasta el producto
+_MAX_H = int(H * 0.22)    # de 0.185 a ~0.40 (REGALO_TOP_Y): no baja hasta el producto
 
 
 def nombre_seguro(textos: dict, on_log: OnLog = _noop) -> str:

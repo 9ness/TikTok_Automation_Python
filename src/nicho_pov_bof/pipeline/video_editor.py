@@ -1438,6 +1438,11 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
         block = regalo.render_rotulo(
             textos or {}, regalo.elegir_variante(semilla), on_log, piezas,
         )
+        # Es más alto que el bloque de siempre y, centrado en TEXT_BLOCK_Y,
+        # quedaba pegado al borde de la zona segura (Néstor, 27/10): el borde
+        # de arriba va en REGALO_TOP_Y.
+        if block is not None and y_frac is None:
+            y_frac = config.REGALO_TOP_Y + block.height / 2 / config.TARGET_H
     else:
         block = _bloque_de_texto(
             video_in, textos, on_log, layout, piezas, semilla, estilo_texto,
