@@ -56,14 +56,15 @@ país, otro día otro, o mezclados.
    precio se cambia por algo que no sea precio fijo («a precio de chollo»,
    «revisa si tienes cupones», «mira la oferta en el carrito»). No repitas: mira
    antes `producto_carrusel()` / la lista de «Tus carruseles» (`carrusel_url`).
-4. **¿Se puede enlazar desde España?** Muchos productos de FR/DE/IT también se
-   venden con carrito en España (Néstor, 27/10): que Social1 no lo marque en ES
-   NO es motivo para descartar. Compruébalo en el **Mi 8** (TikTok Shop desde la
-   cuenta, busca el producto/tienda y mira si se añade al escaparate). Si no se
-   puede, busca un equivalente de ES (catálogos con `productos`, Social1 región
-   es). Solo se descarta si no hay forma de enlazar ni ese ni uno equivalente.
-   Si no está en ningún catálogo nuestro, alta en «Carruseles virales»
-   (`producto_carrusel`, abajo). Volumen: Néstor quiere MUCHOS (decenas al día).
+4. **Solo el MISMO producto, enlazable desde España** (Néstor, 27/10). Los
+   productos de las tiendas de FR/DE/IT salen «Este artículo solo está
+   disponible en FR» y no se pueden añadir al escaparate. Valen los
+   internacionales (tiendas que venden en varios países): cruza `product_id` y
+   tienda con lo recogido en España y, si no, abre
+   `https://www.tiktok.com/view/product/<product_id>` en el **Mi 8**: tiene que
+   salir «Comprar» / «Añadir al escaparate» sin ese aviso. Social1 no dice si
+   hay envío internacional. **Nunca un producto «parecido»** (riesgo de sanción
+   por producto incoherente): si no es el mismo, se descarta.
 5. `replicar_carrusel(..., url=<url>, pais="FR")` y sigue §2-§4 como cualquier
    carrusel (fotos en Flow, subir, quemar, Mis tandas con semáforo).
 6. Apaga tu pestaña al terminar; el navegador se apaga solo a los 45 min.
