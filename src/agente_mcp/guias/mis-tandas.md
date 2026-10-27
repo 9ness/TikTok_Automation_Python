@@ -249,8 +249,9 @@ productos concretos); las de GMV de 1.000 €, directos o similares, no.
   entero, capturas en mosaico.
 - No cambia tandas ni orden: es una etiqueta. En la web, chips «Todas · <tarea>
   subidos/requeridos · ⏳ · Sin tarea» enseñan solo sus vídeos de todas las
-  tandas abiertas (y bajar Todos/Pendientes baja solo esos). Con filtro no sale
-  «Tanda completada».
+  tandas abiertas (y bajar Todos/Pendientes baja solo esos). Con filtro también
+  sale «Tanda completada» (27/10/2026), pero cierra la tanda ENTERA, no solo los
+  vídeos de la tarea.
 - Progreso (`mis_tandas` › `tareas_activas`): `subidos` cuenta solo lo marcado
   subido DESDE que se apuntó la tarea (o desde `desde`); `productos_sin_video`
   dice qué falta montar y `faltan` los vídeos por subir. Son TEMPORALES: al pasar

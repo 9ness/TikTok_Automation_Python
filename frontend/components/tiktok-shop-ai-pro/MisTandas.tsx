@@ -565,7 +565,8 @@ export function MisTandas() {
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-col items-stretch gap-1">
-                    {t.abierta && !filtroReal ? (
+                    {/* También con el filtro de tarea: cierra la tanda ENTERA, no solo lo de la tarea. */}
+                    {t.abierta ? (
                       <button
                         type="button"
                         disabled={completar.isPending}
@@ -576,7 +577,11 @@ export function MisTandas() {
                           } else setACompletar(t.numero);
                         }}
                         onBlur={() => setACompletar((x) => (x === t.numero ? null : x))}
-                        title="Da la tanda por terminada y pasa a la siguiente. No marca nada como subido"
+                        title={
+                          filtroReal && visibles.length < t.items.length
+                            ? `Cierra la tanda ${t.numero} entera (${t.items.length} vídeos, no solo los de la tarea). No marca nada como subido`
+                            : "Da la tanda por terminada y pasa a la siguiente. No marca nada como subido"
+                        }
                         className={`flex items-center justify-center gap-1 rounded-md border px-2 py-1 text-[11px] disabled:opacity-50 ${
                           aCompletar === t.numero
                             ? "border-emerald-500 bg-emerald-500/20 text-emerald-500"
