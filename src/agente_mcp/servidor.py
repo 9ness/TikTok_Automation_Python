@@ -996,7 +996,7 @@ async def subir_imagen_carrusel(ctx: Context, id: str, n: int, archivo_id: str =
 async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
                              texto: str | None = None, estilo_texto: str = "",
                              texto_y: float = 0, texto_tam: float = 0,
-                             estilo_n: int = 0, caption: str | None = None) -> str:
+                             texto_alinear: str = "", estilo_n: int = 0, caption: str | None = None) -> str:
     """Un carrusel replicado: diapositivas con su texto, si ya tienen foto,
     `hechas`/`total`, y `zip` = enlace para bajar TODAS de golpe (con su texto
     quemado) + caption.txt. Sin `id`: la lista de carruseles replicados.
@@ -1010,7 +1010,9 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
     pildora_negra, maquina, elegante, manuscrita, rotulador, impacto),
     `texto_y` la altura del texto (0.05 arriba … 0.95 abajo; 0 = la de
     siempre) y `texto_tam` el multiplicador de tamaño (0.5-1.6; 0 = el del
-    estilo; los virales suelen llevar letra más pequeña: ~0.7-0.8).
+    estilo; los virales suelen llevar letra más pequeña: ~0.7-0.8) y
+    `texto_alinear` izquierda / derecha / centro (por defecto) para dejar el
+    texto en el mismo lado que el viral.
     Vuelve a quemar todas. Con `estilo_n` el estilo es SOLO de esa
     diapositiva (virales que mezclan letras: barra de Snapchat en la 1ª y
     letra normal en la 2ª); un estilo sin `estilo_n` borra los de diapositiva.
@@ -1031,6 +1033,8 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
             body["y"] = texto_y
         if texto_tam:
             body["tam"] = texto_tam
+        if texto_alinear:
+            body["alinear"] = texto_alinear
         if estilo_n:
             body["n"] = estilo_n
         await api.post(f"/api/v1/replicar-viral/carrusel/{id}/estilo", body)

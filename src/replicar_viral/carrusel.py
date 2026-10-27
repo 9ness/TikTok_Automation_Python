@@ -481,7 +481,7 @@ def _quemar(usuario: str, id_: str, n: int, texto: str, doc: dict | None = None)
         nombre = "tiktok_sans"  # Montserrat no trae ą ę ł ń ś ź ż
     if texto.strip():
         texto_foto.quemar(base, texto, destino, estilo=nombre, y_rel=est.get("y"),
-                          tam_rel=est.get("tam"))
+                          tam_rel=est.get("tam"), alinear=est.get("alinear", ""))
     elif destino.exists():
         destino.unlink()
     olvidar_disco(usuario, id_)
@@ -522,7 +522,8 @@ def cambiar_caption(usuario: str, id_: str, caption: str) -> dict:
 
 
 def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None,
-                   tam: float | None = None, n: int | None = None) -> dict:
+                   tam: float | None = None, n: int | None = None,
+                   alinear: str = "") -> dict:
     """Letra del carrusel entero (para parecerse al viral: máquina de escribir,
     manuscrita, píldora blanca…; ver `texto_foto.ESTILOS`) y, si se da, altura
     del texto (0-1 sobre el alto) y `tam` (multiplicador 0.5-1.6 del tamaño
@@ -544,6 +545,11 @@ def cambiar_estilo(usuario: str, id_: str, estilo: str, y: float | None = None,
     if tam is not None:
         try:
             est["tam"] = texto_foto.tam_valido(tam)
+        except ValueError as e:
+            raise ErrorReplica(str(e)) from e
+    if alinear:
+        try:
+            est["alinear"] = texto_foto.alinear_valido(alinear)
         except ValueError as e:
             raise ErrorReplica(str(e)) from e
     if n:

@@ -1250,3 +1250,4 @@
 - 2026-10-27 · Celo Eagle: el viral original SÍ tiene gancho negro sobre blanco hasta 4,7 s; Genjutsu lo convirtió en un bloque de fondo. A petición de Néstor se repone el mismo gancho en español solo 0–3,133 s (referencia ×1,5), conservando audio y CTA; comprobar los fotogramas originales antes de afirmar que no hay texto.
 - 2026-10-27 · Carruseles de otros países (`pais`): Montserrat (estilo tiktok) no tiene ą ę ł ń ś ź ż → en PL se quema con tiktok_sans. `test_semaforo_de_carrusel` falla a ratos también en HEAD (flaky, no por el cambio).
 - 2026-10-27 · Virales que son anuncios de diseño (título oscuro sobre pared clara) no se podían copiar con letras blancas → estilos editorial / redonda_oscura / anuncio_azul en texto_foto.py
+- 2026-10-27 · Carruseles replicados: los espacios duros apenas descentran el texto (glifo estrecho) → parámetro `alinear` (izquierda/derecha, margen 7 %) en texto_foto.quemar, endpoint /estilo y MCP `texto_alinear`

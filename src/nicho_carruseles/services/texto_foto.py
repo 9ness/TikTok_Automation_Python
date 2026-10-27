@@ -113,6 +113,17 @@ ESTILO_DEFECTO = "tiktok"
 TAM_REL_MIN, TAM_REL_MAX = 0.5, 1.6
 
 
+MARGEN_LADO = 0.07
+ALINEACIONES = ("centro", "izquierda", "derecha")
+
+
+def alinear_valido(alinear: str | None) -> str:
+    a = (alinear or "centro").strip().lower()
+    if a not in ALINEACIONES:
+        raise ValueError(f"alinear: {' / '.join(ALINEACIONES)}")
+    return a
+
+
 def tam_valido(tam: float | None) -> float | None:
     """Multiplicador de tamaño (0.5-1.6) o None (el del estilo)."""
     if tam is None:
@@ -180,12 +191,14 @@ def _caja_unida(dib: ImageDraw.ImageDraw, cajas: list[tuple[float, float, float,
 
 
 def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: float | None = None,
-           tam_rel: float | None = None) -> Path:
+           tam_rel: float | None = None, alinear: str = "") -> Path:
     """Escribe `texto` sobre la foto y la guarda en `destino`.
 
     `estilo`: uno de `ESTILOS` (por defecto «tiktok»). `y_rel`: centro del
     bloque de texto sobre el alto (0-1); por defecto `config.TEXTO_Y`.
     `tam_rel`: multiplicador del tamaño (0.5-1.6) sobre el del estilo.
+    `alinear`: «izquierda» / «derecha» (con margen `MARGEN_LADO` del ancho) o
+    centrado (por defecto), para dejar el texto donde lo lleva el viral.
 
     Siempre parte de la foto ORIGINAL, nunca de una ya quemada: por eso las
     versiones con texto viven en su propia carpeta (`config.SUBCARPETAS`). Si se
@@ -198,6 +211,7 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
     if est["mayus"]:
         texto = texto.upper()
     tam_rel = tam_valido(tam_rel)
+    alinear = alinear_valido(alinear)
     y_rel = config.TEXTO_Y if y_rel is None else min(0.9, max(0.08, float(y_rel)))
 
     with Image.open(origen) as original:
@@ -233,6 +247,10 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
         for linea in lineas:
             ancho = _seg_width(_split_runs(linea), font, d0, emoji_size, gap)
             x = (W - ancho) / 2
+            if alinear == "izquierda":
+                x = W * MARGEN_LADO + pad
+            elif alinear == "derecha":
+                x = W * (1 - MARGEN_LADO) - pad - ancho
             if est.get("banda"):
                 cajas.append((0, y, W, y + alto_linea))
                 y_txt = y + (alto_linea - tam * 1.24) / 2
