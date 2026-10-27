@@ -56,11 +56,14 @@ país, otro día otro, o mezclados.
    precio se cambia por algo que no sea precio fijo («a precio de chollo»,
    «revisa si tienes cupones», «mira la oferta en el carrito»). No repitas: mira
    antes `producto_carrusel()` / la lista de «Tus carruseles» (`carrusel_url`).
-4. **Producto equivalente en ESPAÑA** (la cuenta solo enlaza el catálogo ES; las
-   tiendas de FR/DE/IT son otras): búscalo en nuestros catálogos (`productos`) o
-   en Social1 con región **es** y *Filter by product* / en TikTok Shop ES. Si no
-   está en ningún catálogo, alta en «Carruseles virales» (`producto_carrusel`,
-   abajo). Sin equivalente en España → descártalo.
+4. **¿Se puede enlazar desde España?** Muchos productos de FR/DE/IT también se
+   venden con carrito en España (Néstor, 27/10): que Social1 no lo marque en ES
+   NO es motivo para descartar. Compruébalo en el **Mi 8** (TikTok Shop desde la
+   cuenta, busca el producto/tienda y mira si se añade al escaparate). Si no se
+   puede, busca un equivalente de ES (catálogos con `productos`, Social1 región
+   es). Solo se descarta si no hay forma de enlazar ni ese ni uno equivalente.
+   Si no está en ningún catálogo nuestro, alta en «Carruseles virales»
+   (`producto_carrusel`, abajo). Volumen: Néstor quiere MUCHOS (decenas al día).
 5. `replicar_carrusel(..., url=<url>, pais="FR")` y sigue §2-§4 como cualquier
    carrusel (fotos en Flow, subir, quemar, Mis tandas con semáforo).
 6. Apaga tu pestaña al terminar; el navegador se apaga solo a los 45 min.
