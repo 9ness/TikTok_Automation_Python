@@ -165,6 +165,7 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
 - `pildora_tiktok` — negra con la letra de TikTok (medium) sobre píldora blanca por línea: el texto «con fondo» de la app en la mayoría de virales («Juste ici⤵️», «S'il porte une doudoune…»). NO uses `pildora` (Rubik, otra letra) si el viral lleva la de TikTok.
 - `pildora_impacto` — mayúsculas condensadas negras sobre píldora blanca («EN PROMO‼️», «DISPO ICI👀»).
 - `impacto_fino` — mayúsculas condensadas blancas solo con sombra (sin el contorno gordo de `impacto`).
+- `editorial` / `redonda_oscura` / `anuncio_azul` — letra OSCURA sin caja ni contorno para los virales que son anuncios de diseño (título arriba sobre pared o cielo claro): serif fina marrón (Cormorant), redondeada granate (Fredoka) o sans azul marino (Poppins). Pide en el prompt de la foto esa zona despejada y clara donde va el texto.
 - `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
 **Textos (SIEMPRE, Néstor 27/10):** misma letra o la más parecida, mismo
 efecto (píldora, contorno, sombra, barra, mayúsculas, color) y en el MISMO SITIO

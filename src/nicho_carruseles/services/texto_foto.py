@@ -34,7 +34,8 @@ from src.tiktok_shop.pipeline.ready_video import (
 # usa la letra que le da su tono (máquina de escribir, manuscrita, píldora
 # blanca de TikTok…). Solo fuentes que vienen en `assets/fonts`. Todos se
 # tienen que leer sobre cualquier foto: letra blanca con contorno + sombra, y
-# la oscura SOLO sobre su píldora blanca (nunca letra negra suelta).
+# la oscura sobre su píldora blanca, o suelta solo en los estilos de anuncio
+#   (editorial, redonda_oscura, anuncio_azul) sobre una zona clara de la foto.
 #   fuente · color · borde (sobre el tamaño; 0 = sin contorno) · pildora (fondo
 #   por línea, RGBA o None) · mayus · tam (sobre el ancho) · sombra
 #   «unida» (opcional): las cajas de líneas consecutivas forman UNA sola forma
@@ -94,6 +95,15 @@ ESTILOS: dict[str, dict] = {
     # Condensada blanca SIN contorno grueso, solo sombra («L'ENSEMBLE EST…»).
     "impacto_fino": {"fuente": "anton.ttf", "color": (255, 255, 255), "borde": 0.025,
                      "pildora": None, "mayus": True, "tam": 1.0, "sombra": True},
+    # Letra OSCURA sin caja para virales que son anuncios de diseño (título
+    # arriba sobre una pared o un cielo claro). Solo si la foto deja esa zona
+    # clara: se genera así a propósito, copiando la composición del viral.
+    "editorial": {"fuente": "CormorantGaramond-Light.ttf", "color": (62, 48, 38), "borde": 0.0,
+                  "pildora": None, "mayus": False, "tam": 1.15, "sombra": False},
+    "redonda_oscura": {"fuente": "Fredoka-SemiBold.ttf", "color": (92, 52, 50), "borde": 0.0,
+                       "pildora": None, "mayus": False, "tam": 0.95, "sombra": False},
+    "anuncio_azul": {"fuente": "Poppins-SemiBold.ttf", "color": (28, 48, 100), "borde": 0.0,
+                     "pildora": None, "mayus": False, "tam": 0.95, "sombra": False},
     "impacto": {"fuente": "anton.ttf", "color": (255, 255, 255), "borde": 0.1,
                 "pildora": None, "mayus": True, "tam": 1.05, "sombra": True},
 }
