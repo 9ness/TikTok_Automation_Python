@@ -185,6 +185,8 @@ def _caja_unida(dib: ImageDraw.ImageDraw, cajas: list[tuple[float, float, float,
     for c in cajas:
         dib.rounded_rectangle(c, radius=radio, fill=relleno)
     for a, b in zip(cajas, cajas[1:]):
+        if b[1] > a[3] + 1:
+            continue  # hueco entre dos textos: no se unen
         x0, x1 = max(a[0], b[0]), min(a[2], b[2])  # tramo común = la más estrecha
         yj = a[3]
         dib.rectangle((x0, yj - radio, x1, yj + radio), fill=relleno)
@@ -245,6 +247,10 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
         alto_bloque = alto_linea * len(lineas)
         y = int(H * y_rel - alto_bloque / 2)
         for linea in lineas:
+            if not linea.strip(" \t\xa0"):
+                # Línea de separación (dos textos en una diapositiva): sin caja.
+                y += alto_linea
+                continue
             ancho = _seg_width(_split_runs(linea), font, d0, emoji_size, gap)
             x = (W - ancho) / 2
             if alinear == "izquierda":
