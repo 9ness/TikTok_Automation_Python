@@ -31,7 +31,7 @@ from src.multiplataforma.clients.pinterest import PinterestClient
 from src.multiplataforma.clients.threads import ThreadsClient
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, publicaciones_repo
-from src.multiplataforma.services import ingesta, tandas, video_url
+from src.multiplataforma.services import ingesta, reel_fotos, tandas, video_url
 
 
 def _noop(_: str) -> None:
@@ -48,6 +48,8 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
     texto = pub.textos.get(plataforma, "")
     simulado = dry_run or not token
 
+    if pub.tipo == "carrusel" and config.CARRUSEL_COMO_REEL and plataforma in config.PLATAFORMAS_CARRUSEL_REEL:
+        return _ejecutar_reel_fotos(plataforma, pub, cuenta, token, destino, texto, simulado, kw, previo)
     if pub.tipo == "carrusel":
         return _ejecutar_carrusel(plataforma, pub, token, destino, texto, simulado, kw, previo)
 
@@ -74,6 +76,28 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
             video_path=pub.video_path, cover_url=pub.cover_url, previo=previo,
         )
     raise ErrorPublicacion(f"Plataforma desconocida: {plataforma}", reintentable=False)
+
+
+def _ejecutar_reel_fotos(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, token: str, destino: str,
+                         texto: str, simulado: bool, kw: dict, previo: dict) -> dict:
+    """Carrusel publicado como reel de fotos con música (`reel_fotos`)."""
+    if previo.get("children") or previo.get("photo_ids") or previo.get("post_id"):
+        previo = {}  # ids de un intento como carrusel: no valen para el reel
+    if simulado:
+        reel = str(reel_fotos.ruta(pub)) if pub.imagenes else ""
+    else:
+        try:
+            reel = str(reel_fotos.reel_de(pub, cuenta.dueno))
+        except reel_fotos.ErrorReel as e:
+            raise ErrorPublicacion(f"reel de fotos: {e}", reintentable=True) from e
+    if plataforma == "instagram":
+        res = InstagramClient(token, **kw).publicar(
+            destino, caption=texto, video_url=video_url.url_publica(reel), cover_url="",
+            trial=False, graduacion=pub.trial_graduation, previo=previo)
+    else:
+        res = FacebookClient(token, **kw).publicar(
+            destino, descripcion=texto, video_path=reel, comentario=pub.comentario, previo=previo)
+    return {**res, "reel_fotos": reel}
 
 
 def _ejecutar_carrusel(plataforma: str, pub: Publicacion, token: str, destino: str, texto: str,

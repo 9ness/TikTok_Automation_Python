@@ -31,6 +31,14 @@ MAX_FOTOS_CARRUSEL: dict[str, int] = {"instagram": 10, "facebook": 10, "threads"
 # IG solo acepta fotos entre 4:5 y 1.91:1: las de 9:16 o 3:4 se meten en un
 # lienzo 4:5 con el fondo de la propia foto desenfocado.
 IG_LIENZO_CARRUSEL: tuple[int, int] = (1080, 1350)
+# En IG y FB el carrusel sale como REEL de fotos con música
+# (`services/reel_fotos.py`): la API no deja poner música a un carrusel y sin
+# ella no tenían alcance. `MULTIPLATAFORMA_CARRUSEL_REEL=0` vuelve al carrusel.
+CARRUSEL_COMO_REEL = os.getenv("MULTIPLATAFORMA_CARRUSEL_REEL", "1").strip() != "0"
+PLATAFORMAS_CARRUSEL_REEL: tuple[str, ...] = ("instagram", "facebook")
+REEL_FOTO_S = 3.0   # segundos por foto
+REEL_ZOOM = 1.06    # zoom final de cada foto (empieza en 1.0)
+REEL_LUFS = -14.0   # la música es el único audio
 
 # Estados de cada plataforma dentro de una publicación.
 ESTADO_PENDIENTE = "pendiente"

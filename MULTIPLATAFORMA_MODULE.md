@@ -121,8 +121,13 @@ publican con `services/carruseles.py:encolar(slug, carrusel_id, asin|shein, capt
   CAROUSEL → `threads_publish`; Pinterest `multiple_image_urls` (máx. 5). Los
   ids intermedios (`children`, `photo_ids`, `container_id`) se guardan para
   no duplicar al reintentar.
-- Sin música: la API de Meta no la admite en fotos. La sugerida
-  (`musica.meta` de la réplica) vuelve en la respuesta.
+- **IG y FB van como REEL de fotos con música** (27/10/2026,
+  `services/reel_fotos.py`): la API no deja poner música a un carrusel y sin
+  ella tenían 0 de alcance. Fotos en 9:16 (fondo desenfocado),
+  `REEL_FOTO_S`=3 s cada una con zoom suave, y la pista `musica.meta.fichero`
+  de la réplica (o una del banco rotando) a −14 LUFS. Se monta en el tick a
+  `<carpeta del carrusel>/reel.mp4` y se reutiliza. Threads y Pinterest
+  siguen como carrusel. `MULTIPLATAFORMA_CARRUSEL_REEL=0` vuelve al carrusel.
 - **Solos desde el tick** (`carruseles.auto_encolar_todas`, 1 vez/hora): los
   carruseles TERMINADOS de los dueños de las cuentas que no están en ninguna
   cola entran en la de su nicho (`cuenta_para` por `categoria_link`: moda
@@ -262,7 +267,7 @@ solo admin).
 acceso Trial), `MULTIPLATAFORMA_DRY_RUN`, `MULTIPLATAFORMA_LIMITE_*`,
 `MULTIPLATAFORMA_AMAZON_DOMINIO`, `MULTIPLATAFORMA_VIDEO_URL_TTL_S`,
 `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`, `MULTIPLATAFORMA_MUSICA_DIR`,
-`MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`.
+`MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`, `MULTIPLATAFORMA_CARRUSEL_REEL`.
 Reutiliza `PUBLIC_BASE_URL` y `AUTH_COOKIE_KEY`. Sin cost tracking: las APIs
 de publicación son gratuitas.
 

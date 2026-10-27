@@ -13,8 +13,9 @@
 - El texto: el `caption` que se pase o el de la réplica sin lo que solo vale
   en TikTok (carrito, TikTok Shop). Hashtags sin los de TikTok + los de la
   tienda.
-- La música NO va: la API de Meta no deja ponerla a fotos/carruseles. La
-  sugerida (`musica.meta` de la réplica) se añade a mano si se quiere.
+- La API de Meta no deja poner música a un carrusel, así que en IG y FB se
+  publica como reel de fotos con la música `musica.meta` de la réplica
+  (`reel_fotos.py`, lo decide el publicador); Threads y Pinterest, carrusel.
 """
 
 from __future__ import annotations

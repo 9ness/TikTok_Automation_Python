@@ -104,8 +104,9 @@ Un carrusel con TODAS sus fotos hechas se publica en IG/FB/Threads con
 - `caption` en español y sin «carrito» ni TikTok (vacío = el de la réplica
   limpio). Sale uno al día a las 17:00 (± unos minutos), tras el último ya
   programado de esa cuenta. Repetir la llamada no duplica.
-- IG recibe las fotos en un lienzo 4:5 (no admite 3:4 ni 9:16). La música no
-  se puede poner por API: la respuesta trae la sugerida.
+- En IG y FB sale como **reel de fotos con música** (la de Meta de la
+  réplica), montado solo al publicar; en Threads, como carrusel. Así tiene
+  alcance: los carruseles sin música se quedaban en 0 visitas.
 - **No hace falta encolarlos a mano**: el tick, una vez por hora, programa
   solo cada carrusel terminado en la cuenta de su nicho **si ya tiene enlace**
   en esa cuenta. Tu trabajo es dejar el enlace (`encolar_carrusel` con

@@ -97,7 +97,8 @@ def test_falta_texto_quemado(replica, cuenta, monkeypatch):
         carruseles.encolar("viva_shop", "abc123", asin="B0ABC12345", ahora=AHORA)
 
 
-def test_publica_carrusel_en_las_tres(replica, cuenta):
+def test_publica_carrusel_en_las_tres(replica, cuenta, monkeypatch):
+    monkeypatch.setattr(config, "CARRUSEL_COMO_REEL", False)
     cuentas_repo.set_tokens("viva_shop", {"facebook": "tok", "threads": "tok"})
     inf = carruseles.encolar("viva_shop", "abc123", asin="B0ABC12345", ahora=AHORA,
                              plataformas=["instagram", "facebook", "threads"])
@@ -201,3 +202,76 @@ def test_actualizar_caption_de_la_cola(replica, cuenta):
     assert pub.textos["instagram"].startswith("Paraguas automático.") and "Un paraguas" not in pub.textos["instagram"]
     assert pub.textos["threads"] == viejo_threads  # ya publicada: no se toca
     assert carruseles.actualizar_caption("otro", "x") == []
+
+
+def test_ig_y_fb_salen_como_reel_de_fotos(replica, cuenta, monkeypatch, tmp_path):
+    from src.multiplataforma.services import reel_fotos
+
+    cuentas_repo.set_tokens("viva_shop", {"facebook": "tok", "threads": "tok"})
+    inf = carruseles.encolar("viva_shop", "abc123", asin="B0ABC12345", ahora=AHORA,
+                             plataformas=["instagram", "facebook", "threads"])
+    pub = publicaciones_repo.get(inf["publicacion"]["id"])
+    # restos de un intento anterior como carrusel: no deben reutilizarse
+    pub.resultados["instagram"] = {"children": ["viejo"], "container_id": "viejo-car"}
+    publicaciones_repo.guardar(pub)
+    reel = reel_fotos.ruta(pub)
+    hechos = []
+
+    def falso(p, usuario="", log=None):
+        hechos.append(usuario)
+        reel.write_bytes(b"mp4")
+        return reel
+
+    monkeypatch.setattr(reel_fotos, "reel_de", falso)
+
+    def th_media(r):
+        return {"id": "th-car"} if form(r).get("media_type") == "CAROUSEL" else {"id": "th-x"}
+
+    g = Grabadora([
+        ("GET", "content_publishing_limit", {"data": [{"quota_usage": 0}]}),
+        ("POST", "/ig1/media_publish", {"id": "ig-post"}),
+        ("POST", "/ig1/media", {"id": "ig-reel"}),
+        ("GET", "/ig-reel", {"status_code": "FINISHED"}),
+        ("POST", "/pg1/video_reels", lambda r: {"video_id": "fbv1", "upload_url": "https://rupload.facebook.com/video-upload/v24.0/fbv1"}
+         if "start" in r.content.decode() else {"success": True}),
+        ("POST", "rupload.facebook.com/video-upload", {"success": True}),
+        ("GET", "/fbv1", {"status": {"video_status": "ready", "publishing_phase": {"status": "complete"}}}),
+        ("POST", "/fbv1/comments", {"id": "c1"}),
+        ("GET", "threads_publishing_limit", {"data": [{"quota_usage": 0}]}),
+        ("POST", "/th1/threads_publish", {"id": "th-post"}),
+        ("POST", "/th1/threads", th_media),
+        ("GET", "/th-", {"status": "FINISHED"}),
+    ])
+    rep = publicador.publicar_pendientes(pub.programada_en + 1, http=g.cliente(), sleep=lambda s: None)
+    final = publicaciones_repo.get(pub.id)
+    assert final.estado == {p: config.ESTADO_PUBLICADO for p in ("instagram", "facebook", "threads")}, rep
+    assert hechos == ["ness", "ness"]
+    ig = form(next(r for r in g.peticiones if str(r.url).endswith("/ig1/media")))
+    assert ig["media_type"] == "REELS" and "/archivo/" in ig["video_url"]
+    assert final.resultados["instagram"]["reel_fotos"] == str(reel)
+    assert final.resultados["facebook"]["reel_fotos"] == str(reel)
+    assert not any("/pg1/photos" in str(r.url) for r in g.peticiones)
+    assert any("CAROUSEL" in r.content.decode() for r in g.peticiones if "/th1/threads" in str(r.url))
+
+
+def test_reel_de_fotos_monta_mp4_con_musica(replica, cuenta, tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+
+    from src.multiplataforma.services import musica, reel_fotos
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("sin ffmpeg")
+    banco = tmp_path / "musica" / "lofi_otono"
+    banco.mkdir(parents=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=f=440:d=4",
+                    str(banco / "a.mp3")], check=True)
+    monkeypatch.setenv("MULTIPLATAFORMA_MUSICA_DIR", str(tmp_path / "musica"))
+    replica["musica"]["meta"]["fichero"] = "_musica/lofi_otono/a.mp3"
+    monkeypatch.setattr(config, "REEL_FOTO_S", 1.0)
+    inf = carruseles.encolar("viva_shop", "abc123", asin="B0ABC12345", ahora=AHORA)
+    pub = publicaciones_repo.get(inf["publicacion"]["id"])
+    out = reel_fotos.reel_de(pub, "ness")
+    assert out.is_file() and abs(musica.duracion(out) - 3.0) < 0.2
+    assert not musica.es_mudo(out)
+    assert reel_fotos.reel_de(pub, "ness") == out  # reutiliza
