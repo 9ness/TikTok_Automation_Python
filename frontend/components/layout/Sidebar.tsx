@@ -172,6 +172,11 @@ const NAV: NavGroup[] = [
     item: { href: "/costs", label: "Costes", icon: DollarSign },
   },
   {
+    // Ventas de la cuenta de TikTok Shop: solo de Néstor (ver `SOLO_NESS`).
+    kind: "single",
+    item: { href: "/estadisticas", label: "Estadísticas", icon: BarChart3 },
+  },
+  {
     kind: "single",
     item: { href: "/claude", label: "Claude", icon: Bot },
   },
@@ -324,6 +329,9 @@ export function primeraPantalla(
   return `${BASE_AI_PRO}/nicho-pov-bof`;
 }
 
+/** Pantallas solo de `ness` (sus ventas). El backend también lo corta. */
+const SOLO_NESS = ["/estadisticas"];
+
 /** De los `pro`, quién sube productos propios: solo quien tiene catálogo de
  *  físicos (Ana). Mauro no tiene ninguno y el menú solo le enseñaría lo de otros. */
 const PRO_SUBEN_PRODUCTOS = ["ana"];
@@ -333,7 +341,9 @@ export function navPara(
   usuario?: string | null,
 ): NavGroup[] {
   if (rol !== "pro") {
-    return NAV.map((n) =>
+    return NAV.filter(
+      (n) => n.kind !== "single" || !SOLO_NESS.includes(n.item.href) || usuario === "ness",
+    ).map((n) =>
       esAiPro(n) && n.kind === "group"
         ? { ...n, items: ordenar(n.items, ORDEN_AI_PRO) }
         : n,

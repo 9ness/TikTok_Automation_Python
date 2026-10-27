@@ -493,6 +493,10 @@ Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
 
 [`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/TIKTOK_SHOP_AI_PRO/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Enlace por producto (`enlaces:<slug>`) y resubida de Mis tandas del dueño de la cuenta, SOLO por MCP (guía `multiplataforma.md`); página pública sin login `/links/<cuenta>` para la bio. Los vídeos MUDOS de Mis tandas salen con música Mixkit mezclada (banco `Multiplataforma/_musica/<estilo>/`, `services/musica.py`). Enlaces NUNCA en TikTok. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
 
+### Estadísticas — ventas de la cuenta de Néstor (oct 2026)
+
+[`src/estadisticas/`](src/estadisticas/) (prefijo `estadisticas:`, clave `ventas:<usuario>`, API `/api/v1/estadisticas`, solo `ness`) guarda lo que se lee en la app de TikTok (Datos por mes + productos con venta + tendencias por día) y la pantalla `/estadisticas` lo enseña: GMV/ventas/clics por mes, correlación clics→ventas y previsión, por día, por tipo y por país. No hay API de TikTok: lo lee un agente en el OPPO por ADB (MCP `estadisticas_ventas`/`guardar_estadisticas`, guía `estadisticas.md`).
+
 ### Mi menú — la sidebar, por usuario
 
 Cada persona esconde y reordena su menú lateral desde `/settings` ("Mi menú",

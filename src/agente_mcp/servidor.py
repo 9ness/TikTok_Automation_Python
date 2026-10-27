@@ -153,6 +153,7 @@ def guia(menu: str = "") -> str:
     enlaces de afiliado y resubida a IG/FB/Threads/Pinterest. `menu="genjutsu"`:
     receta de virales con personajes Flow y Higgsfield (no ejecuta generaciones).
     `menu="replicar-virales"`: registrar un viral replicado YA MONTADO (con o sin IA).
+    `menu="estadisticas"`: leer las ventas de TikTok del móvil y guardarlas.
     Léelas antes de trabajar."""
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
@@ -160,6 +161,8 @@ def guia(menu: str = "") -> str:
             "comun/campanas.md", "comun/fotos-extra.md"))
     if menu == "multiplataforma":  # no es un menú de vídeo: solo guía + herramientas
         return _leer_guia("multiplataforma.md")
+    if menu == "estadisticas":  # ventas de ness: se leen del móvil y se guardan
+        return _leer_guia("estadisticas.md")
     if menu == "genjutsu":  # flujo externo: guía, sin crear un menú ni llamar al proveedor
         return _leer_guia("genjutsu-higgsfield.md")
     if menu in ("replicar-virales", "replicar_virales"):  # MP4 montado fuera de la app
@@ -754,6 +757,37 @@ async def tareas_tiktok(ctx: Context) -> str:
     que quedan, productos sin vídeo aún) sale en `mis_tandas` › `tareas_activas`,
     y cada vídeo trae `tareas` (ids). Guía `mis-tandas.md` › Tareas."""
     return _json(await Interno(_usuario(ctx)).get("/api/v1/mis-tandas/tareas"))
+
+
+@_herramienta(structured_output=False)
+async def estadisticas_ventas(ctx: Context) -> str:
+    """Estadísticas de ventas de TikTok Shop guardadas (solo ness): por mes
+    GMV, ventas, impresiones, clics y comisiones; por día visitas/clics/ventas;
+    y los productos con venta de cada mes. Guía `estadisticas.md`."""
+    return _json(await Interno(_usuario(ctx)).get("/api/v1/estadisticas"))
+
+
+@_herramienta(structured_output=False)
+async def guardar_estadisticas(ctx: Context, meses: list[dict] | None = None,
+                               dias: list[dict] | None = None, cuenta: str | None = None,
+                               actualizado: str | None = None, notas: list[str] | None = None,
+                               contenidos: list[dict] | None = None,
+                               rango_pedidos: str | None = None) -> str:
+    """Guarda lo leído del panel «Datos» de la app de TikTok (solo ness).
+    `meses`: [{mes:"2026-06", gmv, ventas, impresiones, clics, comision,
+    gmv_comision, art_comision, base_comision, productos:[{titulo, pais, gmv,
+    ventas, tipo}]}] (números, no texto). `dias`: [{fecha:"2026-10-01",
+    impresiones, clics, gmv, ventas, visualizaciones}]. Se fusiona por mes/fecha
+    con lo que ya había. `actualizado`: fecha de la lectura (AAAA-MM-DD).
+    Origen de las ventas (Pedidos de afiliados): cada mes puede llevar
+    `origen: {"Vídeo"|"Carrusel"|"Anuncios": {pedidos, importe, comision,
+    es_pedidos, es_importe, no_aptos}}`; `contenidos`: [{caption, tipo, pedidos,
+    importe, comision}]; `rango_pedidos`: «29/7 – 27/10». Los «No apto» no suman."""
+    body = {k: v for k, v in {"meses": meses, "dias": dias, "cuenta": cuenta,
+                              "actualizado": actualizado, "notas": notas,
+                              "contenidos": contenidos,
+                              "rango_pedidos": rango_pedidos}.items() if v is not None}
+    return _json(await Interno(_usuario(ctx)).post("/api/v1/estadisticas", body))
 
 
 @_herramienta(structured_output=False)
