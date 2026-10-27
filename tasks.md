@@ -41,6 +41,7 @@ Notas: [`docs/clases/2026-10-21_clase_miercoles.md`](docs/clases/2026-10-21_clas
 - [ ] 👤 Moda hombre: ¿meter MEI qu shop (packs de chándal y cargo) en un catálogo del operador y replicar sus formatos (Tienda Colores, «4-Pack»)?
 - [ ] Formato libro (contenido real para nestor2): foto de una frase → texto → voz → Néstor graba el dedo señalando. Hace falta que Néstor tenga libros.
 - [ ] Dreamina / Seedance 2.0 Mini (15 s por 75 cr): solo probarlo si hace falta un clip de 15 s hablado. No contratar sin Néstor.
+- [ ] **nestor2 · Genjutsu navideño (27/10):** dispensador automático de celo para envolver regalos (Eagle), viral UK @dealswithsandy, 24 s, 98K vistas — https://vm.tiktok.com/ZGdCwrfXm/ (id 7699439956451659040). Falta: encontrar el mismo producto en TikTok Shop España, replicar con Genjutsu (`guia("genjutsu")`) con guion en español de regalo («envolver regalos sin buscar el final del celo»).
 
 ## 🚲 Bici eléctrica HillMiles MileCity1 (669 €, muestra gratuita) — vender 3 (13 oct 2026)
 - Alta: Muestras productos › Mis Productos 5 › nº 8. Textos extraídos; 5 guiones (dolor, precio, acción, épico, inversa) a 30 s = 3 clips de 10 s (Omni 1.1, GenAI Pro).

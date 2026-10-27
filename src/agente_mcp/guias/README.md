@@ -138,7 +138,7 @@ de imágenes. Ninguna conexión autoriza por sí sola comprar o generar.
   operador —: lee [`comun/navegador-vps.md`](comun/navegador-vps.md) (cómo
   manejarlo, cuidar CPU y RAM con pocas pestañas, y borrar lo descargado al
   terminar cada vídeo o tanda).
-  Si una web **bloquea la IP del VPS** (p. ej. Social1): Chrome aparte con IP
+  Si una web **bloquea la IP del VPS** (p. ej. IPTV; Social1 NO: su cuenta de pago está en el Chrome 9222): Chrome aparte con IP
   residencial española, [`comun/navegador-proxy-es.md`](comun/navegador-proxy-es.md).
 - **Nunca gastes sin permiso.** Cada imagen y cada clip cuesta créditos. Antes
   de generar, di cuántas imágenes y clips vas a lanzar y espera el «sí».

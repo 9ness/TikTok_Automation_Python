@@ -24,6 +24,13 @@ producto NUESTRO va con ese carrusel (del mismo estilo; búscalo con
 `productos` en el catálogo del POV BOF). Solo para cuentas fuera de estado
 crítico de CRH y pocos al día.
 
+**Social1 de PAGO = Chrome principal (CDP 9222)**, pestaña propia en
+`https://www.social1.ai/` (logueado «Nestor»; ese Chrome ya sale por la IP
+española). **Trampa:** si ves «Unlock Social1», solo los puestos #61-72 o
+«Sign In», estás en el Chrome del proxy 9223 (perfil sin la cuenta de pago):
+ciérralo y usa el 9222. Datos sin clicar: la server action de la home (`next-action`
+que se ve al marcar *Slideshows only*) con `region` es/uk/fr/de/it/us y `tsStart`/`tsEnd`.
+
 ### Si el producto no está en ningún catálogo: «🖼️ Carruseles virales»
 
 Se da de alta en la misma pantalla (caja «Carruseles virales» › «Dar de alta

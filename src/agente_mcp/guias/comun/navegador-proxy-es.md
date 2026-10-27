@@ -4,6 +4,11 @@
 > y cualquier otra que dé «acceso denegado», captcha infinito o pantalla en
 > blanco desde el VPS. Si la web funciona con el Chrome normal, usa ese
 > ([`navegador-vps.md`](navegador-vps.md)).
+>
+> **Social1 ya NO va aquí:** la cuenta de PAGO de Néstor está en el Chrome
+> principal (9222, que desde el 20/10 también sale por IP española). Este 9223
+> tiene un perfil SIN esa cuenta: si ves «Unlock Social1» o solo #61-72, estás
+> en el sitio equivocado → pestaña propia en el 9222 (`www.social1.ai`).
 
 ## 1. Qué hay
 
