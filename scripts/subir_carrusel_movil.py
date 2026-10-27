@@ -24,6 +24,7 @@ Entre fases, mira la captura (`/tmp/carr/sh/s.jpg`). Casuísticas de la UI de Ti
 
 from __future__ import annotations
 
+import html
 import io
 import json
 import os
@@ -36,7 +37,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-SERIAL = os.environ.get("MOVIL_ADB", "100.123.211.22:39195")
+SERIAL = os.environ.get("MOVIL_ADB", "100.123.211.22:40281")
 PAQUETE = "com.zhiliaoapp.musically"
 TMP = Path("/tmp/carr")
 CARPETA_MOVIL = "/sdcard/Pictures/carr_tmp"
@@ -220,6 +221,8 @@ def preparar(cid: str) -> None:
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
         "-d", c["musica"]["tiktok"]["enlace"], PAQUETE)
     time.sleep(6)
+    adb("shell", "input", "swipe", "720", "900", "720", "2800", "300")  # a veces abre a media página
+    time.sleep(2)
     # Guardado de antes → quitar y volver a guardar: así queda el PRIMERO de Favoritos
     if pulsar(r"^Guardado$"):
         time.sleep(1)
@@ -261,6 +264,11 @@ def editor(cid: str) -> None:
     time.sleep(7)
     tap(720, 3024, 4)                     # «+»
     tap(141, 2991, 3)                     # galería
+    # Solo el álbum carr_tmp: en «Recientes» se cuelan capturas y vídeos más nuevos
+    if not any(n["text"] == "carr_tmp" and n["y"] < 400 for n in nodos()):
+        tap(688, 243, 2)                  # desplegable de álbumes
+        if not pulsar(r"^carr_tmp$", 3):
+            raise SystemExit("No encuentro el álbum carr_tmp")
     if not buscar(r"Siguiente", intentos=1):
         pulsar(r"Selección múltiple")     # activa los círculos
     for i in range(n_fotos):              # rejilla 3 columnas; lo más nuevo arriba
@@ -271,10 +279,13 @@ def editor(cid: str) -> None:
         raise SystemExit("No veo «Siguiente (N)»: revisa la selección")
 
     # Sonido desde Favoritos
-    tap(660, 372, 3)                      # píldora del sonido recomendado
-    pulsar(r"^Favoritos$", 3)
-    tap(600, 1845, 3)                     # primera fila = el último guardado (el dump no ve la lista)
-    tap(720, 750, 2)                      # cierra el panel
+    for _ in range(2):                    # a veces la fila no ha cargado y queda «Añadir sonido»
+        tap(660, 372, 3)                  # píldora del sonido recomendado
+        pulsar(r"^Favoritos$", 4)
+        tap(600, 1845, 3)                 # primera fila = el último guardado (el dump no ve la lista)
+        tap(720, 750, 2)                  # cierra el panel
+        if not any(n["text"] == "Añadir sonido" and n["y"] < 500 for n in nodos()):
+            break
     captura("2_sonido")
     pulsar(r"^Siguiente$", 4)
 
@@ -282,6 +293,16 @@ def editor(cid: str) -> None:
     tap(700, 980, 2)
     tecla(113, 50)                        # Ctrl+V
     time.sleep(1)
+    # A veces TikTok antepone un hashtag suyo (p. ej. del sonido): se borra lo que haya delante.
+    inicio = c["caption"][:20]
+    texto = next((html.unescape(n["text"]) for n in nodos()
+                  if n["clase"].endswith("EditText") and inicio in html.unescape(n["text"])), "")
+    sobra = texto.find(inicio)
+    if sobra > 0:
+        print(f"AVISO: TikTok añadió «{texto[:sobra].strip()}» delante del caption → borrado")
+        tecla(113, 122)                   # Ctrl+Inicio
+        for _ in range(sobra):
+            tecla(112)                    # Supr
     pulsar(r"^Listo$", 2)
 
     producto(cid)
@@ -315,10 +336,12 @@ def producto(cid: str) -> None:
     c = carrusel(cid)
     pid = c["product_url"].rstrip("/").split("/")[-1]
     abrir_enlace()
-    if buscar(r"sonido comercial", intentos=2):
+    time.sleep(2)
+    if buscar(r"sonido comercial", intentos=3):
         # El sonido del viral no deja producto: se quita, se pone el producto y se
         # buscan comerciales con su título. NO se elige a ciegas: lo decide Néstor.
-        tap(1341, 2226, 2)                # cierra «Añadir enlace»
+        if not pulsar(r"^Cerrar$"):       # cierra «Añadir enlace» (su altura cambia)
+            tap(1341, 2226, 2)
         al_editor()
         x = next((n for n in nodos() if n["desc"] == "Cerrar" and n["y"] < 500), None)
         tap(x["x"] if x else 906, 372, 2) # «x» de la píldora del sonido
@@ -335,8 +358,11 @@ def producto(cid: str) -> None:
     captura("3_producto")
     tap(1188, 840, 4)                     # «Añadir» del único resultado (la lista no sale en el dump)
     campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
+    if not campo:                         # a veces «¿Añadir producto al vídeo?» (el dump no lo ve)
+        tap(720, 1698, 4)
+        campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
     if not campo:
-        raise SystemExit("No se abrió «Cambiar nombre»: ¿sin producto con ese ID o el sonido lo impide?")
+        raise SystemExit("No se abrió «Cambiar nombre»: ¿producto sin stock («No disponible», mira 3_producto), sin ese ID o el sonido lo impide?")
     if campo:
         tap(campo[0]["x"], campo[0]["y"], 1)
         tecla(113, 29)
@@ -350,8 +376,15 @@ def producto(cid: str) -> None:
         al_editor()
         tap(660, 372, 4)                  # con producto solo salen «Sonidos comerciales»
         escribir(consulta_comercial(c))
-        tecla(66)
-        time.sleep(5)
+        time.sleep(3)
+        tap(723, 578, 8)                  # primera sugerencia: con Enter a veces no hay resultados
+        for _ in range(2):                # a veces sale «No se encontraron resultados»: repetir desde el historial
+            if not buscar(r"No se encontraron", intentos=1):
+                break
+            tap(1188, 405, 2)             # vaciar
+            tecla(4)                      # oculta teclado → se ve el historial
+            time.sleep(2)
+            tap(340, 759, 8)              # primera búsqueda del historial (la misma)
         captura("5_comerciales")
         tap(1278, 640, 4)                 # check del primero: el más parecido
         captura("5_comercial")
