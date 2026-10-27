@@ -54,7 +54,8 @@ def fila(r: dict) -> dict:
         "producto": prod.get("name"),
         "product_id": r.get("product_id") or prod.get("product_id"),
         "tienda": r.get("shop_name"),
-        "precio": prod.get("price"),
+        "precio": prod.get("price") or prod.get("price_display") or prod.get("price_value"),
+        "foto": prod.get("img_url"),  # foto limpia del producto (alta en «Carruseles virales»)
     }
 
 

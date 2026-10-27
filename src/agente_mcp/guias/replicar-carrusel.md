@@ -143,6 +143,8 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
   clásico de TikTok sobre la foto.
 - `tiktok_medio` — la misma, más fina (medium): la de los textos normales de
   TikTok, pequeños y sin negrita. Medido en los virales: `texto_tam` 0.75 (texto pequeño a media altura) a 0.95 (gancho arriba).
+- `tiktok_crema` — la `tiktok_medio` en color crema (amarillo pálido, sin contorno
+  marcado): virales de regalo tipo «Do you have a girlfriend…». 0.8 de tamaño.
 - `tiktok_amarillo` — la letra de TikTok en amarillo con contorno oscuro
   (el texto amarillo de muchos virales de hogar y regalos).
 - `fondo_negro` — blanca sobre caja negra opaca, líneas unidas en una sola forma

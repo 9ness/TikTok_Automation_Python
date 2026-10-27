@@ -1005,7 +1005,7 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
     reglas (promesas, cupones afirmados).
     `estilo_texto`: la letra de TODO el carrusel, la que más se parezca al viral
     (tiktok —por defecto, blanca con contorno—, tiktok_sans —la letra nativa de
-    TikTok—, tiktok_medio —la misma más fina, la de los textos normales de TikTok—, tiktok_amarillo —la amarilla con contorno oscuro de TikTok—, fondo_negro / fondo_blanco / fondo_trans / fondo_rosa —el texto «con fondo» de
+    TikTok—, tiktok_medio —la misma más fina, la de los textos normales de TikTok—, tiktok_crema —la misma fina en color crema—, tiktok_amarillo —la amarilla con contorno oscuro de TikTok—, fondo_negro / fondo_blanco / fondo_trans / fondo_rosa —el texto «con fondo» de
     TikTok, caja unida; fondo_rosa: fucsia sobre caja rosa claro—, snap —barra de Snapchat de lado a lado—, clasico, pildora —negra sobre píldora blanca—,
     pildora_negra, maquina, elegante, manuscrita, rotulador, impacto),
     `texto_y` la altura del texto (0.05 arriba … 0.95 abajo; 0 = la de

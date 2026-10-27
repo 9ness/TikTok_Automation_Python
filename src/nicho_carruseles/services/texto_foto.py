@@ -53,6 +53,10 @@ ESTILOS: dict[str, dict] = {
                     "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
     "tiktok_medio": {"fuente": "TikTokSans-Medium.ttf", "color": (255, 255, 255), "borde": 0.03,
                      "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
+    # Letra media color crema (virales «Do you have a girlfriend…»): el texto
+    # nativo de TikTok con el color amarillo pálido de la paleta.
+    "tiktok_crema": {"fuente": "TikTokSans-Medium.ttf", "color": (250, 236, 178), "borde": 0.02,
+                     "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
     "tiktok_amarillo": {"fuente": "TikTokSans-Bold.ttf", "color": (246, 188, 40), "borde": 0.08,
                         "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
     "fondo_negro": {"fuente": "TikTokSans-SemiBold.ttf", "color": (255, 255, 255), "borde": 0.0,
