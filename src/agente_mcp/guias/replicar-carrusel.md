@@ -31,6 +31,40 @@ española). **Trampa:** si ves «Unlock Social1», solo los puestos #61-72 o
 ciérralo y usa el 9222. Datos sin clicar: la server action de la home (`next-action`
 que se ve al marcar *Slideshows only*) con `region` es/uk/fr/de/it/us y `tsStart`/`tsEnd`.
 
+### Buscar virales de cada país (tú solo, sin que te pasen enlaces)
+
+Néstor (27/10): se replican virales de los países de TikTok Shop Europa que
+pueden comprar con nuestro carrito, **en su idioma y tal cual**, y se suben en
+la cuenta de ness (VivaShop). Social1 tiene **es, fr, de, it, ie, uk** (no
+AT/BE/NL/PL: para esos, virales de FR/DE en su idioma valen igual). Un día un
+país, otro día otro, o mezclados.
+
+1. Enciende el navegador (`navegador on`; sin permisos, `sudo -n navegador on`)
+   si hay RAM (≥2,5 GB disponibles, ver `comun/navegador-vps.md`).
+2. Recoge los carruseles del país (30 días, ordenados por GMV y visitas):
+   ```bash
+   ~/nav-venv/bin/python scripts/social1_carruseles.py fr --dias 30 --paginas 25 \
+       --salida /tmp/s1_fr.json      # ~12 por página, tarda: en segundo plano
+   ```
+   Cada fila trae `url` (la de TikTok, para `replicar_carrusel`), `producto`,
+   `tienda`, `gmv`, `view_gain`, `is_ad`. Abre su pestaña propia y la cierra.
+3. Elige los mejores: con GMV (vende) o muchas visitas ganadas, sin niños, sin
+   promesas de salud, nada de marcas que no estén en España.
+   **Descarta los de dibujos animados** (Simpsons, Bob Esponja, memes de
+   personajes que se ponen la ropa o enseñan el producto): TikTok los puede
+   sancionar (Néstor, 27/10). Los que ponen un **precio fijo** sí valen, pero el
+   precio se cambia por algo que no sea precio fijo («a precio de chollo»,
+   «revisa si tienes cupones», «mira la oferta en el carrito»). No repitas: mira
+   antes `producto_carrusel()` / la lista de «Tus carruseles» (`carrusel_url`).
+4. **Producto equivalente en ESPAÑA** (la cuenta solo enlaza el catálogo ES; las
+   tiendas de FR/DE/IT son otras): búscalo en nuestros catálogos (`productos`) o
+   en Social1 con región **es** y *Filter by product* / en TikTok Shop ES. Si no
+   está en ningún catálogo, alta en «Carruseles virales» (`producto_carrusel`,
+   abajo). Sin equivalente en España → descártalo.
+5. `replicar_carrusel(..., url=<url>, pais="FR")` y sigue §2-§4 como cualquier
+   carrusel (fotos en Flow, subir, quemar, Mis tandas con semáforo).
+6. Apaga tu pestaña al terminar; el navegador se apaga solo a los 45 min.
+
 ### Si el producto no está en ningún catálogo: «🖼️ Carruseles virales»
 
 Se da de alta en la misma pantalla (caja «Carruseles virales» › «Dar de alta
