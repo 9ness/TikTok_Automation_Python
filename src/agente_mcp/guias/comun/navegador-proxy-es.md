@@ -1,7 +1,11 @@
 # Chrome con IP residencial de España (proxy) en el VPS
 
-> Para webs que **bloquean la IP del VPS** (Hetzner, IP de datacenter): Social1,
-> y cualquier otra que dé «acceso denegado», captcha infinito o pantalla en
+> **Desde el 20/10/2026 el Chrome principal (9222) ya sale TODO por esta IP
+> española**, así que este 9223 solo queda para IPTV. Para cualquier otra web
+> (Social1, Flow, GenAI Pro…) usa el 9222.
+>
+> Antes era para webs que **bloquean la IP del VPS** (Hetzner, IP de datacenter):
+> cualquiera que dé «acceso denegado», captcha infinito o pantalla en
 > blanco desde el VPS. Si la web funciona con el Chrome normal, usa ese
 > ([`navegador-vps.md`](navegador-vps.md)).
 >
@@ -67,7 +71,7 @@ proxy por tu cuenta.
 - **Logins, códigos al correo y captchas** los hace el operador por noVNC. Tú
   le avisas de qué pantalla tiene delante.
 - Si quieres usar EE. UU. u otro país dentro de la web (p. ej. el selector de
-  Social1), se cambia en la web. La IP sigue siendo española.
+  país de Social1, en el 9222), se cambia en la web. La IP sigue siendo española.
 
 ## 5. Normas
 
