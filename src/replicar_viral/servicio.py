@@ -285,6 +285,7 @@ def lista(usuario: str, tipo: str = "", limite: int = 50) -> list[dict]:
             fila["hechas"] = _fotos_subidas(d)
             fila["subido"] = bool(d.get("subido"))
             fila["replica_de"] = d.get("replica_de", "")
+            fila["pais"] = d.get("pais") or "ES"
         else:
             fila["idea"] = (d.get("adaptacion") or {}).get("idea", "")
         salida.append(fila)

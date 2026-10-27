@@ -16,6 +16,7 @@ import {
   urlZipTandaFotos,
 } from "@/lib/queries/misTandas";
 import { BotonFotosEnOrden } from "@/components/tiktok-shop-ai-pro/BotonFotosEnOrden";
+import { banderaPais } from "@/lib/queries/replicarCarrusel";
 
 /** «sáb 3 oct» a partir de «2026-10-03». */
 function fechaCorta(iso: string): string {
@@ -194,7 +195,7 @@ export function CarruselesReplicados() {
                             c.sin_stock && !c.subido ? "text-muted-foreground line-through" : ""
                           }`}
                         >
-                          {String(i + 1).padStart(2, "0")} · {c.titulo}
+                          {String(i + 1).padStart(2, "0")} · {banderaPais(c.pais) ? `${banderaPais(c.pais)} ` : ""}{c.titulo}
                         </p>
                         {c.semaforo && c.semaforo.color !== "verde" ? (
                           <p className={`break-words text-[10px] ${SEMAFORO[c.semaforo.color].texto}`}>

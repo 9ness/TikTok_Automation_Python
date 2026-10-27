@@ -11,6 +11,27 @@ import { api } from "@/lib/api";
 
 const ROOT = "/api/v1/replicar-viral";
 
+/** Países de TikTok Shop Europa a los que vende la cuenta de España
+ *  (`carrusel.PAISES` en el backend): el carrusel se replica en su idioma. */
+export const PAISES_CARRUSEL = [
+  { codigo: "ES", bandera: "🇪🇸", nombre: "España" },
+  { codigo: "FR", bandera: "🇫🇷", nombre: "Francia" },
+  { codigo: "DE", bandera: "🇩🇪", nombre: "Alemania" },
+  { codigo: "IT", bandera: "🇮🇹", nombre: "Italia" },
+  { codigo: "AT", bandera: "🇦🇹", nombre: "Austria" },
+  { codigo: "BE", bandera: "🇧🇪", nombre: "Bélgica" },
+  { codigo: "NL", bandera: "🇳🇱", nombre: "Países Bajos" },
+  { codigo: "PL", bandera: "🇵🇱", nombre: "Polonia" },
+  { codigo: "IE", bandera: "🇮🇪", nombre: "Irlanda" },
+  { codigo: "GB", bandera: "🇬🇧", nombre: "Reino Unido" },
+] as const;
+
+/** Bandera del país del viral; vacío si es de España (lo de siempre). */
+export function banderaPais(pais?: string): string {
+  if (!pais || pais === "ES") return "";
+  return PAISES_CARRUSEL.find((p) => p.codigo === pais)?.bandera ?? "";
+}
+
 export type RolDiapositiva = "gancho" | "problema" | "producto" | "prueba" | "cta";
 
 export interface Diapositiva {
@@ -60,6 +81,8 @@ export interface CarruselReplica {
   /** id de la réplica de la que se copió (replicar para otro usuario). */
   replica_de?: string;
   musica?: MusicaCarrusel;
+  /** País del viral (ES por defecto): idioma de los textos. */
+  pais?: string;
 }
 
 export interface CarruselResumen {
@@ -76,6 +99,7 @@ export interface CarruselResumen {
   hechas: number;
   subido?: boolean;
   replica_de?: string;
+  pais?: string;
 }
 
 /** Producto del catálogo compartido «🖼️ Carruseles virales». */
@@ -168,7 +192,7 @@ export function useCarrusel(id: string | null) {
 
 export function useReplicarCarrusel() {
   const qc = useQueryClient();
-  return useMutation<CarruselReplica, Error, { source: string; folder: string; producto: string; url: string; para?: string }>({
+  return useMutation<CarruselReplica, Error, { source: string; folder: string; producto: string; url: string; para?: string; pais?: string }>({
     mutationFn: (v) => {
       const fd = new FormData();
       fd.append("source", v.source);
@@ -176,6 +200,7 @@ export function useReplicarCarrusel() {
       fd.append("producto", v.producto);
       fd.append("url", v.url);
       if (v.para) fd.append("para", v.para);
+      if (v.pais) fd.append("pais", v.pais);
       return api.post<CarruselReplica>(`${ROOT}/carrusel/analizar`, fd);
     },
     onSuccess: (doc) => {

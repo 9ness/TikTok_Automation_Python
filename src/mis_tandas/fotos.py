@@ -142,6 +142,7 @@ def _publica(d: dict, sin_stock: bool = False, sem: dict | None = None) -> dict:
         "caption": d.get("caption", ""),
         "hashtags": d.get("hashtags") or [],
         "musica": d.get("musica") or {},
+        "pais": d.get("pais") or "ES",
         "semaforo": _semaforo(d, sem or {}),
     }
 

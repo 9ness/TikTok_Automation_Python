@@ -939,7 +939,7 @@ def _enlaces_carrusel(u: str, doc: dict) -> dict:
 @_herramienta(structured_output=False)
 async def replicar_carrusel(ctx: Context, catalogo: str = "", carpeta: str = "",
                             producto: str = "", url: str = "", para: str = "",
-                            replica_id: str = "") -> str:
+                            replica_id: str = "", pais: str = "ES") -> str:
     """Copia la FÓRMULA de un CARRUSEL de fotos viral de TikTok (`url`) con un
     producto nuestro (catálogo/carpeta/producto del POV BOF). Gemini ve todas
     las diapositivas y devuelve, por cada una: `rol` (gancho/problema/producto/
@@ -953,17 +953,21 @@ async def replicar_carrusel(ctx: Context, catalogo: str = "", carpeta: str = "",
     textos nuevos) sin pasar lo demás. `para`: otro usuario (ana, mauro…),
     solo si el token es de un admin; la réplica queda en SU lista.
     Productos que no están en ningún catálogo: dalos de alta con
-    `producto_carrusel` (catálogo `carruseles_virales`, compartido)."""
+    `producto_carrusel` (catálogo `carruseles_virales`, compartido).
+    `pais`: de dónde es el viral (ES, FR, DE, IT, AT, BE, NL, PL, IE, GB):
+    textos, caption y hashtags salen en SU idioma y Mis tandas enseña la
+    bandera. Con `replica_id`, vacío = el de la réplica original."""
     u = _usuario(ctx)
     if replica_id:
         doc = await Interno(u).post(f"/api/v1/replicar-viral/carrusel/{replica_id}/replicar",
-                                    {"para": para})
+                                    {"para": para, "pais": pais if pais != "ES" else ""})
         return _json(_enlaces_carrusel(doc.get("usuario") or u, doc))
     if not (catalogo and carpeta and producto and url):
         raise ErrorApp("Faltan `catalogo`, `carpeta`, `producto` y `url` (o pasa `replica_id`).")
     r = await Interno(u)._pedir("POST", "/api/v1/replicar-viral/carrusel/analizar",
                                 data={"source": catalogo, "folder": carpeta,
-                                      "producto": producto, "url": url, "para": para})
+                                      "producto": producto, "url": url, "para": para,
+                                      "pais": pais})
     doc = r.json()
     return _json(_enlaces_carrusel(doc.get("usuario") or u, doc))
 

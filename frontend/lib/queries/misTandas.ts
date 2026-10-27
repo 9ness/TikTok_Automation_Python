@@ -376,6 +376,8 @@ export interface CarruselTanda {
   caption: string;
   hashtags: string[];
   musica?: import("./replicarCarrusel").MusicaCarrusel;
+  /** País del viral replicado (ES por defecto): sale su bandera. */
+  pais?: string;
   /** Revisión antes de subir (id `car|<id>` en el semáforo); null = sin revisar. */
   semaforo?: SemaforoVideo | null;
 }

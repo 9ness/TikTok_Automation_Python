@@ -150,6 +150,24 @@ def test_replicar_guarda_tipo_carrusel_y_normaliza(entorno):
     assert len(ll["images"]) == 3 and "3:4" in ll["sistema"] and "{{FORMATO}}" not in ll["sistema"]
 
 
+def test_replicar_de_otro_pais_escribe_en_su_idioma(entorno):
+    doc = carrusel.replicar("ness", source="mis_productos", folder="Carpeta_1", producto="3",
+                            url="https://www.tiktok.com/@x/photo/123", pais="fr")
+    assert doc["pais"] == "FR"
+    sistema = entorno["llamadas"][0]["sistema"]
+    assert "francés" in sistema and "{{IDIOMA}}" not in sistema and "español de España" not in sistema
+    # Los hashtags generales del POV BOF están en español: fuera se usan los de la IA.
+    assert carrusel.hashtags_tiktok(doc) == doc["hashtags"]
+
+
+def test_replicar_por_defecto_es_espana_y_rechaza_paises_raros(entorno):
+    assert _replicar()["pais"] == "ES"
+    assert "español de España" in entorno["llamadas"][0]["sistema"]
+    with pytest.raises(ErrorReplica, match="País"):
+        carrusel.replicar("ness", source="mis_productos", folder="Carpeta_1", producto="3",
+                          url="https://www.tiktok.com/@x/photo/123", pais="US")
+
+
 def test_formato_9_16_si_la_diapositiva_es_alargada(entorno, monkeypatch):
     real = carrusel.requests.get
 

@@ -50,7 +50,7 @@ lo que hace viral un carrusel es su patrón, y ese patrón es lo que se replica:
 
 Para cada diapositiva:
 
-**`texto`** — el que se quemará encima (en español de España, natural):
+**`texto`** — el que se quemará encima (en {{IDIOMA}}, natural: el idioma del país del viral):
 - Copia la FORMA del original (longitud parecida, pregunta si era pregunta,
   emoji si llevaba emoji, el mismo tono), pero hablando de NUESTRO producto.
   Nunca el texto literal del creador original.
@@ -62,7 +62,7 @@ Para cada diapositiva:
 - **Cupones: nunca los afirmes.** Vale «revisa si tienes cupones»; NUNCA «tu
   cupón», «aplica tus cupones», «con tu descuento».
 - La diapositiva `cta` manda al carrito naranja o al enlace del vídeo, p. ej.
-  «Lo tienes en el carrito naranja 🧡».
+  «Lo tienes en el carrito naranja 🧡» (traducido al idioma del texto).
 - Si la diapositiva original no lleva texto, `texto` vacío.
 
 **`prompt_imagen`** — para generar la foto en Google Flow (Nano Banana), en
@@ -92,9 +92,9 @@ INGLÉS:
 Al menos una diapositiva tiene que enseñarlo (normalmente la de `producto`).
 
 Del carrusel entero:
-- `caption`: el texto de la publicación, en español de España, 1-2 frases,
+- `caption`: el texto de la publicación, en {{IDIOMA}}, 1-2 frases,
   sin promesas ni cupones afirmados.
-- `hashtags`: 4-6, con `#`, del producto y del nicho (sin `#fyp` repetidos).
+- `hashtags`: 4-6, con `#`, del producto y del nicho, en {{IDIOMA}} (sin `#fyp` repetidos).
 
 Sé estricto con `apto`: `false` si el carrusel original no vende un producto
 físico (memes, consejos, frases) o si nuestro producto no tiene nada que ver y

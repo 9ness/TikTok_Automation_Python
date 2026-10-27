@@ -45,6 +45,31 @@ LADO_GEMINI = 1080
 ROLES = ("gancho", "problema", "producto", "prueba", "cta")
 TIPOS_FOTO = ("orig", "base", "txt")
 _ID = re.compile(r"[a-f0-9]{12}")
+# País del viral → idioma de los textos quemados, caption y hashtags (27/10/2026).
+# Son los 10 de TikTok Shop Europa (+ Reino Unido) a los que la cuenta de España
+# puede vender con «Vender en la UE». El carrusel se replica en SU idioma y la
+# bandera sale en Mis tandas para saber de dónde viene.
+PAISES: dict[str, dict[str, str]] = {
+    "ES": {"bandera": "🇪🇸", "nombre": "España", "idioma": "español de España"},
+    "FR": {"bandera": "🇫🇷", "nombre": "Francia", "idioma": "francés de Francia"},
+    "DE": {"bandera": "🇩🇪", "nombre": "Alemania", "idioma": "alemán de Alemania"},
+    "IT": {"bandera": "🇮🇹", "nombre": "Italia", "idioma": "italiano"},
+    "AT": {"bandera": "🇦🇹", "nombre": "Austria", "idioma": "alemán (de Austria, sin regionalismos raros)"},
+    "BE": {"bandera": "🇧🇪", "nombre": "Bélgica", "idioma": "francés (de Bélgica); si el viral está en neerlandés, neerlandés de Flandes"},
+    "NL": {"bandera": "🇳🇱", "nombre": "Países Bajos", "idioma": "neerlandés de los Países Bajos"},
+    "PL": {"bandera": "🇵🇱", "nombre": "Polonia", "idioma": "polaco"},
+    "IE": {"bandera": "🇮🇪", "nombre": "Irlanda", "idioma": "inglés (de Irlanda/Reino Unido)"},
+    "GB": {"bandera": "🇬🇧", "nombre": "Reino Unido", "idioma": "inglés británico"},
+}
+
+
+def pais_valido(pais: str = "") -> str:
+    codigo = (pais or "ES").strip().upper()
+    if codigo == "UK":
+        codigo = "GB"
+    if codigo not in PAISES:
+        raise ErrorReplica(f"País «{pais}» no vale: {', '.join(PAISES)}.")
+    return codigo
 
 
 # ---------------------------------------------------------------------------
@@ -187,11 +212,12 @@ def _normalizar(resultado: dict, n_diapos: int, formato: str) -> dict:
 # Analizar + adaptar
 # ---------------------------------------------------------------------------
 def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
-             replica_de: str = "") -> dict:
+             replica_de: str = "", pais: str = "ES") -> dict:
     from src.cost_tracking import finalize_and_persist, start_job
     from src.tiktok_shop.api.claude import generate_text
 
     usuario = usuario or "ness"
+    pais = pais_valido(pais)
     if not url:
         raise ErrorReplica("Falta el enlace del carrusel de TikTok.")
     meta = datos_carrusel(url)
@@ -210,6 +236,7 @@ def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
         formato = _formato(origs[0])
 
         sistema = servicio._sin_comentarios(PROMPT.read_text(encoding="utf-8")).replace("{{FORMATO}}", formato)
+        sistema = sistema.replace("{{IDIOMA}}", PAISES[pais]["idioma"])
         mensaje = (
             f"CARRUSEL DE REFERENCIA: las {len(origs)} primeras imágenes adjuntas, en orden"
             f" (diapositiva 1 = la primera)"
@@ -261,6 +288,7 @@ def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
             "producto": {"source": source, "folder": folder, "producto": str(producto),
                          "titulo": textos.get("titulo", ""), "tienda": textos.get("tienda", "")},
             "formato": formato,
+            "pais": pais,
             **({"replica_de": replica_de} if replica_de else {}),
             **_normalizar(resultado if isinstance(resultado, dict) else {}, len(origs), formato),
         }
@@ -327,6 +355,9 @@ def hashtags_tiktok(doc: dict) -> list[str]:
     """Los de TikTok son los MISMOS que llevan los vídeos (los generales de la
     configuración del POV BOF) y, si el producto es ropa/calzado/bolsos, los de
     moda. Los que propuso la IA (`hashtags`) se quedan para Meta."""
+    if (doc.get("pais") or "ES") != "ES":
+        # Réplica de otro país: los generales del POV BOF están en español.
+        return list(doc.get("hashtags") or [])
     try:
         from src.nicho_pov_bof.repos import product_repo
 
@@ -445,8 +476,11 @@ def _quemar(usuario: str, id_: str, n: int, texto: str, doc: dict | None = None)
     for d in (doc or {}).get("diapositivas") or []:
         if d.get("n") == int(n) and d.get("estilo_texto"):
             est = d["estilo_texto"]
+    nombre = est.get("nombre", "")
+    if (doc or {}).get("pais") == "PL" and nombre in ("", "tiktok"):
+        nombre = "tiktok_sans"  # Montserrat no trae ą ę ł ń ś ź ż
     if texto.strip():
-        texto_foto.quemar(base, texto, destino, estilo=est.get("nombre", ""), y_rel=est.get("y"),
+        texto_foto.quemar(base, texto, destino, estilo=nombre, y_rel=est.get("y"),
                           tam_rel=est.get("tam"))
     elif destino.exists():
         destino.unlink()
@@ -657,7 +691,7 @@ def destino(usuario: str, para: str = "") -> str:
     return para
 
 
-def replicar_otra_vez(usuario: str, id_: str, para: str = "") -> dict:
+def replicar_otra_vez(usuario: str, id_: str, para: str = "", pais: str = "") -> dict:
     """Vuelve a pasar el MISMO carrusel viral con el MISMO producto (una
     llamada nueva de Gemini: textos y prompts salen distintos, que es lo que
     se quiere en otra cuenta) para `para` o para uno mismo."""
@@ -666,4 +700,5 @@ def replicar_otra_vez(usuario: str, id_: str, para: str = "") -> dict:
     if not doc.get("url") or not prod.get("source"):
         raise ErrorReplica("A esa réplica le falta el enlace o el producto.", status=409)
     return replicar(destino(usuario, para), source=prod["source"], folder=prod["folder"],
-                    producto=str(prod["producto"]), url=doc["url"], replica_de=id_)
+                    producto=str(prod["producto"]), url=doc["url"], replica_de=id_,
+                    pais=pais or doc.get("pais") or "ES")

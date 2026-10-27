@@ -51,8 +51,16 @@ lo lista (con `carrusel_url`, el último viral con el que se replicó).
 
 ## 2. Analizar y adaptar
 
-`replicar_carrusel(catalogo, carpeta, producto, url=<enlace>)` (con el
-catálogo nuevo: `catalogo="carruseles_virales"`). ~1 min, una
+`replicar_carrusel(catalogo, carpeta, producto, url=<enlace>, pais="ES")` (con el
+catálogo nuevo: `catalogo="carruseles_virales"`).
+
+**Virales de otros países (Néstor, 27/10):** se replican tal cual, EN SU IDIOMA.
+`pais` = ES, FR, DE, IT, AT, BE, NL, PL, IE o GB (los 10 de TikTok Shop Europa
+que pueden comprar con carrito). Textos, caption y hashtags salen en ese idioma
+y el carrusel lleva la bandera en la web y en Mis tandas. En Social1, `region`
+fr/de/it/uk. El producto tiene que estar en NUESTRO catálogo de España (la
+cuenta solo enlaza productos de ES): busca el equivalente. En otros países solo
+carruseles, no vídeos. «Replicar otra vez» conserva el país. ~1 min, una
 llamada de Gemini Flash (céntimos). Hasta 12 diapositivas. Devuelve `id`,
 `formato` (3:4 o 9:16, el del original; **genera SIEMPRE las fotos en 3:4**, aunque el original sea 9:16 — decisión de Néstor del 20/10/2026; las fotos reales de la ficha se encajan también a 1080×1440), `apto`, `caption`, `hashtags` y por
 diapositiva: `rol`, `texto_original`, `texto` (el nuestro), `usa_foto_producto`,

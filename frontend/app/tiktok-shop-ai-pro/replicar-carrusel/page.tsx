@@ -13,8 +13,10 @@ import { Caja, Paso, Sub } from "@/components/tiktok-shop-ai-pro/Paso";
 import { useMe } from "@/lib/queries/auth";
 import { useBuscarProductos, useSources } from "@/lib/queries/nichoPovBof";
 import {
+  banderaPais,
   type CarruselReplica,
   type Diapositiva,
+  PAISES_CARRUSEL,
   type ProductoCarrusel,
   urlFotoCarrusel,
   useCarrusel,
@@ -62,6 +64,7 @@ export default function ReplicarCarruselPage() {
   const [url, setUrl] = useState("");
   const [abierto, setAbierto] = useState<string | null>(null);
   const [para, setPara] = useState("");
+  const [pais, setPais] = useState("ES");
   const me = useMe();
   const esAdmin = me.data?.rol === "admin";
   const otros = (me.data?.usuarios ?? []).filter((u) => u.username !== me.data?.username);
@@ -82,6 +85,7 @@ export default function ReplicarCarruselPage() {
       {
         source: elegido.source, folder: elegido.folder, producto: elegido.producto, url: url.trim(),
         para: esAdmin ? para : "",
+        pais,
       },
       {
         onSuccess: (d) => {
@@ -221,6 +225,24 @@ export default function ReplicarCarruselPage() {
             {replicar.isPending ? "Analizando…" : "Analizar y adaptar"}
           </button>
         </div>
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[10px] text-muted-foreground">País del viral:</span>
+          {PAISES_CARRUSEL.map((p) => (
+            <button
+              key={p.codigo}
+              type="button"
+              title={`${p.nombre}: los textos salen en su idioma`}
+              onClick={() => setPais(p.codigo)}
+              className={`rounded border px-2 py-1 text-[10px] ${
+                pais === p.codigo
+                  ? "border-sky-500 bg-sky-500/10 text-sky-400"
+                  : "border-border/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p.bandera} {p.codigo}
+            </button>
+          ))}
+        </div>
         {esAdmin && otros.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
             <span className="text-[10px] text-muted-foreground">Para:</span>
@@ -267,6 +289,7 @@ export default function ReplicarCarruselPage() {
               >
                 {completo ? "✓ " : ""}
                 {c.subido ? "📤 " : ""}
+                {banderaPais(c.pais) ? `${banderaPais(c.pais)} ` : ""}
                 {c.producto?.titulo || c.producto?.producto}
                 <span
                   className={`ml-1 rounded-full px-1.5 text-[9px] font-semibold ${

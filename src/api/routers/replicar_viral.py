@@ -226,14 +226,16 @@ def carrusel_analizar(
     producto: Annotated[str, Form()],
     url: Annotated[str, Form()],
     para: Annotated[str, Form()] = "",
+    pais: Annotated[str, Form()] = "ES",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Carrusel de TikTok (enlace) + producto del POV BOF → por diapositiva:
     papel, texto adaptado y prompt de imagen para Flow. Una llamada de Gemini
-    Flash; no genera imágenes. Tarda ~1 min. `para`: otro usuario (solo admin)."""
+    Flash; no genera imágenes. Tarda ~1 min. `para`: otro usuario (solo admin).
+    `pais`: de dónde es el viral (`carrusel.PAISES`); los textos salen en su idioma."""
     try:
         return carrusel.replicar(carrusel.destino(usuario, para), source=source, folder=folder,
-                                 producto=producto, url=url)
+                                 producto=producto, url=url, pais=pais)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 
@@ -382,12 +384,14 @@ def carrusel_imagen(
 @router.post("/carrusel/{id_}/replicar")
 def carrusel_replicar_otra_vez(
     id_: str, para: Annotated[str, Body(embed=True)] = "",
+    pais: Annotated[str, Body(embed=True)] = "",
     usuario: Annotated[str, Depends(get_web_user)] = "",
 ) -> dict:
     """Vuelve a replicar el MISMO viral con el MISMO producto (Gemini otra vez:
-    textos y prompts nuevos) para `para` (solo admin) o para uno mismo."""
+    textos y prompts nuevos) para `para` (solo admin) o para uno mismo.
+    `pais` vacío = el de la réplica original."""
     try:
-        return carrusel.replicar_otra_vez(usuario, id_, para)
+        return carrusel.replicar_otra_vez(usuario, id_, para, pais)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 
