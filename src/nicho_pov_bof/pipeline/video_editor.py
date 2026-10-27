@@ -1429,6 +1429,32 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
                      # puede medir el color de la marca porque medio encuadre
                      # es la mano y la encimera.
                      foto_producto: "Path | None" = None) -> Path:
+    if estilo_texto == "regalo":
+        # Rótulo de idea de regalo (forma, color y letra rotan por producto,
+        # ver `regalo.py`). No usa gancho/CTA fijos ni la paleta por fondo:
+        # su texto y sus colores son los suyos.
+        from src.nicho_pov_bof.pipeline import regalo
+
+        block = regalo.render_rotulo(
+            textos or {}, regalo.elegir_variante(semilla), on_log, piezas,
+        )
+    else:
+        block = _bloque_de_texto(
+            video_in, textos, on_log, layout, piezas, semilla, estilo_texto,
+            foto_producto,
+        )
+    if block is None:
+        on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
+        _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
+              str(out_path)], on_log)
+        return out_path
+    return _quemar_bloque(video_in, block, out_path, on_log, y_frac)
+
+
+def _bloque_de_texto(video_in: Path, textos: dict, on_log: OnLog, layout: str,
+                     piezas: "set[str] | None", semilla: str, estilo_texto: str,
+                     foto_producto: "Path | None") -> "Image.Image | None":
+    """El bloque de siempre (clásico o blanco liso) como imagen."""
     # El gancho/CTA fijos se meten AQUÍ, antes de elegir paleta, porque el
     # color se decide a partir de sus emojis.
     textos = {**(textos or {}), **textos_fijos(semilla)}
@@ -1456,13 +1482,11 @@ def _burn_text_block(video_in: Path, textos: dict, out_path: Path, on_log: OnLog
         pintar = _render_blanco_png
     else:
         pintar = _render_plano_png if rotulo.get("estilo") else _render_text_block_png
-    block = pintar(textos, layout, piezas, paleta, rotulo, on_log)
-    if block is None:
-        on_log("[3/5] sin textos que quemar — se copia el vídeo tal cual")
-        _run(["ffmpeg", "-y", "-v", "error", "-i", str(video_in), "-c", "copy",
-              str(out_path)], on_log)
-        return out_path
+    return pintar(textos, layout, piezas, paleta, rotulo, on_log)
 
+
+def _quemar_bloque(video_in: Path, block: "Image.Image", out_path: Path,
+                   on_log: OnLog, y_frac: float | None) -> Path:
     png_path = out_path.with_suffix(".png")
     block.save(png_path)
 
@@ -1873,11 +1897,41 @@ def limpiar_metadatos(video: Path, on_log: OnLog = _noop) -> Path:
     return video
 
 
-def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog) -> Path:
+def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog,
+               sfx: "tuple[Path, float] | None" = None) -> Path:
     """Sustituye la pista de audio del vídeo por `audio_in` (la locución ya
     recortada de silencios). El vídeo llega mudo desde el paso 3
     (`duration_match` genera el resultado con `-an`), así que esto es un mux
-    directo, no una mezcla de varias pistas."""
+    directo, no una mezcla de varias pistas.
+
+    `sfx` = (wav, segundo en que empieza): los efectos del acabado «regalo»,
+    mezclados POR DEBAJO de la voz. Si la mezcla falla se hace el mux de
+    siempre: un vídeo sin efectos es mejor que ningún vídeo."""
+    if sfx is not None:
+        wav, t0 = sfx
+        ms = int(max(0.0, t0) * 1000)
+        try:
+            _run([
+                "ffmpeg", "-y", "-v", "error",
+                "-i", str(video_in), "-i", str(audio_in), "-i", str(wav),
+                "-filter_complex",
+                # La voz pasa por su cadena de siempre; el sfx ya viene a su
+                # nivel (pico 0.25) y solo se retrasa. `normalize=0` para que
+                # amix no baje la voz a la mitad, y el limitador final por si
+                # un golpe coincide con un pico de voz.
+                f"[1:a]{_filtro_voz(audio_in, on_log)},aresample=48000[voz];"
+                f"[2:a]aresample=48000,adelay={ms}:all=1[fx];"
+                "[voz][fx]amix=inputs=2:duration=first:normalize=0,"
+                "alimiter=limit=0.9:level=disabled[a]",
+                "-map", "0:v:0", "-map", "[a]",
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+                "-shortest", "-movflags", "+faststart",
+                str(out_path),
+            ], on_log)
+            on_log(f"[5/5] efectos de regalo mezclados desde {t0:.2f}s")
+            return out_path
+        except RuntimeError as e:
+            on_log(f"[5/5] la mezcla de efectos falló ({str(e)[:120]}) — solo voz")
     _run([
         "ffmpeg", "-y", "-v", "error",
         "-i", str(video_in), "-i", str(audio_in),
@@ -1892,6 +1946,43 @@ def _mux_audio(video_in: Path, audio_in: Path, out_path: Path, on_log: OnLog) ->
         str(out_path),
     ], on_log)
     return out_path
+
+
+def _animacion_regalo(
+    video_in: Path, audio_path: Path, work_dir: Path, semilla: str,
+    palabras: list[dict] | None, on_log: OnLog,
+) -> "tuple[Path | None, tuple[Path, float] | None]":
+    """Animación de cierre del acabado «regalo» + su wav de efectos.
+
+    Arranca donde entraría la flecha de siempre (`_find_arrow_window`: un
+    segundo antes de «carrito»), así la flecha de la animación llega a señalar
+    más o menos cuando la voz lo dice. Devuelve (vídeo, (wav, t0)); si algo
+    falla, (None, None) y quien llama pone la flecha `.mov` normal — el
+    montaje nunca se cae por un adorno.
+    """
+    from src.nicho_pov_bof.pipeline import regalo
+
+    try:
+        variante = regalo.elegir_variante(semilla)
+        t0, _ = _find_arrow_window(
+            audio_path, work_dir, on_log, probe_duration(video_in),
+            words=palabras if palabras is not None else [],
+        )
+        out = regalo.superponer_animacion(
+            video_in, work_dir / "05_regalo.mp4", t0, variante, semilla, on_log,
+        )
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[regalo] la animación falló ({str(e)[:160]}) — flecha normal")
+        return None, None
+    try:
+        wav = regalo.generar_sfx(
+            variante, regalo.eventos_de(variante), work_dir / "05_regalo_sfx.wav",
+            semilla,
+        )
+        return out, (wav, t0)
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[regalo] los efectos de sonido fallaron ({str(e)[:160]}) — sin sfx")
+        return out, None
 
 
 # ---------------------------------------------------------------------------
@@ -1967,6 +2058,11 @@ def build_video(
     work_dir.mkdir(parents=True, exist_ok=True)
 
     on_progress(0.0, "Preparando…")
+    if estilo_texto == "regalo":
+        from src.nicho_pov_bof.pipeline import regalo
+
+        on_log("[regalo] " + regalo.describir(
+            regalo.elegir_variante(semilla or str(output_path.stem))))
 
     # 1) Normalizar resolución/fps. Antes había un paso previo de quitado de
     # marca de agua para Veo3; dejó de ponerla (2026-07) y Kling nunca la
@@ -2030,15 +2126,25 @@ def build_video(
         else:
             on_log("[3/5] sin transcripción de la voz — se continúa sin subtítulos")
 
-    # 5) Flecha .mov
-    if con_flecha:
+    # 5) Flecha .mov — o, en el acabado «regalo», su animación de cierre
+    sfx = None
+    arrowed = None
+    if con_flecha and estilo_texto == "regalo":
+        on_log("[4/5] Animación de regalo…")
+        arrowed, sfx = _animacion_regalo(
+            texted, audio_path, work_dir, semilla or str(output_path.stem),
+            palabras, on_log,
+        )
+        if arrowed is not None:
+            on_progress(0.84, "Animación de regalo")
+    if arrowed is None and con_flecha:
         on_log("[4/5] Superponiendo flecha…")
         arrowed = _overlay_arrow(
             texted, audio_path, work_dir, work_dir / "05_arrow.mp4", on_log,
             words=palabras if palabras is not None else [],
         )
         on_progress(0.84, "Flecha superpuesta")
-    else:
+    elif arrowed is None:
         on_log("[4/5] Sin flecha")
         arrowed = texted
         on_progress(0.84, "Sin flecha")
@@ -2050,7 +2156,7 @@ def build_video(
     # ("Unable to re-open … for shifting data") y se perdía el montaje.
     on_log("[5/5] Mezclando audio final…")
     final_local = work_dir / "06_final.mp4"
-    _mux_audio(arrowed, audio_path, final_local, on_log)
+    _mux_audio(arrowed, audio_path, final_local, on_log, sfx=sfx)
     limpiar_metadatos(final_local, on_log)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(final_local), str(output_path))

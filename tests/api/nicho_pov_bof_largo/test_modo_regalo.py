@@ -6,7 +6,7 @@ from src.nicho_pov_bof_largo import config
 def test_regalo_es_un_estilo_con_su_prompt():
     assert config.ESTILOS_GUION["regalo"]["fichero"] == "guion_regalo.md"
     assert "regalo" in menus.MENUS["pov_bof_largo"].opciones["estilo_guion"]
-    assert config.estilo_texto_valido("", "regalo") == "blanco"
+    assert config.estilo_texto_valido("", "regalo") == "regalo"
 
 
 def test_prompt_regalo_rellena_la_cta_y_no_lleva_la_cabecera():

@@ -302,6 +302,12 @@ para la temporada de Black Friday y Navidad, tareas incluidas.
   Friday ni destinatarios niños. Si lo trae, se rehace.
 - Escena (prompt de Flow, lo escribes tú): fondo navideño o papel/bolsa de
   regalo al lado, con el producto idéntico a la foto.
+- Acabado de texto `estilo_texto="regalo"` (el de serie con este gancho): rótulo
+  «idea de regalo» + nombre + «revisa si tienes cupón», y al final una animación
+  (caja, copos o lazo con confeti) que acaba con la flecha en el carrito, con su
+  sonido. Forma (caja, solo texto con borde, cinta o etiqueta), colores, letra,
+  animación y sonido CAMBIAN por producto (`nicho_pov_bof/pipeline/regalo.py`):
+  no hace falta pedir variedad, sale sola.
 
 ## 🎄 Productos Q4 (Black Friday y Navidad)
 

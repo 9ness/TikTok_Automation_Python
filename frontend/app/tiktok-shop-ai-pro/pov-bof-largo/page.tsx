@@ -274,9 +274,12 @@ export default function PovBofLargoPage() {
   // elegir, cada producto se va al acabado que le toca por gancho, así que se
   // enseña ese como el de partida.
   const estiloCarpetaActual = (() => {
-    const porGancho = (items[0]?.estilo_guion || "precio") === "dolor"
+    const ganchoCarpeta = items[0]?.estilo_guion || "precio";
+    const porGancho = ganchoCarpeta === "dolor"
       ? "blanco"
-      : "clasico";
+      : ganchoCarpeta === "regalo"
+        ? "regalo"
+        : "clasico";
     const vistos = new Set(items.map((p) => p.estilo_texto || porGancho));
     return vistos.size === 1 ? [...vistos][0] : "";
   })();
@@ -1233,6 +1236,7 @@ export default function PovBofLargoPage() {
               {[
                 { v: "blanco", label: "Blanco liso" },
                 { v: "clasico", label: "Clásico (color)" },
+                { v: "regalo", label: "Regalo 🎁" },
               ].map((o) => (
                 <button
                   key={o.v}
@@ -1829,8 +1833,13 @@ function ProductoCard({
   // producto (se pone de golpe para toda la carpeta y se retoca aquí si hace
   // falta). Sin elegir, manda el gancho del catálogo — el de punto de dolor
   // va con el bloque blanco liso y el de precio con el clásico de color.
+  const ganchoProducto = p.estilo_guion || "precio";
   const estiloPorGancho =
-    (p.estilo_guion || "precio") === "dolor" ? "blanco" : "clasico";
+    ganchoProducto === "dolor"
+      ? "blanco"
+      : ganchoProducto === "regalo"
+        ? "regalo"
+        : "clasico";
   const estiloTexto = p.estilo_texto || estiloPorGancho;
 
   const urlNoEncontrada = buscarUrl.isSuccess && !p.product_url;
@@ -2436,6 +2445,8 @@ function ProductoCard({
             // "no me lo han dicho" y aplica el de serie (el blanco), así que
             // pedir el clásico tiene que ser explícito.
             { v: "clasico", label: "Clásico (color)" },
+            // Rótulo navideño con animación hasta el carrito; varía por producto.
+            { v: "regalo", label: "Regalo 🎁" },
           ].map((o) => (
             <button
               key={o.v}

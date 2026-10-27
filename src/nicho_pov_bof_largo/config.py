@@ -632,14 +632,16 @@ def opciones_guion(clip_s: float = 0) -> tuple[tuple[int, int], ...]:
 # Por eso "" no significa "clásico" sino "no me lo han dicho": para pedir el
 # clásico a propósito hay que mandar "clasico".
 ESTILO_TEXTO_DEFECTO = "blanco"
-# Los dos acabados, como los eligen desde la pantalla.
-ESTILOS_TEXTO = ("blanco", "clasico")
+# Los acabados, como los eligen desde la pantalla. "regalo" (oct 2026) es el
+# de Navidad: rótulo de idea de regalo + animación de cierre con sonido, que
+# cambian de forma, color y letra por producto (`nicho_pov_bof/pipeline/regalo.py`).
+ESTILOS_TEXTO = ("blanco", "clasico", "regalo")
 # Cuál le toca a cada gancho cuando nadie ha dicho nada. No es un capricho: el
 # de punto de dolor abre con preguntas al espectador y el bloque blanco liso
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "regalo": "blanco", "viral": "blanco"}
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "regalo": "regalo", "viral": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:
@@ -650,7 +652,7 @@ def estilo_texto_de(estilo_guion: str = "") -> str:
 
 
 def estilo_texto_valido(valor: str = "", estilo_guion: str = "") -> str:
-    """Lo que hay que pasarle al montador: "blanco" o "" (el clásico).
+    """Lo que hay que pasarle al montador: "blanco", "regalo" o "" (el clásico).
 
     Con `estilo_guion` (precio / dolor), el vacío deja de ser un único valor de
     serie y pasa a ser el que le toca a ESE gancho.
@@ -658,8 +660,8 @@ def estilo_texto_valido(valor: str = "", estilo_guion: str = "") -> str:
     v = (valor or "").strip().lower()
     if v == "clasico":
         return ""
-    if v == "blanco":
-        return "blanco"
+    if v in ("blanco", "regalo"):
+        return v
     elegido = estilo_texto_de(estilo_guion)
     return "" if elegido == "clasico" else elegido
 
