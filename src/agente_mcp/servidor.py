@@ -1005,7 +1005,7 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
     reglas (promesas, cupones afirmados).
     `estilo_texto`: la letra de TODO el carrusel, la que más se parezca al viral
     (tiktok —por defecto, blanca con contorno—, tiktok_sans —la letra nativa de
-    TikTok—, tiktok_medio —la misma más fina, la de los textos normales de TikTok—, tiktok_crema —la misma fina en color crema—, pildora_tiktok —la de TikTok sobre píldora blanca—, pildora_impacto —condensada en mayúsculas sobre píldora blanca—, impacto_fino —condensada blanca solo con sombra—, tiktok_amarillo —la amarilla con contorno oscuro de TikTok—, editorial / editorial_negra / redonda_oscura / anuncio_azul —letra OSCURA sin caja de los virales que son anuncios de diseño (serif fina marrón, serif gruesa casi negra, redondeada granate, sans azul marino), solo sobre una zona clara de la foto—, fondo_negro / fondo_blanco / fondo_trans / fondo_rosa —el texto «con fondo» de
+    TikTok—, tiktok_medio —la misma más fina, la de los textos normales de TikTok—, tiktok_crema —la misma fina en color crema—, pildora_tiktok —la de TikTok sobre píldora blanca—, pildora_impacto —condensada en mayúsculas sobre píldora blanca—, impacto_fino —condensada blanca solo con sombra—, tiktok_amarillo —la amarilla con contorno oscuro de TikTok—, editorial / editorial_negra / redonda_oscura / anuncio_azul —letra OSCURA sin caja de los virales que son anuncios de diseño (serif fina marrón, serif gruesa casi negra, redondeada granate, sans azul marino), solo sobre una zona clara de la foto—, anuncio_blanco —blanca gruesa sin contorno, con sombra, la de los anuncios de fondo oscuro—, fondo_negro / fondo_blanco / fondo_trans / fondo_rosa —el texto «con fondo» de
     TikTok, caja unida; fondo_rosa: fucsia sobre caja rosa claro—, snap —barra de Snapchat de lado a lado—, clasico, pildora —negra sobre píldora blanca—,
     pildora_negra, maquina, elegante, manuscrita, rotulador, impacto),
     `texto_y` la altura del texto (0.05 arriba … 0.95 abajo; 0 = la de
@@ -1013,6 +1013,8 @@ async def descargar_carrusel(ctx: Context, id: str = "", texto_n: int = 0,
     estilo; los virales suelen llevar letra más pequeña: ~0.7-0.8) y
     `texto_alinear` izquierda / derecha / centro (por defecto) para dejar el
     texto en el mismo lado que el viral.
+    En el `texto`, `*palabra*` la pinta en amarillo (los anuncios que
+    resaltan una palabra: «Banco da lavoro *3 livelli*»).
     Vuelve a quemar todas. Con `estilo_n` el estilo es SOLO de esa
     diapositiva (virales que mezclan letras: barra de Snapchat en la 1ª y
     letra normal en la 2ª); un estilo sin `estilo_n` borra los de diapositiva.

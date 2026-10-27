@@ -1253,3 +1253,4 @@
 - 2026-10-27 · Carruseles replicados: los espacios duros apenas descentran el texto (glifo estrecho) → parámetro `alinear` (izquierda/derecha, margen 7 %) en texto_foto.quemar, endpoint /estilo y MCP `texto_alinear`
 - 2026-10-27 · Carruseles: las líneas de espacio duro que separan dos textos pintaban trozos de píldora/caja → quemar salta las líneas en blanco y _caja_unida no une cajas con hueco
 - 2026-10-27 · Carruseles de anuncio con letra oscura: el viral lleva un resplandor blanco difuminado detrás del texto → `halo` en los estilos oscuros (blur del alfa del texto ×5, opacidad 0.8)
+- 2026-10-27 · viral con una palabra resaltada en otro color → `*palabra*` en el texto del carrusel la pinta en COLOR_ACENTO (amarillo); se mide sin los asteriscos. Estilo `anuncio_blanco` (Montserrat ExtraBold, sombra)

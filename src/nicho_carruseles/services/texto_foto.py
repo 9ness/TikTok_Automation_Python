@@ -106,6 +106,10 @@ ESTILOS: dict[str, dict] = {
                        "pildora": None, "mayus": False, "tam": 0.95, "sombra": False, "halo": True},
     "anuncio_azul": {"fuente": "Poppins-SemiBold.ttf", "color": (28, 48, 100), "borde": 0.0,
                      "pildora": None, "mayus": False, "tam": 0.95, "sombra": False, "halo": True},
+    # Blanca gruesa sin contorno, solo sombra: la de los anuncios de diseño con
+    # fondo oscuro; con *palabra* la palabra va en amarillo (COLOR_ACENTO).
+    "anuncio_blanco": {"fuente": "Montserrat-ExtraBold.ttf", "color": (255, 255, 255), "borde": 0.0,
+                       "pildora": None, "mayus": False, "tam": 1.0, "sombra": True},
     "impacto": {"fuente": "anton.ttf", "color": (255, 255, 255), "borde": 0.1,
                 "pildora": None, "mayus": True, "tam": 1.05, "sombra": True},
 }
@@ -115,6 +119,7 @@ TAM_REL_MIN, TAM_REL_MAX = 0.5, 1.6
 
 MARGEN_LADO = 0.07
 HALO_OPACIDAD = 0.8
+COLOR_ACENTO = (255, 196, 30)
 ALINEACIONES = ("centro", "izquierda", "derecha")
 
 
@@ -168,7 +173,7 @@ def _repartir(texto: str, font: ImageFont.FreeTypeFont, max_w: float,
         actual = ""
         for palabra in bloque.split(" "):
             prueba = f"{actual} {palabra}".strip(" ")
-            if _seg_width(_split_runs(prueba), font, d0, emoji_size, gap) <= max_w or not actual:
+            if _seg_width(_split_runs(prueba.replace("*", "")), font, d0, emoji_size, gap) <= max_w or not actual:
                 actual = prueba
             else:
                 lineas.append(actual)
@@ -247,12 +252,13 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
 
         alto_bloque = alto_linea * len(lineas)
         y = int(H * y_rel - alto_bloque / 2)
+        acento = False  # *palabra* = en el color de acento (como el amarillo de los anuncios)
         for linea in lineas:
             if not linea.strip(" \t\xa0"):
                 # Línea de separación (dos textos en una diapositiva): sin caja.
                 y += alto_linea
                 continue
-            ancho = _seg_width(_split_runs(linea), font, d0, emoji_size, gap)
+            ancho = _seg_width(_split_runs(linea.replace("*", "")), font, d0, emoji_size, gap)
             x = (W - ancho) / 2
             if alinear == "izquierda":
                 x = W * MARGEN_LADO + pad
@@ -271,18 +277,23 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
                     radius=int(tam * 0.3), fill=est["pildora"])
             else:
                 y_txt = y
-            for clase, tramo in _split_runs(linea):
-                if clase == "emoji":
-                    em = _emoji_run_img(tramo, emoji_size)
-                    if em is not None:
-                        capa.paste(em, (int(x), int(y_txt + (tam - emoji_size) / 2)), em)
-                        x += em.width + gap
-                else:
-                    dib.text(
-                        (x, y_txt), tramo, font=font, fill=(*est["color"], 255),
-                        stroke_width=borde, stroke_fill=(0, 0, 0, 255),
-                    )
-                    x += d0.textlength(tramo, font=font)
+            for trozo in re.split(r"(\*)", linea):
+                if trozo == "*":
+                    acento = not acento
+                    continue
+                color = est.get("acento", COLOR_ACENTO) if acento else est["color"]
+                for clase, tramo in _split_runs(trozo):
+                    if clase == "emoji":
+                        em = _emoji_run_img(tramo, emoji_size)
+                        if em is not None:
+                            capa.paste(em, (int(x), int(y_txt + (tam - emoji_size) / 2)), em)
+                            x += em.width + gap
+                    else:
+                        dib.text(
+                            (x, y_txt), tramo, font=font, fill=(*color, 255),
+                            stroke_width=borde, stroke_fill=(0, 0, 0, 255),
+                        )
+                        x += d0.textlength(tramo, font=font)
             y += alto_linea
 
         if unida:
