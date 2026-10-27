@@ -100,6 +100,8 @@ ESTILOS: dict[str, dict] = {
     # clara: se genera así a propósito, copiando la composición del viral.
     "editorial": {"fuente": "CormorantGaramond-Light.ttf", "color": (62, 48, 38), "borde": 0.0,
                   "pildora": None, "mayus": False, "tam": 1.15, "sombra": False},
+    "editorial_negra": {"fuente": "PTSerif-Bold.ttf", "color": (38, 30, 26), "borde": 0.0,
+                        "pildora": None, "mayus": False, "tam": 1.1, "sombra": False},
     "redonda_oscura": {"fuente": "Fredoka-SemiBold.ttf", "color": (92, 52, 50), "borde": 0.0,
                        "pildora": None, "mayus": False, "tam": 0.95, "sombra": False},
     "anuncio_azul": {"fuente": "Poppins-SemiBold.ttf", "color": (28, 48, 100), "borde": 0.0,
