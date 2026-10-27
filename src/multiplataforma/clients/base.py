@@ -72,6 +72,22 @@ class ClienteBase:
                 paso[k] = _ocultar(v) if isinstance(v, dict) else v
         self.pasos.append(paso)
 
+    def _post_foto(self, url: str, datos: dict, codigos: tuple[str, ...], intentos: int = 3) -> Any:
+        """POST de una foto que Meta baja de nuestra URL. A veces falla AL AZAR al
+        bajarla (IG/Threads 2207052, FB 324/2069019 «Missing or invalid image
+        file»; la misma foto entra en otra red): se reintenta, y si no, el error
+        queda reintentable para que el siguiente tick siga desde esta foto."""
+        for intento in range(intentos):
+            try:
+                return self._request("POST", url, data=datos)
+            except ErrorPublicacion as e:
+                if not any(c in str(e) for c in codigos):
+                    raise
+                e.reintentable = True
+                if intento == intentos - 1:
+                    raise
+                self._sleep(5)
+
     def _request(
         self, metodo: str, url: str, *, params: dict | None = None, data: dict | None = None,
         json: dict | None = None, headers: dict | None = None, content: Any = None,

@@ -132,7 +132,7 @@ class FacebookClient(ClienteBase):
                         self._anotar("POST", url, data=datos)
                         fotos.append(f"dry-fb-photo-{i + 1}")
                         continue
-                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    j = self._post_foto(url, {**datos, "access_token": self.token}, ("2069019", "code=324"))
                     if not j.get("id"):
                         raise ErrorPublicacion(f"facebook: foto {i + 1} sin id: {j}")
                     fotos.append(str(j["id"]))

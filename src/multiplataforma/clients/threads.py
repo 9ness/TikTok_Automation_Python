@@ -127,7 +127,7 @@ class ThreadsClient(ClienteBase):
                         self._anotar("POST", url, data=datos)
                         hijos.append(f"dry-th-item-{i + 1}")
                         continue
-                    j = self._request("POST", url, data={**datos, "access_token": self.token})
+                    j = self._post_foto(url, {**datos, "access_token": self.token}, ("2207052",))
                     if not j.get("id"):
                         raise ErrorPublicacion(f"threads: foto {i + 1} sin id de contenedor: {j}")
                     hijos.append(str(j["id"]))

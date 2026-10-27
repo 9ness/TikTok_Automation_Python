@@ -230,3 +230,40 @@ def test_instagram_carrusel_reintenta_foto_que_meta_no_baja():
     res = InstagramClient("tok", http=g.cliente(), sleep=lambda s: None).publicar_carrusel(
         "17841", caption="x", imagenes_url=["https://x/1.jpg", "https://x/2.jpg"])
     assert res["media_id"] == "m1" and len(res["children"]) == 2
+
+
+def test_facebook_y_threads_reintentan_foto_que_meta_no_baja():
+    from src.multiplataforma.clients.facebook import FacebookClient
+    from src.multiplataforma.clients.threads import ThreadsClient
+
+    fb_fallos = iter([True, False, False])
+
+    def fb_foto(r):
+        if next(fb_fallos):
+            return httpx.Response(400, json={"error": {"message": "Missing or invalid image file",
+                                                       "code": 324, "error_subcode": 2069019}})
+        return {"id": "f"}
+    g = Grabadora([("POST", "/pg/photos", fb_foto), ("POST", "/pg/feed", {"id": "pg_1"})])
+    res = FacebookClient("tok", http=g.cliente(), sleep=lambda s: None).publicar_fotos(
+        "pg", mensaje="x", imagenes_url=["https://x/1.jpg", "https://x/2.jpg"])
+    assert res["post_id"] == "pg_1" and len(res["photo_ids"]) == 2
+
+    th_fallos = iter([True, False, False])
+
+    def th_media(r):
+        if b"CAROUSEL" in r.content:
+            return {"id": "car"}
+        if next(th_fallos):
+            return httpx.Response(400, json={"error": {"message": "An unknown error occurred",
+                                                       "code": 1, "error_subcode": 2207052}})
+        return {"id": "h"}
+    g = Grabadora([
+        ("GET", "threads_publishing_limit", {"data": [{"quota_usage": 0}]}),
+        ("POST", "/th/threads_publish", {"id": "p1"}),
+        ("POST", "/th/threads", th_media),
+        ("GET", "/h", {"status": "FINISHED"}),
+        ("GET", "/car", {"status": "FINISHED"}),
+    ])
+    res = ThreadsClient("tok", http=g.cliente(), sleep=lambda s: None).publicar_carrusel(
+        "th", texto="x", imagenes_url=["https://x/1.jpg", "https://x/2.jpg"])
+    assert res["post_id"] == "p1" and len(res["children"]) == 2
