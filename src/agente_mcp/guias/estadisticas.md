@@ -41,6 +41,28 @@ No lo hagas a mano: está todo resuelto y un mes tarda ~3 min.
   distintos, porque el círculo y el globo del punto tapan la línea.
   Comprobado en mayo: suma de ventas 32 = total del mes, GMV ±0,5 %.
 - `conv.py` junta los `m_*.json` en `doc.json` con números y `tipo`.
+- `pedidos.py salida.json` → un registro por pedido de **Perfil › Ganancias ›
+  Pedidos de afiliados** (pestaña **Todo**, rango máx. 90 días; Néstor empezó
+  en agosto, no hace falta antes). Lleva estado, tipo (Vídeo / Carousel /
+  Escaparate), país, importe, comisión y caption. Se tarda ~1 h en 480
+  pedidos. Lánzalo en segundo plano con un límite de 2 h. Si se corta, se
+  vuelve a lanzar y continúa desde el JSON. La vista guarda todo lo ya
+  cargado y solo pide más al llegar al fondo, así que hay que bajar con
+  flings rápidos: con un swipe lento se queda en 128.
+  - **Anuncios**: la tarjeta lleva la etiqueta «Anuncios de la tienda».
+    Márcalos con un dump al final (`anuncio: true`); no hace falta cambiar
+    de pestaña.
+  - **España**: los pedidos españoles NO llevan país. Solo los de fuera
+    muestran «global XX».
+  - **No aptos**: no dan comisión y no suman.
+- `agg.py pedidos.json ID_A:AAAA-MM-DD ID_B:AAAA-MM-DD` → `origen.json` (el
+  origen de cada mes y los vídeos/carruseles que más venden). La lista no da
+  fechas: el ID crece con el tiempo y se interpola entre dos pedidos con
+  fecha conocida («Ver detalles» › Fecha del pedido), uno al final de la
+  lista y otro al principio. El error es de ±1 día. **No** es un snowflake
+  `id >> 22`.
+- Para subir: `meses[].origen`, `contenidos` y `rango_pedidos`, junto al
+  resto de `guardar_estadisticas`.
 
 Trampas: las hojas inferiores (Tendencias, calendario) NO salen en
 `uiautomator dump`; el dump a veces vuelve vacío (reintentar antes de creer

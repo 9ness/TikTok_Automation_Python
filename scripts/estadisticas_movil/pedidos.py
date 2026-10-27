@@ -14,7 +14,9 @@ def dump():
     return []
 TIPOS = {"Vídeo", "Carousel", "Carrusel", "LIVE", "Escaparate", "Tarjeta de producto", "Anuncio", "Imagen", "Foto"}
 pedidos, quietos, ultimo = {}, 0, None
-while quietos < 4:
+if os.path.exists(sys.argv[1]):   # retomar: la lista del móvil sigue cargada, solo se sigue bajando
+    pedidos = {p["id"]: p for p in json.load(open(sys.argv[1]))}
+while quietos < 3:
     t = dump(); nuevos = 0
     idx = [i for i, s in enumerate(t) if s.startswith("ID del pedido:")]
     for n, i in enumerate(idx):
@@ -34,7 +36,9 @@ while quietos < 4:
     quietos = quietos + 1 if not nuevos else 0
     json.dump(list(pedidos.values()), open(sys.argv[1], "w"), ensure_ascii=False, indent=1)   # guarda en cada vuelta: un corte no pierde lo leído
     print(len(pedidos), flush=True)
-    adb("shell", "input", "swipe", "720", "2700", "720", "1000", "400"); time.sleep(1.6)
+    # la vista guarda TODOS los cargados y solo pide más al llegar al fondo: flings rápidos, no un swipe lento
+    for _ in range(15): adb("shell", "input", "swipe", "720", "2700", "720", "400", "80")
+    time.sleep(2)
 json.dump(list(pedidos.values()), open(sys.argv[1], "w"), ensure_ascii=False, indent=1)
 from collections import Counter
 print(len(pedidos), "pedidos", Counter(p.get("tipo", "?") for p in pedidos.values()))

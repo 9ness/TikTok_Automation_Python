@@ -1,8 +1,11 @@
-# pedidos → origen por mes + contenidos. Fecha del pedido por su ID (crece con el tiempo):
-# fecha_ms = (id >> 22) + OFFSET, OFFSET calibrado con pedidos de fecha conocida (Ver detalles).
+# pedidos → origen por mes + contenidos. La lista no trae fecha: el ID crece con el tiempo y se
+# interpola entre DOS pedidos de fecha conocida («Ver detalles» › Fecha del pedido), uno al principio
+# y otro al final del rango. uso: agg.py pedidos.json ID_A:AAAA-MM-DD ID_B:AAAA-MM-DD
 import json, sys, re, datetime
 from collections import defaultdict
-ped = json.load(open(sys.argv[1])); OFFSET = int(sys.argv[2])
+ped = json.load(open(sys.argv[1]))
+(A, fA), (B, fB) = [(int(a.split(":")[0]), datetime.date.fromisoformat(a.split(":")[1])) for a in sys.argv[2:4]]
+def fecha(i): return fA + datetime.timedelta(days=(int(i) - A) / (B - A) * (fB - fA).days)
 NOM = {"Vídeo": "Vídeo", "Carousel": "Carrusel", "Carrusel": "Carrusel", "LIVE": "LIVE", "Escaparate": "Escaparate"}
 def eur(s):
     m = re.search(r"([\d.]+,\d+|\d+(?:\.\d+)?)\s*€|€\s*([\d.]+,\d+|\d+(?:\.\d+)?)", s or "")
@@ -14,8 +17,7 @@ def uds(s):
 origen = defaultdict(lambda: defaultdict(lambda: {"pedidos": 0, "importe": 0.0, "comision": 0.0, "es_pedidos": 0, "es_importe": 0.0}))
 cont = {}
 for p in ped:
-    f = datetime.datetime.utcfromtimestamp(((int(p["id"]) >> 22) + OFFSET) / 1000)
-    mes = f.strftime("%Y-%m")
+    mes = fecha(p["id"]).strftime("%Y-%m")
     k = "Anuncios" if p.get("anuncio") else NOM.get(p.get("tipo"), p.get("tipo") or "Otros")
     imp = eur(p.get("importe")) * uds(p.get("importe")); com = eur(p.get("comision"))
     o = origen[mes][k]

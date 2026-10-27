@@ -671,6 +671,7 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- [x] 27/10 · Estadísticas de ventas de ness (`/estadisticas`): meses may–oct, días, productos con venta y origen de 482 pedidos de afiliados (vídeo/carrusel/anuncios/escaparate, España vs fuera, no aptos aparte) leídos del OPPO por ADB; MCP `estadisticas_ventas`/`guardar_estadisticas`.
 - [x] 26/10 · Mis tandas: filtro 🎯 por tarea de Campañas de creadores (chips con subidos/requeridos y horas que quedan, etiqueta por vídeo, MCP `guardar_tarea`/`tareas_tiktok`).
 - [x] 2026-10-15 · Réplicas Q4 juguetes/tecnología de Casca Chollos: Néstor confirma ficha del arbolito (1729930618957568103) y semáforos → 22 en 🟢 (las 4 de flores siguen sin stock).
 - [x] 26/10 · Mis tandas: botón «ID» (copia el ID de 19 cifras del producto) junto al 🛍️, en fotos y vídeos. El stock se mira en el Mi 8 con `scripts/stock_tiktok_movil.py`.
