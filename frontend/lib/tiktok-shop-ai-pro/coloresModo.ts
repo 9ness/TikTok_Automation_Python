@@ -36,6 +36,7 @@ const ESTILOS_LARGO: Record<string, string> = {
   epico: "bg-red-600/25 text-red-700 dark:text-red-300",
   inversa: "bg-teal-500/15 text-teal-700 dark:text-teal-300",
   accion: "bg-lime-500/15 text-lime-700 dark:text-lime-300",
+  regalo: "bg-green-600/20 text-green-700 dark:text-green-300",
   viral: "bg-sky-600/20 text-sky-700 dark:text-sky-300",
 };
 

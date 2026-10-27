@@ -501,6 +501,12 @@ ESTILOS_GUION: dict[str, dict[str, str]] = {
     # CTA de siempre. Pide productos que se puedan USAR en plano (muebles,
     # ropa, cocina, mascotas…): la electrónica encendida es difícil de clavar.
     "accion": {"label": "Acción", "fichero": "guion_accion.md"},
+    # Idea de REGALO para Black Friday y Navidad (27/10/2026, prompt nuestro):
+    # el gancho dice a QUIÉN regalárselo (adulto, situación real) y luego
+    # características, precio y la CTA de siempre. Sin promesas de campaña
+    # (envoltorio, entrega, ofertas). El producto que no pega como regalo se
+    # hace en otro modo: se elige por producto, no por tanda.
+    "regalo": {"label": "Regalo", "fichero": "guion_regalo.md"},
     # «Replicar viral» (`src/replicar_viral/`): el guion NO se escribe aquí,
     # viene ya adaptado en la réplica del producto (`replica_id`). Siempre dos
     # clips de 8 s. Ver `guion_de_replica`.
@@ -633,7 +639,7 @@ ESTILOS_TEXTO = ("blanco", "clasico")
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "viral": "blanco"}
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "regalo": "blanco", "viral": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:
@@ -774,6 +780,10 @@ def _caracteristicas(segundos: float = 0, estilo: str = "") -> str:
             "ya en uso y la voz hablándole al espectador, sin dolor ni "
             "preguntas."
             if (estilo or "").strip().lower() == "accion" else
+            " Y empieza con el GANCHO DE REGALO que se te ha pedido ARRIBA: a "
+            "quién se lo regalarías (un adulto y su situación real), sin "
+            "decir que es el regalo perfecto ni prometer nada de la campaña."
+            if (estilo or "").strip().lower() == "regalo" else
             " Y empieza con una de las aperturas de precio "
             "que se te han dado ARRIBA, copiada tal cual: son verbales a "
             "propósito."

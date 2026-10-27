@@ -284,6 +284,25 @@ todo para los productos caros (más de 200 €), que necesitan más vídeos.
   plano (muebles, ropa, calzado, cocina, mascotas, deporte); la electrónica
   encendida sigue siendo difícil y mantiene sus reglas.
 
+## 🎁 Modo «Regalo» (27/10/2026)
+
+Sexto modo (`estilo_guion="regalo"`, prompt nuestro en `prompts/guion_regalo.md`)
+para la temporada de Black Friday y Navidad, tareas incluidas.
+
+- Forma: el gancho dice **a quién regalárselo**, un ADULTO con una situación
+  real que encaje con el uso del producto («Si tienes un compañero que se pasa
+  el día de pie en el trabajo, regálale esto») → características que le sirven
+  a esa persona → urgencia de precio → la CTA de siempre (escalera normal).
+- **Se elige por producto, no por tanda**: la mayoría de productos de temporada
+  van en regalo, pero lo que no pega como regalo (recambios, limpieza,
+  consumibles…) va en dolor o precio. Nada de hacer todos los modos de un
+  producto «porque sí».
+- Revisa el guion antes de locutar: nada de «el regalo perfecto», «le va a
+  encantar», envoltorio, tarjeta, «llega antes de Navidad», ofertas de Black
+  Friday ni destinatarios niños. Si lo trae, se rehace.
+- Escena (prompt de Flow, lo escribes tú): fondo navideño o papel/bolsa de
+  regalo al lado, con el producto idéntico a la foto.
+
 ## 🎄 Productos Q4 (Black Friday y Navidad)
 
 Carpeta de temporada dentro de **📦 Inventario General**, la primera de la lista

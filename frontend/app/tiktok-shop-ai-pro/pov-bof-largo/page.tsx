@@ -306,6 +306,7 @@ export default function PovBofLargoPage() {
     epico: "border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-400",
     inversa: "border-sky-500 bg-sky-500/15 text-sky-400",
     accion: "border-lime-500 bg-lime-500/15 text-lime-400",
+    regalo: "border-red-500 bg-red-500/15 text-red-400",
   };
   // Global, igual que el listado (ver el mismo comentario en el POV BOF).
   const vendidos = useVendidosLargo("");
@@ -1067,6 +1068,8 @@ export default function PovBofLargoPage() {
                 ? "border-sky-500/40 bg-sky-500/[0.06]"
                 : estiloActual === "accion"
                 ? "border-lime-500/40 bg-lime-500/[0.06]"
+                : estiloActual === "regalo"
+                ? "border-red-500/40 bg-red-500/[0.06]"
                 : estiloActual === "dolor"
                 ? "border-amber-500/40 bg-amber-500/[0.06]"
                 : "border-violet-500/40 bg-violet-500/[0.06]"
@@ -1085,6 +1088,7 @@ export default function PovBofLargoPage() {
                 { k: "epico", txt: "Épico" },
                 { k: "inversa", txt: "Venta inversa" },
                 { k: "accion", txt: "Acción" },
+                { k: "regalo", txt: "Regalo" },
               ].map((e) => (
                 <button
                   key={e.k}
@@ -1118,6 +1122,8 @@ export default function PovBofLargoPage() {
                 ? "Irónico: «No lo compres si no quieres…» y cada motivo es una ventaja real; acaba con «El único problema es que…» y «te lo intento dejar en el carrito naranja, pero no te aseguro que siga disponible». Sin urgencia de precio. Siempre 3 clips (~24 s)."
                 : estiloActual === "accion"
                 ? "El gancho «Acción» del UGC del curso: sin problemas ni dolor, el vídeo arranca con el producto YA en uso y la voz le habla al espectador («Mira cómo…»); luego características y cierre de precio. Para productos que se puedan usar en plano (muebles, ropa, cocina, mascotas)."
+                : estiloActual === "regalo"
+                ? "Idea de regalo para estas fechas: el gancho dice a quién regalárselo (un adulto y su situación real, «si tienes un compañero que…»), luego características y cierre de precio. Sin prometer envoltorio, entregas ni ofertas. Solo para productos que pegan como regalo; el resto, dolor o precio."
                 : estiloActual === "dolor"
                 ? "El vídeo empieza con tres a cinco problemas dirigidos al espectador y el precio va al final."
                 : "El vídeo empieza por el precio (“Han ajustado el precio de…”) y el punto de dolor va en medio."}{" "}

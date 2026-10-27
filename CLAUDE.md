@@ -443,6 +443,8 @@ muestras en `docs/venta_inversa/`); cierre de disponibilidad (`CTAS_INVERSA`), s
 
 **⚡ Acción** (`estilo_guion="accion"`): el «UGC Desde 0 · Gancho Acción» del curso pasado a POV (`prompts/guion_accion.md`, original en `docs/ugc_accion/`): sin dolor, el producto ya en uso y «Mira cómo…», luego características y la CTA de precio de siempre.
 
+**🎁 Regalo** (`estilo_guion="regalo"`, 27/10/2026): prompt nuestro `prompts/guion_regalo.md` — el gancho dice a QUIÉN regalarlo (adulto, situación real), luego características, precio y CTA de siempre; sin promesas de campaña. Se elige por producto (lo que no pega como regalo, dolor o precio).
+
 **🔁 Réplica viral** (`estilo_guion="viral"`, carpeta especial «Réplicas virales», de todos los usuarios): el guion y los prompts de los clips salen de la réplica (`src/replicar_viral/`, campo `replica_id`), sin IA; `POST /replica/anadir` y MCP `anadir_replica`. Siempre 2 clips.
 
 **Calendario de subidas** (qué carpeta toca cada día): [`docs/CALENDARIO_POV_BOF_LARGO.md`](docs/CALENDARIO_POV_BOF_LARGO.md).
