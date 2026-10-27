@@ -11,7 +11,7 @@
 ## La idea
 
 Mismo carrusel, diapositiva a diapositiva: **mismo papel y misma forma de texto
-en cada foto, otro ambiente y NUESTRO producto**. La app no genera imágenes:
+en cada foto, las fotos lo más parecidas posible al viral y NUESTRO producto**. La app no genera imágenes:
 escribe el texto y el prompt de cada foto; tú las generas en Google Flow y la
 app les quema el texto (el mismo estilo que el nicho Carruseles) y las da
 todas en orden (en la web, una a una; por el MCP, también en ZIP).
@@ -121,8 +121,16 @@ En **Google Flow (Nano Banana)**, una imagen por diapositiva, en su `formato`:
 
 Antes de subir, revisa (`comun/revision-calidad.md`): producto idéntico a la
 ficha y a tamaño real, nada flotando, **ningún texto ni letras en la imagen**
-(lo pone la app), sin niños, sin pantallas con números, y que se parezca a la
-original en encuadre y emoción pero en otro sitio.
+(lo pone la app), sin niños, sin pantallas con números.
+
+**Replicar lo máximo posible (Néstor, 27/10 — SIEMPRE):** todo lo del viral
+está ahí por algo. Antes de generar, pon cada `prompt_imagen` al lado de su
+foto original y corrígelo si no pide lo mismo: misma hora y luz (puesta de sol
+→ puesta de sol), mismo sitio y fondo (estadio, lago, tienda…), mismas poses y
+gestos, mismo encuadre, mismos colores. Al bajarlas, hoja viral arriba /
+nuestra abajo: si una foto no se parece (p. ej. cielo de día donde el viral
+tiene atardecer), se REGENERA. No es copia: la imagen se hace desde cero y la
+persona es otra.
 
 ### Letra: la que se parezca al viral
 
@@ -158,6 +166,12 @@ Copiar el texto NATIVO de TikTok (TikTok Sans, la fuente de la app):
 - `pildora_impacto` — mayúsculas condensadas negras sobre píldora blanca («EN PROMO‼️», «DISPO ICI👀»).
 - `impacto_fino` — mayúsculas condensadas blancas solo con sombra (sin el contorno gordo de `impacto`).
 - `snap` — la barra de Snapchat: banda negra translúcida de lado a lado y letra pequeña (medium). Muchos virales de ropa la usan; ponla a la altura del viral con `texto_y`.
+**Textos (SIEMPRE, Néstor 27/10):** misma letra o la más parecida, mismo
+efecto (píldora, contorno, sombra, barra, mayúsculas, color) y en el MISMO SITIO
+de la foto que en el viral: si el viral pone una etiqueta sobre cada persona o
+cada objeto («Ich» / «Meine Mama», «Ohne sie» / «Mit ihr»), la nuestra también,
+encima de lo mismo, con los mismos cortes de línea y emojis en su sitio. Nunca
+una letra que no se parece ni el texto movido «porque queda mejor».
 **Mismo estilo, misma letra y mismo tamaño que el viral** (Néstor, 22/10 y 27/10: «eso influye mucho»; la letra más parecida Y el mismo aspecto: píldora si el viral lleva píldora, misma fuente dentro de la píldora, mayúsculas si van en mayúsculas): quema la diapositiva 1, ponla al lado de la original y ajusta `estilo_texto`, `texto_tam` y `texto_y` hasta que no se distingan. Si el viral MEZCLA letras (barra de Snapchat en la 1ª y texto normal en la 2ª), pon primero el estilo general y luego el de esa diapositiva con `estilo_n`; compara TODAS, no solo la 1ª. Fíjate también en los cortes de línea del viral y cópialos con `\n` en el texto.
 Los tres `fondo_*` salen ya a ~0.78 del tamaño base; afina con `texto_tam`.
 **Cómo se clava (lo que funcionó, 23/10):**

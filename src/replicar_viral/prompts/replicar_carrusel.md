@@ -10,7 +10,7 @@ Te paso un **carrusel de fotos viral de TikTok** (que ya vende), diapositiva a
 diapositiva y en orden, y **el producto que vendemos nosotros** (foto limpia +
 ficha). Vamos a hacer NUESTRO carrusel con la misma fórmula: mismas
 diapositivas, mismo papel de cada una, el texto adaptado a nuestro producto y
-otro ambiente.
+las fotos lo más parecidas posible a las del viral (hechas desde cero).
 
 ## 1. Entender el carrusel original
 
@@ -71,9 +71,13 @@ INGLÉS:
 - **Sin ningún texto en la imagen**: termina siempre con "No text, no letters,
   no captions, no watermarks, no logos added on the image." (el texto lo pone
   la app después).
-- El mismo encuadre, plano y emoción que la diapositiva original, pero en
-  **otro ambiente** (otra habitación, otra luz, otros muebles) y con aspecto de
-  foto real hecha con el móvil, sin efecto cinematográfico.
+- **Replica la foto original lo máximo posible** (se genera desde cero, así
+  que no es copia): mismo encuadre y plano, misma hora y luz (si es una puesta
+  de sol, puesta de sol; si es de noche con focos, de noche con focos), mismo
+  tipo de sitio y de FONDO (estadio, lago, dormitorio, tienda…), mismas POSES y
+  gestos de las personas, misma ropa en tono y estilo, mismos colores
+  dominantes y misma emoción. Describe todo eso con detalle en el prompt.
+  Aspecto de foto real hecha con el móvil.
 - Si la diapositiva enseña el producto (`usa_foto_producto: true`): di que use
   la foto de referencia adjunta ("Use the attached reference photo of the
   product") y que el producto es **exactamente** ese: misma forma, colores,
@@ -85,7 +89,9 @@ INGLÉS:
 - Si no enseña el producto (`usa_foto_producto: false`), que tampoco salga
   ningún otro producto que se pueda confundir con él.
 - **NUNCA niños ni bebés** (ni de espaldas, ni una mano pequeña). Personas
-  solo si el original las tiene, y sin copiar su cara: una persona distinta.
+  solo si el original las tiene, en la misma pose, pero sin copiar su cara: una
+  persona distinta. Si en el original sale un niño, pon a un adulto joven delgado
+  en la misma pose.
 - **Nada de pantallas con texto** (móviles con apps, números, notificaciones).
 
 **`usa_foto_producto`**: `true` si en NUESTRA diapositiva se ve el producto.
