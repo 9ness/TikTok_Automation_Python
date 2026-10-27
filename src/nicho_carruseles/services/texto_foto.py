@@ -99,13 +99,13 @@ ESTILOS: dict[str, dict] = {
     # arriba sobre una pared o un cielo claro). Solo si la foto deja esa zona
     # clara: se genera así a propósito, copiando la composición del viral.
     "editorial": {"fuente": "CormorantGaramond-Light.ttf", "color": (62, 48, 38), "borde": 0.0,
-                  "pildora": None, "mayus": False, "tam": 1.15, "sombra": False},
+                  "pildora": None, "mayus": False, "tam": 1.15, "sombra": False, "halo": True},
     "editorial_negra": {"fuente": "PTSerif-Bold.ttf", "color": (38, 30, 26), "borde": 0.0,
-                        "pildora": None, "mayus": False, "tam": 1.1, "sombra": False},
+                        "pildora": None, "mayus": False, "tam": 1.1, "sombra": False, "halo": True},
     "redonda_oscura": {"fuente": "Fredoka-SemiBold.ttf", "color": (92, 52, 50), "borde": 0.0,
-                       "pildora": None, "mayus": False, "tam": 0.95, "sombra": False},
+                       "pildora": None, "mayus": False, "tam": 0.95, "sombra": False, "halo": True},
     "anuncio_azul": {"fuente": "Poppins-SemiBold.ttf", "color": (28, 48, 100), "borde": 0.0,
-                     "pildora": None, "mayus": False, "tam": 0.95, "sombra": False},
+                     "pildora": None, "mayus": False, "tam": 0.95, "sombra": False, "halo": True},
     "impacto": {"fuente": "anton.ttf", "color": (255, 255, 255), "borde": 0.1,
                 "pildora": None, "mayus": True, "tam": 1.05, "sombra": True},
 }
@@ -114,6 +114,7 @@ TAM_REL_MIN, TAM_REL_MAX = 0.5, 1.6
 
 
 MARGEN_LADO = 0.07
+HALO_OPACIDAD = 0.8
 ALINEACIONES = ("centro", "izquierda", "derecha")
 
 
@@ -311,6 +312,13 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
             # Con contorno fino o sin él la sombra es lo que deja leer: más densa.
             for _ in range(1 if est["borde"] >= 0.1 else 3):
                 foto.paste(sombra, (0, 0), sombra)
+        if est.get("halo"):
+            # Resplandor blanco difuminado detrás de la letra oscura, como en los
+            # virales de anuncio: la despega de la pared aunque no sea lisa.
+            nube = capa.split()[-1].filter(ImageFilter.GaussianBlur(max(6, int(tam * 0.55))))
+            nube = nube.point(lambda v: min(int(255 * HALO_OPACIDAD), v * 5))
+            blanco = Image.new("RGB", (W, H), (255, 255, 255))
+            foto.paste(blanco, (0, 0), nube)
         foto.paste(capa, (0, 0), capa)
 
         destino.parent.mkdir(parents=True, exist_ok=True)
