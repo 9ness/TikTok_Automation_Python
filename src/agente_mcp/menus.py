@@ -145,7 +145,14 @@ def _elegir(nombre: str, opciones: list[str], que: str) -> str:
         return parecidos[0]
     nums = re.findall(r"\d+", nombre or "")
     if nums:
-        cand = [o for o in opciones if re.findall(r"\d+", o.split("__")[-1])[-1:] == nums[-1:]]
+        # Solo por número si las letras también casan (o no hay): «Productos
+        # Q4» no es «Carpeta_4», y caer ahí trabajaba otra carpeta.
+        letras = re.sub(r"\d+", " ", n).split()
+        cand = [
+            o for o in opciones
+            if re.findall(r"\d+", o.split("__")[-1])[-1:] == nums[-1:]
+            and all(p in _norm(o).split() for p in letras)
+        ]
         if len(cand) == 1:
             return cand[0]
     raise ErrorApp(
