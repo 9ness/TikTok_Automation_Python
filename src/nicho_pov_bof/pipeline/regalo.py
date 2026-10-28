@@ -84,15 +84,14 @@ PALETAS = (
      "fuerte": (150, 20, 52), "confeti": ((240, 196, 80), (255, 245, 225), (200, 40, 70), (90, 170, 110))},
 )
 
-# Letras gruesas que llevan tildes, Ñ, ¿ y ¡ (comprobado con el cmap de cada
-# una). Las «de cartel» van con mayúsculas; Playfair da el aire de tarjeta.
+# Letras gruesas de palo que llevan tildes, Ñ, ¿ y ¡ (comprobado con el cmap de
+# cada una). Fuera las de cartel y la de tarjeta (Luckiest Guy, Bangers,
+# Playfair): 28/10/2026, Néstor — no se leían de un vistazo y el rótulo tiene
+# que entenderse en lo que dura el scroll.
 FUENTES = (
-    "LuckiestGuy-Regular.ttf",
-    "Bangers-Regular.ttf",
+    "Montserrat-Black.ttf",
     "Rubik-Bold.ttf",
     "Fredoka-SemiBold.ttf",
-    "PlayfairDisplay-Black.ttf",
-    "Montserrat-Black.ttf",
 )
 _FUENTE_CUPON = "Montserrat-Black.ttf"   # la línea pequeña tiene que leerse sí o sí
 
@@ -143,7 +142,7 @@ def elegir_variante(semilla: str) -> dict:
         # La etiqueta cuelga: inclinada se ve más de verdad (siempre 4-6°).
         giro = (4.0 + (h[9] % 3)) * (1 if h[10] % 2 else -1)
     elif forma == "cinta":
-        # La cinta va de lado a lado: girada se le cortan las puntas.
+        # Recta: es una cinta, girada parece mal pegada.
         giro = 0.0
     return {
         "forma": forma,
@@ -297,7 +296,8 @@ def _lazo(ancho: int, pal: dict, colas: bool = True) -> Image.Image:
 # ---------------------------------------------------------------------------
 # Rótulo
 # ---------------------------------------------------------------------------
-_MAX_W = W - 160          # el rótulo entero, emojis incluidos
+_MAX_W = W - 240          # el rótulo entero, emojis incluidos: que no tape el vídeo
+_CINTA_MAX_W = W - 320    # la cinta, más estrecha: es una banda llena de color
 _MAX_H = int(H * 0.22)    # de 0.185 a ~0.40 (REGALO_TOP_Y): no baja hasta el producto
 
 
@@ -339,12 +339,7 @@ def render_rotulo(textos: dict, variante: dict, on_log: OnLog = _noop,
     giro = variante.get("giro") or 0.0
     if giro:
         im = im.rotate(giro, expand=True, resample=Image.BICUBIC)
-    # La cinta va de lado a lado a propósito: se recorta al ancho del vídeo.
-    if variante["forma"] == "cinta" and im.width > W:
-        x = (im.width - W) // 2
-        im = im.crop((x, 0, x + W, im.height))
-    tope_w = W if variante["forma"] == "cinta" else _MAX_W
-    k = min(1.0, tope_w / im.width, _MAX_H / im.height)
+    k = min(1.0, _MAX_W / im.width, _MAX_H / im.height)
     if k < 1.0:
         im = im.resize((int(im.width * k), int(im.height * k)), Image.LANCZOS)
     return im
@@ -479,7 +474,7 @@ def _rotulo_borde(nombre, frase, cupon, v) -> Image.Image:
 
 
 def _rotulo_cinta(nombre, frase, cupon, v) -> Image.Image:
-    """Cinta de regalo de lado a lado con el nombre dentro y un lazo encima,
+    """Cinta de regalo del ancho del nombre, con él dentro y un lazo encima,
     la cabecera en letra suelta y el cupón en pastilla debajo."""
     pal, fuente = v["paleta"], v["fuente"]
     d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
@@ -506,16 +501,20 @@ def _rotulo_cinta(nombre, frase, cupon, v) -> Image.Image:
     nudo = int(lazo.height * 0.42)         # alto del centro del nudo en el sprite
     pisa = int(lazo.height * 0.34)         # lo que las lazadas bajan dentro de la cinta
     if nombre:
-        lin, f = _ajustar(nombre, fuente, _MAX_W - 40, 70, 40, borde_frac=0.05)
+        muesca = 34                        # cola de golondrina en las puntas
+        margen = muesca + 44               # de la punta a la letra
+        lin, f = _ajustar(nombre, fuente, _CINTA_MAX_W - 2 * margen, 62, 36, borde_frac=0.05)
         b = max(2, f.size // 20)
         lh = int(_alto(f) * 0.92)
         cinta_h = int(lh * len(lin) + 44 + pisa)
         top = nudo
-        c = Image.new("RGBA", (W + 40, top + cinta_h))
+        # Del ancho del nombre, no de lado a lado (28/10/2026, Néstor: la de
+        # borde a borde tapaba demasiado vídeo).
+        tw = max(_ancho(d0, l, f, b) for l in lin)
+        c = Image.new("RGBA", (int(min(_CINTA_MAX_W, max(tw + 2 * margen, lazo_w + 2 * margen))), top + cinta_h))
         d = ImageDraw.Draw(c)
         x0, x1, y0, y1 = 0, c.width, top, top + cinta_h
         mid = (y0 + y1) / 2
-        muesca = 34                        # cola de golondrina en las puntas
         d.polygon([(x0, y0), (x1, y0), (x1 - muesca, mid), (x1, y1), (x0, y1), (x0 + muesca, mid)],
                   fill=pal["fondo"])
         # ribete metálico arriba y abajo, como las cintas de verdad
@@ -533,7 +532,7 @@ def _rotulo_cinta(nombre, frase, cupon, v) -> Image.Image:
     cup = _linea_cupon(cupon, pal, _MAX_W - 100, "pastilla")
     if cup is not None:
         piezas.append((cup, 0))
-    return _apilar(piezas, W + 40)
+    return _apilar(piezas, max([_MAX_W] + [p.width for p, _ in piezas]))
 
 
 def _rotulo_etiqueta(nombre, frase, cupon, v) -> Image.Image:
