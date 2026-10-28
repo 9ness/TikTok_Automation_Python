@@ -127,6 +127,15 @@ ufw allow in on tailscale0 to any port 6080 proto tcp comment 'noVNC navegador (
 `100.122.102.10` es la IP de Tailscale del VPS (`tailscale ip -4`). noVNC NO se
 publica en Caddy.
 
+## IP residencial (20/10/2026)
+Todo el Chrome 9222 navega por el proxy residencial ES: drop-in
+`navegador-chrome.service.d/proxy-es.conf` (`--proxy-server=http://127.0.0.1:8899`,
+`--force-webrtc-ip-handling-policy=disable_non_proxied_udp`) + `proxy-reenvio.service`
+(`~/.config/proxy_es/reenvio.py`, añade la auth; credencial en `~/.config/proxy_es/env`).
+Motivo: Google forzó «Demuestra que eres tú» + cambio de contraseña al ver la IP de
+Hetzner. Comprobar: `curl -s -x http://127.0.0.1:8899 https://ipinfo.io/json` → `"country": "ES"`.
+Si el proxy cae, Chrome se queda sin red (a propósito: nunca salir por Hetzner).
+
 ## Entrar el operador (una vez, y cuando caduque la sesión)
 
 - **Con Tailscale** en el móvil o en el PC (misma cuenta que el VPS):

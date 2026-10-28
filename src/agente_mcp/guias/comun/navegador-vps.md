@@ -8,8 +8,13 @@ Si eres un agente que trabaja **desde el VPS** (Claude Code, Codex), aquí está
 que tienes que saber para usar ese Chrome tú solo, **sin pedirle nada al
 operador** salvo que aparezca un login, una verificación o un CAPTCHA.
 
-> ¿La web bloquea la IP del VPS? Usa el Chrome con IP residencial:
-> [`navegador-proxy-es.md`](navegador-proxy-es.md).
+> **Desde el 20/10/2026 este Chrome (9222) sale TODO por la IP residencial
+> española** (IPRoyal, tarifa plana, sin coste por GB): Google pidió verificar y
+> cambiar la contraseña de ness4b al ver la IP de Hetzner. Lo hace el drop-in
+> `/etc/systemd/system/navegador-chrome.service.d/proxy-es.conf` + el servicio
+> `proxy-reenvio` (127.0.0.1:8899). **Nunca abras webs con sesión del operador
+> desde un navegador que salga por la IP del VPS.** El Chrome aparte de
+> [`navegador-proxy-es.md`](navegador-proxy-es.md) (9223) queda para IPTV. **Social1 de pago está en ESTE Chrome (9222)**, no en el 9223.
 
 ## 1. Qué hay
 

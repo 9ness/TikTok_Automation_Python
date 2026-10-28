@@ -257,6 +257,22 @@ Consumos del tutorial: 30 s a 480p = 90 cr; 30 s a 720p = 210 cr. Son orientaci�
 
 ## 7. Audio: tres rutas, sin mezclar
 
+**Réplica fiel sin locución (Néstor, 27/10/2026):** si el viral se apoya en
+el sonido de la demostración, conserva su audio original; no inventes voz en
+off, subtítulos ni un rótulo de venta. Si el operador pide solo CTA, añade
+únicamente ese cierre (puede ser la animación navideña con su SFX, sin el
+rótulo superior del acabado «regalo»). Recupera el bruto de Genjutsu, no
+intentes quitar textos ya quemados del montaje final. Si la referencia se
+aceleró, ajusta el audio original con el mismo factor para conservar los
+tiempos. El dispensador de celo de Nestor2 usa referencia ×1,5 y el bruto
+no tiene audio: se repone desde `ref/referencia_original.mp4`. Esta indicación
+expresa del operador sustituye el acabado con textos de §8 para este caso.
+Si el original sí lleva un gancho, compruébalo en sus fotogramas y conserva
+ese gancho (traducido para la cuenta española) solo durante su tramo real:
+en el celo termina a 4,7 s del original, o 3,133 s tras acelerar ×1,5. No
+confundir el fondo reconstruido por Genjutsu con ausencia de texto en la
+referencia; la versión final de Nestor2 lleva este gancho por petición de Néstor.
+
 | Qué muestra el vídeo | Qué hace Jonny | Qué hace el agente |
 |---|---|---|
 | Mudo / música | Transferencia y montaje; puede acelerar | Preservar la acción; música/sonido permitido para el destino, sin inventar diálogo |
