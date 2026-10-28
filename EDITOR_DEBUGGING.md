@@ -77,9 +77,11 @@ Fases tal cual salen en `diagnostic["phases"]` (orden real de ejecución):
 | (render ffmpeg) | aplica los keeps | — |
 | `post_render_audit` | re-analiza el MP4 (silencios/sueltas/residuo) → score | — |
 | deep audit | **re-transcribe el OUTPUT** y compara con lo esperado | — |
-| coherence judge | la IA\* juzga si el render tiene SENTIDO | — |
+| coherence judge | la IA\* juzga si el render tiene SENTIDO («¿falta algo?») | — |
+| leftover judge | la IA\* busca lo que SOBRA (repetición, falso inicio, muletilla, voz ajena) | — |
 
 \* Desde el 23/10/2026 la IA es Claude Haiku (`api/claude_client.py`) y gpt-5.4/gpt-4o solo de respaldo si Claude falla; `EDITOR_AUTO_LLM=openai` vuelve a OpenAI. El `model=` de cada llamada solo vale para OpenAI.
+**Tres comprobaciones** de cada render (y de cada candidato del self-heal): (1) deep audit acústico + Whisper ($0); (2) juez de coherencia, que con Claude se pasa SIEMPRE (`coherence_prescreen` lo saltaba en renders limpios para ahorrar OpenAI); (3) revisor de sobrantes (`_ai_leftover_judge`, `prompts/silence_cutter_leftover.md`, solo con Claude o `ai_leftover_judge_enabled`). Las citas del revisor se verifican contra las palabras conservadas y pasan filtros duros (una repetición se tiene que repetir al lado, nunca el cierre, muletilla sin contenido); las de sev≥2 las prueba a cortar el self-heal, y la puerta lexicográfica `(coherencia, palabras, sobrantes, -score)` solo acepta el candidato si no empeora sentido ni palabras. Resta poco (tope −8) y no fuerza reencolar.
 | `self_heal` | corrige los fallos del audit y re-renderiza | — |
 | `false_start_output_sweep` | barre falsos inicios sobre el output | contenido |
 

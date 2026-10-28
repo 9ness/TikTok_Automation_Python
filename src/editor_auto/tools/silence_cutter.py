@@ -1626,6 +1626,35 @@ class SilenceCutterTool:
                                 f"[silence_cutter] 🚩 coherencia ({d.get('type')}): "
                                 f"falta '{d.get('missing_text')}' — {d.get('why')}"
                             )
+                # 10b-ter) REVISOR DE SOBRANTES — la 3ª comprobación, con otra
+                # pregunta: ¿queda algo que sobre? Lo que encuentre lo prueba a
+                # cortar el self-heal, y el juez de coherencia (arriba) vigila
+                # en el candidato que el corte no se coma contenido.
+                if _leftover_judge_enabled(config) and words:
+                    ctx.on_progress(0.987, "🧹 Revisión IA: ¿sobra algo?…")
+                    try:
+                        lft = _ai_leftover_judge(
+                            words=words, keep_intervals=kints,
+                            language=config.get("ai_language", "es"), log=ctx.on_log,
+                            call_budget=leftover_budget,
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        lft = {"error": f"{type(e).__name__}: {e}"}
+                        ctx.on_log(f"[silence_cutter] ⚠️ Revisor de sobrantes falló (no bloquea): {e}")
+                    if isinstance(lft.get("leftover_score"), int):
+                        audit["leftover_score"] = int(lft["leftover_score"])
+                        audit["leftover_issues"] = lft.get("leftovers", [])
+                        audit["leftover_fallos"] = int(lft.get("leftover_fallos", 0) or 0)
+                        if isinstance(audit.get("quality_score"), int):
+                            audit["quality_score"] = min(
+                                audit["quality_score"], audit["leftover_score"],
+                            )
+                            audit["verdict"] = _verdict_for_score(audit["quality_score"])
+                        for d in (lft.get("leftovers") or [])[:3]:
+                            ctx.on_log(
+                                f"[silence_cutter] 🚩 sobra ({d.get('type')}): "
+                                f"'{d.get('quote')}' — {d.get('why')}"
+                            )
                 # VEREDICTO EXPLICABLE — el operador ve QUÉ puntuó, no un número:
                 # separa fallo real del motor (Contenido) de fuente bruta (Ritmo)
                 # y de avisos de baja confianza (probables falsos positivos).
@@ -1653,6 +1682,7 @@ class SilenceCutterTool:
             # candidato sin coherencia parecería 0 fallos y podría aceptarse mal).
             _heal_n = int(config.get("self_heal_max_attempts", 3))
             coherence_budget = [int(config.get("coherence_max_calls", _heal_n + 2))]
+            leftover_budget = [int(config.get("leftover_max_calls", _heal_n + 2))]
             audit = _full_audit(keep_intervals)
             diagnostic["audit"] = audit
 
@@ -1687,6 +1717,7 @@ class SilenceCutterTool:
                         best_score < heal_target
                         or _count_word_fallos(best_audit) > 0
                         or _count_coherence_fallos(best_audit) > 0
+                        or _count_leftover_fallos(best_audit) > 0
                     )
                     and best_audit.get("transcription_ok", True)
                 ):
@@ -1816,10 +1847,13 @@ class SilenceCutterTool:
                     # 2º fallos de PALABRA, 3º score. Restaurar una promesa rota
                     # (coherencia) manda sobre todo; a igualdad, menos fallos de
                     # palabra; a igualdad, mayor score. Sigue siendo monótono.
+                    # 3º SOBRANTES del revisor IA: cortar uno solo se acepta si
+                    # no sube ni sentido ni palabras (coherencia vigila).
                     def _qkey(a: dict) -> tuple:
                         return (
                             _count_coherence_fallos(a),
                             _count_word_fallos(a),
+                            _count_leftover_fallos(a),
                             -(a.get("quality_score") or 0),
                         )
                     accepted = isinstance(cand_score, int) and _qkey(cand_audit) < _qkey(best_audit)
@@ -4921,7 +4955,8 @@ def _ai_coherence_judge(
     # palabra y sin enumeración/número junto a un corte) NO llamamos al LLM →
     # coherence_score=100 y el coste medio se queda como hoy (~$0.04).
     if (
-        float((deep or {}).get("match_ratio", 0) or 0) >= 0.97
+        _coherence_prescreen(config)
+        and float((deep or {}).get("match_ratio", 0) or 0) >= 0.97
         and not (deep or {}).get("missing_blocks")
         and not (deep or {}).get("inserted_blocks")
         and not _has_list_or_number_near_cut(words, keep_intervals)
@@ -5008,6 +5043,163 @@ def _ai_coherence_judge(
 
 def _count_coherence_fallos(audit: dict) -> int:
     return int((audit or {}).get("coherence_fallos", 0) or 0)
+
+
+# Revisor de SOBRANTES (3ª comprobación, oct 2026): el juez de coherencia busca
+# lo que FALTA; este busca lo que SOBRA en el render (repetición, falso inicio,
+# muletilla, voz ajena) y lo entrega como corte al self-heal. Solo con Claude
+# activo (Haiku: ~0,001 $ la llamada). Su penalización tiene TOPE y no retiene
+# el vídeo: es una mejora, no una alarma — el guardián de que el corte no se
+# coma contenido es el juez de coherencia, que re-audita cada candidato.
+_LEFT_SEV_PENALTY = {1: 2, 2: 4, 3: 6}
+_LEFT_PENALTY_CAP = 8
+_LEFT_TYPES = frozenset({"repeticion", "falso_inicio", "muletilla", "voz_ajena"})
+_LEFT_MAX_TOKENS = {"repeticion": 8, "falso_inicio": 5, "muletilla": 3, "voz_ajena": 8}
+
+
+def _ai_leftover_judge(
+    *, words: list[dict], keep_intervals: list[tuple[float, float]],
+    language: str, log, call_budget: list[int] | None,
+) -> dict:
+    """¿Queda algo en el render que sobre? Devuelve `leftover_score`,
+    `leftovers` (con `cut_span` en tiempo de INPUT) y `leftover_fallos`
+    (sev≥2 con span → el self-heal prueba a cortarlos). Las citas del modelo
+    se verifican contra las palabras CONSERVADAS y se filtran con reglas
+    duras (una repetición tiene que repetirse de verdad, nunca el cierre)."""
+    from src.editor_auto.api import openai_client
+    if not openai_client.is_configured():
+        return {"skipped": "ia no configurada"}
+    if call_budget is not None and call_budget and call_budget[0] <= 0:
+        return {"skipped": "presupuesto de llamadas agotado"}
+    if len(words) < 8:
+        return {"skipped": "pocas palabras"}
+
+    def _n(s: str) -> str:
+        s = unicodedata.normalize("NFKD", str(s).lower()).encode("ascii", "ignore").decode()
+        return re.sub(r"[^\w]", "", s)
+
+    kept: list[dict] = []
+    for w in words:
+        try:
+            ws, we = float(w["start"]), float(w["end"])
+        except (KeyError, ValueError, TypeError):
+            continue
+        dur = max(1e-6, we - ws)
+        ov = sum(max(0.0, min(we, b) - max(ws, a)) for a, b in keep_intervals)
+        if ov / dur >= 0.4:
+            kept.append(w)
+    if len(kept) < 8:
+        return {"skipped": "poco contenido conservado"}
+    toks = [_n(w.get("word", "")) for w in kept]
+    orig_text = " ".join(str(w.get("word", "")) for w in words).strip()
+    out_text = " ".join(str(w.get("word", "")) for w in kept).strip()
+
+    try:
+        prompt_path = (
+            Path(__file__).resolve().parent.parent
+            / "prompts" / "silence_cutter_leftover.md"
+        )
+        system = _with_lessons(prompt_path.read_text(encoding="utf-8"), "leftover")
+    except OSError as e:
+        return {"error": f"prompt no leíble: {e}"}
+    try:
+        data = openai_client.analyze_transcript_json(
+            system_prompt=system,
+            user_payload={"language": language, "original": orig_text, "rendered": out_text},
+            model=_COHERENCE_MODEL, temperature=0.0, seed=_COHERENCE_SEED,
+        )
+        if call_budget is not None and call_budget:
+            call_budget[0] -= 1
+    except Exception as e:  # noqa: BLE001
+        log(f"[silence_cutter] ⚠️ Revisor de sobrantes falló (no bloquea): {e}")
+        return {"error": str(e)[:200]}
+
+    def _find(seq: list[str], lo: int = 0, hi: int | None = None) -> int | None:
+        """Índice del primer match EXACTO de `seq` en toks[lo:hi]."""
+        hi = len(toks) if hi is None else hi
+        L = len(seq)
+        for i in range(lo, max(lo, hi - L + 1)):
+            if toks[i:i + L] == seq:
+                return i
+        return None
+
+    leftovers: list[dict] = []
+    used: set[int] = set()
+    for d in (data or {}).get("leftovers", []) or []:
+        typ = str(d.get("type", "")).strip()
+        if not d.get("confirmed") or typ not in _LEFT_TYPES:
+            continue
+        q = [t for t in (_n(x) for x in str(d.get("quote", "")).split()) if t]
+        if not q or len(q) > _LEFT_MAX_TOKENS[typ]:
+            continue
+        # Localiza la cita DENTRO del contexto (desambigua frases repetidas).
+        c = [t for t in (_n(x) for x in str(d.get("context", "")).split()) if t]
+        ci = _find(c) if len(c) >= len(q) else None
+        i = _find(q, ci, ci + len(c)) if ci is not None else _find(q)
+        if i is None:
+            continue
+        j = i + len(q)  # exclusivo
+        if used & set(range(i, j)):
+            continue
+        content = [t for t in q if len(t) > 2 and t not in _FILLER_TOKENS
+                   and t not in _AUDIT_STOPWORDS]
+        # Reglas duras anti-falso-positivo (lo grave es comerse contenido):
+        if j > len(toks) - 4 and typ != "muletilla":
+            continue  # nunca el cierre / la llamada a la acción
+        if typ == "muletilla" and content:
+            continue  # una muletilla no lleva palabras de contenido
+        if typ == "repeticion":
+            # La copia que sobra tiene que REPETIRSE de verdad justo al lado.
+            win = toks[max(0, i - 12):i] + toks[j:j + 12]
+            if not content or any(t not in win for t in content):
+                continue
+        if typ == "falso_inicio" and content:
+            # Arranque abandonado = reinicio que reusa alguna de sus palabras.
+            if not any(t in toks[j:j + 8] for t in content):
+                continue
+        sev = min(3, max(1, int(d.get("severity", 2) or 2)))
+        try:
+            span = (float(kept[i]["start"]), float(kept[j - 1]["end"]))
+        except (KeyError, ValueError, TypeError):
+            continue
+        used.update(range(i, j))
+        leftovers.append({
+            "type": typ, "severity": sev, "quote": " ".join(
+                str(w.get("word", "")) for w in kept[i:j]),
+            "why": str(d.get("why", ""))[:200], "cut_span": span,
+        })
+
+    penalty = min(_LEFT_PENALTY_CAP, sum(_LEFT_SEV_PENALTY[x["severity"]] for x in leftovers))
+    return {
+        "leftover_score": 100 - penalty,
+        "leftovers": leftovers,
+        "leftover_fallos": sum(1 for x in leftovers if x["severity"] >= 2),
+    }
+
+
+def _count_leftover_fallos(audit: dict) -> int:
+    return int((audit or {}).get("leftover_fallos", 0) or 0)
+
+
+def _claude_activo() -> bool:
+    try:
+        from src.editor_auto.api import claude_client
+        return claude_client.activo()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _leftover_judge_enabled(config: dict) -> bool:
+    """3ª comprobación: por defecto solo con Claude (con OpenAI saldría caro)."""
+    v = config.get("ai_leftover_judge_enabled")
+    return _claude_activo() if v is None else bool(v)
+
+
+def _coherence_prescreen(config: dict) -> bool:
+    """Saltarse el juez de coherencia en renders 'limpios' ahorraba con OpenAI;
+    con Claude cuesta ~0,001 $ y se pasa SIEMPRE (la 2ª comprobación)."""
+    v = config.get("coherence_prescreen")
+    return (not _claude_activo()) if v is None else bool(v)
 
 
 def _union_intervals(
@@ -5688,6 +5880,15 @@ def _derive_self_heal_actions(
                 max(0.0, float(sp[0]) - 0.05), float(sp[1]) + 0.05,
                 f"coherencia:'{str(d.get('missing_text',''))[:40]}'",
             ))
+    # SOBRANTES del revisor IA: son palabras enteras (el word-guard las
+    # protegería) → van como residuo; snap/valle afinan el borde después.
+    for d in audit.get("leftover_issues") or []:
+        sp = d.get("cut_span")
+        if d.get("severity", 1) >= 2 and sp and float(sp[1]) > float(sp[0]):
+            residue_cuts.append((
+                float(sp[0]) - 0.02, float(sp[1]) + 0.02,
+                f"sobra_{d.get('type')}:'{str(d.get('quote',''))[:40]}'",
+            ))
     return residue_cuts, guarded_cuts, restores
 
 
@@ -5930,6 +6131,8 @@ def _build_verdict_detail(audit: dict) -> dict:
         clean_bad.append(
             f"{n_residue} hueco(s) sin voz" + (" (arranque/cierre)" if res_edge else "")
         )
+    for d in (audit.get("leftover_issues") or [])[:3]:
+        clean_bad.append(f"sobra «{d.get('quote')}» ({d.get('type')})")
     dims.append({"dim": "Limpieza", "ok": not clean_bad,
                  "detail": "sin restos" if not clean_bad else " · ".join(clean_bad)})
 

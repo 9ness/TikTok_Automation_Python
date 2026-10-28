@@ -144,7 +144,9 @@ Reusa `UPSTASH_REDIS_REST_URL/_TOKEN` ya compartidas entre programas.
   falla, a OpenAI (`record_openai_chat()`), con tokens reales del provider.
   A/B del corpus de regresión (23/10/2026): Haiku 92/87/92/100 frente a
   OpenAI 100/87/100/100 (lo que resta es quitar ruido de fondo repetido),
-  a ~0,006 $ el vídeo frente a ~0,12.
+  a ~0,006 $ el vídeo frente a ~0,12. Con Claude cada render pasa TRES
+  comprobaciones (deep audit, coherencia siempre y revisor de sobrantes) y el
+  self-heal corrige con lo que encuentran; ver `EDITOR_DEBUGGING.md` §2.
 - `cost_tracking.py` añadió rates para `gpt-4o` ($2.50/$10.00 por 1M
   input/output tokens) — match por prefix del nombre del modelo.
 - `Whisper local` (`faster-whisper`) y `Silero VAD` corren en local y
