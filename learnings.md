@@ -1265,3 +1265,4 @@
 - 2026-10-28 · Portarrollos muñeco de nieve: la ficha dice «2D Flat printing» (acrílico plano) y el viral lo pinta en 3D → enseñarlo SIEMPRE de frente, cámara fija, sin girarlo (política AIGC 2D→3D)
 - 2026-10-28 · Veo «arranca una hoja de papel de cocina» saca una segunda mano que tira desde abajo → pedir «only ONE right hand… paper only from the outer layer»
 - 2026-10-28 · Subir ficheros a Flow/GenAI Pro desde CDP: no hay input[type=file] fijo → Playwright `expect_file_chooser` + clic en «Subir archivo…»/zona de drop; el textarea de GenAI Pro se rellena con `locator("textarea").fill`
+- 2026-10-28 · Genjutsu hf_mult_replace_object (480p) para cambiar SOLO el fondo de un viral real (buzón 39 cr/12 s, árbol pop-up 33 cr/11 s): sin «keep the lettering … exactly» borra el rótulo del producto, y si la ficha difiere del viral (bolas brillantes vs terciopelo) la referencia buena es un fotograma del viral, no la ficha → los dos salieron verdes a la primera
