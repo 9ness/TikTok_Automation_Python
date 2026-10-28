@@ -345,6 +345,12 @@ def render_rotulo(textos: dict, variante: dict, on_log: OnLog = _noop,
     return im
 
 
+def _claro(c) -> bool:
+    """Color claro (oro, plata) o no (el rojo que hace de metal en blanco_rojo)."""
+    r, g, b = c[:3]
+    return 0.299 * r + 0.587 * g + 0.114 * b > 150
+
+
 def _linea_cupon(cupon: str, pal: dict, max_w: int, estilo: str) -> Image.Image | None:
     if not cupon:
         return None
@@ -357,7 +363,9 @@ def _linea_cupon(cupon: str, pal: dict, max_w: int, estilo: str) -> Image.Image 
         d = ImageDraw.Draw(im)
         d.rounded_rectangle((0, 0, im.width - 1, im.height - 1), im.height // 2,
                             fill=pal["marco"], outline=pal["sombra"], width=3)
-        _texto_c(d, im.width / 2, im.height / 2, lineas[0], f, pal["sombra"])
+        # Pastilla roja (blanco_rojo) con letra granate no se leía: blanca.
+        _texto_c(d, im.width / 2, im.height / 2, lineas[0], f,
+                 pal["sombra"] if _claro(pal["marco"]) else (255, 255, 255))
         return im
     # «suelta»: solo letra blanca con borde, para los rótulos sin cajas.
     b = max(3, f.size // 8)
@@ -443,10 +451,8 @@ def _rotulo_borde(nombre, frase, cupon, v) -> Image.Image:
         d = ImageDraw.Draw(p)
         # Sin caja detrás, un marco oscuro (el rojo del blanco_rojo) no se lee
         # sobre un fondo oscuro: entonces la frase va en blanco.
-        r, g, bl = pal["marco"][:3]
-        claro = 0.299 * r + 0.587 * g + 0.114 * bl > 150
         _texto_c(d, p.width / 2, p.height / 2, lin[0], f,
-                 pal["marco"] if claro else (255, 255, 255), b, pal["sombra"])
+                 pal["marco"] if _claro(pal["marco"]) else (255, 255, 255), b, pal["sombra"])
         for i, ch in enumerate(v["emojis"]):
             e = _emoji(ch, es)
             if e is not None:
@@ -488,7 +494,9 @@ def _rotulo_cinta(nombre, frase, cupon, v) -> Image.Image:
         tw = _ancho(d0, lin[0], f, b)
         p = Image.new("RGBA", (int(tw + 2 * es + 30), max(th, es) + 10))
         d = ImageDraw.Draw(p)
-        _texto_c(d, p.width / 2, p.height / 2, lin[0], f, pal["marco"], b, pal["sombra"])
+        # Igual que en «texto_borde»: con el marco rojo salía rojo sobre rojo oscuro.
+        _texto_c(d, p.width / 2, p.height / 2, lin[0], f,
+                 pal["marco"] if _claro(pal["marco"]) else (255, 255, 255), b, pal["sombra"])
         e = _emoji(v["emojis"][0], es)
         if e is not None:
             p.alpha_composite(e, (0, (p.height - es) // 2))
