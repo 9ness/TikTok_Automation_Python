@@ -20,6 +20,9 @@ Entre fases, mira la captura (`/tmp/carr/sh/s.jpg`). Casuísticas de la UI de Ti
   y se revisan las capturas.
 - El buscador de productos del escaparate acepta el ID del producto → un solo resultado,
   el exacto. El nombre del enlace tiene 30 caracteres como máximo.
+- Si el producto NO está en el escaparate, el buscador dice «No se han encontrado
+  productos»: `preparar` abre su ficha y pulsa «Añadir al escaparate» antes (captura 6_ficha).
+  Los enlaces cortos (vm.tiktok.com) se siguen hasta sacar el ID.
 """
 
 from __future__ import annotations
@@ -148,6 +151,35 @@ def carrusel(cid: str) -> dict:
     raise SystemExit(f"No encuentro el carrusel {cid} en Mis tandas")
 
 
+def pid_de(c: dict) -> str:
+    """ID del producto; los enlaces cortos (vm.tiktok.com) se siguen hasta la ficha."""
+    url = c["product_url"]
+    if "/product/" not in url:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            url = urllib.request.urlopen(req, timeout=30).geturl()
+        except Exception as e:  # noqa: BLE001
+            raise SystemExit(f"No resuelvo el enlace corto {url}: {e}")
+    m = re.search(r"/product/(\d+)", url)
+    if not m:
+        raise SystemExit(f"No saco el ID de producto de {url}")
+    return m.group(1)
+
+
+def al_escaparate(pid: str) -> bool:
+    """Abre la ficha en TikTok y pulsa «Añadir al escaparate». True si lo añadió o ya estaba."""
+    adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
+        "-d", f"https://www.tiktok.com/view/product/{pid}", PAQUETE)
+    time.sleep(8)
+    captura("6_ficha")
+    if buscar(r"(Añadido al escaparate|En el escaparate|Quitar del escaparate)", intentos=1):
+        return True
+    if not pulsar(r"Añadir al escaparate", 4):
+        return False
+    captura("6_escaparate")
+    return True
+
+
 def nombre_enlace(c: dict) -> str:
     """≤30 caracteres, sin la tienda y sin tildes (ADB no las escribe)."""
     t = " ".join(c["titulo"].split())
@@ -189,7 +221,7 @@ def lote() -> None:
         (d / "datos.json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
         if not any(d.glob("0*")):
             bajar_fotos(c, d)
-        pid = c["product_url"].rstrip("/").split("/")[-1]
+        pid = pid_de(c)
         return f"{c['id']} · {len(list(d.glob('0*')))} fotos · {pid} · {c['musica']['tiktok']['titulo']} · {' '.join(c['titulo'].split())}"
 
     with ThreadPoolExecutor(8) as ex:
@@ -207,6 +239,10 @@ def preparar(cid: str) -> None:
         bajar_fotos(c, d)
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
     print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']}")
+    # Fuera del escaparate el producto no sale al buscarlo por ID: se añade antes de abrir el editor.
+    if not al_escaparate(pid_de(c)):
+        print("AVISO: no vi «Añadir al escaparate» ni que ya estuviera (mira 6_ficha); sigo")
+    adb("shell", "am", "force-stop", PAQUETE)
 
     limpiar()
     adb("shell", "mkdir", "-p", CARPETA_MOVIL)
@@ -334,7 +370,7 @@ def consulta_comercial(c: dict) -> str:
 def producto(cid: str) -> None:
     """Desde la pantalla de publicar: producto por ID y, si el sonido no lo deja, uno comercial."""
     c = carrusel(cid)
-    pid = c["product_url"].rstrip("/").split("/")[-1]
+    pid = pid_de(c)
     abrir_enlace()
     time.sleep(2)
     if buscar(r"sonido comercial", intentos=3):
@@ -356,11 +392,21 @@ def producto(cid: str) -> None:
     tecla(66)
     time.sleep(4)
     captura("3_producto")
-    tap(1188, 840, 4)                     # «Añadir» del único resultado (la lista no sale en el dump)
-    campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
-    if not campo:                         # a veces «¿Añadir producto al vídeo?» (el dump no lo ve)
-        tap(720, 1698, 4)
+    if buscar(r"No se han encontrado", intentos=1):
+        raise SystemExit(f"{pid} no sale al buscarlo: no está en el escaparate (mira 6_ficha de preparar)")
+    campo = []
+    for y in (840, 1044):                 # «Añadir» del único resultado: su altura cambia (la lista no sale en el dump)
+        tap(1188, y, 4)
+        if buscar(r"Obtener una muestra", intentos=1):
+            tecla(4)                      # se pulsó la tarjeta, no «Añadir»
+            time.sleep(2)
+            continue
         campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
+        if not campo:                     # a veces «¿Añadir producto al vídeo?» (el dump no lo ve)
+            tap(720, 1698, 4)
+            campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
+        if campo:
+            break
     if not campo:
         raise SystemExit("No se abrió «Cambiar nombre»: ¿producto sin stock («No disponible», mira 3_producto), sin ese ID o el sonido lo impide?")
     if campo:
