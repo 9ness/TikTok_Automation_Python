@@ -61,9 +61,9 @@ function Dato({ label, valor, sub }: { label: string; valor: string; sub?: strin
   );
 }
 
-function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Seccion({ id, titulo, children }: { id: string; titulo: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-2 rounded-lg border border-border/60 bg-card/50 p-3 sm:p-4">
+    <section id={id} className="scroll-mt-14 space-y-2 rounded-lg border border-border/60 bg-card/50 p-3 sm:p-4">
       <h2 className="text-sm font-semibold sm:text-base">{titulo}</h2>
       {children}
     </section>
@@ -179,7 +179,28 @@ export default function EstadisticasPage() {
 
       {filas.length ? (
         <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <nav className="sticky top-0 z-10 -mx-3 flex gap-1 overflow-x-auto bg-background/95 px-3 py-2 backdrop-blur sm:mx-0 sm:flex-wrap sm:px-0">
+            {([
+              ["resumen", "Resumen"],
+              ["mes", "Mes a mes"],
+              ["prevision", "Previsión"],
+              ...(dias.length ? [["dia", "Día a día"]] : []),
+              ...(origenes.length ? [["origen", "Origen"]] : []),
+              ["productos", "Productos"],
+              ...(q.data?.notas?.length ? [["conclusiones", "Conclusiones"]] : []),
+            ] as [string, string][]).map(([id, t]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="shrink-0 rounded-md border border-border/60 bg-card px-2 py-1 text-xs hover:border-violet-500 sm:text-sm"
+              >
+                {t}
+              </button>
+            ))}
+          </nav>
+
+          <div id="resumen" className="grid scroll-mt-14 grid-cols-2 gap-2 sm:grid-cols-4">
             <Dato label="GMV total" valor={eur(filas.reduce((a, m) => a + m.gmv, 0))}
               sub={`${nombreMes(filas[0]?.mes ?? "")} – ${nombreMes(filas.at(-1)?.mes ?? "")}`} />
             <Dato label="Ventas" valor={num(filas.reduce((a, m) => a + m.ventas, 0))} />
@@ -188,7 +209,7 @@ export default function EstadisticasPage() {
               sub="media últimos 3 meses" />
           </div>
 
-          <Seccion titulo="Mes a mes">
+          <Seccion id="mes" titulo="Mes a mes">
             <div className="h-56 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={filas} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
@@ -228,7 +249,7 @@ export default function EstadisticasPage() {
             </p>
           </Seccion>
 
-          <Seccion titulo="Clics → ventas (previsión)">
+          <Seccion id="prevision" titulo="Clics → ventas (previsión)">
             <ul className="list-disc space-y-1 pl-4 text-xs sm:text-sm">
               <li>
                 Cada <b>100 clics</b> dan unas <b>{(conv3 * 100).toLocaleString("es-ES", { maximumFractionDigits: 1 })} ventas</b>{" "}
@@ -254,7 +275,7 @@ export default function EstadisticasPage() {
           </Seccion>
 
           {dias.length ? (
-            <Seccion titulo="Día a día">
+            <Seccion id="dia" titulo="Día a día">
               <div className="h-56 sm:h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={dias} margin={{ top: 5, right: 0, left: -15, bottom: 0 }}>
@@ -276,7 +297,7 @@ export default function EstadisticasPage() {
           ) : null}
 
           {origenes.length ? (
-            <Seccion titulo="De dónde vienen las ventas">
+            <Seccion id="origen" titulo="De dónde vienen las ventas">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {origenes.map(([k, v]) => (
                   <Dato key={k} label={k} valor={eur(v.importe)}
@@ -330,7 +351,7 @@ export default function EstadisticasPage() {
             </Seccion>
           ) : null}
 
-          <Seccion titulo="Productos que más venden">
+          <Seccion id="productos" titulo="Productos que más venden">
             <div className="flex flex-wrap gap-1">
               {["todos", ...meses.map((m) => m.mes)].map((m) => (
                 <button
@@ -384,7 +405,7 @@ export default function EstadisticasPage() {
           </Seccion>
 
           {q.data?.notas?.length ? (
-            <Seccion titulo="Conclusiones">
+            <Seccion id="conclusiones" titulo="Conclusiones">
               <ul className="list-disc space-y-1 pl-4 text-xs sm:text-sm">
                 {q.data.notas.map((n) => <li key={n}>{n}</li>)}
               </ul>
