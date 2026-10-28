@@ -148,14 +148,33 @@ def num_hablado(x: str) -> str:
     return f"{en_letra(int(ent))} coma {en_letra(int(dec))}"
 
 
+def _sin_tildes(t: str) -> str:
+    import unicodedata
+    return "".join(ch for ch in unicodedata.normalize("NFD", t) if unicodedata.category(ch) != "Mn")
+
+
+# Equipos que en español se dicen en femenino («la Juve no pierde», «gana la Roma»).
+_FEMENINOS = ("juventus", "roma", "lazio", "fiorentina", "atalanta", "sampdoria", "real sociedad", "cremonese",
+              "salernitana", "spal", "reggiana")
+
+
+def _con_articulo(equipo: str, prep: str = "") -> str:
+    """«el Milan» / «la Juventus»; con prep="de": «del Milan» / «de la Juventus»."""
+    nombre = _clave_equipo(equipo)
+    fem = any(f in nombre.lower() for f in _FEMENINOS)
+    if prep == "de":
+        return f"de la {nombre}" if fem else f"del {nombre}"
+    return f"la {nombre}" if fem else f"el {nombre}"
+
+
 def pick_hablado(pick: str, local: str, visitante: str) -> str:
     p = pick.strip()
     low = p.lower()
     if low.startswith("victoria "):
-        return f"gana el {_clave_equipo(p[9:].strip())}"
+        return f"gana {_con_articulo(p[9:].strip())}"
     if low.startswith("doble oportunidad"):
         resto = re.sub(r"\s+", " ", re.sub(r"(?i)doble oportunidad|empate|\so\s", " ", p)).strip()
-        return f"el {_clave_equipo(resto)} no pierde"
+        return f"{_con_articulo(resto)} no pierde"
     if low.startswith("ambos"):
         return "no marcan los dos equipos" if re.search(r"-\s*no\b|\bno$", low) else "marcan los dos equipos"
     m = re.match(r"(?i)^(?:([+-])|(más|menos) de)\s*(\d+(?:\.\d+)?)\s+(.+)$", p)
@@ -165,8 +184,13 @@ def pick_hablado(pick: str, local: str, visitante: str) -> str:
         palabras = cosa.split()
         unidad, equipo = palabras[0].lower(), " ".join(palabras[1:])
         unidad = unidad.replace("corners", "córners")
+        # «+0.5 goles 1ª Parte»: es la primera parte, no un equipo («… goles del Parte», 29-oct).
+        mitad = re.fullmatch(r"(?i)(1[ªa]?|primera|2[ªa]?|segunda)\s+parte", equipo.strip())
+        if mitad:
+            cual = "primera" if mitad.group(1).lower().startswith(("1", "p")) else "segunda"
+            return f"{signo} {num_hablado(m.group(3))} {unidad} en la {cual} parte"
         if equipo:
-            return f"{signo} {num_hablado(m.group(3))} {unidad} del {_clave_equipo(equipo)}"
+            return f"{signo} {num_hablado(m.group(3))} {unidad} {_con_articulo(equipo, 'de')}"
         return f"{signo} {num_hablado(m.group(3))} {unidad}"
     return re.sub(r"\d+(?:\.\d+)?", lambda mm: num_hablado(mm.group(0)), p)
 
@@ -323,6 +347,22 @@ def cantidad(cuota: float) -> int:
     return min(10000, max(5000, int(cuota * 1000 // 1000 * 1000)))
 
 
+# La Serie A de Brasil se llama igual que la italiana en API-Sports (sin país en Redis):
+# el 29-oct dijo «este jueves con la Serie A» con Vasco-Flamengo + Fiorentina-Atalanta.
+_CLUBES_BRASIL = ("flamengo", "palmeiras", "corinthians", "sao paulo", "santos", "gremio", "internacional",
+                  "atletico-mg", "atletico mineiro", "atletico paranaense", "athletico", "fluminense", "botafogo",
+                  "vasco", "cruzeiro", "bahia", "fortaleza", "bragantino", "juventude", "vitoria", "sport recife",
+                  "ceara", "mirassol", "coritiba", "goias", "cuiaba", "chapecoense", "remo")
+
+
+def _liga_real(c: dict) -> str:
+    equipos = unicodedata.normalize("NFD", f"{c['local']} {c['visitante']}".lower())
+    equipos = "".join(ch for ch in equipos if not unicodedata.combining(ch))
+    if c["liga"] == "Serie A" and any(b in equipos for b in _CLUBES_BRASIL):
+        return "Serie A (Brasil)"
+    return c["liga"]
+
+
 def apertura(partidos: list[dict], fecha: str) -> str:
     """«Tres partidazos este martes con la Champions League, y te cuento cómo los vemos.»
     (la mayoría, 2 de 3, de la misma competición conocida; pedido del usuario el
@@ -333,7 +373,7 @@ def apertura(partidos: list[dict], fecha: str) -> str:
     from collections import Counter
     n = NUMEROS.get(len(partidos), str(len(partidos)))
     dia = DIAS[date.fromisoformat(fecha).weekday()]
-    liga, veces = Counter(c["liga"] for c in partidos).most_common(1)[0]
+    liga, veces = Counter(_liga_real(c) for c in partidos).most_common(1)[0]
     if liga in LIGAS and veces * 2 > len(partidos):
         cola = f"este {dia} con {LIGAS[liga]}"
     else:
@@ -346,8 +386,10 @@ def pick_vamos(pick: str, local: str, visitante: str) -> str:
     h = pick_hablado(pick, local, visitante)
     if h.startswith("gana el "):
         return f"la victoria del {h[8:]}"
+    if h.startswith("gana la "):
+        return f"la victoria de la {h[8:]}"
     if h.startswith(("más de", "menos de")):
-        return h if " del " in h else f"{h} en el partido"
+        return h if (" del " in h or " de la " in h or h.endswith(" parte")) else f"{h} en el partido"
     return f"que {h}"
 
 
@@ -383,8 +425,11 @@ def contextos(partidos: list[dict], corto: list[tuple[str, str]]) -> list[str]:
     out = []
     for k, (l, v) in enumerate(corto):
         f = frases[k] if k < len(frases) and frases[k] else ""
+        # A veces Gemini repite el conector que ya pone el guion («Arrancamos con…», «Ya para cerrar…»).
+        f = re.sub(r"(?i)^\s*(arrancamos con|ya para cerrar con broche de oro,?)\s*", "", f)
         rol = roles[k]
-        if rol == "inicio" and not (f.startswith(l) or f.startswith(v)):
+        if rol == "inicio" and not (_sin_tildes(f).lower().startswith(_sin_tildes(l).lower())
+                                    or _sin_tildes(f).lower().startswith(_sin_tildes(v).lower())):
             f = f"{l} contra {v}, un partido que pinta muy bien para lo nuestro"
         elif rol == "cierre":
             if not f:
