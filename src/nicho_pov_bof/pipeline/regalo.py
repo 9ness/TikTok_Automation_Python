@@ -298,7 +298,7 @@ def _lazo(ancho: int, pal: dict, colas: bool = True) -> Image.Image:
 # ---------------------------------------------------------------------------
 _MAX_W = W - 240          # el rótulo entero, emojis incluidos: que no tape el vídeo
 _CINTA_MAX_W = W - 320    # la cinta, más estrecha: es una banda llena de color
-_MAX_H = int(H * 0.22)    # de 0.185 a ~0.40 (REGALO_TOP_Y): no baja hasta el producto
+_MAX_H = int(H * 0.16)    # de 0.15 a ~0.31 (REGALO_TOP_Y): pequeño y arriba, nunca encima del producto
 
 
 def nombre_seguro(textos: dict, on_log: OnLog = _noop) -> str:

@@ -856,7 +856,7 @@ SAFE_Y = (0.15, 0.75)
 
 # Bloque de texto: gancho arriba, título del producto en medio, CTA debajo.
 TEXT_BLOCK_Y = 0.17          # centro del bloque, dentro de la zona segura
-REGALO_TOP_Y = 0.185         # borde de arriba del rótulo regalo (más bajo que SAFE_Y[0])
+REGALO_TOP_Y = 0.15          # borde de arriba del rótulo regalo: arriba del todo de la zona segura (28/10, Néstor: más abajo tapaba el producto)
 # Jerarquía clara: el gancho manda, el CTA le sigue y el nombre del producto
 # va notablemente más pequeño. Antes los tres rondaban 60px y el bloque salía
 # plano ("parece muy básico", dixit el operador).
