@@ -88,9 +88,9 @@ def nodos() -> list[dict]:
             continue
         x1, y1, x2, y2 = map(int, b.groups())
         out.append({
-            "text": re.search(r'text="([^"]*)"', n).group(1),
-            "desc": re.search(r'content-desc="([^"]*)"', n).group(1),
-            "clase": re.search(r'class="([^"]*)"', n).group(1),
+            "text": (re.search(r' text="([^"]*)"', n) or re.match("()", "")).group(1),
+            "desc": (re.search(r'content-desc="([^"]*)"', n) or re.match("()", "")).group(1),
+            "clase": (re.search(r'class="([^"]*)"', n) or re.match("()", "")).group(1),
             "x": (x1 + x2) // 2, "y": (y1 + y2) // 2,
         })
     return out
@@ -160,7 +160,7 @@ def pid_de(c: dict) -> str:
             url = urllib.request.urlopen(req, timeout=30).geturl()
         except Exception as e:  # noqa: BLE001
             raise SystemExit(f"No resuelvo el enlace corto {url}: {e}")
-    m = re.search(r"/product/(\d+)", url)
+    m = re.search(r"/(?:product|pdp)/(\d+)", url)
     if not m:
         raise SystemExit(f"No saco el ID de producto de {url}")
     return m.group(1)
@@ -172,6 +172,8 @@ def al_escaparate(pid: str) -> bool:
         "-d", f"https://www.tiktok.com/view/product/{pid}", PAQUETE)
     time.sleep(8)
     captura("6_ficha")
+    if buscar(r"(se ha eliminado|Producto no disponible)", intentos=1):
+        raise SystemExit(f"{pid}: la ficha dice «eliminado/no disponible» (6_ficha) → sin stock, saltar")
     if buscar(r"(Añadido al escaparate|En el escaparate|Quitar del escaparate)", intentos=1):
         return True
     if not pulsar(r"Añadir al escaparate", 4):
@@ -262,7 +264,13 @@ def preparar(cid: str) -> None:
     # Guardado de antes → quitar y volver a guardar: así queda el PRIMERO de Favoritos
     if pulsar(r"^Guardado$"):
         time.sleep(1)
-    if pulsar(r"^Guardar$"):
+    guardado = False
+    for _ in range(3):                    # a veces la página tarda en cargar (>10 s)
+        if pulsar(r"^Guardar$"):
+            guardado = True
+            break
+        time.sleep(4)
+    if guardado:
         print("sonido guardado (primero en Favoritos)")
     else:
         print("AVISO: no encuentro «Guardar» en la página del sonido")
@@ -410,11 +418,16 @@ def producto(cid: str) -> None:
     if not campo:
         raise SystemExit("No se abrió «Cambiar nombre»: ¿producto sin stock («No disponible», mira 3_producto), sin ese ID o el sonido lo impide?")
     if campo:
-        tap(campo[0]["x"], campo[0]["y"], 1)
-        tecla(113, 29)
-        tecla(67)
-        escribir(nombre_enlace(c))
-        time.sleep(2)
+        nombre = nombre_enlace(c)
+        for _ in range(3):                # Gboard a veces cambia letras («Fruti»): se comprueba y se reescribe
+            tap(campo[0]["x"], campo[0]["y"], 1)
+            tecla(113, 29)
+            tecla(67)
+            escribir(nombre)
+            time.sleep(2)
+            if any(n["desc"] == "edit_anchor_name_input" and n["text"] == nombre for n in nodos()):
+                break
+            print("AVISO: el nombre del enlace no salió bien, lo reescribo")
         tecla(111)                        # oculta el teclado
     if not pulsar(r"^Añadir$", 4):
         tap(720, 2970, 4)
