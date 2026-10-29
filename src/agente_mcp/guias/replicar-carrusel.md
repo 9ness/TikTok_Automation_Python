@@ -8,6 +8,15 @@
 > `producto_carrusel`, `subir_imagen_carrusel`, `descargar_carrusel`.
 > Catálogo propio: `src/replicar_viral/catalogo.py`. Para VÍDEOS: [`replicar-viral.md`](replicar-viral.md).
 
+> **⛔ PROHIBIDO el texto genérico (Néstor, 29/10/2026).** Nunca un mismo estilo
+> «por defecto» (`tiktok_medio`/`tiktok_sans` grande y en negrita) para todos los
+> carruseles. Cada diapositiva lleva el **estilo de texto TAL CUAL el original**
+> (letra, grosor, color, contorno, caja/píldora/barra de Snapchat, mayúsculas,
+> tamaño) y en la **MISMA POSICIÓN** (altura, lado, alineación y cortes de línea).
+> Si el viral cambia de estilo o de sitio entre diapositivas, el nuestro también
+> (`estilo_n`). Un carrusel con texto genérico NO se pone en verde: se rehace.
+> Detalle en § «Letra: la que se parezca al viral».
+
 ## La idea
 
 Mismo carrusel, diapositiva a diapositiva: **mismo papel y misma forma de texto
