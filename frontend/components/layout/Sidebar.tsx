@@ -172,7 +172,12 @@ const NAV: NavGroup[] = [
     item: { href: "/costs", label: "Costes", icon: DollarSign },
   },
   {
-    // Ventas de la cuenta de TikTok Shop: solo de Néstor (ver `SOLO_NESS`).
+    // Vídeos y carruseles publicados cada día (ver `CUENTAS_SUBIDAS`).
+    kind: "single",
+    item: { href: "/subidas", label: "Subidas", icon: Upload },
+  },
+  {
+    // Ventas de la cuenta de TikTok Shop de cada uno (ver `CON_ESTADISTICAS`).
     kind: "single",
     item: { href: "/estadisticas", label: "Estadísticas", icon: BarChart3 },
   },
@@ -320,8 +325,9 @@ export function aplicarPrefs(nav: NavGroup[], prefs: MenuPrefs): NavGroup[] {
 export function primeraPantalla(
   rol: string | null | undefined,
   prefs: MenuPrefs,
+  usuario?: string | null,
 ): string {
-  for (const n of aplicarPrefs(navPara(rol), prefs)) {
+  for (const n of aplicarPrefs(navPara(rol, usuario), prefs)) {
     const primero = n.kind === "group" ? n.items[0] : undefined;
     if (primero) return primero.href;
     if (n.kind === "single" && n.item.href !== "/") return n.item.href;
@@ -329,8 +335,28 @@ export function primeraPantalla(
   return `${BASE_AI_PRO}/nicho-pov-bof`;
 }
 
-/** Pantallas solo de `ness` (sus ventas). El backend también lo corta. */
-const SOLO_NESS = ["/estadisticas"];
+/** Pantallas que solo ven algunos usuarios (lo suyo: sus ventas, sus
+ *  subidas). El backend también lo corta. */
+const CON_ESTADISTICAS = ["ness", "nes_bugallo"];
+const CON_SUBIDAS = ["ness", "nes_bugallo"];
+const SOLO_ALGUNOS: Record<string, string[]> = {
+  "/estadisticas": CON_ESTADISTICAS,
+  "/subidas": CON_SUBIDAS,
+};
+
+/** Cuentas que SOLO llevan el contador de subidas y sus ventas (la cuenta
+ *  árabe de Bugallo, docs/CUENTA_ARABE.md §6): su menú son esas dos pantallas
+ *  y nada de Tiktok Shop AI Pro — el contenido lo preparan los agentes. No
+ *  llevan `NAV_FIJOS` (Settings): ningún `pro` lo tiene, y en su menú no hay
+ *  nada que esconder. */
+export const CUENTAS_SUBIDAS = ["nes_bugallo"];
+export const PANTALLAS_SUBIDAS = ["/subidas", "/estadisticas"];
+
+function visiblePara(n: NavGroup, usuario?: string | null): boolean {
+  if (n.kind !== "single") return true;
+  const quienes = SOLO_ALGUNOS[n.item.href];
+  return !quienes || quienes.includes(usuario ?? "");
+}
 
 /** De los `pro`, quién sube productos propios: solo quien tiene catálogo de
  *  físicos (Ana). Mauro no tiene ninguno y el menú solo le enseñaría lo de otros. */
@@ -340,10 +366,13 @@ export function navPara(
   rol: string | null | undefined,
   usuario?: string | null,
 ): NavGroup[] {
+  if (CUENTAS_SUBIDAS.includes(usuario ?? "")) {
+    return PANTALLAS_SUBIDAS.flatMap((href) =>
+      NAV.filter((n) => n.kind === "single" && n.item.href === href),
+    );
+  }
   if (rol !== "pro") {
-    return NAV.filter(
-      (n) => n.kind !== "single" || !SOLO_NESS.includes(n.item.href) || usuario === "ness",
-    ).map((n) =>
+    return NAV.filter((n) => visiblePara(n, usuario)).map((n) =>
       esAiPro(n) && n.kind === "group"
         ? { ...n, items: ordenar(n.items, ORDEN_AI_PRO) }
         : n,

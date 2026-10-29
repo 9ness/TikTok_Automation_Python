@@ -20,6 +20,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from src import texto_arabe
 from src.font_resolver import _bundled_fonts_dir
 from src.nicho_carruseles import config
 from src.tiktok_shop.pipeline.ready_video import (
@@ -228,7 +229,10 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
         W, H = foto.size
         tam = max(18, int(W * config.TEXTO_TAM * est["tam"] * (tam_rel or 1.0)))
         max_w = W * config.TEXTO_ANCHO_MAX * (0.92 if est["pildora"] else 1.0)
-        font = ImageFont.truetype(_font_path(est["fuente"]), tam)
+        # Texto en árabe (cuenta árabe, `docs/CUENTA_ARABE.md`): ninguna de las
+        # fuentes de los estilos trae letras árabes y salían cuadrados.
+        fuente = texto_arabe.fuente_para(texto, est["fuente"])
+        font = ImageFont.truetype(_font_path(fuente), tam)
         emoji_size = int(tam * 0.92)
         gap = max(1, int(tam * 0.06))
 
@@ -277,23 +281,29 @@ def quemar(origen: Path, texto: str, destino: Path, estilo: str = "", y_rel: flo
                     radius=int(tam * 0.3), fill=est["pildora"])
             else:
                 y_txt = y
+            tramos: list[tuple[tuple, str, str]] = []
             for trozo in re.split(r"(\*)", linea):
                 if trozo == "*":
                     acento = not acento
                     continue
                 color = est.get("acento", COLOR_ACENTO) if acento else est["color"]
-                for clase, tramo in _split_runs(trozo):
-                    if clase == "emoji":
-                        em = _emoji_run_img(tramo, emoji_size)
-                        if em is not None:
-                            capa.paste(em, (int(x), int(y_txt + (tam - emoji_size) / 2)), em)
-                            x += em.width + gap
-                    else:
-                        dib.text(
-                            (x, y_txt), tramo, font=font, fill=(*color, 255),
-                            stroke_width=borde, stroke_fill=(0, 0, 0, 255),
-                        )
-                        x += d0.textlength(tramo, font=font)
+                tramos += [(color, clase, tramo) for clase, tramo in _split_runs(trozo)]
+            # Línea en árabe: los tramos van de derecha a izquierda (si no, el
+            # emoji del final de «لطلب من هنا 👇» salía al otro lado).
+            if texto_arabe.rtl(linea):
+                tramos.reverse()
+            for color, clase, tramo in tramos:
+                if clase == "emoji":
+                    em = _emoji_run_img(tramo, emoji_size)
+                    if em is not None:
+                        capa.paste(em, (int(x), int(y_txt + (tam - emoji_size) / 2)), em)
+                        x += em.width + gap
+                else:
+                    dib.text(
+                        (x, y_txt), texto_arabe.aislar(tramo), font=font, fill=(*color, 255),
+                        stroke_width=borde, stroke_fill=(0, 0, 0, 255),
+                    )
+                    x += d0.textlength(tramo, font=font)
             y += alto_linea
 
         if unida:

@@ -1,4 +1,4 @@
-"""Estadísticas de ventas de TikTok Shop (solo `ness`).
+"""Estadísticas de ventas de TikTok Shop (de `ness` y de `nes_bugallo`, cada uno las suyas).
 
 - GET  /api/v1/estadisticas → el documento guardado (meses, días, productos)
 - POST /api/v1/estadisticas → guarda/fusiona lo leído del panel «Datos»
@@ -21,13 +21,14 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
-# Por ahora solo Néstor: son las ventas de SU cuenta.
-USUARIOS = {"ness"}
+# Quién tiene estadísticas: cada uno ve y guarda las de SU cuenta (Néstor y la
+# cuenta árabe de Bugallo, docs/CUENTA_ARABE.md §6).
+USUARIOS = {"ness", "nes_bugallo"}
 
 
 def _permitido(usuario: str) -> str:
     if usuario not in USUARIOS:
-        raise APIError("Las estadísticas solo están disponibles para ness.", status_code=403)
+        raise APIError("Tu usuario no tiene estadísticas de ventas.", status_code=403)
     return usuario
 
 

@@ -497,7 +497,9 @@ Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
 
 ### Estadísticas — ventas de la cuenta de Néstor (oct 2026)
 
-[`src/estadisticas/`](src/estadisticas/) (prefijo `estadisticas:`, clave `ventas:<usuario>`, API `/api/v1/estadisticas`, solo `ness`) guarda lo que se lee en la app de TikTok (Datos por mes + productos con venta + tendencias por día) y la pantalla `/estadisticas` lo enseña: GMV/ventas/clics por mes, correlación clics→ventas y previsión, por día, por tipo y por país. No hay API de TikTok: lo lee un agente en el OPPO por ADB (MCP `estadisticas_ventas`/`guardar_estadisticas`, guía `estadisticas.md`).
+[`src/estadisticas/`](src/estadisticas/) (prefijo `estadisticas:`, clave `ventas:<usuario>`, API `/api/v1/estadisticas`, `ness` y `nes_bugallo`, cada uno la suya) guarda lo que se lee en la app de TikTok (Datos por mes + productos con venta + tendencias por día) y la pantalla `/estadisticas` lo enseña: GMV/ventas/clics por mes, correlación clics→ventas y previsión, por día, por tipo y por país. No hay API de TikTok: lo lee un agente en el OPPO por ADB (MCP `estadisticas_ventas`/`guardar_estadisticas`, guía `estadisticas.md`).
+
+[`src/subidas/`](src/subidas/) (prefijo `subidas:` o `SUBIDAS_REDIS_PREFIX`, clave `<usuario>:<YYYY-MM>` → `{dias: {fecha: {videos, carruseles, nota, actualizado}}}`, API `/api/v1/subidas`, `nes_bugallo` y `ness`; ness puede pasar `usuario=`) cuenta los vídeos y carruseles publicados cada día con total y media del mes frente al objetivo 45 + 10; pantalla `/subidas` de solo lectura. Lo apuntan los agentes al terminar cada tanda (MCP `registrar_subidas`/`ver_subidas`, guía `subidas.md`). El usuario `nes_bugallo` (`pro`, cuenta árabe del Mi 8, `docs/CUENTA_ARABE.md`) solo ve Subidas y Estadísticas: menú propio (`CUENTAS_SUBIDAS` en `Sidebar.tsx`) y rutas extra en `_PREFIJOS_POR_USUARIO` de `src/api/main.py`.
 
 ### Mi menú — la sidebar, por usuario
 

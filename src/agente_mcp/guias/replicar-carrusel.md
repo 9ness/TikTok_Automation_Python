@@ -98,7 +98,16 @@ que pueden comprar con carrito). Textos, caption y hashtags salen en ese idioma
 y el carrusel lleva la bandera en la web y en Mis tandas. En Social1, `region`
 fr/de/it/uk. El producto tiene que estar en NUESTRO catálogo de España (la
 cuenta solo enlaza productos de ES): busca el equivalente. En otros países solo
-carruseles, no vídeos. «Replicar otra vez» conserva el país. ~1 min, una
+carruseles, no vídeos. «Replicar otra vez» conserva el país.
+
+**Cuenta árabe (Mi 8, `pais="AR"`, 29/10):** no es un país, es la cuenta para el
+público árabe/magrebí (ver `docs/CUENTA_ARABE.md`). Se replican virales de las
+TIENDAS ÁRABES que venden (oujdia, chef.nadia, saritasara…) **con su estilo y sus
+textos**, no los nuestros: misma mezcla de español y darija/árabe, y el PRECIO de
+nuestra ficha donde lo lleve el original. Los hashtags de TikTok son los árabes
+fijos (`HASHTAGS_ARABE`) más 3 de la IA. El texto mixto con números ya se pinta
+bien (Tajawal + bidi, `src/texto_arabe.py`), pero mira la imagen: precio legible
+y dentro de la zona segura. ~1 min, una
 llamada de Gemini Flash (céntimos). Hasta 12 diapositivas. Devuelve `id`,
 `formato` (3:4 o 9:16, el del original; **genera SIEMPRE las fotos en 3:4**, aunque el original sea 9:16 — decisión de Néstor del 20/10/2026; las fotos reales de la ficha se encajan también a 1080×1440), `apto`, `caption`, `hashtags` y por
 diapositiva: `rol`, `texto_original`, `texto` (el nuestro), `usa_foto_producto`,

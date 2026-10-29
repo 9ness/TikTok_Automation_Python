@@ -106,6 +106,7 @@ from src.api.routers import (
     nicho_carruseles_router,
     plantillas_router,
     estadisticas_router,
+    subidas_router,
     voices_router,
     voices_sample_router,
 )
@@ -378,6 +379,7 @@ def create_app() -> FastAPI:
     app.include_router(nicho_carruseles_router)
     app.include_router(plantillas_router)
     app.include_router(estadisticas_router)
+    app.include_router(subidas_router)
     app.include_router(stats_router)
     app.include_router(dashboard_router)
     app.include_router(fonts_router)
@@ -459,6 +461,14 @@ _PREFIJOS_PRO = (
     "/ws/queue",
 )
 
+# Rutas de más para un `pro` concreto, encima de las de `_PREFIJOS_PRO`. Así
+# se le abre una pantalla a una persona sin abrírsela a todos los `pro`.
+# Bugallo (cuenta árabe) solo trabaja «Subidas» y «Estadísticas» de SU cuenta;
+# cada router comprueba además que el usuario esté en su lista.
+_PREFIJOS_POR_USUARIO: dict[str, tuple[str, ...]] = {
+    "nes_bugallo": ("/api/v1/subidas", "/api/v1/estadisticas"),
+}
+
 
 @app.middleware("http")
 async def _programa_de_la_peticion(request, call_next):
@@ -508,7 +518,8 @@ async def _permisos_por_rol(request, call_next):
     if ruta.startswith("/api/") or ruta.startswith("/ws/"):
         quien = usuario_de_request(request) or ""
         if quien and not _users.es_admin(quien):
-            if not any(ruta.startswith(p) for p in _PREFIJOS_PRO):
+            permitidos = _PREFIJOS_PRO + _PREFIJOS_POR_USUARIO.get(quien, ())
+            if not any(ruta.startswith(p) for p in permitidos):
                 from fastapi.responses import JSONResponse
 
                 return JSONResponse(

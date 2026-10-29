@@ -1,1 +1,1 @@
-"""Estadísticas de ventas de la cuenta de TikTok Shop (solo `ness`)."""
+"""Estadísticas de ventas de la cuenta de TikTok Shop de cada usuario (`ness`, `nes_bugallo`)."""

@@ -10,7 +10,11 @@ import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import { useCrearPin, useLogin, useMe } from "@/lib/queries/auth";
 import { MENU_PREFS_VACIAS, useMenuPrefs } from "@/lib/queries/uiMenu";
-import { primeraPantalla } from "@/components/layout/Sidebar";
+import {
+  CUENTAS_SUBIDAS,
+  PANTALLAS_SUBIDAS,
+  primeraPantalla,
+} from "@/components/layout/Sidebar";
 
 /** Modal de login que tapa toda la pantalla cuando no hay sesión.
  *  Solo se renderiza si `/api/v1/auth/me` devuelve `username === null`
@@ -44,9 +48,15 @@ export function LoginGate({ children }: { children: React.ReactNode }) {
     const escondida = mias.ocultos.some(
       (k) => k.startsWith("/tiktok-shop-ai-pro/") && (pathname === k || pathname.startsWith(`${k}/`)),
     );
-    if (!pathname.startsWith("/tiktok-shop-ai-pro/") || escondida) {
+    // Las cuentas de solo subidas (Bugallo) no tienen nada en Tiktok Shop AI
+    // Pro: lo suyo son sus dos pantallas.
+    const soloSubidas = CUENTAS_SUBIDAS.includes(me.data.username);
+    const fuera = soloSubidas
+      ? !PANTALLAS_SUBIDAS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+      : !pathname.startsWith("/tiktok-shop-ai-pro/");
+    if (fuera || escondida) {
       // typedRoutes exige la aserción: la ruta sale del propio menú.
-      router.replace(primeraPantalla(rol, mias) as never);
+      router.replace(primeraPantalla(rol, mias, me.data.username) as never);
     }
   }, [me.data?.username, rol, pathname, router, prefsListas, prefs.data]);
 

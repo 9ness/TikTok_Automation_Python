@@ -69,7 +69,8 @@ en la raíz del repo.
 | **Replicar virales** (MP4 de un viral replicado y YA MONTADO, con IA en Omni o sin IA; sale en Mis tandas como `rv|<id>`; MCP `registrar_replica_video`) | `/tiktok-shop-ai-pro/replicar-virales` | [`replicar-virales.md`](replicar-virales.md) |
 | **Replicar carrusel** (copiar un carrusel de fotos viral: texto + prompt de Flow por diapositiva, texto quemado y ZIP; MCP `replicar_carrusel`) | `/tiktok-shop-ai-pro/replicar-carrusel` | [`replicar-carrusel.md`](replicar-carrusel.md) |
 | **Multiplataforma** (enlaces de afiliado SHEIN/Amazon por producto y resubida de Mis tandas a IG/FB/Threads/Pinterest; sin pantalla, solo MCP con token de admin; los enlaces NUNCA en TikTok) | — | [`multiplataforma.md`](multiplataforma.md) |
-| **Estadísticas** (solo ness: ventas, clics y productos de la cuenta, leídos del panel «Datos» de la app de TikTok en el móvil; MCP `estadisticas_ventas`/`guardar_estadisticas`) | `/estadisticas` | [`estadisticas.md`](estadisticas.md) |
+| **Estadísticas** (ness y nes_bugallo, cada uno su cuenta: ventas, clics y productos, leídos del panel «Datos» de la app de TikTok en el móvil; MCP `estadisticas_ventas`/`guardar_estadisticas`) | `/estadisticas` | [`estadisticas.md`](estadisticas.md) |
+| **Subidas** (nes_bugallo y ness: carruseles y vídeos publicados cada día, total del mes y media frente al objetivo 45 + 10; se apunta al terminar cada tanda; MCP `registrar_subidas`/`ver_subidas`) | `/subidas` | [`subidas.md`](subidas.md) |
 | POV BOF Largo | `/tiktok-shop-ai-pro/pov-bof-largo` | [`pov-bof-largo.md`](pov-bof-largo.md) · recetas: [`pov-bof-largo-recetas.md`](pov-bof-largo-recetas.md) |
 | Nicho POV BOF | `/tiktok-shop-ai-pro/nicho-pov-bof` | [`pov-bof.md`](pov-bof.md) |
 | Moda Mujer · Aleatorios | `/tiktok-shop-ai-pro/nicho-ropa-mujer` | [`moda-mujer-aleatorios.md`](moda-mujer-aleatorios.md) |

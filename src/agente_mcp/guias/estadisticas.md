@@ -1,12 +1,16 @@
-# Estadísticas de ventas (solo ness)
+# Estadísticas de ventas (ness y nes_bugallo)
 
-Pantalla `/estadisticas` (menú lateral, solo la ve `ness`): GMV, ventas,
+Pantalla `/estadisticas` (menú lateral de `ness` y de `nes_bugallo`; cada uno ve
+las de SU cuenta, la del usuario del token): GMV, ventas,
 impresiones y clics por mes, comisiones, conversión clics → ventas con su
 previsión, día a día, y los productos con venta por tipo y país. Arriba,
 «Última actualización»: la fecha de la última lectura.
 
 Los datos NO salen de ninguna API: se leen de la app de TikTok en el móvil
 (OPPO por ADB, ver `comun/` y la memoria del móvil) y se guardan con el MCP.
+La cuenta árabe de Bugallo se lee del **Xiaomi Mi 8** cada semana y se guarda
+con el token de `nes_bugallo` (`docs/CUENTA_ARABE.md` §6; los scripts de abajo
+están calibrados para el OPPO y falta adaptarlos al Mi 8).
 
 ## Dónde se leen
 

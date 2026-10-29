@@ -1,4 +1,12 @@
 ## Pendiente
+
+### 🇲🇦 Cuenta árabe (Mi 8) + usuario `nes_bugallo` («Ness/Bugallo», PIN 1111) (29 oct 2026) — ver `docs/CUENTA_ARABE.md` §7
+- [ ] Perfil de la cuenta (ya en el Mi 8, 29/10): Néstor elige nombre (propuestos «Hmizat Spain 🇪🇸🇲🇦» · «Souq Spain 🛍️» · «Dar Shop 🏠») y cambia el @; el agente hace la foto y pone foto + bio por ADB.
+- [ ] Calibrar `scripts/subir_carrusel_movil.py` en el Mi 8 (1080x2248) y primeros 15 carruseles `pais=AR`.
+- [ ] Script `scripts/subir_video_movil.py` con «Comprobar contenido» (hasta 10/día); primeros 5-10 POV (A/B 1 clip contra 2-3).
+- [ ] Tarea nocturna 00:00 (carruseles → vídeos) + `registrar_subidas` al terminar.
+- [ ] Adaptar `scripts/estadisticas_movil/` al Mi 8; estadísticas de nes_bugallo cada lunes.
+- [x] Lista de productos del nicho en Drive `_agente/nestor2/arabe/PRODUCTOS_ARABE.md` (29/10; 26 de 60 con datos, verificar los «sin verificar» en FastMoss ya desbloqueado).
 - [ ] **Carruseles de otros países (Néstor, 27/10): SÍ.** Virales de FR/DE/IT/IE/UK en su idioma, con bandera (`pais`), en ness; producto equivalente de ES. Cómo buscarlos: guía `replicar-carrusel.md` §1 + `scripts/social1_carruseles.py`. Sin dibujos animados; precio fijo → cambiarlo.
 - [ ] **Tareas de Campañas de creadores (26/10)**: ver en el OPPO las 4 realistas (envío rápido 100 €, y los 3 retos de 30 €), apuntarlas con `guardar_tarea`, dar de alta los productos en «Tareas Productos» y montar hasta 23 vídeos POV (primero la de 100 €). Esperando que Néstor active la depuración inalámbrica.
 - [ ] 👤 **Ana limitada hasta el 31/10 (3.ª vez, 24/10)**: grabar 1 vídeo REAL al día de su ropa física y subirlo a `_agente/_clips_reales/ana/`; el agente lo monta. Plan: `_agente/ana/PLAN_SUBIDAS_25-31oct.md` (Drive). Nada de IA en Ana hasta entonces.

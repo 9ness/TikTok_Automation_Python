@@ -34,6 +34,9 @@ USUARIOS: dict[str, dict] = {
     "ana": {"nombre": "Ana", "rol": PRO},
     # Segunda cuenta de Néstor (Casca Chollos, oct 2026): sus propias tandas.
     "nestor2": {"nombre": "Néstor 2", "rol": PRO},
+    # Socio que lleva la cuenta árabe de TikTok Shop (Mi 8, oct 2026). Solo ve
+    # «Subidas» y «Estadísticas» (docs/CUENTA_ARABE.md §6); sin tandas.
+    "nes_bugallo": {"nombre": "Ness/Bugallo", "rol": PRO},
 }
 
 # Prefijo de Redis para los PIN. Va sobre el cliente de viralización porque es

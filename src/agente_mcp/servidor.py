@@ -154,6 +154,7 @@ def guia(menu: str = "") -> str:
     receta de virales con personajes Flow y Higgsfield (no ejecuta generaciones).
     `menu="replicar-virales"`: registrar un viral replicado YA MONTADO (con o sin IA).
     `menu="estadisticas"`: leer las ventas de TikTok del móvil y guardarlas.
+    `menu="subidas"`: apuntar los carruseles y vídeos publicados cada día.
     Léelas antes de trabajar."""
     if not menu:
         return "\n\n---\n\n".join(_leer_guia(r) for r in (
@@ -161,8 +162,10 @@ def guia(menu: str = "") -> str:
             "comun/campanas.md", "comun/fotos-extra.md"))
     if menu == "multiplataforma":  # no es un menú de vídeo: solo guía + herramientas
         return _leer_guia("multiplataforma.md")
-    if menu == "estadisticas":  # ventas de ness: se leen del móvil y se guardan
+    if menu == "estadisticas":  # ventas de cada cuenta: se leen del móvil y se guardan
         return _leer_guia("estadisticas.md")
+    if menu == "subidas":  # contador diario de publicaciones (cuenta árabe)
+        return _leer_guia("subidas.md")
     if menu == "genjutsu":  # flujo externo: guía, sin crear un menú ni llamar al proveedor
         return _leer_guia("genjutsu-higgsfield.md")
     if menu in ("replicar-virales", "replicar_virales"):  # MP4 montado fuera de la app
@@ -170,7 +173,7 @@ def guia(menu: str = "") -> str:
     m = menus.MENUS.get(menu)
     if not m:
         raise ErrorApp(f"Menú desconocido. Válidos: {', '.join(menus.MENUS)}, multiplataforma, genjutsu, "
-                       "replicar-virales.")
+                       "replicar-virales, estadisticas, subidas.")
     return _leer_guia(f"{m.guia}.md")
 
 
@@ -761,7 +764,7 @@ async def tareas_tiktok(ctx: Context) -> str:
 
 @_herramienta(structured_output=False)
 async def estadisticas_ventas(ctx: Context) -> str:
-    """Estadísticas de ventas de TikTok Shop guardadas (solo ness): por mes
+    """Estadísticas de ventas de TikTok Shop guardadas (ness y nes_bugallo, cada uno las suyas): por mes
     GMV, ventas, impresiones, clics y comisiones; por día visitas/clics/ventas;
     y los productos con venta de cada mes. Guía `estadisticas.md`."""
     return _json(await Interno(_usuario(ctx)).get("/api/v1/estadisticas"))
@@ -773,7 +776,7 @@ async def guardar_estadisticas(ctx: Context, meses: list[dict] | None = None,
                                actualizado: str | None = None, notas: list[str] | None = None,
                                contenidos: list[dict] | None = None,
                                rango_pedidos: str | None = None) -> str:
-    """Guarda lo leído del panel «Datos» de la app de TikTok (solo ness).
+    """Guarda lo leído del panel «Datos» de la app de TikTok (ness y nes_bugallo, en la cuenta del token).
     `meses`: [{mes:"2026-06", gmv, ventas, impresiones, clics, comision,
     gmv_comision, art_comision, base_comision, productos:[{titulo, pais, gmv,
     ventas, tipo}]}] (números, no texto). `dias`: [{fecha:"2026-10-01",
@@ -788,6 +791,27 @@ async def guardar_estadisticas(ctx: Context, meses: list[dict] | None = None,
                               "contenidos": contenidos,
                               "rango_pedidos": rango_pedidos}.items() if v is not None}
     return _json(await Interno(_usuario(ctx)).post("/api/v1/estadisticas", body))
+
+
+@_herramienta(structured_output=False)
+async def registrar_subidas(ctx: Context, fecha: str = "", videos: int = 0, carruseles: int = 0,
+                            nota: str = "", modo: str = "sumar", usuario: str = "") -> str:
+    """Apunta los carruseles y vídeos PUBLICADOS un día (pantalla «Subidas»).
+    Llámala al terminar cada tanda de subida. `fecha` AAAA-MM-DD (vacía = hoy,
+    Madrid). `modo="sumar"` (por defecto) añade a lo del día; `"fijar"` pone el
+    número exacto (corregir). `usuario`: solo ness, para apuntar en el de otro
+    (p. ej. "nes_bugallo"). Devuelve el día y los totales del mes. Guía `subidas.md`."""
+    body = {"fecha": fecha, "videos": videos, "carruseles": carruseles,
+            "nota": nota, "modo": modo, "usuario": usuario}
+    return _json(await Interno(_usuario(ctx)).post("/api/v1/subidas", body))
+
+
+@_herramienta(structured_output=False)
+async def ver_subidas(ctx: Context, mes: str = "", usuario: str = "") -> str:
+    """Carruseles y vídeos publicados cada día de un mes (`mes` AAAA-MM, vacío
+    = el actual) con totales y media por día. `usuario`: solo ness, para ver el
+    de otro (p. ej. "nes_bugallo"). Guía `subidas.md`."""
+    return _json(await Interno(_usuario(ctx)).get("/api/v1/subidas", mes=mes, usuario=usuario))
 
 
 @_herramienta(structured_output=False)
@@ -954,7 +978,8 @@ async def replicar_carrusel(ctx: Context, catalogo: str = "", carpeta: str = "",
     solo si el token es de un admin; la réplica queda en SU lista.
     Productos que no están en ningún catálogo: dalos de alta con
     `producto_carrusel` (catálogo `carruseles_virales`, compartido).
-    `pais`: de dónde es el viral (ES, FR, DE, IT, AT, BE, NL, PL, IE, GB):
+    `pais`: de dónde es el viral (ES, FR, DE, IT, AT, BE, NL, PL, IE, GB, o AR =
+    cuenta árabe: español + una línea en darija, precio y hashtags árabes):
     textos, caption y hashtags salen en SU idioma y Mis tandas enseña la
     bandera. Con `replica_id`, vacío = el de la réplica original."""
     u = _usuario(ctx)

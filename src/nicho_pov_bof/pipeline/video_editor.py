@@ -45,6 +45,7 @@ from typing import Callable
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from src.font_resolver import _bundled_fonts_dir
+from src import texto_arabe
 import cv2
 
 from src.nicho_pov_bof import config
@@ -151,6 +152,8 @@ def _render_text_line(
     text = (text or "").strip()
     if not text:
         return None
+    # Con árabe, Tajawal (ver `src/texto_arabe.py`).
+    fuente = texto_arabe.fuente_para(text, fuente)
     d0 = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
 
     def _repartir(size: int) -> tuple[list[str], "ImageFont.FreeTypeFont", int, int]:
@@ -211,7 +214,12 @@ def _render_text_line(
     for i, ln in enumerate(lines):
         x = (W - line_ws[i]) / 2
         y = pad + i * line_h
-        for k, t in _split_runs(ln):
+        # Línea en árabe: los tramos (texto/emoji) se colocan de derecha a
+        # izquierda, si no el «👇» de «لطلب من هنا 👇» quedaba al otro lado.
+        tramos = _split_runs(ln)
+        if texto_arabe.rtl(ln):
+            tramos = tramos[::-1]
+        for k, t in tramos:
             if k == "emoji":
                 em = _emoji_run_img(t, emoji_size)
                 if em is not None:
@@ -219,7 +227,7 @@ def _render_text_line(
                     img.paste(em, (int(x), ey), em)
                     x += em.width + gap
             else:
-                d.text((x, y), t, font=font, fill=fill,
+                d.text((x, y), texto_arabe.aislar(t), font=font, fill=fill,
                        stroke_width=stroke_w, stroke_fill=stroke)
                 x += d0.textlength(t, font=font)
     return img
@@ -598,6 +606,7 @@ def _cuerpo_que_cabe(lineas: list[str], fuente: str, max_w: int) -> int:
     """
     medidor = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     textos = [t for t in lineas if (t or "").strip()]
+    fuente = texto_arabe.fuente_para(" ".join(textos), fuente)
     cuerpo = BLANCO_FONT_SIZE
     while cuerpo > 32:
         f = ImageFont.truetype(_font_path(fuente), cuerpo)

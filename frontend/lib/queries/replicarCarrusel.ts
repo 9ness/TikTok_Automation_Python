@@ -24,6 +24,8 @@ export const PAISES_CARRUSEL = [
   { codigo: "PL", bandera: "🇵🇱", nombre: "Polonia" },
   { codigo: "IE", bandera: "🇮🇪", nombre: "Irlanda" },
   { codigo: "GB", bandera: "🇬🇧", nombre: "Reino Unido" },
+  // Cuenta árabe del Mi 8 (docs/CUENTA_ARABE.md): español + darija, con precio.
+  { codigo: "AR", bandera: "🇲🇦", nombre: "Árabe (España)" },
 ] as const;
 
 /** Bandera del país del viral; vacío si es de España (lo de siempre). */

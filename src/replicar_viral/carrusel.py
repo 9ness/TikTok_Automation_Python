@@ -60,7 +60,29 @@ PAISES: dict[str, dict[str, str]] = {
     "PL": {"bandera": "🇵🇱", "nombre": "Polonia", "idioma": "polaco"},
     "IE": {"bandera": "🇮🇪", "nombre": "Irlanda", "idioma": "inglés (de Irlanda/Reino Unido)"},
     "GB": {"bandera": "🇬🇧", "nombre": "Reino Unido", "idioma": "inglés británico"},
+    # No es un país: la cuenta árabe del Mi 8 (`docs/CUENTA_ARABE.md`, 29/10/2026).
+    # Público árabe/magrebí de España y Europa. Se replican virales de SUS
+    # tiendas tal cual los hacen ellos (Néstor: «no adaptarlo a lo nuestro»),
+    # precio incluido si lo llevan.
+    "AR": {"bandera": "🇲🇦", "nombre": "Árabe (España)", "idioma": (
+        "el MISMO idioma y la misma mezcla que el carrusel original, que es de una tienda"
+        " árabe que vende en España: si mezcla español con darija o árabe, igual; si solo"
+        " usa español, solo español. No lo «traduzcas» a nuestro estilo: copia cómo escriben"
+        " ellos (expresiones, emojis, mayúsculas). Si el original pone precio, pon el PRECIO"
+        " de nuestra ficha en el mismo sitio (p. ej. «39,90 €»). Caption y hashtags, como"
+        " los suyos: en su mezcla de español y árabe")},
 }
+
+# Los que llevan las tiendas árabes que venden en España (ver el informe del
+# nicho en Drive, `_agente/nestor2/NICHO_ARABE_ES_2026-10-28.md`). Delante de
+# los de la IA: son los que reparten el carrusel a ese público.
+HASHTAGS_ARABE = [
+    "#إسبانيا🇪🇸_ايطاليا🇮🇹_البرتغال",
+    "#فرنسا🇨🇵_بلجيكا🇧🇪_المانيا🇩🇪",
+    "#المغرب🇲🇦تونس🇹🇳الجزائر🇩🇿",
+    "#tiktokshop",
+    "#oferta",
+]
 
 
 def pais_valido(pais: str = "") -> str:
@@ -355,6 +377,9 @@ def hashtags_tiktok(doc: dict) -> list[str]:
     """Los de TikTok son los MISMOS que llevan los vídeos (los generales de la
     configuración del POV BOF) y, si el producto es ropa/calzado/bolsos, los de
     moda. Los que propuso la IA (`hashtags`) se quedan para Meta."""
+    if doc.get("pais") == "AR":
+        propios = [t for t in (doc.get("hashtags") or []) if t not in HASHTAGS_ARABE]
+        return HASHTAGS_ARABE + propios[:3]
     if (doc.get("pais") or "ES") != "ES":
         # Réplica de otro país: los generales del POV BOF están en español.
         return list(doc.get("hashtags") or [])

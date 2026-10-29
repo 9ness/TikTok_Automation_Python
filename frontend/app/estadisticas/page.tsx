@@ -21,8 +21,9 @@ import {
   useEstadisticas,
 } from "@/lib/queries/estadisticas";
 
-/** Solo Néstor: son las ventas de su cuenta. El backend lo corta también. */
-const USUARIOS = ["ness"];
+/** Quién tiene estadísticas: cada uno ve las de SU cuenta (Néstor y la cuenta
+ *  árabe de Bugallo). El backend lo corta también. */
+const USUARIOS = ["ness", "nes_bugallo"];
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
@@ -156,7 +157,7 @@ export default function EstadisticasPage() {
 
   if (me.isLoading) return <Loader2 className="m-6 h-5 w-5 animate-spin" />;
   if (!permitido) {
-    return <p className="p-6 text-sm text-muted-foreground">Esta pantalla solo está disponible para ness.</p>;
+    return <p className="p-6 text-sm text-muted-foreground">Tu usuario no tiene estadísticas de ventas.</p>;
   }
 
   return (
