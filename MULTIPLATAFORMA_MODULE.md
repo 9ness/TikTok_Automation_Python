@@ -38,6 +38,8 @@ Carpetas (se crean solas al `POST /cuentas`, mkdir -p defensivo):
     viralizacion/publicados/
     producto/                → tipo producto
     producto/publicados/
+    fotos/                   → tipo foto (.jpg/.png, solo Facebook)
+    fotos/publicados/
 ```
 
 `<mount>` = `mount_root()` del POV BOF (`/mnt/drive` en el container,
@@ -63,6 +65,20 @@ Carpetas (se crean solas al `POST /cuentas`, mkdir -p defensivo):
   `simulado` no cuenta: sin tokens no se mueve nada.
 - El tick (`scripts/multiplataforma_tick.py`) ingesta todas las cuentas
   activas antes de publicar (no con `--dry-run`; `--sin-ingesta` la salta).
+- `fotos/` (oct 2026, FrutiDramas): una foto suelta por publicación (fotograma
+  del episodio en 4:5 + una pregunta genuina en el `.json`) para dar
+  interacción a la página entre reels. Ritmo/horas de `foto` (def. 1 a las
+  17:00). Se publica con `publicar_fotos` (una foto → `/feed`); IG no admite
+  9:16 en foto y Threads necesita ≥2, así que solo Facebook.
+
+## Historias de Facebook (`CuentaDestino.fb_historias`)
+
+Con el flag, tras cada reel publicado en FB (tipos de vídeo, no carrusel ni
+foto) el mismo vídeo sale como historia de la página (`/{page_id}/video_stories`,
+start → rupload → finish). Si dura más de `MULTIPLATAFORMA_FB_HISTORIA_MAX_S`
+(def. 60) se recortan los primeros segundos con ffmpeg. Si falla, el reel ya
+está publicado: queda `historia_error` en `resultados.facebook` y no se
+reintenta. Activo en `frutidramas`.
 
 ## Música en los vídeos mudos (Mis tandas)
 

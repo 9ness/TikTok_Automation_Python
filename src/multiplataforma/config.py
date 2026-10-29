@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 PLATAFORMAS: tuple[str, ...] = ("instagram", "facebook", "threads", "pinterest")
-TIPOS: tuple[str, ...] = ("producto", "prueba_viral", "carrusel")
+TIPOS: tuple[str, ...] = ("producto", "prueba_viral", "carrusel", "foto")
 # Carrusel de fotos (Replicar carrusel → `services/carruseles.py`): IG admite
 # 2-10 fotos, Threads 2-20, Pinterest 2-5 (se cogen las primeras).
 MAX_FOTOS_CARRUSEL: dict[str, int] = {"instagram": 10, "facebook": 10, "threads": 20, "pinterest": 5}
@@ -155,19 +155,27 @@ EXTENSIONES_SERVIBLES = (".mp4", ".mov", ".jpg", ".jpeg", ".png")
 # dentro de cada una, `publicados/` con lo ya subido a todas las plataformas.
 AI_PRO_SUBDIR = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO"
 DRIVE_SUBDIR = f"{AI_PRO_SUBDIR}/Multiplataforma"
-CARPETAS_INGESTA: dict[str, str] = {"viralizacion": "prueba_viral", "producto": "producto"}
+CARPETAS_INGESTA: dict[str, str] = {"viralizacion": "prueba_viral", "producto": "producto", "fotos": "foto"}
 CARPETA_PUBLICADOS = "publicados"
 EXTENSIONES_INGESTA = (".mp4", ".mov")
+# `fotos/`: una foto suelta por publicación (fotograma de un episodio + una
+# pregunta en el texto). Solo Facebook: IG no admite 9:16 en foto.
+EXTENSIONES_FOTO = (".jpg", ".jpeg", ".png")
 ZONA_HORARIA = os.getenv("MULTIPLATAFORMA_TZ", "Europe/Madrid")
-RITMO_DEFAULT: dict[str, int] = {"prueba_viral": 1, "producto": 1, "carrusel": 1}  # vídeos/día
-HORAS_DEFAULT: dict[str, list[str]] = {"prueba_viral": ["19:00"], "producto": ["13:00"], "carrusel": ["17:00"]}
+RITMO_DEFAULT: dict[str, int] = {"prueba_viral": 1, "producto": 1, "carrusel": 1, "foto": 1}  # vídeos/día
+HORAS_DEFAULT: dict[str, list[str]] = {"prueba_viral": ["19:00"], "producto": ["13:00"], "carrusel": ["17:00"],
+                                       "foto": ["17:00"]}
 # Desfase de ±N minutos sobre cada hora (14:00 → 13:57, 14:03…) para no
 # publicar siempre al minuto exacto. Fijo por cuenta y día (hash), 0 lo apaga.
 DESFASE_MAX_MIN = int(os.getenv("MULTIPLATAFORMA_DESFASE_MIN", "4"))
 # Plataformas por tipo cuando el vídeo no dice otra cosa. Los virales de
 # viralización son para ganar seguidores en Instagram (clase 7/10: «solo
 # mételos en reel de prueba»); FB y Threads ya tienen enlace y no los necesitan.
-PLATAFORMAS_POR_TIPO: dict[str, tuple[str, ...]] = {"prueba_viral": ("instagram",)}
+PLATAFORMAS_POR_TIPO: dict[str, tuple[str, ...]] = {"prueba_viral": ("instagram",), "foto": ("facebook",)}
+# Historia de Facebook tras cada reel publicado (cuentas con `fb_historias`).
+# La API de historias de página admite vídeos de 3 a 60 s: los más largos se
+# recortan a los primeros `FB_HISTORIA_MAX_S` (de gancho al reel).
+FB_HISTORIA_MAX_S = float(os.getenv("MULTIPLATAFORMA_FB_HISTORIA_MAX_S", "60"))
 
 
 def raiz_drive() -> Path:

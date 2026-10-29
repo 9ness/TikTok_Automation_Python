@@ -1,7 +1,8 @@
 """Ingesta automática desde las carpetas del Drive montado.
 
-Por cuenta: `<raíz Multiplataforma>/<slug>/viralizacion/` → `prueba_viral` y
-`<slug>/producto/` → `producto`. Cada vídeo (.mp4/.mov) nuevo se encola con
+Por cuenta: `<raíz Multiplataforma>/<slug>/viralizacion/` → `prueba_viral`,
+`<slug>/producto/` → `producto` y `<slug>/fotos/` → `foto` (.jpg/.png, una
+foto suelta por publicación, solo Facebook). Cada vídeo (.mp4/.mov) nuevo se encola con
 la programación que le toca según el `ritmo` (vídeos/día por tipo) y las
 `horas` de la cuenta, continuando tras la última ya programada. Orden natural
 por nombre de fichero (`2.mp4` antes que `10.mp4`).
@@ -66,10 +67,11 @@ def _orden_natural(nombre: str) -> list:
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", nombre)]
 
 
-def _videos(carpeta: Path) -> list[Path]:
+def _videos(carpeta: Path, tipo: str = "") -> list[Path]:
     if not carpeta.is_dir():
         return []
-    vids = [p for p in carpeta.iterdir() if p.is_file() and p.suffix.lower() in config.EXTENSIONES_INGESTA
+    exts = config.EXTENSIONES_FOTO if tipo == "foto" else config.EXTENSIONES_INGESTA
+    vids = [p for p in carpeta.iterdir() if p.is_file() and p.suffix.lower() in exts
             and not p.name.startswith(".")]
     return sorted(vids, key=lambda p: _orden_natural(p.name))
 
@@ -215,7 +217,7 @@ def ingestar(cuenta: str | CuentaDestino, ahora: float | None = None, *,
 
     for carpeta, tipo in config.CARPETAS_INGESTA.items():
         ritmo = int((c.ritmo or {}).get(tipo, config.RITMO_DEFAULT.get(tipo, 1)))
-        nuevos = [v for v in _videos(base / carpeta) if str(v) not in ya]
+        nuevos = [v for v in _videos(base / carpeta, tipo) if str(v) not in ya]
         if not nuevos:
             continue
         if ritmo <= 0:

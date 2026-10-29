@@ -45,6 +45,7 @@ class CuentaIn(BaseModel):
     afiliado_amazon_tag: str = ""
     afiliado_shein: str = ""
     activa: bool = True
+    fb_historias: bool = False  # historia de FB tras cada reel
     auto_tandas: int = Field(0, ge=0, le=60)  # días de vídeos de producto que el tick mantiene en cola
     ritmo: dict[str, int] = Field(default_factory=lambda: dict(config.RITMO_DEFAULT))  # vídeos/día por tipo
     horas: dict[str, list[str]] = Field(default_factory=lambda: {k: list(v) for k, v in config.HORAS_DEFAULT.items()})
@@ -184,8 +185,9 @@ def encolar(body: PublicacionIn) -> dict:
     cuenta = cuentas_repo.get(body.cuenta)
     if not cuenta:
         raise APIError(f"No existe la cuenta {body.cuenta}", status_code=404)
-    if body.tipo not in config.TIPOS or body.tipo == "carrusel":
-        raise APIError(f"tipo no válido: {body.tipo} (los carruseles van por /cuentas/<slug>/carrusel)",
+    if body.tipo not in config.TIPOS or body.tipo in ("carrusel", "foto"):
+        raise APIError(f"tipo no válido: {body.tipo} (los carruseles van por /cuentas/<slug>/carrusel "
+                       "y las fotos por la carpeta fotos/ del Drive)",
                        status_code=400)
     malas = set(body.plataformas) - set(config.PLATAFORMAS)
     if malas or not body.plataformas:

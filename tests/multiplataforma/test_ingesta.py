@@ -84,7 +84,7 @@ def test_reparto_por_dias_y_horas(raiz, monkeypatch):
 
 def test_defaults_y_ritmo_mayor_que_horas():
     c = CuentaDestino(slug="x")
-    assert c.ritmo == {"prueba_viral": 1, "producto": 1, "carrusel": 1}
+    assert c.ritmo == {"prueba_viral": 1, "producto": 1, "carrusel": 1, "foto": 1}
     assert c.horas["prueba_viral"] == ["19:00"] and c.horas["producto"] == ["13:00"]
     assert ingesta.horas_del_dia(3, ["19:00"]) == [(19, 0), (20, 0), (21, 0)]
     assert ingesta.horas_del_dia(0, ["19:00"]) == []
@@ -229,3 +229,16 @@ def test_virales_solo_instagram(tmp_path):
     v.write_bytes(b"x")
     pub = ing._publicacion(CuentaDestino(slug="x", nombre="x"), v, "prueba_viral", 0.0)
     assert pub.plataformas == ["instagram"]
+
+
+def test_fotos_se_ingestan_como_foto_solo_facebook(raiz):
+    _cuenta(ritmo={"foto": 1}, horas={"foto": ["17:00"]})
+    _video(raiz, "fotos", "01_taper.jpg")
+    _video(raiz, "fotos", "02_dormilones.png")
+    _video(raiz, "fotos", "video.mp4")  # en fotos/ solo cuentan las fotos
+    _video(raiz, "producto", "foto.jpg")  # y en producto/ solo los vídeos
+    inf = ingesta.ingestar("casa", AHORA)
+    assert [(e["video"].rsplit("/", 1)[1], e["tipo"]) for e in inf["encoladas"]] == [
+        ("01_taper.jpg", "foto"), ("02_dormilones.png", "foto")]
+    assert [_local(e["programada_en"])[-5:-3] for e in inf["encoladas"]] == ["17", "17"]
+    assert all(p.plataformas == ["facebook"] for p in publicaciones_repo.pendientes())

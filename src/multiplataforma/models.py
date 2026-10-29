@@ -48,6 +48,9 @@ class CuentaDestino:
     # Reordenar la cola de producto por época/semáforo y sin huecos
     # (`tandas.replanificar`, lo llama el tick cada hora).
     priorizar_epocas: bool = False
+    # Tras cada reel publicado en Facebook, el mismo vídeo como historia de la
+    # página (recortado a `config.FB_HISTORIA_MAX_S`).
+    fb_historias: bool = False
     creada_en: float = field(default_factory=time.time)
 
     def duenos(self) -> list[str]:
@@ -98,7 +101,7 @@ class Publicacion:
     cuenta: str
     video_path: str
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
-    tipo: str = "producto"  # producto | prueba_viral | carrusel
+    tipo: str = "producto"  # producto | prueba_viral | carrusel | foto (`video_path` = la foto)
     producto_ref: str = ""  # ref opcional al producto del nicho de origen
     titulo: str = ""
     # Texto base (sin enlace) para poder rehacer `textos` si el enlace llega

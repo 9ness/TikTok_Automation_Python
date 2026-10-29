@@ -17,6 +17,8 @@ No hay cerrojo entre procesos: se asume un único timer.
 
 from __future__ import annotations
 
+import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Callable
@@ -52,6 +54,11 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
         return _ejecutar_reel_fotos(plataforma, pub, cuenta, token, destino, texto, simulado, kw, previo)
     if pub.tipo == "carrusel":
         return _ejecutar_carrusel(plataforma, pub, token, destino, texto, simulado, kw, previo)
+    if pub.tipo == "foto":
+        if plataforma != "facebook":
+            raise ErrorPublicacion(f"{plataforma}: las fotos sueltas solo van a Facebook", reintentable=False)
+        return _ejecutar_carrusel(plataforma, pub, token, destino, texto, simulado, kw, previo,
+                                  fotos=[pub.video_path])
 
     if not simulado and not pub.video_path.startswith(("http://", "https://")):
         ClienteBase._fichero(pub.video_path)  # error claro y no reintentable si no está
@@ -63,9 +70,12 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
             trial=pub.tipo == "prueba_viral" and config.IG_TRIAL_REELS, graduacion=pub.trial_graduation, previo=previo,
         )
     if plataforma == "facebook":
-        return FacebookClient(token, **kw).publicar(
-            destino, descripcion=texto, video_path=pub.video_path, comentario=pub.comentario, previo=previo,
-        )
+        fb = FacebookClient(token, **kw)
+        res = fb.publicar(destino, descripcion=texto, video_path=pub.video_path, comentario=pub.comentario,
+                          previo=previo)
+        if cuenta.fb_historias and not previo.get("historia_id"):
+            res.update(_historia(fb, destino, pub.video_path, simulado, previo))
+        return res
     if plataforma == "threads":
         return ThreadsClient(token, **kw).publicar(
             destino, texto=texto, video_url=video_url.url_publica(pub.video_path), previo=previo,
@@ -76,6 +86,35 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
             video_path=pub.video_path, cover_url=pub.cover_url, previo=previo,
         )
     raise ErrorPublicacion(f"Plataforma desconocida: {plataforma}", reintentable=False)
+
+
+def _duracion(path: str) -> float:
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+                         capture_output=True, text=True, timeout=60)
+    return float(out.stdout.strip() or 0)
+
+
+def _historia(fb: FacebookClient, destino: str, video_path: str, simulado: bool, previo: dict) -> dict:
+    """El reel también como historia de la página. Si falla, el reel ya está
+    publicado: solo se anota `historia_error` (no se reintenta)."""
+    corto = ""
+    try:
+        video = video_path
+        if not simulado and _duracion(video_path) > config.FB_HISTORIA_MAX_S:
+            fd, corto = tempfile.mkstemp(suffix=".mp4", prefix="fb_historia_")
+            Path(corto).unlink()
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", video_path, "-t", str(config.FB_HISTORIA_MAX_S),
+                            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac",
+                            "-movflags", "+faststart", corto], check=True, capture_output=True, timeout=600)
+            video = corto
+        return fb.publicar_historia(destino, video_path=video, previo=previo)
+    except ErrorPublicacion as e:
+        return {"historia_error": str(e), **e.parcial}
+    except (OSError, ValueError, subprocess.SubprocessError) as e:
+        return {"historia_error": f"{type(e).__name__}: {e}"}
+    finally:
+        if corto:
+            Path(corto).unlink(missing_ok=True)
 
 
 def _ejecutar_reel_fotos(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, token: str, destino: str,
@@ -101,9 +140,11 @@ def _ejecutar_reel_fotos(plataforma: str, pub: Publicacion, cuenta: CuentaDestin
 
 
 def _ejecutar_carrusel(plataforma: str, pub: Publicacion, token: str, destino: str, texto: str,
-                       simulado: bool, kw: dict, previo: dict) -> dict:
-    """Carrusel de fotos (`pub.imagenes`; IG usa `pub.imagenes_ig`, en 4:5)."""
-    fotos = (pub.imagenes_ig or pub.imagenes) if plataforma == "instagram" else pub.imagenes
+                       simulado: bool, kw: dict, previo: dict, fotos: list[str] | None = None) -> dict:
+    """Carrusel de fotos (`pub.imagenes`; IG usa `pub.imagenes_ig`, en 4:5).
+    `fotos` lo fuerza (tipo `foto`: una sola)."""
+    if fotos is None:
+        fotos = (pub.imagenes_ig or pub.imagenes) if plataforma == "instagram" else pub.imagenes
     if not fotos:
         raise ErrorPublicacion("carrusel sin fotos", reintentable=False)
     if not simulado:

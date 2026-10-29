@@ -10,6 +10,9 @@ Flujo:
    comentario (`POST /{video_id}/comments`): en la descripción de un reel el
    enlace no es clicable.
 
+Historia (`publicar_historia`): mismas fases en `/{page_id}/video_stories`
+(start → binario a rupload → finish); devuelve `post_id`.
+
 El comentario es aparte: si falla, el reel YA está publicado (no se repite) y
 el fallo queda en `comentario_error` para reintentarlo a mano.
 """
@@ -112,6 +115,31 @@ class FacebookClient(ClienteBase):
             return "dry-fb-comment"
         j = self._request("POST", url, data={"message": mensaje, "access_token": self.token})
         return str(j.get("id") or "")
+
+    # ---- historia de la página ----
+    def publicar_historia(self, page_id: str, *, video_path: str, previo: dict | None = None) -> dict:
+        previo = previo or {}
+        if not page_id:
+            raise ErrorPublicacion("facebook: la cuenta no tiene fb_page_id", reintentable=False)
+        url = f"{self.base}/{page_id}/video_stories"
+        video_id = previo.get("historia_video_id", "")
+        try:
+            if not video_id:
+                video_id, upload_url = self._start(url)
+                self._subir(video_id, upload_url, video_path)
+            datos = {"upload_phase": "finish", "video_id": video_id}
+            if self.dry_run:
+                self._anotar("POST", url, data=datos)
+                post_id = "dry-fb-story"
+            else:
+                j = self._request("POST", url, data={**datos, "access_token": self.token})
+                if j.get("success") is False:
+                    raise ErrorPublicacion(f"facebook: historia rechazada: {j}")
+                post_id = str(j.get("post_id") or j.get("id") or "")
+        except ErrorPublicacion as e:
+            e.parcial = {**e.parcial, "historia_video_id": video_id}
+            raise
+        return {"historia_id": post_id, "historia_video_id": video_id}
 
     # ---- carrusel de fotos (publicación con varias fotos) ----
     def publicar_fotos(self, page_id: str, *, mensaje: str, imagenes_url: list[str], comentario: str = "",

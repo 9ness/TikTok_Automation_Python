@@ -113,6 +113,15 @@ Un carrusel con TODAS sus fotos hechas se publica en IG/FB/Threads con
   `asin`/`shein`, o el guardado de enlaces); los que faltan salen como
   `sin_enlace` en `~/multiplataforma/tick.log`.
 
+## Fotos con pregunta e historias (Facebook)
+
+- Una foto suelta (fotograma de un episodio YA publicado, 4:5, sin subtítulo
+  quemado) + `.json` con `caption` = una pregunta genuina («¿Quién tuvo la
+  culpa? 👇»), nunca cebo tipo «míralo hasta el final». Va a
+  `Multiplataforma/<cuenta>/fotos/`; sale una al día a la hora `foto` de la
+  cuenta. Solo Facebook.
+- Cuentas con `fb_historias`: cada reel de FB sale también como historia, solo.
+
 ## Informe al terminar
 
 Una línea por producto: «✅ enlace (SHEIN/ASIN) · ⛔ sin_equivalente (motivo)

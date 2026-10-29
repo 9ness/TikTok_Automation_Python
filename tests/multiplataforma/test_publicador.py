@@ -267,3 +267,65 @@ def test_facebook_y_threads_reintentan_foto_que_meta_no_baja():
     res = ThreadsClient("tok", http=g.cliente(), sleep=lambda s: None).publicar_carrusel(
         "th", texto="x", imagenes_url=["https://x/1.jpg", "https://x/2.jpg"])
     assert res["post_id"] == "p1" and len(res["children"]) == 2
+
+
+def _rutas_fb_historia(historias):
+    def stories(r):
+        historias.append(r.content.decode())
+        if "start" in r.content.decode():
+            return {"video_id": "st1", "upload_url": "https://rupload.facebook.com/video-upload/v24.0/st1"}
+        return {"success": True, "post_id": "story_1"}
+    return [("POST", "/999/video_stories", stories)] + _rutas_ok()
+
+
+def test_historia_de_facebook_tras_el_reel(tmp_path, monkeypatch):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"0" * 1000)
+    monkeypatch.setattr(publicador, "_duracion", lambda p: 30.0)
+    _cuenta(tokens={"facebook": "tok"}, fb_historias=True)
+    pub = _pub(video, plataformas=["facebook"])
+    historias: list[str] = []
+    g = Grabadora(_rutas_fb_historia(historias))
+    publicador.publicar_pendientes(AHORA, http=g.cliente(), sleep=lambda s: None)
+    res = publicaciones_repo.get(pub.id).resultados["facebook"]
+    assert res["video_id"] == "fbv1" and res["historia_id"] == "story_1"
+    assert len(historias) == 2  # start + finish
+
+
+def test_historia_que_falla_no_tumba_el_reel(tmp_path, monkeypatch):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"0" * 1000)
+    monkeypatch.setattr(publicador, "_duracion", lambda p: 30.0)
+    _cuenta(tokens={"facebook": "tok"}, fb_historias=True)
+    pub = _pub(video, plataformas=["facebook"])
+    rutas = [("POST", "/999/video_stories", httpx.Response(400, json={"error": {"message": "no", "code": 100}}))]
+    publicador.publicar_pendientes(AHORA, http=Grabadora(rutas + _rutas_ok()).cliente(), sleep=lambda s: None)
+    p = publicaciones_repo.get(pub.id)
+    assert p.estado["facebook"] == config.ESTADO_PUBLICADO
+    assert "historia_error" in p.resultados["facebook"]
+
+
+def test_sin_flag_no_hay_historia(tmp_path):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"0" * 1000)
+    _cuenta(tokens={"facebook": "tok"})
+    pub = _pub(video, plataformas=["facebook"])
+    g = Grabadora(_rutas_ok())
+    publicador.publicar_pendientes(AHORA, http=g.cliente(), sleep=lambda s: None)
+    assert "historia_id" not in publicaciones_repo.get(pub.id).resultados["facebook"]
+    assert not any("video_stories" in str(r.url) for r in g.peticiones)
+
+
+def test_foto_suelta_en_facebook(tmp_path, monkeypatch):
+    from src.multiplataforma.services import video_url
+    foto = tmp_path / "01.jpg"
+    foto.write_bytes(b"jpg")
+    monkeypatch.setattr(video_url, "url_publica", lambda p: f"https://pub/{p.rsplit('/', 1)[1]}")
+    _cuenta(tokens={"facebook": "tok"})
+    pub = _pub(foto, tipo="foto", plataformas=["facebook"], comentario="")
+    g = Grabadora([("POST", "/999/photos", {"id": "ph1"}), ("POST", "/999/feed", {"id": "999_1"})])
+    publicador.publicar_pendientes(AHORA, http=g.cliente(), sleep=lambda s: None)
+    p = publicaciones_repo.get(pub.id)
+    assert p.estado["facebook"] == config.ESTADO_PUBLICADO, p.errores
+    assert p.resultados["facebook"]["post_id"] == "999_1"
+    assert "url=https%3A%2F%2Fpub%2F01.jpg" in g.peticiones[0].content.decode()
