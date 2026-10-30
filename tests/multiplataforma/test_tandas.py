@@ -407,3 +407,36 @@ def test_replanificar_quita_huecos_y_ordena_por_epoca(filas, drive, cuenta, monk
     assert primero.date() == dt.date(2026, 10, 8) and primero.hour in (20, 21)
     # idempotente
     assert tandas.replanificar("ama_shop", ahora=AHORA)["movidas"] == 0
+
+
+def _prod(cuenta, cuando, **kw):
+    p = Publicacion(cuenta=cuenta.slug, video_path=f"/v/{cuando}.mp4", tipo="producto", programada_en=cuando,
+                    plataformas=["instagram", "facebook"], **kw)
+    return publicaciones_repo.guardar(p)
+
+
+def test_garantia_diaria_adelanta_el_ultimo_de_la_cola(cuenta):
+    noche = dt.datetime(2026, 10, 8, 22, 15, tzinfo=TZ).timestamp()
+    fallida = _prod(cuenta, noche - 7200, estado={"instagram": "fallido", "facebook": "fallido"})
+    manana = _prod(cuenta, noche + 80000)
+    ultima = _prod(cuenta, noche + 3 * 86400)
+    assert tandas.garantia_diaria(cuenta.slug, ahora=noche - 3600)["motivo"] == "antes de hora"
+    assert tandas.garantia_diaria(cuenta.slug, ahora=noche)["adelantada"] == ultima.id
+    assert publicaciones_repo.get(ultima.id).programada_en == noche
+    assert publicaciones_repo.get(manana.id).programada_en == noche + 80000  # mañana sigue cubierto
+    assert publicaciones_repo.get(fallida.id).estado["instagram"] == "fallido"
+    assert tandas.garantia_diaria(cuenta.slug, ahora=noche + 600)["motivo"] == "ya hecha hoy"
+
+
+def test_garantia_diaria_no_actua_si_hoy_salio_o_queda(cuenta):
+    noche = dt.datetime(2026, 10, 8, 22, 15, tzinfo=TZ).timestamp()
+    _prod(cuenta, noche + 2 * 86400)
+    pend = _prod(cuenta, noche - 600)
+    assert tandas.garantia_diaria(cuenta.slug, ahora=noche)["motivo"] == "queda uno para hoy"
+    pend.estado = {"instagram": "publicado", "facebook": "publicado"}
+    pend.resultados = {"instagram": {"publicado_en": noche - 500}}
+    publicaciones_repo.guardar(pend)
+    assert tandas.garantia_diaria(cuenta.slug, ahora=noche)["motivo"] == "hoy ya salió"
+    cuenta.ritmo = {"producto": 0}
+    cuentas_repo.guardar(cuenta)
+    assert tandas.garantia_diaria(cuenta.slug, ahora=noche)["motivo"] == "apagada"

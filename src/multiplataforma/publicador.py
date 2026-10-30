@@ -213,6 +213,8 @@ def publicar_una(pub: Publicacion, *, ahora: float, dry_run: bool = False, http:
             pub.resultados[plat] = {**(pub.resultados.get(plat) or {}), **e.parcial}
             final = not e.reintentable or n >= config.MAX_INTENTOS
             pub.estado[plat] = config.ESTADO_FALLIDO if final else config.ESTADO_ERROR
+            if final and real and _rescatar(pub, plat, ahora):
+                log(f"[multiplataforma] {pub.id} {plat}: rescate {pub.rescates[plat]} a las +{config.RESCATE_S}s")
             informe["plataformas"][plat] = {"estado": pub.estado[plat], "error": str(e)}
             log(f"[multiplataforma] {pub.id} {plat}: {e}")
         else:
@@ -239,6 +241,20 @@ def publicar_una(pub: Publicacion, *, ahora: float, dry_run: bool = False, http:
             publicaciones_repo.guardar(pub)
             informe["movido_a"] = nueva
     return informe
+
+
+def _rescatar(pub: Publicacion, plat: str, ahora: float) -> bool:
+    """Plan B de una plataforma `fallido`: vuelve a `pendiente` sin los ids del
+    intento roto (un contenedor de IG en ERROR no se recupera) y la publicación
+    se aplaza RESCATE_S. No se rescata si el fichero ya no existe."""
+    if pub.rescates.get(plat, 0) >= config.MAX_RESCATES or not Path(pub.video_path).exists():
+        return False
+    pub.rescates[plat] = pub.rescates.get(plat, 0) + 1
+    pub.estado[plat] = config.ESTADO_PENDIENTE
+    pub.intentos.pop(plat, None)
+    pub.resultados[plat] = {"rescate_de": pub.errores.get(plat, "")}
+    pub.programada_en = max(pub.programada_en, ahora + config.RESCATE_S)
+    return True
 
 
 def _queda_algo(pub: Publicacion) -> bool:

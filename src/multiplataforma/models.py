@@ -125,6 +125,7 @@ class Publicacion:
     resultados: dict[str, dict] = field(default_factory=dict)
     errores: dict[str, str] = field(default_factory=dict)
     intentos: dict[str, int] = field(default_factory=dict)
+    rescates: dict[str, int] = field(default_factory=dict)  # veces que se rehízo de cero tras `fallido`
     creada_en: float = field(default_factory=time.time)
     actualizada_en: float = 0.0
 

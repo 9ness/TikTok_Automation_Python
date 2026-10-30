@@ -46,6 +46,11 @@ def main() -> int:
             informe["replanificar"] = tandas.replanificar_todas(log=print)
         except Exception as e:  # noqa: BLE001 — no parar la publicación por esto
             informe["replanificar"] = [{"error": str(e)}]
+        # plan B: a partir de GARANTIA_HORA, ninguna cuenta se queda sin vídeo de producto ese día
+        try:
+            informe["garantia"] = tandas.garantia_diaria_todas(log=print)
+        except Exception as e:  # noqa: BLE001 — no parar la publicación por esto
+            informe["garantia"] = [{"error": str(e)}]
         # carruseles terminados en «Replicar carrusel» → a la cuenta de su nicho
         try:
             informe["auto_carruseles"] = carruseles.auto_encolar_todas(log=print)

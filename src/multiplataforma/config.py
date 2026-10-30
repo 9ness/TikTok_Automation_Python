@@ -50,6 +50,18 @@ ESTADOS_FINALES = (ESTADO_PUBLICADO, ESTADO_FALLIDO)
 
 MAX_INTENTOS = int(os.getenv("MULTIPLATAFORMA_MAX_INTENTOS", "3"))
 
+# Plan B cuando algo falla (30/10/2026: un reel de ama_shop se quedó sin IG ni FB
+# porque Meta no procesó el vídeo; el mismo fichero salió bien en Threads).
+# Rescate: una plataforma que acaba `fallido` vuelve a empezar DE CERO (sin los
+# ids del intento roto) pasadas RESCATE_S, hasta MAX_RESCATES veces.
+RESCATE_S = int(os.getenv("MULTIPLATAFORMA_RESCATE_S", "7200"))
+MAX_RESCATES = int(os.getenv("MULTIPLATAFORMA_MAX_RESCATES", "1"))
+# Garantía diaria: a partir de esta hora local, si una cuenta con ritmo de
+# producto no ha sacado hoy ningún vídeo de producto en Instagram ni le queda
+# uno para hoy, se adelanta el ÚLTIMO de su cola (así no se abre otro hueco
+# mañana). Una vez al día por cuenta. Vacío = apagada.
+GARANTIA_HORA = os.getenv("MULTIPLATAFORMA_GARANTIA_HORA", "22:00")
+
 # Reels de prueba (`trial_params`) de IG. Apagado: con nuestra app Meta lo
 # rechaza (code=10, subcode=2207081, «Application does not have permission»)
 # aunque el token tenga instagram_content_publish. =1 si algún día lo da.

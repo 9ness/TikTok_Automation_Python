@@ -194,9 +194,25 @@ def test_error_no_reintentable_y_reintentable(tmp_path):
     for i in range(config.MAX_INTENTOS):
         publicador.publicar_pendientes(AHORA + i, http=g.cliente())
     p = publicaciones_repo.get(pub.id)
+    # plan B: el primer `fallido` se rescata — de cero y RESCATE_S más tarde
+    assert p.estado["instagram"] == config.ESTADO_PENDIENTE and p.rescates == {"instagram": 1}
+    assert "instagram" not in p.intentos and p.resultados["instagram"] == {"rescate_de": p.errores["instagram"]}
+    assert p.programada_en >= AHORA + config.RESCATE_S
+    assert publicador.publicar_pendientes(AHORA + 60, http=g.cliente())["procesadas"] == 0
+    for i in range(config.MAX_INTENTOS):
+        publicador.publicar_pendientes(AHORA + config.RESCATE_S + 10 + i, http=g.cliente())
+    p = publicaciones_repo.get(pub.id)
     assert p.estado["instagram"] == config.ESTADO_FALLIDO and "caído" in p.errores["instagram"]
     assert p.intentos["instagram"] == config.MAX_INTENTOS
     assert not publicaciones_repo.pendientes()
+
+
+def test_sin_fichero_no_se_rescata(tmp_path):
+    _cuenta(tokens={"instagram": "tok"})
+    pub = _pub(tmp_path / "no_existe.mp4", plataformas=["instagram"])
+    publicador.publicar_pendientes(AHORA, http=httpx.Client())
+    p = publicaciones_repo.get(pub.id)
+    assert p.estado["instagram"] == config.ESTADO_FALLIDO and not p.rescates
 
 
 def test_tick_no_se_atasca_con_simuladas_sin_token(tmp_path):

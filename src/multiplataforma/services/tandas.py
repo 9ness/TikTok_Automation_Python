@@ -439,6 +439,60 @@ def replanificar_todas(*, ahora: float | None = None, cada_s: int = 3600, log=la
     return out
 
 
+def garantia_diaria(slug: str, *, ahora: float | None = None) -> dict:
+    """Que no haya día sin vídeo de producto: pasada `config.GARANTIA_HORA`, si
+    hoy no ha salido ninguno en Instagram y no queda ninguno para hoy (fallido
+    sin rescate, cola vacía hoy…), adelanta a ahora el ÚLTIMO de la cola (no el
+    de mañana, que abriría otro hueco). Como mucho una vez al día por cuenta."""
+    c = cuenta_o_error(slug)
+    ahora = time.time() if ahora is None else ahora
+    out: dict = {"cuenta": slug, "adelantada": ""}
+    hora = (config.GARANTIA_HORA or "").strip()
+    if not hora or not c.activa or int((c.ritmo or {}).get(TIPO, config.RITMO_DEFAULT.get(TIPO, 1))) <= 0:
+        return {**out, "motivo": "apagada"}
+    zona = _zona()
+    local = dt.datetime.fromtimestamp(ahora, zona)
+    hh, mm = (int(x) for x in hora.split(":"))
+    if local < local.replace(hour=hh, minute=mm, second=0, microsecond=0):
+        return {**out, "motivo": "antes de hora"}
+    hoy = local.date()
+    r = redis_base.get_redis()
+    marca = f"garantia:{slug}"
+    if (r.get_json(marca) or {}).get("dia") == hoy.isoformat():
+        return {**out, "motivo": "ya hecha hoy"}
+    inicio = dt.datetime.combine(hoy, dt.time(), zona).timestamp()
+    fin = inicio + 86400
+    pubs = [p for p in publicaciones_repo.de_cuenta(slug) if p.tipo == TIPO and "instagram" in p.plataformas]
+    if any(inicio <= float((p.resultados.get("instagram") or {}).get("publicado_en") or 0) < fin for p in pubs):
+        return {**out, "motivo": "hoy ya salió"}
+    if any(p.estado.get("instagram") not in config.ESTADOS_FINALES and p.programada_en < fin for p in pubs):
+        return {**out, "motivo": "queda uno para hoy"}
+    cola = [p for p in pubs if not p.terminada and not _empezada(p) and p.programada_en >= fin]
+    if not cola:
+        return {**out, "motivo": "cola vacía"}
+    ultima = max(cola, key=lambda p: p.programada_en)
+    ultima.programada_en = ahora
+    publicaciones_repo.guardar(ultima)
+    r.set_json(marca, {"dia": hoy.isoformat(), "pub": ultima.id})
+    return {**out, "adelantada": ultima.id}
+
+
+def garantia_diaria_todas(*, ahora: float | None = None, log=lambda _: None) -> list[dict]:
+    """Lo llama el tick en cada pasada (barato: sale enseguida antes de la hora)."""
+    out = []
+    for c in cuentas_repo.listar():
+        if not c.activa:
+            continue
+        try:
+            inf = garantia_diaria(c.slug, ahora=ahora)
+        except Exception as e:  # noqa: BLE001 — una cuenta rota no para el tick
+            inf = {"cuenta": c.slug, "error": str(e)}
+        if inf.get("adelantada") or inf.get("error"):
+            log(f"[garantia] {c.slug}: adelantada {inf.get('adelantada', '')} {inf.get('error', '')}")
+        out.append(inf)
+    return out
+
+
 def _hashtags(titulo: str, enlace: str, slug: str = "") -> list[str]:
     """Hashtags por categoría del producto (`config.HASHTAGS_CATEGORIA`) + los de la tienda.
     Sin categoría, los de la cuenta (`HASHTAGS_DEFECTO_CUENTA`) o los genéricos de hogar."""

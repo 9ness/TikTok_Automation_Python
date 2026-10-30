@@ -173,6 +173,17 @@ Viva Shop/Salud con `duenos_extra=[nestor2, mauro]`.
   cuota real de Meta antes de crear el contenedor.
 - Error 5xx/429/timeout → `error` y reintento (máx. `MULTIPLATAFORMA_MAX_INTENTOS`=3);
   4xx → `fallido`.
+- **Plan B (30/10/2026), que no haya día sin vídeo:**
+  - *Rescate:* una plataforma que acaba `fallido` vuelve a `pendiente` DE CERO
+    (sin los ids del intento roto: un contenedor de IG en ERROR no se recupera)
+    y la publicación se aplaza `MULTIPLATAFORMA_RESCATE_S` (7200). Máx.
+    `MULTIPLATAFORMA_MAX_RESCATES` (1) por plataforma (`Publicacion.rescates`);
+    sin fichero no se rescata.
+  - *Garantía diaria* (`tandas.garantia_diaria_todas`, en cada tick): desde
+    `MULTIPLATAFORMA_GARANTIA_HORA` (22:00, vacío = apagada), si una cuenta con
+    ritmo de producto > 0 no ha sacado hoy ningún `producto` en IG ni le queda
+    uno para hoy, adelanta a ahora el ÚLTIMO de su cola (no el de mañana). Una
+    vez al día (`garantia:<slug>`). viva_salud (ritmo 0) queda fuera.
 - `tipo="prueba_viral"` → **solo Instagram** por defecto
   (`config.PLATAFORMAS_POR_TIPO`; un `.json` con `plataformas` lo cambia): son
   para llegar a los 1000 seguidores de IG Shop, y la clase del 7/10 dice de los
@@ -204,6 +215,7 @@ Viva Shop/Salud con `duenos_extra=[nestor2, mauro]`.
 | `enlaces:<slug>` | JSON | `{producto_key: {enlace, shein, asin, sin_equivalente, titulo, tienda, foto_url, precio, nota, fila_id, clave, actualizado}}` |
 | `tandas_encoladas:<slug>` | SET | rutas de vídeo de Mis tandas ya encoladas (idempotencia de `encolar-tandas`) |
 | `musica_ultima:<slug>` | JSON | `{estilo: fichero}` última pista usada por estilo (rotación de la música) |
+| `garantia:<slug>` | JSON | `{dia, pub}` último día en que la garantía diaria adelantó un vídeo |
 
 ## API (`/api/v1/multiplataforma`, API key)
 
@@ -283,7 +295,8 @@ solo admin).
 acceso Trial), `MULTIPLATAFORMA_DRY_RUN`, `MULTIPLATAFORMA_LIMITE_*`,
 `MULTIPLATAFORMA_AMAZON_DOMINIO`, `MULTIPLATAFORMA_VIDEO_URL_TTL_S`,
 `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`, `MULTIPLATAFORMA_MUSICA_DIR`,
-`MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`, `MULTIPLATAFORMA_CARRUSEL_REEL`.
+`MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`, `MULTIPLATAFORMA_CARRUSEL_REEL`,
+`MULTIPLATAFORMA_RESCATE_S`, `MULTIPLATAFORMA_MAX_RESCATES`, `MULTIPLATAFORMA_GARANTIA_HORA`.
 Reutiliza `PUBLIC_BASE_URL` y `AUTH_COOKIE_KEY`. Sin cost tracking: las APIs
 de publicación son gratuitas.
 
