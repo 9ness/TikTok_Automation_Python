@@ -51,8 +51,35 @@ def reiniciar_tiktok() -> None:
     time.sleep(10)
 
 
+def _despertar() -> None:
+    """En AOD (Dozing) WAKEUP solo no basta y la ficha se lee tras la pantalla de
+    bloqueo → todo «desconocido». Se insiste con POWER y se quita el bloqueo."""
+    _adb("shell", "svc", "power", "stayon", "true")
+    for _ in range(3):
+        for tecla in ("KEYCODE_WAKEUP", "KEYCODE_POWER"):
+            _adb("shell", "input", "keyevent", tecla)
+            time.sleep(1.5)
+            if "mWakefulness=Awake" in _adb("shell", "dumpsys power | grep mWakefulness="):
+                break
+        else:
+            continue
+        break
+    _adb("shell", "wm", "dismiss-keyguard")
+    time.sleep(1)
+    if "isStatusBarKeyguard=true" in _adb("shell", "dumpsys window | grep isStatusBarKeyguard"):
+        _adb("shell", "input", "swipe", "540", "1900", "540", "600", "300")
+        time.sleep(2)
+    # Guía «no cubrir la zona del auricular»: tapa la ficha y el volcado sale vacío.
+    # Se quita con VOLUME_UP y EN SEGUIDA VOLUME_DOWN (autorizado; nunca UP suelto).
+    for _ in range(3):
+        if "ScreenOnProximitySensorGuide" not in _adb("shell", "dumpsys window | grep mCurrentFocus"):
+            break
+        _adb("shell", "input keyevent KEYCODE_VOLUME_UP && input keyevent KEYCODE_VOLUME_DOWN")
+        time.sleep(2)
+
+
 def _leer(product_id: str) -> str:
-    _adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+    _despertar()
     _adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
          "-d", f"'snssdk1233://ec/pdp?product_id={product_id}'")
     textos: list[str] = []
@@ -91,6 +118,7 @@ def cerrar() -> None:
     """Al acabar no se deja TikTok abierto: cerrarlo, ir al inicio y apagar la pantalla."""
     _adb("shell", "am", "force-stop", PAQUETE)
     _adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    _adb("shell", "svc", "power", "stayon", "false")
     _adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
 
 
