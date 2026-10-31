@@ -297,6 +297,13 @@ def editor(ronda: str, n: str) -> None:
 
     if not it.get("voz", {}).get("si"):
         poner_sonido(it.get("sonido") or {})
+    else:
+        # TikTok pega solo un sonido sugerido; si no es comercial, «Producto» sale desactivado
+        # («Usa un sonido comercial…», 31/10) y además taparía la voz: se quita con su X
+        pulsar(r"^Cerrar$", 3, 2)
+        if not buscar(r"^Añadir sonido$", 2):
+            captura("2_sonido")
+            raise SystemExit("No consigo quitar el sonido sugerido (2_sonido)")
     captura("2_sonido")
     if not pulsar(r"^Siguiente$", 6):
         raise SystemExit("No veo «Siguiente» en el editor (2_sonido)")

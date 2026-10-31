@@ -193,7 +193,9 @@ Reglas del Mi 8:
   `{busqueda, sugerencia ("" = pulsar «Buscar», Intro no busca), fila (regex OCR de su línea
   «N publicaciones»), comprobar}`; si falla dos veces, vuelve a «Suns». La búsqueda de
   sonidos no tiene filtro de «comerciales». Ejemplo para la música jbala/árabe:
-  «Arab Romantic Lover» (Zahidan Beats, 1,2M). Los vídeos con voz (`voz.si`) no llevan sonido.
+  «Arab Romantic Lover» (Zahidan Beats, 1,2M). Los vídeos con voz (`voz.si`) no llevan sonido: el script QUITA el que TikTok
+  sugiere solo (X «Cerrar» de la píldora); si se queda y no es comercial, «Producto» sale
+  desactivado («Usa un sonido comercial para añadir un producto») y además tapa la voz.
 - **Prohibido**: «Crear ahora» y «Retirar».
 - **Al acabar**: `rm /sdcard/u.xml`, HOME y bloquear.
 
