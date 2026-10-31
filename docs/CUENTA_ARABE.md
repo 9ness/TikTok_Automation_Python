@@ -102,6 +102,81 @@ Se hace cuando la cuenta esté puesta en el móvil: las coordenadas cambian con 
 cuenta (las de Shop enseñan «Añadir enlace»), así que no se calibra antes.
 
 | Pieza | Estado | Qué falta |
+### Receta probada: 10 POV replicados en un día (ronda 8, 31/10)
+
+Scripts en [`scripts/cuenta_arabe_pov/`](../scripts/cuenta_arabe_pov/README.md): se copian
+a la carpeta de la ronda (`/mnt/HC_Volume_106974679/navegador/trabajo/hmizat_rondaN/`) y se
+ejecutan desde ahí con `~/nav-venv/bin/python`. Coste de la ronda 8: 21 créditos de GenAI
+(unos 0,6 €) para 10 vídeos; imágenes y voz gratis.
+
+1. **Virales**: los perfiles de las tiendas árabes de §2, mirados en Social1 (Chrome 9222).
+   Solo POV de producto (mano y sin cara) de productos que tengamos en stock y se puedan enlazar.
+   `tikwm_hojas.py` baja de cada viral el caption, el audio y una hoja de fotogramas.
+2. **Idioma, al pie de la letra.**
+   - El texto en pantalla va en el idioma del ORIGINAL, que se mira en sus fotogramas:
+     español si es español, árabe si es árabe (las marcas en latino: `WISECEE F206`).
+   - No se mezcla en un mismo bloque ni se añade darija porque la cuenta sea árabe.
+   - **El caption es el del original, literal, con sus hashtags** (incluso erratas como
+     `#blakfriday`). Solo se colapsan los espacios.
+   - Los precios o «-X %» del original se cambian por «Mira la oferta en el carrito».
+3. **¿Habla o es música?** Se transcribe el audio del original con Whisper `small`
+   (`language="ar"`, con `nice` y 1-2 hilos, nunca `large`; al modelo se le pasa un array de
+   numpy, porque con la ruta del fichero falla av).
+   - **Si habla** (en la ronda 8, 9 de 10 en darija): guion darija condensado del suyo,
+     de 2-3 frases cortas (`audio/guiones.json`). Locución con Fish (`voz8.py`, modelo
+     `s2.1-pro-free`, voz automática; lee bien la darija). Los subtítulos van alineados por
+     palabra con Whisper (`alinear8.py`), y el montaje parte en dos las frases de más de
+     6 palabras. Con `silencedetect` salían descuadrados: las comas también hacen pausa.
+   - **Si es música**: el montaje sale sin voz y en `SUBIDA.json` se pone un sonido
+     comercial parecido, que se añade al subir (ver §5).
+4. **Imágenes** (gratis): Google Flow, Nano Banana 2, en un proyecto PROPIO.
+   - Dos escenas por vídeo. La ficha va como ingrediente y, en la escena 2, también la
+     imagen 1, para que el producto sea idéntico.
+   - Sufijo común: casa española real, una sola mano adulta, el producto idéntico a las
+     referencias y sin texto.
+   - `gen_todas.sh` las hace en bucle. Cada imagen se revisa contra la ficha antes del clip
+     (la cafetera salió sin el portafiltro y se rehízo).
+5. **Clips**: GenAI Pro → `?ws=video&mode=frames&model=veo` → Frames, con solo el fotograma
+   inicial, Portrait y «Cost: 1 credit».
+   - Si se abre el modal de modelos, Escape ×2.
+   - `generar_veo8.py` lleva `GENERACIONES.json` con un tope de créditos y como mucho un
+     reintento por clip.
+   - **Prompts cortos (~25 palabras) con una sola acción física**, terminando en «Calm,
+     realistic handheld phone shot. Soft ambient room sound.». Los largos o los que llevan
+     «no music» o listas de prohibiciones disparan el **«audio safety filter»** de Veo: falla
+     y devuelve el crédito.
+   - Nada que se despliegue o se transforme (la mesa plegable se deformó). Mejor el producto
+     quieto y una mano que lo toca o lo usa.
+   - **Plan B**: si un clip falla dos veces, la imagen de Flow con zoom suave (Ken Burns,
+     2-3 s).
+6. **Revisión**: hoja de fotogramas de cada clip.
+   - El producto tiene que ser igual a la ficha en TODO el clip, nada debe atravesar nada y
+     solo puede haber una mano.
+   - Veo suele estropear el final (a la aspiradora le sale una manguera, aparecen manos de
+     más, la fregona desaparece): se recorta a la parte buena en `CONTROL_CALIDAD.json`.
+7. **Montaje** (`montar8.py N`): los 2 clips a 1080×1920 y 30 fps, con un acabado más
+   cuidado que el suyo.
+   - Cabecera de 2 líneas (nombre del producto + gancho del original) en Tajawal ExtraBold
+     con caja, que entra con fundido y deslizamiento.
+   - Cierre en los últimos 2,8 s: «راجعي القسائم المتاحة» + «لطلب من هنا» en árabe, o
+     «Revisa si tienes cupones» + «PINCHA AQUÍ PARA COMPRAR» en español, con una flecha
+     naranja que rebota hacia el carrito.
+   - Whoosh y pops suaves sintetizados con ffmpeg.
+   - Si hay voz: subtítulos encima del cierre, voz con `loudnorm=I=-14:TP=-2.0` y efectos
+     al 40 %.
+   - `clean_metadata` y una hoja de 15 fotogramas en `revision/`.
+8. **Registro y semáforo**: `registrar_app.py N [replica_id_a_reemplazar]` (MCP
+   `registrar_replica_video`, `para="nes_bugallo"`).
+   - ⚠️ El semáforo por MCP se guarda en el usuario del TOKEN (ness). Hay que ponerlo dentro
+     del contenedor: `docker exec tiktok-api python -c "from src.mis_tandas import servicio
+     as s; s.poner_semaforo('nes_bugallo','rv|<id>','verde','<motivo>','agente')"`.
+   - Lo electrónico que se enciende o tiene pantalla va en ámbar.
+9. **Subida**: `SUBIDA.json` de la ronda (`voz.si=true` en los hablados, `sonido` propio en
+   los de música) + `scripts/subir_video_movil.py` (§5) y `registrar_subidas`.
+
+Navegador: Flow y GenAI Pro en pestañas propias, con ENTRA/SALE en `~/navegador_turnos.log`
+y nunca los dos a la vez si queda poca RAM.
+
 |---|---|---|
 | Carruseles: `scripts/subir_carrusel_movil.py` | Calibrado para el OPPO (1440x3168), coordenadas fijas | Perfil de coordenadas del Mi 8 (`MOVIL_ADB=100.115.12.26:5555`), mejor por `uiautomator dump` que por coordenadas. Probar sin publicar hasta el editor |
 | Vídeos: script nuevo `scripts/subir_video_movil.py` | No existe | Galería → vídeo → texto/caption → enlace del producto → **«Comprobar contenido»** (hasta 10 al día: evita infracciones) → publicar |
@@ -114,6 +189,11 @@ Reglas del Mi 8:
 - **Perfiles**: `snssdk1233://user/profile/<uid>` (el https abre una web con
   banner de cookies).
 - **En bucles de bash**: `adb ... </dev/null`, si no adb se come la entrada.
+- **Sonido por vídeo** (31/10): si el viral lleva música, `sonido` en `SUBIDA.json` trae
+  `{busqueda, sugerencia ("" = pulsar «Buscar», Intro no busca), fila (regex OCR de su línea
+  «N publicaciones»), comprobar}`; si falla dos veces, vuelve a «Suns». La búsqueda de
+  sonidos no tiene filtro de «comerciales». Ejemplo para la música jbala/árabe:
+  «Arab Romantic Lover» (Zahidan Beats, 1,2M). Los vídeos con voz (`voz.si`) no llevan sonido.
 - **Prohibido**: «Crear ahora» y «Retirar».
 - **Al acabar**: `rm /sdcard/u.xml`, HOME y bloquear.
 
