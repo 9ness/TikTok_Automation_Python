@@ -154,7 +154,7 @@ ejecutan desde ahí con `~/nav-venv/bin/python`. Coste de la ronda 8: 21 crédit
    1080p · Portrait 9:16** y «Cost: 1 credit». `generar_omni.py` no envía si algo de eso no
    está marcado (`aria-pressed`) o el coste no es 1; `recoger_omni.py` los baja. Al montar,
    `omni: true` en `CONTROL_CALIDAD.json` aplica el zoom que se come la estrella de la marca.
-   Revisión densa (~7 fotogramas por clip) antes de montar: si un tramo falla (pieza suelta, mano que sale), se salta con `inicios` (segundo de entrada por clip) y se acorta con `duraciones`.
+   Revisión densa a 2 fps del clip ENTERO antes de montar (no 7 fotogramas: el molde de la ronda 8 cambiaba de forma al girar entre dos muestras y costó una sanción). Producto que se transforma al girar o se abre estando cerrado = reintento, nunca verde; si un tramo falla (pieza suelta, mano que sale), se salta con `inicios` (segundo de entrada por clip) y se acorta con `duraciones`.
    Hasta la ronda 8 era Veo (`generar_veo8.py`, `model=veo`), también a 1 cr.
    - Si se abre el modal de modelos, Escape ×2.
    - `generar_veo8.py` lleva `GENERACIONES.json` con un tope de créditos y como mucho un
