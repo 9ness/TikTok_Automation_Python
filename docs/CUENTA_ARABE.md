@@ -84,8 +84,8 @@ zona segura (`x 0.05-0.78`, `y 0.15-0.75`).
 Lo que se coge del viral árabe son sus **rótulos, su gancho, su caption con hashtags y su guion**; los **planos** son los del POV BOF Largo:
 - **Imagen** (Flow NB2, una por clip): el prompt del curso literal, `src/nicho_pov_bof/prompts/prompt_imagen.md`: producto en un sitio real distinto del de la ficha, a su tamaño, con su etiqueta, y una mano POV que lo SEÑALA. La imagen 2 lleva la 1 como ingrediente (producto idéntico) y cambia el plano: más cerca, otro ángulo o un detalle.
 - **Clip** (Omni 1 cr, igual que ahora): `prompt_video.md` literal, en inglés: «The camera moves realistically with subtle vibrations. The person gestures with the visible hand as if explaining the product, without touching or interacting with any object.». Nada se coge, gira, abre ni enciende; lo electrónico, apagado.
-- **Voz** (Fish, darija): si el viral habla, su guion condensado; si es música, uno nuestro con la estructura de `nicho_pov_bof_largo/prompts/guion.md` (nombre → dolor → situación → beneficio → CTA de carrito), unos 11-16 s para 2 clips. Sin promesas totales y sin afirmar cupones.
-- **Montaje**: `montar8.py` igual (cabecera con el nombre y el gancho del viral, subtítulos alineados, cierre «راجعي القسائم المتاحة / لطلب من هنا» con la flecha y metadatos limpios).
+- **Voz** (Fish, darija): los vídeos árabes no siguen un guion fijo (hablan libre). Se usa el MODO del POV BOF Largo que pegue con cada producto (dolor, precio/urgencia, regalo, venta inversa, acción; `nicho_pov_bof_largo/prompts/guion*.md`), escrito en darija, unos 11-16 s para 2 clips. Si se replica un viral que habla, su guion condensado. Sin promesas totales y sin afirmar cupones.
+- **Montaje**: `hmizat_ronda9/montar10.py` (1/11, Néstor: los rótulos tapaban media pantalla). Rótulo de arriba de UNA línea con el nombre del producto en árabe (caja ajustada, como los de oujdia_fespania48), subtítulos de la voz blancos con borde negro donde los pone el POV BOF Largo (centro y=68 %), cierre solo «لطلب من هنا» pequeño + flecha los últimos 2,8 s y metadatos limpios. `--out` monta una prueba sin pisar el vídeo de la ronda.
 - **Revisión** a 2 fps del clip entero: la mano no toca nada y el producto sigue igual a la ficha de principio a fin.
 
 > **Regla desde el 1/11/2026 (Néstor), por encima de copiar los planos del viral:** los clips se hacen como en el POV BOF Largo. El producto se queda quieto, la mano no lo coge, ni lo gira ni lo abre si se puede evitar, y no se enciende nada electrónico (pantallas, luces, chorros). Motivo: la cafetera AIRMSEN (ronda 8) salió con un panel distinto al de la ficha y con el vaso llenándose sin chorro, y el molde (ronda 8, 04) se transformaba al girar. Resultado: −8 puntos de CRH, la cuenta en 192/1000 «Necesita atención» y el carrito quitado. El molde y el 08 duplicado de la ronda 9 están borrados.
@@ -114,6 +114,8 @@ rótulo del POV BOF.
   Néstor. Ya funciona vía `carrusel.destino()`.
 
 ### Banco de productos (1/11)
+
+Lista para los próximos POV: `hmizat_ronda10/PRODUCTOS_POV.{json,md}`: 157 productos (banco de 9 creadoras + los 100 vídeos de imane.fh.shop), con categoría. La ropa sí vale para POV (en cama o percha). Quedan fuera los de niños o bebé, la cafetera y el Corán.
 
 `/mnt/HC_Volume_106974679/navegador/trabajo/hmizat_ronda9/BANCO.json` (+ `BANCO.md`): 49 productos
 de virales de las tiendas árabes con el **enlace ya comprobado en el Mi 8**, ordenados por GMV del
