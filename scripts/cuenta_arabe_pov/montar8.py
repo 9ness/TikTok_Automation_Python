@@ -3,6 +3,8 @@ cierre con fundido, flecha naranja que rebota, whoosh/pop suaves. Sin voz: mudo 
 audio/NN_fish.mp3 + audio/NN_subs.json [[ini,fin,texto],...] → voz al 100 %, efectos al 40 %, subtítulos."""
 import json,sys
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]))   # repo: detección de la marca de Omni
+from src.nicho_pov_bof.config import es_clip_omni,filtro_encuadre,ZOOM_MARCA_OMNI,ESQUINA_MARCA_OMNI
 from PIL import Image,ImageDraw
 from produccion import overlay,contact_sheet,probe,run,clean_metadata,SAFE
 def partir(subs,maxp=6):
@@ -38,7 +40,10 @@ def mount(n):
     if subs: a+=['-i',str(voz)]
     k=len(clips); ch=[]; ns=len(subs); kk=k+3+ns  # índice del primer sfx
     for i,(c,d) in enumerate(zip(clips,durs)):
-        ch.append(f'[{i}:v]trim=duration={d},setpts=PTS-STARTPTS,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30[v{i}]')
+        # Omni 1 cr lleva la estrella abajo a la derecha: se amplía un 14 % tirando la franja de abajo.
+        # `omni: true` en CONTROL_CALIDAD lo fuerza (la detección falla en fondos con mucha textura)
+        enc=filtro_encuadre(1080,1920,30,zoom=ZOOM_MARCA_OMNI,esquina=ESQUINA_MARCA_OMNI,acabado=False) if ctl.get('omni') or es_clip_omni(c) else 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30'
+        ch.append(f'[{i}:v]trim=duration={d},setpts=PTS-STARTPTS,{enc}[v{i}]')
     ch.append(''.join(f'[v{i}]' for i in range(k))+f'concat=n={k}:v=1:a=0[base]')
     ch.append(f'[{k}:v]format=rgba,fade=t=in:st=0.1:d=0.35:alpha=1[h]')
     ch.append(f'[{k+1}:v]format=rgba,fade=t=in:st={tc}:d=0.3:alpha=1[t]')

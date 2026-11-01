@@ -742,6 +742,8 @@ MARCA_NO_OMNI = "marca:no-omni"  # comentario del MP4: fuerza que NO (si la dete
 # reales (nov 2026): en Omni el núcleo queda 24-63 niveles más claro que los
 # cuatro huecos entre puntas y liso (desv. <= 8); en Veo, <= 2 o con textura
 # (una sombra, un borde de sofá). Se mira en 6 fotogramas y basta con 3.
+# Sobre textura fina (asiento perforado) la desviación llega a 25 pero el núcleo
+# sigue >= 30 más claro: se acepta con >= 25 y desv. <= 30 (0 falsos en 21 Veo, 1/11).
 _ESTRELLA_CX, _ESTRELLA_CY, _ESTRELLA_R = 900, 1740, 60
 
 
@@ -793,7 +795,9 @@ def tiene_estrella_omni(path, fotogramas: int = 6) -> bool:
             for dx in range(2 * pad + 1):
                 p = f[dy:dy + 2 * _ESTRELLA_R, dx:dx + 2 * _ESTRELLA_R]
                 n = p[nucleo]
-                if min(n.mean() - p[h].mean() for h in huecos) >= 10 and n.std() <= 10:
+                d = min(n.mean() - p[h].mean() for h in huecos)
+                # liso y algo más claro, o con textura (asiento perforado) pero mucho más claro
+                if (d >= 10 and n.std() <= 10) or (d >= 25 and n.std() <= 30):
                     vistas += 1
                     break
             else:
