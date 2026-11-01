@@ -87,6 +87,7 @@ Ajustes, siempre los mismos:
 
 - Modelo **Omni 1.1** · **Portrait 9:16** · **1080p** · **10 s** · **CON marca
   de agua** (1 crédito; sin marca son 3 y no compensa).
+- **1/11/2026: «Watermark» vuelve a estar disponible** (Omni · Watermark · 10s · 1080p → «Cost: 1 credit»): úsalo. Lo que sigue es del 22/10, cuando estaba deshabilitado.
 - **22/10/2026: el botón «Watermark» sale DESHABILITADO** en todos los modos y
   resoluciones: un clip de 10 s cuesta **3 créditos** (2 en 720p). Eso es SOLO para clips que hablan; los mudos/POV van en Veo a 1. Néstor aprobó
   seguir en 1080p a 3. Avisa del coste nuevo al pedir el «sí»; si vuelve a

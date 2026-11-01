@@ -39,11 +39,12 @@ def mount(n):
     a+=['-i','sfx/whoosh.wav','-i','sfx/pop.wav','-i','sfx/pop.wav','-f','lavfi','-t',str(total),'-i','anullsrc=r=48000:cl=stereo']
     if subs: a+=['-i',str(voz)]
     k=len(clips); ch=[]; ns=len(subs); kk=k+3+ns  # índice del primer sfx
+    inis=ctl.get('inicios',[0]*len(clips))  # segundo de entrada de cada clip (saltar un tramo malo)
     for i,(c,d) in enumerate(zip(clips,durs)):
         # Omni 1 cr lleva la estrella abajo a la derecha: se amplía un 14 % tirando la franja de abajo.
         # `omni: true` en CONTROL_CALIDAD lo fuerza (la detección falla en fondos con mucha textura)
         enc=filtro_encuadre(1080,1920,30,zoom=ZOOM_MARCA_OMNI,esquina=ESQUINA_MARCA_OMNI,acabado=False) if ctl.get('omni') or es_clip_omni(c) else 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30'
-        ch.append(f'[{i}:v]trim=duration={d},setpts=PTS-STARTPTS,{enc}[v{i}]')
+        ch.append(f'[{i}:v]trim=start={inis[i]}:duration={d},setpts=PTS-STARTPTS,{enc}[v{i}]')
     ch.append(''.join(f'[v{i}]' for i in range(k))+f'concat=n={k}:v=1:a=0[base]')
     ch.append(f'[{k}:v]format=rgba,fade=t=in:st=0.1:d=0.35:alpha=1[h]')
     ch.append(f'[{k+1}:v]format=rgba,fade=t=in:st={tc}:d=0.3:alpha=1[t]')

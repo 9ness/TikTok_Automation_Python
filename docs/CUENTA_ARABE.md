@@ -18,7 +18,7 @@ fue en más de un 85 % a Francia.
 | Formatos | Carruseles de fotos con **precio** + vídeos **POV sin cara** (mano enseñando el producto) |
 | Ritmo | **Desde el 29/10: 10 vídeos/día y 0 carruseles** (el modo foto no deja enlazar producto en esta cuenta, ver §5). Cuando lo active: 45 carruseles + 10 vídeos/día. Más adelante, 20 vídeos |
 | Horario | Subida automática desde las **00:00**: primero los carruseles, luego los vídeos |
-| Presupuesto noviembre | 22-25 € (300 cr de GenAI Pro = 8 €; Veo = 1 cr por clip) |
+| Presupuesto noviembre | 22-25 € (300 cr de GenAI Pro = 8 €; Omni con marca de agua = 1 cr por clip de 10 s) |
 | Objetivo | ~10.000 € de ventas en noviembre (Black Friday). Si deja ~1.000 € de comisión, en diciembre se reinvierte (Genjutsu, más cuentas, avatar para vídeos largos) |
 
 El Mi 8 **también lo usa el agente de stock** (`scripts/stock_tiktok_movil.py`)
@@ -84,7 +84,7 @@ Se hacen con **«Replicar virales» en modo `con_ia`** (guía
 vídeo de referencia **con sus textos, su estilo y su sonido**, sin pasar por el
 rótulo del POV BOF.
 
-- **Clips**: Veo en GenAI Pro (1 cr cada uno), 8 s por clip.
+- **Clips**: Omni 1.1 en GenAI Pro, 1080p y 10 s, **con marca de agua** (1 cr cada uno; desde la ronda 9, 1/11). La marca la quita `montar8.py`.
   - Prueba A/B: 1 clip (8 s) contra 2-3 clips (16-24 s).
   - Mano o percha con el producto, como en el original.
 - **Texto**: el del vídeo de referencia, con nuestro producto y precio. Para
@@ -142,10 +142,20 @@ ejecutan desde ahí con `~/nav-venv/bin/python`. Coste de la ronda 8: 21 crédit
      imagen 1, para que el producto sea idéntico.
    - Sufijo común: casa española real, una sola mano adulta, el producto idéntico a las
      referencias y sin texto.
-   - `gen_todas.sh` las hace en bucle. Cada imagen se revisa contra la ficha antes del clip
+   - `gen_todas_cdp.sh` las hace en bucle por **CDP directo** (`cdp.py`, sin Playwright: su
+     `connect_over_cdp` se cuelga en cuanto hay una pestaña ajena que no responde). Las
+     imágenes salen de `flow-content.google/image/<uuid>` y las referencias subidas TAMBIÉN,
+     así que el «antes» se toma justo al pulsar «Iniciar generación» y solo vale una 9:16.
+     Hasta la ronda 8, `gen_todas.sh` con Playwright.
+   - Cada imagen se revisa contra la ficha antes del clip
      (la cafetera salió sin el portafiltro y se rehízo).
-5. **Clips**: GenAI Pro → `?ws=video&mode=frames&model=veo` → Frames, con solo el fotograma
-   inicial, Portrait y «Cost: 1 credit».
+5. **Clips** (desde la ronda 9, 1/11: **Omni**, no Veo): GenAI Pro →
+   `?ws=video&mode=frames&model=omni` → Frames, solo el fotograma inicial, **Watermark · 10s ·
+   1080p · Portrait 9:16** y «Cost: 1 credit». `generar_omni.py` no envía si algo de eso no
+   está marcado (`aria-pressed`) o el coste no es 1; `recoger_omni.py` los baja. Al montar,
+   `omni: true` en `CONTROL_CALIDAD.json` aplica el zoom que se come la estrella de la marca.
+   Revisión densa (~7 fotogramas por clip) antes de montar: si un tramo falla (pieza suelta, mano que sale), se salta con `inicios` (segundo de entrada por clip) y se acorta con `duraciones`.
+   Hasta la ronda 8 era Veo (`generar_veo8.py`, `model=veo`), también a 1 cr.
    - Si se abre el modal de modelos, Escape ×2.
    - `generar_veo8.py` lleva `GENERACIONES.json` con un tope de créditos y como mucho un
      reintento por clip.
