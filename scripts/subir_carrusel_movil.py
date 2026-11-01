@@ -121,6 +121,41 @@ def captura(nombre: str = "s") -> None:
     print(f"captura: {TMP / 'sh' / (nombre + '.jpg')}")
 
 
+def texto_pantalla() -> str:
+    """Texto de la mitad de arriba por OCR (la lista de productos no sale en el volcado)."""
+    from PIL import Image
+
+    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
+    im = Image.open(io.BytesIO(png)).convert("L")
+    im.crop((0, 0, im.width, im.height // 2)).save(TMP / "sh" / "ocr.png")
+    return subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
+                          capture_output=True, text=True).stdout
+
+
+def texto_zona(y0: int, y1: int) -> str:
+    """OCR de una franja horizontal (coordenadas reales de la pantalla)."""
+    from PIL import Image
+
+    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
+    Image.open(io.BytesIO(png)).convert("L").crop((0, y0, 1440, y1)).save(TMP / "sh" / "ocr.png")
+    return subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
+                          capture_output=True, text=True).stdout
+
+
+def sin_resultados() -> bool:
+    """«No se han encontrado productos» no sale en el volcado: se mira con OCR el centro de la pantalla."""
+    from PIL import Image
+
+    if buscar(r"No se han encontrado", intentos=1):
+        return True
+    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
+    im = Image.open(io.BytesIO(png)).convert("L")
+    im.crop((0, int(im.height * .25), im.width, int(im.height * .5))).save(TMP / "sh" / "ocr.png")
+    t = subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
+                       capture_output=True, text=True).stdout
+    return bool(re.search(r"encontrado|otra b", t))
+
+
 # ---------------------------------------------------------------- datos de la app
 def mcp(herramienta: str, argumentos: dict) -> dict:
     url = re.search(rf"^- {USUARIO}: (\S+)", MCP_URLS.read_text(), re.M).group(1)
@@ -166,18 +201,48 @@ def pid_de(c: dict) -> str:
     return m.group(1)
 
 
+SIN_STOCK = TMP / "sin_stock_pids.txt"   # productos ya vistos sin existencias: se saltan sin abrir nada
+
+
+def sin_stock(pid: str, motivo: str) -> None:
+    with SIN_STOCK.open("a") as f:
+        f.write(pid + "\n")
+    raise SystemExit(f"{pid}: {motivo} → sin stock, saltar")
+
+
 def al_escaparate(pid: str) -> bool:
     """Abre la ficha en TikTok y pulsa «Añadir al escaparate». True si lo añadió o ya estaba."""
+    if SIN_STOCK.exists() and pid in SIN_STOCK.read_text().split():
+        raise SystemExit(f"{pid}: ya visto sin existencias → sin stock, saltar")
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
         "-d", f"https://www.tiktok.com/view/product/{pid}", PAQUETE)
     time.sleep(8)
     captura("6_ficha")
     if buscar(r"(se ha eliminado|Producto no disponible)", intentos=1):
-        raise SystemExit(f"{pid}: la ficha dice «eliminado/no disponible» (6_ficha) → sin stock, saltar")
+        sin_stock(pid, "la ficha dice «eliminado/no disponible» (6_ficha)")
+    # el stock sale en el panel «Información de la promoción», que sube al 2.º deslizamiento
+    for _ in range(2):
+        adb("shell", "input", "swipe", "720", "2600", "720", "1200", "600")
+        time.sleep(2)
+        if buscar(r"Sin existen", intentos=1):
+            captura("6_panel")
+            sin_stock(pid, "«Sin existencias» en la ficha (6_panel)")
+        if buscar(r"Información de la promoción", intentos=1):
+            break
     if buscar(r"(Añadido al escaparate|En el escaparate|Quitar del escaparate)", intentos=1):
         return True
     if not pulsar(r"Añadir al escaparate", 4):
-        return False
+        # Al deslizar sube el panel «Información de la promoción»: ahí sale el stock y el botón
+        for _ in range(3):
+            adb("shell", "input", "swipe", "720", "2600", "720", "1200", "600")
+            time.sleep(2)
+            if buscar(r"Sin existen", intentos=1):
+                captura("6_panel")
+                sin_stock(pid, "«Sin existencias» en la ficha (6_panel)")
+            if buscar(r"Añadir al escaparate", intentos=1):
+                break
+        if not pulsar(r"Añadir al escaparate", 4):
+            return False
     captura("6_escaparate")
     return True
 
@@ -400,7 +465,21 @@ def producto(cid: str) -> None:
     tecla(66)
     time.sleep(4)
     captura("3_producto")
-    if buscar(r"No se han encontrado", intentos=1):
+    for intento in range(4):              # a veces el buscador no lo encuentra a la primera: se repite
+        if not sin_resultados():
+            break
+        print(f"AVISO: «No se han encontrado productos», repito la búsqueda ({intento + 1})", flush=True)
+        time.sleep(3 + 3 * intento)
+        pulsar(r"Buscar productos|^\d{10,}$", 1)
+        tecla(113, 29)
+        tecla(67)
+        escribir(pid)
+        tecla(66)
+        time.sleep(6)
+    captura("3_producto")
+    if re.search(r"Sin existencias|Existencias: ?0\b", texto_pantalla()):
+        sin_stock(pid, "«Sin existencias» en el escaparate (3_producto)")
+    if sin_resultados():
         raise SystemExit(f"{pid} no sale al buscarlo: no está en el escaparate (mira 6_ficha de preparar)")
     campo = []
     for y in (840, 1044):                 # «Añadir» del único resultado: su altura cambia (la lista no sale en el dump)
@@ -444,6 +523,16 @@ def producto(cid: str) -> None:
             tecla(4)                      # oculta teclado → se ve el historial
             time.sleep(2)
             tap(340, 759, 8)              # primera búsqueda del historial (la misma)
+        # lista vacía sin aviso (no sale en el volcado): «Buscar» y, si nada, otras consultas del estilo
+        hay = lambda: re.search(r"[A-Za-z]{3,}", texto_zona(450, 1500))  # noqa: E731
+        for q in [None, "slowed", "trending", "pop"]:
+            if hay():
+                break
+            print(f"AVISO: sin sonidos comerciales; pruebo {q or '«Buscar»'}", flush=True)
+            if q:
+                tap(1188, 405, 2)         # vaciar
+                escribir(q)
+            tap(1296, 402, 8)             # «Buscar» (la lista queda por encima del teclado)
         captura("5_comerciales")
         tap(1278, 640, 4)                 # check del primero: el más parecido
         captura("5_comercial")

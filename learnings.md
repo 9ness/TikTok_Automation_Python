@@ -1310,3 +1310,4 @@
 - 2026-11-01 · Los prompts del replicador arrastran marcas («monogram tote bag») y Flow cuela logos de fondo (vaso Stanley, monitor Dell) → leer el prompt antes de generar, ampliar el fondo y tapar el logo con PIL sin regenerar
 - 2026-11-01 · Virales a descartar al replicar: con famosos/políticos, o de hombres si el producto es de mujer y nuestras fotos salen con hombres
 - 2026-11-01 · Néstor: misma letra en todos los carruseles = queja → la letra del viral en cada uno (chat → fondo_negro izquierda, anuncio serif → editorial_negra, TikTok fina crema → tiktok_crema) y dos seguidos nunca iguales salvo que sus virales lo sean
+- 2026-11-01 · tend.py daba «SIN ANCLAS» en GMV y ventas: la regex de la cabecera exigía ≥2 cifras, así que un día a «0 €» o con <10 ventas no servía de ancla → cifras finales opcionales. Octubre: 31 días, suma 5.609 € / 142 ventas = total del mes.

@@ -79,7 +79,7 @@ try:
       def ancla(cands):
           for d, x, y in cands[:4]:
               tap(x, 2620, 1)
-              m = re.search(r"\b[a-z]{3,4}\.? ?(\d{1,2})\s*\|.*?(?:atr\.|producto)\s+([\dO](?:[\d.,]|\s(?=\d{3}\b))*\d\s*K?)(?=\s*€|\s|$)", ocr().strip(), re.I)
+              m = re.search(r"\b[a-z]{3,4}\.? ?(\d{1,2})\s*\|.*?(?:atr\.|producto)\s+([\dO](?:(?:[\d.,]|\s(?=\d{3}\b))*\d)?\s*K?)(?=\s*€|\s|$)", ocr().strip(), re.I)
               if not m: continue
               dd = int(m.group(1))
               yy = ypix[dd - 1][1] if 1 <= dd <= ndias else None
