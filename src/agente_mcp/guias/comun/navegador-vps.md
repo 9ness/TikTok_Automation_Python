@@ -12,7 +12,11 @@ operador** salvo que aparezca un login, una verificación o un CAPTCHA.
 > española** (IPRoyal, tarifa plana, sin coste por GB): Google pidió verificar y
 > cambiar la contraseña de ness4b al ver la IP de Hetzner. Lo hace el drop-in
 > `/etc/systemd/system/navegador-chrome.service.d/proxy-es.conf` + el servicio
-> `proxy-reenvio` (127.0.0.1:8899). **Nunca abras webs con sesión del operador
+> `proxy-reenvio` (127.0.0.1:8899).
+> **Desde el 29/10/2026 solo Google (ness4b, Flow) y Social1 salen por la
+> residencial**; TikTok, FastMoss, GenAI Pro y el resto, directos por la IP del VPS
+> (IPRoyal avisó de uso alto). Lista `PROXY_SOLO` en `~/.config/proxy_es/reenvio.py`;
+> consumo cada 10 min en `~/.config/proxy_es/consumo.log`. **Nunca abras webs con sesión del operador
 > desde un navegador que salga por la IP del VPS.** El Chrome aparte de
 > [`navegador-proxy-es.md`](navegador-proxy-es.md) (9223) queda para IPTV. **Social1 de pago está en ESTE Chrome (9222)**, no en el 9223.
 

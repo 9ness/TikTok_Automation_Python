@@ -73,7 +73,13 @@
       "Bash(python3 /tmp/renombrar.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\" --aplicar)",
       "Bash(python3 /tmp/renombrar.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\")",
       "Bash(python3 /tmp/restaurar_nombres.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\")",
-      "Bash(python3 /tmp/restaurar_nombres.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\" --aplicar)"
+      "Bash(python3 /tmp/restaurar_nombres.py \"gdrive:NEBULABS_AUTOMATED_TIKTOK/PAQUETE_Productos_Espana_2026-08-19\" --aplicar)",
+      "Bash(sudo -n tee /etc/rsyslog.d/05-claude-remote.conf)",
+      "Bash(sudo -n tee /etc/systemd/journald.conf.d/tope.conf)",
+      "Bash(sudo -n tee /etc/systemd/system/claude-remote@.service.d/sin-salida.conf)",
+      "Bash(sudo -n mkdir -p /etc/systemd/journald.conf.d)",
+      "Bash(sudo -n systemctl daemon-reload)",
+      "Bash(sudo -n systemctl restart rsyslog systemd-journald)"
     ]
   }
 }

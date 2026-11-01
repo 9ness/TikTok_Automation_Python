@@ -16,7 +16,7 @@ fue en más de un 85 % a Francia.
 |---|---|
 | Móvil | **Xiaomi Mi 8** (ADB por Tailscale `100.115.12.26:5555`, 1080x2248, MIUI, Android 10) |
 | Formatos | Carruseles de fotos con **precio** + vídeos **POV sin cara** (mano enseñando el producto) |
-| Ritmo | Primeros días: 15 carruseles + 5-10 vídeos. Después **45 carruseles + 10 vídeos/día**. Más adelante, 20 vídeos |
+| Ritmo | **Desde el 29/10: 10 vídeos/día y 0 carruseles** (el modo foto no deja enlazar producto en esta cuenta, ver §5). Cuando lo active: 45 carruseles + 10 vídeos/día. Más adelante, 20 vídeos |
 | Horario | Subida automática desde las **00:00**: primero los carruseles, luego los vídeos |
 | Presupuesto noviembre | 22-25 € (300 cr de GenAI Pro = 8 €; Veo = 1 cr por clip) |
 | Objetivo | ~10.000 € de ventas en noviembre (Black Friday). Si deja ~1.000 € de comisión, en diciembre se reinvierte (Genjutsu, más cuentas, avatar para vídeos largos) |
@@ -33,7 +33,13 @@ otro proceso con el móvil:
 «CUPÓN DESCUENTO», «APROVECHA AHORA»…). Se miran los textos y el estilo visual
 que les funcionan a las tiendas árabes que venden (oujdia, chef.nadia,
 saritasara, beldi…) y **se replican tal cual**. Como mucho se añade un plus
-visual encima. Lo calibrado para España no vale para este público (Néstor,
+visual encima.
+
+**Y encima, más calidad que ellos (Néstor, 29/10):** misma estructura, mismos
+textos y mismo tono, pero mejor acabado: texto bien maquetado y legible (precio
+grande, jerarquía clara), animaciones suaves de entrada del texto en los POV,
+fotos más limpias. El público son árabes/magrebíes que viven en España (el envío
+es a España). Nunca se copian cupones, «-60 %» ni precios tachados falsos. Lo calibrado para España no vale para este público (Néstor,
 29/10).
 
 Lo que llevan ellos (visto en el Mi 8):
@@ -96,12 +102,6 @@ rótulo del POV BOF.
 - Se registra con `para="nes_bugallo"` para que no se mezcle con las tandas de
   Néstor. Ya funciona vía `carrusel.destino()`.
 
-## 5. Subida automática desde el Mi 8 (PENDIENTE)
-
-Se hace cuando la cuenta esté puesta en el móvil: las coordenadas cambian con la
-cuenta (las de Shop enseñan «Añadir enlace»), así que no se calibra antes.
-
-| Pieza | Estado | Qué falta |
 ### Receta probada: 10 POV replicados en un día (ronda 8, 31/10)
 
 Scripts en [`scripts/cuenta_arabe_pov/`](../scripts/cuenta_arabe_pov/README.md): se copian
@@ -177,18 +177,18 @@ ejecutan desde ahí con `~/nav-venv/bin/python`. Coste de la ronda 8: 21 crédit
 Navegador: Flow y GenAI Pro en pestañas propias, con ENTRA/SALE en `~/navegador_turnos.log`
 y nunca los dos a la vez si queda poca RAM.
 
-|---|---|---|
-| Carruseles: `scripts/subir_carrusel_movil.py` | Calibrado para el OPPO (1440x3168), coordenadas fijas | Perfil de coordenadas del Mi 8 (`MOVIL_ADB=100.115.12.26:5555`), mejor por `uiautomator dump` que por coordenadas. Probar sin publicar hasta el editor |
-| Vídeos: script nuevo `scripts/subir_video_movil.py` | No existe | Galería → vídeo → texto/caption → enlace del producto → **«Comprobar contenido»** (hasta 10 al día: evita infracciones) → publicar |
-| Programación nocturna | No existe | Tarea del VPS a las 00:00: carruseles (los del día con semáforo verde), luego vídeos. Al terminar, `registrar_subidas` |
+## 5. Subida automática desde el Mi 8
 
-Reglas del Mi 8:
-- **Despertar**: `keyevent 26`. Si sale la guía del sensor de proximidad,
-  VOLUME_UP y en seguida VOLUME_DOWN (autorizado por Néstor), y deslizar
-  `540 1900 → 540 500`. Nunca VOLUME_UP suelto.
-- **Perfiles**: `snssdk1233://user/profile/<uid>` (el https abre una web con
-  banner de cookies).
-- **En bucles de bash**: `adb ... </dev/null`, si no adb se come la entrada.
+| Pieza | Estado |
+|---|---|
+| Vídeos: `scripts/subir_video_movil.py` | **Calibrado el 29/10 en el Mi 8** (ronda 6). Uso: `todo <ronda> <n> ["AAAA-MM-DD HH:MM"]` (con hora = programado en TikTok, hora de Madrid) y `programar <ronda> 05=2026-10-29T23:49 06=…` (cola, uno tras otro; si una hora queda a <35 min la corre). Lanzar con `flock /tmp/subir_video.lock`. Lee `SUBIDA.json` de la ronda y apunta en `SUBIDAS.log` |
+| Carruseles: `scripts/subir_carrusel_movil.py` | Calibrado para el OPPO; falta pasarlo al Mi 8 |
+
+Cómo lo hace el script de vídeos (por si TikTok cambia la UI):
+- Busca por `uiautomator dump`; lo que no sale en el dump (menús flotantes, listas) por OCR (tesseract spa, psm 11).
+- Galería: `adb push` + `touch` (si no, conserva el mtime viejo y no sale el primero) + scan; al limpiar, `content delete` en MediaStore.
+- Árabe: compartir el texto a Keep → pulsación larga en una palabra → «Seleccionar todo» → «Cortar» → pegar con el chip del portapapeles de Gboard.
+- Orden: sonido «Suns» (lupa → « Suns» con espacio delante, el 1.er carácter se pierde) → caption → producto por ID (nombre del enlace ≤30) → sin etiqueta IA.
 - **Sonido por vídeo** (31/10): si el viral lleva música, `sonido` en `SUBIDA.json` trae
   `{busqueda, sugerencia ("" = pulsar «Buscar», Intro no busca), fila (regex OCR de su línea
   «N publicaciones»), comprobar}`; si falla dos veces, vuelve a «Suns». La búsqueda de
@@ -196,6 +196,16 @@ Reglas del Mi 8:
   «Arab Romantic Lover» (Zahidan Beats, 1,2M). Los vídeos con voz (`voz.si`) no llevan sonido: el script QUITA el que TikTok
   sugiere solo (X «Cerrar» de la píldora); si se queda y no es comercial, «Producto» sale
   desactivado («Usa un sonido comercial para añadir un producto») y además tapa la voz.
+- **Programar**: «Más opciones» → «Programar publicación» → rueda día/hora/minuto (columnas x=254/592/877, fila central y=1424, 106 px = 1 unidad, swipes lentos de 900 ms; se lee por OCR y se corrige) → «Listo». El botón sigue diciendo «Publicar»; tras pulsarlo sale «Consulta tus publicaciones programadas en tu perfil» = subida terminada (solo entonces se cierra TikTok y se borra el vídeo). Mínimo ~30 min por delante, máximo 10 días.
+- Comprobar antes que el producto se puede enlazar: «en stock» en la ficha no basta (29/10: prensa, kimono, jellaba mostaza y mkhzani no salen en la búsqueda de «Añadir enlace»).
+
+Reglas del Mi 8:
+- **Despertar**: WAKEUP (y POWER si sigue en reposo) + `wm dismiss-keyguard`. Si sale la guía del sensor de proximidad,
+  VOLUME_UP y en seguida VOLUME_DOWN (autorizado por Néstor), y deslizar
+  `540 1900 → 540 500`. Nunca VOLUME_UP suelto.
+- **Perfiles**: `snssdk1233://user/profile/<uid>` (el https abre una web con
+  banner de cookies).
+- **En bucles de bash**: `adb ... </dev/null`, si no adb se come la entrada.
 - **Prohibido**: «Crear ahora» y «Retirar».
 - **Al acabar**: `rm /sdcard/u.xml`, HOME y bloquear.
 
@@ -228,3 +238,27 @@ Sin «Mis tandas»: el contenido lo preparan los agentes.
 5. Estadísticas del Mi 8 cada lunes.
 6. Medir a la semana: ventas por formato (carrusel / POV) y por número de clips;
    decidir si se sube a 20 vídeos.
+
+### Precio y cupones (Néstor, 29/10)
+- **Sí se puede** (no se penaliza, lo usamos en las otras cuentas): una invitación genérica a mirar el cupón, tipo
+  «Revisa si tiene cupón» / «mira si te sale cupón» (en darija si encaja con el estilo del original).
+- **No:** prometer un cupón concreto, un precio «con cupón», «-X %» o precios tachados.
+- El precio que se pone es el de la ficha SIN cupón, comprobado en el Mi 8 (`snssdk1233://ec/pdp?product_id=<id>`)
+  antes de subir. Si la ficha va con «[Black Friday]», «Flash» o precio tachado, ese precio es temporal: o se vuelve a
+  comprobar justo antes de publicar o la pieza va sin cifra (+ «revisa si tiene cupón»).
+  Ejemplo 29/10: molinillo LAICHY 1729773675957492189, 15,47 € con «[Black Friday]» en el título.
+
+### Subida desde el Mi 8 (primera prueba, 29/10)
+- Molinillo publicado en público el 29/10 a las 13:34 con el sonido «Suns» (Official Sound Studio), el producto 1729773675957492189 (enlace «Molinillo de cafe electrico») y el caption de darija con 4 hashtags.
+- **Sin etiqueta «Contenido generado por IA»** (Néstor, 29/10: «no hace falta»). Este primero salió con ella; en los siguientes, no se activa.
+- Gboard del Mi 8: autocorrección, revisión ortográfica y sugerencias de palabras **desactivadas** (metían palabras al perder el foco). La barra de sugerencias sigue activa, porque su chip del portapapeles es la forma de pegar el árabe.
+- El Mi 8 no admite `input keycombination` (Ctrl+A/C/V): para vaciar se usa `keyevent 123` + DEL; para copiar, una pulsación larga → «Seleccionar todo» → «Copiar» en Keep, y para pegar, el chip del portapapeles de Gboard.
+- Voz: los referentes del nicho (C01–C08, V01–V04, E01–E06 en ESTILO_IDIOMAS.md) **no llevan locución de venta**: solo música o el sonido, con texto en pantalla y caption en darija.
+
+### Consistencia del producto y cupones (Néstor, 29/10 tarde)
+- **El producto no puede cambiar entre planos.** En el molinillo, el botón de pulsar aparece de la nada en un clip de IA. Antes de dar un vídeo por bueno, comparar fotograma a fotograma con la foto de la ficha (botones, asa, tapa, logos, número de piezas) y descartar el clip que añada o quite piezas.
+- **No poner el precio exacto** (cambia siempre). Usar los textos de cupón de las otras cuentas: «CUPÓN DESCUENTO» como gancho visual, «Revisa si tienes cupones», «Precio ajustado / a precio de chollo», «Mira la oferta en el carrito», «Lo tienes en el carrito naranja 🧡». Nunca afirmar «tu cupón» ni una cifra con cupón.
+- **Voz:** si el POV de referencia lleva voz, el nuestro lleva voz en árabe/darija de Fish Audio; si no la lleva, solo música o sonido.
+- **Receta del viral, tal cual (Néstor, 29/10):** idioma en pantalla y caption, los MISMOS que lleve el viral que se replica. No se añade darija «porque la cuenta es árabe». Ejemplo, el tocador (C01 @halaluxe, 800k): fotos en español y caption solo con hashtags, con el árabe del original (`#اسبانيا🇪🇸_ايطاليا🇮🇹_البرتغال🇵🇹`). Solo cambia lo obligatorio: el precio exacto pasa a ser el gancho del cupón.
+
+- **29/10 14:40 · Sin carruseles por ahora.** En @hmizat.spain el modo foto NO deja enlazar producto («De momento, los enlaces a productos no están disponibles en el modo de foto»; en la cuenta del OPPO sí deja). Néstor: nada de «vídeos de fotos»; la cuenta sube **solo vídeos, 10 al día**, hechos por Codex, y con continuidad TikTok suele activarlo (le pasó con otras cuentas). Revisar de vez en cuando si «Producto» deja de salir en gris en un carrusel; entonces se vuelve al plan 45 + 10.
