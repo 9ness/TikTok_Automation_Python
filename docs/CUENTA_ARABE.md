@@ -79,6 +79,8 @@ zona segura (`x 0.05-0.78`, `y 0.15-0.75`).
 
 ## 4. Vídeos POV (sin cara)
 
+> **Regla desde el 1/11/2026 (Néstor), por encima de copiar los planos del viral:** los clips se hacen como en el POV BOF Largo. El producto se queda quieto, la mano no lo coge, ni lo gira ni lo abre si se puede evitar, y no se enciende nada electrónico (pantallas, luces, chorros). Motivo: la cafetera AIRMSEN (ronda 8) salió con un panel distinto al de la ficha y con el vaso llenándose sin chorro, y el molde (ronda 8, 04) se transformaba al girar. Resultado: −8 puntos de CRH, la cuenta en 192/1000 «Necesita atención» y el carrito quitado. El molde y el 08 duplicado de la ronda 9 están borrados.
+
 Se hacen con **«Replicar virales» en modo `con_ia`** (guía
 `replicar-virales.md`; MCP `registrar_replica_video`). Así el agente rehace el
 vídeo de referencia **con sus textos, su estilo y su sonido**, sin pasar por el
