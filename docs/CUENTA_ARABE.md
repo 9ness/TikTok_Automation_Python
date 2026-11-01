@@ -102,6 +102,14 @@ rótulo del POV BOF.
 - Se registra con `para="nes_bugallo"` para que no se mezcle con las tandas de
   Néstor. Ya funciona vía `carrusel.destino()`.
 
+### Banco de productos (1/11)
+
+`/mnt/HC_Volume_106974679/navegador/trabajo/hmizat_ronda9/BANCO.json` (+ `BANCO.md`): 49 productos
+de virales de las tiendas árabes con el **enlace ya comprobado en el Mi 8**, ordenados por GMV del
+viral. `tipo: camara_a_pov` = el viral es una chica hablando a cámara y lo hacemos en nuestro POV
+en 1ª persona (Néstor, 1/11). Se coge de arriba abajo y se marca `hecho: true`. Antes de producir un
+producto nuevo, comprobar que se puede enlazar (buscarlo por ID en «Añadir enlace → Producto»).
+
 ### Receta probada: 10 POV replicados en un día (ronda 8, 31/10)
 
 Scripts en [`scripts/cuenta_arabe_pov/`](../scripts/cuenta_arabe_pov/README.md): se copian
