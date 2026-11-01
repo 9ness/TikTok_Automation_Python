@@ -1322,3 +1322,4 @@
 - 2026-11-01 · GenAI Pro pinta los botones en `oklch()` (el regex de rgb fallaba): el estado fiable es `aria-pressed`; y tras navegar los clics se pierden mientras hidrata → marcar y verificar por rondas.
 - 2026-11-01 · `pkill -f`/`pgrep -f <patrón>` dentro de un comando de Bash del agente se caza a sí mismo (el patrón va en la línea de la shell) → exit 144; usar `ps aux | grep "[p]atrón"` y `kill PID`.
 - 2026-11-01 · Omni 1 cr con marca en la ronda 9: 20 clips sin rehacer ninguno; los fallos (cabezal suelto, mano que se va) se esquivan recortando con `inicios`/`duraciones` en CONTROL_CALIDAD → revisar 7 fotogramas por clip antes de montar
+- 2026-11-01 · Cuenta árabe: 1ª infracción (-8 puntos, 31/10) por «promoción de productos inconsistente» en el vídeo 02 de la ronda 8 (cafetera AIRMSEN, Veo): quitan productos del vídeo y bajan visibilidad → en máquinas con panel/botones comparar el aparato del clip con la ficha antes de publicar; 0 ventas en 7 días
