@@ -110,9 +110,8 @@ def pegar(
         "\n".join(f"file '{p.as_posix()}'" for p in iguales) + "\n",
         encoding="utf-8",
     )
-    # Al pegar se pierde la firma de Omni (`encoder=Google`) y el montaje ya
-    # no sabría que tiene que comerse su estrella: se deja dicho en el
-    # comentario del MP4 (`config.es_clip_omni` mira los dos).
+    # Si algún clip es de Omni se deja dicho en el comentario del MP4 pegado:
+    # así el montaje no depende de volver a ver la estrella (`config.es_clip_omni`).
     marca = (["-metadata", f"comment={pov_config.MARCA_OMNI}"]
              if any(pov_config.es_clip_omni(c) for c in clips) else [])
     _run([

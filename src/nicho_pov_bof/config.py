@@ -728,29 +728,99 @@ ESQUINA_MARCA_AGUA = os.getenv("ESQUINA_MARCA_AGUA", "centro")
 # ampliando un 14% y tirando solo lo de ABAJO (la ventana se queda arriba)
 # sale entera con ~23 px de margen, y de paso también la de Veo. Lo que se
 # pierde es la franja de abajo, que es donde van subtítulos y botones de TikTok.
-# Se reconoce sola: Omni firma el MP4 con `encoder=Google`; Veo de GenAI Pro
-# llega remuxado (`Lavf`) y Magnific/Kling tampoco dice Google.
+# Se reconoce MIRANDO LA IMAGEN (`es_clip_omni`): desde nov 2026 la firma ya no
+# sirve (Veo de GenAI Pro llega con `encoder=Google` y Omni sin `encoder`).
 ZOOM_MARCA_OMNI = float(os.getenv("ZOOM_MARCA_OMNI", "1.14"))
 ESQUINA_MARCA_OMNI = os.getenv("ESQUINA_MARCA_OMNI", "abajo")
 
 
-MARCA_OMNI = "marca:omni"   # comentario que deja quien PEGA clips de Omni
+MARCA_OMNI = "marca:omni"        # comentario del MP4: fuerza el encuadre de Omni (lo deja quien pega clips)
+MARCA_NO_OMNI = "marca:no-omni"  # comentario del MP4: fuerza que NO (si la detección fallara)
+
+# La estrella de Omni: blanca al ~26 % de opacidad, ~72 px, centrada en
+# (899.5, 1739.3) de 1080x1920 y SIEMPRE en el mismo sitio. Medido con clips
+# reales (nov 2026): en Omni el núcleo queda 24-63 niveles más claro que los
+# cuatro huecos entre puntas y liso (desv. <= 8); en Veo, <= 2 o con textura
+# (una sombra, un borde de sofá). Se mira en 6 fotogramas y basta con 3.
+_ESTRELLA_CX, _ESTRELLA_CY, _ESTRELLA_R = 900, 1740, 60
+
+
+def _mascaras_estrella():
+    import numpy as np
+
+    y, x = np.mgrid[-_ESTRELLA_R:_ESTRELLA_R, -_ESTRELLA_R:_ESTRELLA_R] + 0.5
+    forma = (np.abs(x) / 43) ** 0.6 + (np.abs(y) / 43) ** 0.6
+    estrella, nucleo, disco = forma <= 1, forma <= 0.55, x**2 + y**2 <= 30**2
+    huecos = [disco & ~estrella & (np.sign(x) == sx) & (np.sign(y) == sy)
+              & (np.abs(np.abs(x) - np.abs(y)) < 14) for sx in (-1, 1) for sy in (-1, 1)]
+    return nucleo, huecos
+
+
+def tiene_estrella_omni(path, fotogramas: int = 6) -> bool:
+    """¿Se ve la estrella de Omni abajo a la derecha? Mira `fotogramas` repartidos
+    por el clip (escalados a 1080x1920) y pide la estrella en al menos la mitad."""
+    import subprocess
+
+    import numpy as np
+
+    try:
+        dur = float(subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", str(path)],
+            capture_output=True, text=True, timeout=30,
+        ).stdout.strip() or 0)
+    except Exception:  # noqa: BLE001
+        return False
+    nucleo, huecos = _mascaras_estrella()
+    lado, pad = 2 * _ESTRELLA_R + 4, 2   # ±2 px de holgura por el escalado
+    x0, y0 = _ESTRELLA_CX - _ESTRELLA_R - pad, _ESTRELLA_CY - _ESTRELLA_R - pad
+    vistas = 0
+    for i in range(fotogramas):
+        try:
+            raw = subprocess.run(
+                ["ffmpeg", "-v", "error", "-ss", f"{dur * (i + 0.5) / fotogramas:.2f}",
+                 "-i", str(path), "-frames:v", "1",
+                 "-vf", f"scale=1080:1920,crop={lado}:{lado}:{x0}:{y0},format=gray",
+                 "-f", "rawvideo", "-"],
+                capture_output=True, timeout=60,
+            ).stdout
+        except Exception:  # noqa: BLE001
+            continue
+        if len(raw) != lado * lado:
+            continue
+        f = np.frombuffer(raw, np.uint8).reshape(lado, lado).astype(float)
+        for dy in range(2 * pad + 1):
+            for dx in range(2 * pad + 1):
+                p = f[dy:dy + 2 * _ESTRELLA_R, dx:dx + 2 * _ESTRELLA_R]
+                n = p[nucleo]
+                if min(n.mean() - p[h].mean() for h in huecos) >= 10 and n.std() <= 10:
+                    vistas += 1
+                    break
+            else:
+                continue
+            break
+    return vistas >= (fotogramas + 1) // 2
 
 
 def es_clip_omni(path) -> bool:
-    """¿El clip sale de Omni? Firma `encoder=Google` del original, o el
-    comentario `MARCA_OMNI` que deja quien pega varios clips (se pierde la firma)."""
+    """¿El clip sale de Omni? Manda el comentario del MP4 (`MARCA_OMNI` /
+    `MARCA_NO_OMNI`, para marcarlo a mano o al pegar clips); si no hay, se busca
+    la estrella en la imagen (`tiene_estrella_omni`)."""
     import subprocess
 
     try:
         out = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format_tags=encoder,comment",
+            ["ffprobe", "-v", "error", "-show_entries", "format_tags=comment",
              "-of", "default=nw=1:nk=1", str(path)],
             capture_output=True, text=True, timeout=30,
         ).stdout
     except Exception:  # noqa: BLE001 — sin ffprobe, el encuadre de siempre
         return False
-    return "google" in out.lower() or MARCA_OMNI in out
+    if MARCA_NO_OMNI in out:
+        return False
+    if MARCA_OMNI in out:
+        return True
+    return tiene_estrella_omni(path)
 
 
 def encuadre_marca(clips) -> tuple[float | None, str]:
