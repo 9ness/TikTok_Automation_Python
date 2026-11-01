@@ -404,6 +404,16 @@ def boton_anadir() -> tuple[int, int] | None:
     return (880, e[1] + 174) if e else None
 
 
+def rebuscar(pid: str) -> None:
+    """Vuelve a buscar el ID. En la pantalla de resultados el buscador sube arriba (y≈160) y la
+    X de (985, 281) caía fuera: el ID se pegaba detrás del anterior y no salía nada (1/11)."""
+    campo = next((n for n in nodos() if n["clase"].endswith("EditText")), None)
+    tap(*((campo["x"], campo["y"]) if campo else BUSCAR_PRODUCTOS), 1.5)
+    adb("shell", "input", "keyevent", "123", *["67"] * 40)   # MOVE_END + borrar
+    escribir(pid)
+    tecla(66, 6)
+
+
 def producto(it: dict) -> None:
     pid = it["product_id"]
     if not pulsar(r"^Añadir enlace$", 3):
@@ -422,10 +432,7 @@ def producto(it: dict) -> None:
                 break
             time.sleep(3)
         else:
-            tap(985, 281, 1.5)            # la X del buscador
-            tap(*BUSCAR_PRODUCTOS, 1.5)
-            escribir(pid)
-            tecla(66, 6)
+            rebuscar(pid)
             continue
         break
     captura("4_producto")
