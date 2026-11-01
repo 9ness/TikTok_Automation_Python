@@ -79,6 +79,15 @@ zona segura (`x 0.05-0.78`, `y 0.15-0.75`).
 
 ## 4. Vídeos POV (sin cara)
 
+### Receta desde la ronda 10: POV BOF Largo con rótulos y voz árabes (1/11/2026)
+
+Lo que se coge del viral árabe son sus **rótulos, su gancho, su caption con hashtags y su guion**; los **planos** son los del POV BOF Largo:
+- **Imagen** (Flow NB2, una por clip): el prompt del curso literal, `src/nicho_pov_bof/prompts/prompt_imagen.md`: producto en un sitio real distinto del de la ficha, a su tamaño, con su etiqueta, y una mano POV que lo SEÑALA. La imagen 2 lleva la 1 como ingrediente (producto idéntico) y cambia el plano: más cerca, otro ángulo o un detalle.
+- **Clip** (Omni 1 cr, igual que ahora): `prompt_video.md` literal, en inglés: «The camera moves realistically with subtle vibrations. The person gestures with the visible hand as if explaining the product, without touching or interacting with any object.». Nada se coge, gira, abre ni enciende; lo electrónico, apagado.
+- **Voz** (Fish, darija): si el viral habla, su guion condensado; si es música, uno nuestro con la estructura de `nicho_pov_bof_largo/prompts/guion.md` (nombre → dolor → situación → beneficio → CTA de carrito), unos 11-16 s para 2 clips. Sin promesas totales y sin afirmar cupones.
+- **Montaje**: `montar8.py` igual (cabecera con el nombre y el gancho del viral, subtítulos alineados, cierre «راجعي القسائم المتاحة / لطلب من هنا» con la flecha y metadatos limpios).
+- **Revisión** a 2 fps del clip entero: la mano no toca nada y el producto sigue igual a la ficha de principio a fin.
+
 > **Regla desde el 1/11/2026 (Néstor), por encima de copiar los planos del viral:** los clips se hacen como en el POV BOF Largo. El producto se queda quieto, la mano no lo coge, ni lo gira ni lo abre si se puede evitar, y no se enciende nada electrónico (pantallas, luces, chorros). Motivo: la cafetera AIRMSEN (ronda 8) salió con un panel distinto al de la ficha y con el vaso llenándose sin chorro, y el molde (ronda 8, 04) se transformaba al girar. Resultado: −8 puntos de CRH, la cuenta en 192/1000 «Necesita atención» y el carrito quitado. El molde y el 08 duplicado de la ronda 9 están borrados.
 
 Se hacen con **«Replicar virales» en modo `con_ia`** (guía
