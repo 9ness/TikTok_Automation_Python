@@ -1328,3 +1328,4 @@
 - 2026-11-02 · Pestaña de Chrome en segundo plano (CDP) no registra clics en GenAI → abrir la propia con `Target.createTarget newWindow:true`.
 - 2026-11-02 · `subir_video_movil.py`: Keep no saca «Seleccionar todo» con un nombre de enlace corto en latín («Shilajit») → si el nombre es ASCII se teclea directo con `input text` (espacio = `%s`).
 - 2026-11-02 · Gboard autocorrige el nombre del enlace tecleado («Cubrecolchon» → «Cubre colchón») → en latín se acepta si solo cambian espacios/tildes/mayúsculas; en árabe, igualdad exacta (normalizar a ASCII dejaría vacío y pasaría siempre).
+- 2026-11-02 · Cuenta árabe ronda 10: la imagen 2 de Flow solo traía el jersey del conjunto y Omni se inventó un pantalón → comparar ficha+imagen1+imagen2 en una hoja ANTES de animar; Omni también mete cambios de plano a mitad de clip donde el producto cambia → revisar cada corte (docs/CUENTA_ARABE.md §4)
