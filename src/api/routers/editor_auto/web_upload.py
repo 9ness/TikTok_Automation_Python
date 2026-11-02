@@ -21,8 +21,10 @@ Flujo:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Annotated, Any
@@ -52,6 +54,8 @@ from src.queue.models import JobMode, JobStatus
 
 
 router = APIRouter(prefix="/api/v1/editor-auto/web", tags=["editor-auto · web"])
+
+logger = logging.getLogger("editor_auto.web_upload")
 
 _ALLOWED_VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm"}
 
@@ -268,6 +272,26 @@ def _user_plan(user: EditorUser):
         from src.editor_auto.repos import PlanRepo
         return PlanRepo().get(sub.plan_id)
     return None
+
+
+def web_priority(user: EditorUser, account: dict | None = None) -> int:
+    """Prioridad en la cola de las ediciones de este cliente (mayor = antes):
+    la de su plan de la web; sin plan web, la del plan del backend; en prueba,
+    la última."""
+    from src.editor_auto.config import WEB_PLAN_PRIORITY, WEB_TRIAL_PRIORITY
+    if account is None:
+        try:
+            from src.editor_auto.repos.web_account_repo import get_web_account_repo
+            account = get_web_account_repo().get(user.account_email) or {}
+        except Exception:
+            account = {}
+    web_plan = (account or {}).get("planId")
+    if web_plan:
+        return WEB_PLAN_PRIORITY.get(str(web_plan), WEB_TRIAL_PRIORITY)
+    plan = _user_plan(user)
+    if plan is not None:
+        return int(getattr(plan, "queue_priority", 0) or 0)
+    return WEB_TRIAL_PRIORITY
 
 
 def _effective_daily_limit(user: EditorUser, plan) -> int:
@@ -488,6 +512,7 @@ class SendToEditRequest(BaseModel):
 def _enqueue_video(
     queue: JobQueue, user: EditorUser, mount_path: Path, day: str,
     *, plan=None, scheduled_for: float | None = None, is_admin: bool = False,
+    priority: int = 0, auto_retry: int = 0, count_quota: bool = True,
 ) -> str:
     """Encola un vídeo leyéndolo DIRECTO del rclone-mount (input_path = ruta
     del mount). El runner lee on-demand al procesar — sin copia previa que
@@ -535,13 +560,17 @@ def _enqueue_video(
         "script": "",
         "output_subdir": day,
         "source_filename": mount_path.name,
+        # Prioridad entre ediciones de clientes (la usa el worker) y nº de
+        # re-ediciones automáticas ya hechas (la usa el revisor automático).
+        "queue_priority": int(priority),
+        "auto_retry": int(auto_retry),
     }
     job = queue.enqueue(
         JobMode.EDITOR_AUTO, title=title, params=params, scheduled_for=scheduled_for,
     )
     # Solo contamos contra la cuota rolling "de hoy" cuando se edita YA (hoy);
     # los programados a futuro cuentan por su propio día (recuento de day_jobs).
-    if scheduled_for is None:
+    if scheduled_for is None and count_quota:
         try:
             quota_service.register_enqueue(user)
         except Exception:
@@ -576,6 +605,12 @@ def web_send_to_edit(
     from src.editor_auto.services.style_mapper import build_tool_flow
     account = get_web_account_repo().get(user.account_email)
     plan = _user_plan(user)
+    # El plan de la WEB manda: los planes viejos del backend recortan tools
+    # (p. ej. sin flecha en Starter) que la web sí promete en todos los planes.
+    web_plan = (account or {}).get("planId")
+    if web_plan:
+        plan = None
+    priority = web_priority(user, account)
     tool_flow = build_tool_flow((account or {}).get("styleConfig"))
     # El plan limita las herramientas: si el estilo del cliente incluye una tool
     # que su plan NO cubre (p.ej. sticker_arrow en Starter), la DESCARTAMOS en
@@ -607,8 +642,25 @@ def web_send_to_edit(
     # sin tope (0 = ilimitado), para poder mandar a editar tantas veces como
     # quiera el mismo día.
     eff_daily = 0 if is_admin else _effective_daily_limit(user, plan)
+    trial_left: int | None = None
+    if not is_admin and account is not None and plan is None:
+        if web_plan:
+            from src.editor_auto.config import WEB_PLAN_DAILY
+            if user.daily_video_limit_override is None:
+                eff_daily = WEB_PLAN_DAILY.get(str(web_plan), 3)
+        else:
+            # PRUEBA GRATIS: sin plan solo quedan los vídeos de prueba que le
+            # resten a la cuenta (en total, no por día).
+            trial_left = max(0, int(account.get("trialVideos") or 0))
+            if trial_left <= 0:
+                raise APIError(
+                    "Ya has usado tus vídeos de prueba. Elige un plan para seguir editando.",
+                    status_code=402,
+                )
     already = len(_get_day_jobs(user.id, day))
     remaining = (eff_daily - already) if eff_daily > 0 else None
+    if trial_left is not None:
+        remaining = trial_left if remaining is None else min(remaining, trial_left)
 
     enqueued: list[dict] = []
     errors: list[dict] = []
@@ -617,6 +669,8 @@ def web_send_to_edit(
             errors.append({
                 "filename": v["filename"],
                 "error": (
+                    f"Solo te quedaban {trial_left} vídeos de prueba. Elige un plan para editar el resto."
+                    if trial_left is not None else
                     f"Has alcanzado tu límite de {eff_daily} vídeos para este día. "
                     f"Programa el resto para otro día."
                 ),
@@ -624,7 +678,10 @@ def web_send_to_edit(
             break
         mount_path = Path(user_input_day_folder(user.name, day)) / v["filename"]
         try:
-            job_id = _enqueue_video(queue, user, mount_path, day, plan=plan, scheduled_for=scheduled_for, is_admin=is_admin)
+            job_id = _enqueue_video(
+                queue, user, mount_path, day, plan=plan, scheduled_for=scheduled_for,
+                is_admin=is_admin, priority=priority,
+            )
             enqueued.append({"filename": v["filename"], "job_id": job_id})
         except APIError as e:
             errors.append({"filename": v["filename"], "error": e.message})
@@ -672,8 +729,7 @@ def web_output(
     show_queue_pos = _user_has_plan(user)
     pos_map: dict[str, int] = {}
     if show_queue_pos:
-        pending = [j for j in all_jobs if j.status == JobStatus.PENDING]
-        pos_map = {j.id: i + 1 for i, j in enumerate(pending)}
+        pos_map = queue.posiciones_pendientes()
 
     gate = manual_approval_enabled()
     approved = _approved_set(user.id, day)
@@ -978,6 +1034,96 @@ class RequeueRequest(BaseModel):
     filename: str | None = None
 
 
+_ATTENTION_KEY = "webday_attention:"  # set de sources que el revisor no pudo dejar bien
+# Dos workers pueden acabar a la vez jobs del mismo día: la meta del día se
+# lee y se reescribe entera, así que el revisor va de uno en uno.
+_AUTO_REVIEW_LOCK = threading.Lock()
+
+
+def auto_review_hook(queue: JobQueue, job) -> None:
+    with _AUTO_REVIEW_LOCK:
+        _auto_review(queue, job)
+
+
+def _auto_review(queue: JobQueue, job) -> None:
+    """Revisor automático de las ediciones de clientes web (hook de la cola).
+
+    Al acabar un job del Editor Auto web:
+      · entregable (score ≥ 90, sin fallos de palabra ni de coherencia) →
+        se aprueba solo y, si el día queda completo, sale el email de listos;
+      · no entregable o fallido → se re-edita solo hasta
+        `AUTO_REVIEW_MAX_RETRIES` veces (sin gastar cuota del cliente);
+      · si sigue mal → queda retenido "en revisión" y se avisa al operador.
+    Apagable con `settings:auto_review` = 0 (vuelve la aprobación manual)."""
+    from src.editor_auto.config import AUTO_REVIEW_MAX_RETRIES, auto_review_enabled
+
+    params = job.params or {}
+    if job.mode != JobMode.EDITOR_AUTO or not params.get("output_subdir") or not params.get("user_id"):
+        return
+    if job.status not in (JobStatus.COMPLETED, JobStatus.FAILED):
+        return
+    if not auto_review_enabled():
+        return
+    day = params["output_subdir"]
+    user = UserRepo().get(params["user_id"])
+    if user is None:
+        return
+    source = params.get("source_filename") or ""
+    jobs_meta = _get_day_jobs(user.id, day)
+    # Si el admin ya lo re-encoló, este job ya no es el vigente: no tocar.
+    if not any(m.get("job_id") == job.id for m in jobs_meta):
+        return
+
+    out_name = os.path.basename(job.result_path) if job.result_path else None
+    score = _job_score(job) if job.status == JobStatus.COMPLETED else None
+    if job.status == JobStatus.COMPLETED and out_name and _job_deliverable(job, score):
+        _approve_output(user.id, day, out_name)
+        _maybe_notify_ready(user, day, queue)
+        return
+
+    retries = int(params.get("auto_retry") or 0)
+    mount_path = Path(user_input_day_folder(user.name, day)) / source
+    if source and retries < AUTO_REVIEW_MAX_RETRIES and os.path.exists(mount_path):
+        try:
+            new_id = _enqueue_video(
+                queue, user, mount_path, day,
+                priority=int(params.get("queue_priority") or 0),
+                auto_retry=retries + 1, count_quota=False,
+            )
+        except Exception as e:
+            logger.warning("[auto_review] no pude re-encolar %s: %s", source, e)
+        else:
+            for m in jobs_meta:
+                if m.get("job_id") == job.id:
+                    m["job_id"] = new_id
+            _save_day_jobs(user.id, day, jobs_meta)
+            logger.info("[auto_review] %s · %s re-editado (intento %d, score %s)",
+                        user.name, source, retries + 1, score)
+            return
+
+    # Agotados los intentos: retener y avisar.
+    try:
+        get_editor_redis().sadd(f"{_ATTENTION_KEY}{user.id}:{day}", source)
+    except Exception:
+        pass
+    try:
+        from src.editor_auto.services import email_notify
+        if email_notify.is_configured():
+            motivo = (job.error or "").splitlines()[0][:300] if job.status == JobStatus.FAILED else f"score {score}"
+            email_notify.send_operator_alert(
+                f"[Editor] Revisar vídeo de {user.name} ({day})",
+                [
+                    f"Cliente: {user.name} · {user.account_email or ''}",
+                    f"Día: {day} · Vídeo: {source}",
+                    f"Estado: {job.status.value} · {motivo}",
+                    f"Intentos automáticos: {retries}",
+                    "Revísalo en el panel admin (aprobar o re-editar).",
+                ],
+            )
+    except Exception as e:
+        logger.warning("[auto_review] aviso al operador falló: %s", e)
+
+
 @router.post("/admin/requeue")
 def web_admin_requeue(
     _: Annotated[str, Depends(get_current_user)],
@@ -1001,7 +1147,7 @@ def web_admin_requeue(
             details={"source": payload.source},
         )
     try:
-        job_id = _enqueue_video(queue, user, mount_path, payload.day)
+        job_id = _enqueue_video(queue, user, mount_path, payload.day, priority=web_priority(user))
     except APIError:
         raise
 
@@ -1020,8 +1166,10 @@ def web_admin_requeue(
     # del output anterior (mismo nombre `<stem>_editado.mp4`).
     if payload.filename:
         _unapprove_output(user.id, payload.day, _safe_name(payload.filename))
-    # Permite reenviar el email de "listos" cuando se vuelva a completar.
+    # Permite reenviar el email de "listos" cuando se vuelva a completar, y
+    # quita la marca de "atención" del revisor automático.
     try:
+        get_editor_redis().srem(f"{_ATTENTION_KEY}{user.id}:{payload.day}", src)
         get_editor_redis().delete(f"{_NOTIFIED_KEY}{user.id}:{payload.day}")
     except Exception:
         pass

@@ -445,3 +445,47 @@ TOOL_POSITION_WEIGHTS: dict[str, int] = {
     TOOL_SUBS_AUTO: 90,
 }
 DEFAULT_TOOL_WEIGHT = 50
+
+
+# ---------------------------------------------------------------------------
+# Planes de la WEB (nebulabs-media) — espejo de `lib/pricing.ts` de la web
+# ---------------------------------------------------------------------------
+# La cuenta web guarda `planId` (starter/pro/studio/agencia/vip). Para un
+# cliente de la web ESTO manda sobre la `subscription` del backend (planes
+# viejos del seeder, con tools recortadas que la web no promete). Si cambias
+# vídeos/día en la web, cámbialo aquí también.
+WEB_PLAN_DAILY: dict[str, int] = {
+    "starter": 3,
+    "pro": 5,
+    "studio": 10,
+    "agencia": 15,
+    "vip": 5,
+}
+
+# Prioridad en la cola entre ediciones de clientes (mayor = antes). La prueba
+# gratis va la última. Mismo plan → orden de llegada.
+WEB_PLAN_PRIORITY: dict[str, int] = {
+    "starter": 10,
+    "pro": 50,
+    "studio": 70,
+    "agencia": 90,
+    "vip": 100,
+}
+WEB_TRIAL_PRIORITY = 0
+
+# Revisor automático: cuántas veces se re-edita SOLO un vídeo que no pasa la
+# auditoría (o que falla) antes de dejarlo al operador.
+AUTO_REVIEW_MAX_RETRIES = int(os.getenv("EDITOR_AUTO_REVIEW_RETRIES", "2"))
+
+
+def auto_review_enabled() -> bool:
+    """¿Aprueba solo los vídeos que pasan la auditoría y re-edita los que no?
+    Default ON. Redis `settings:auto_review` → env EDITOR_AUTO_REVIEW → True."""
+    try:
+        from src.editor_auto.repos.redis_base import get_editor_redis
+        v = get_editor_redis().get_str("settings:auto_review")
+        if v is not None and str(v).strip() != "":
+            return str(v).strip() not in ("0", "false", "False", "no")
+    except Exception:
+        pass
+    return os.getenv("EDITOR_AUTO_REVIEW", "1").strip() not in ("0", "false", "False", "no")

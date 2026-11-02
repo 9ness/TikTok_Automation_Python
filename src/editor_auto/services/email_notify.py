@@ -21,6 +21,7 @@ import smtplib
 import ssl
 from datetime import datetime
 from email.message import EmailMessage
+from html import escape
 
 logger = logging.getLogger("editor_auto.email_notify")
 
@@ -257,3 +258,13 @@ def recipients_subject(to: list[str]) -> list[str]:
             seen.add(e.lower())
             out.append(e)
     return out
+
+
+def send_operator_alert(subject: str, lines: list[str]) -> dict:
+    """Aviso interno al operador (vídeo de cliente que el revisor automático
+    no ha podido dejar bien). Va a `EDITOR_OPERATOR_EMAIL` o, si no hay, a la
+    propia cuenta SMTP."""
+    to = (os.getenv("EDITOR_OPERATOR_EMAIL") or _user()).strip()
+    text = "\n".join(lines)
+    html = "<br>".join(escape(l) for l in lines)
+    return _send([to], subject, f"<p>{html}</p>", text)

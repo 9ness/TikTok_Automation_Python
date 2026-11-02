@@ -53,6 +53,9 @@ def get_queue() -> JobQueue:
         _API_QUEUE = JobQueue(persist_dir)
         from src.queue.runners import dispatch_job
         _API_QUEUE.set_dispatcher(dispatch_job)
+        # Revisor automático de las ediciones de clientes web.
+        from src.api.routers.editor_auto.web_upload import auto_review_hook
+        _API_QUEUE.add_finish_hook(auto_review_hook)
     return _API_QUEUE
 
 

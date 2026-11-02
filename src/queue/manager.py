@@ -55,6 +55,15 @@ def _is_client_edit_job(job: Job) -> bool:
     return is_editor and bool((job.params or {}).get("output_subdir"))
 
 
+def _client_priority(job: Job) -> int:
+    """Prioridad de una edición de cliente (la pone el plan al encolar).
+    `max()` devuelve el PRIMERO de los empatados → a igual prioridad, FIFO."""
+    try:
+        return int((job.params or {}).get("queue_priority") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 _PERSIST_FILENAME = "queue_state.json"
 
 # Cuántos trabajos YA TERMINADOS se conservan. Los pendientes y los que corren
@@ -111,6 +120,9 @@ class JobQueue:
         self._persist_path = Path(persist_dir) / _PERSIST_FILENAME
         self._persist_path.parent.mkdir(parents=True, exist_ok=True)
         self._dispatch: Callable[[Job], None] | None = None
+        # Funciones que se llaman al acabar cada job (COMPLETED o FAILED), fuera
+        # del lock. Las usa la revisión automática del Editor Auto web.
+        self._finish_hooks: list[Callable[["JobQueue", Job], None]] = []
 
         self._load_state()
         self._readonly = readonly
@@ -152,6 +164,13 @@ class JobQueue:
         fuera para evitar imports circulares con runners.py."""
         with self._lock:
             self._dispatch = dispatch
+
+    def add_finish_hook(self, hook: Callable[["JobQueue", Job], None]) -> None:
+        """Registra `hook(queue, job)` para cuando un job acaba (COMPLETED o
+        FAILED). Corre fuera del lock y sus errores no tocan al worker."""
+        with self._lock:
+            if hook not in self._finish_hooks:
+                self._finish_hooks.append(hook)
 
     # ----------------------------------------------------------
     # Graceful shutdown (deploy seguro sin matar jobs)
@@ -356,8 +375,8 @@ class JobQueue:
         reparte a cada quien con su job.
 
         El orden replica el de `_worker_loop`: primero los que no son ediciones
-        de cliente (van con prioridad), y dentro de cada grupo el de la lista
-        (FIFO + los reordenados a mano). Es una ESTIMACIÓN en un caso: si un
+        de cliente (van con prioridad); entre clientes, el plan más alto
+        (`queue_priority`), y a igualdad el de la lista (FIFO + reordenados). Es una ESTIMACIÓN en un caso: si un
         modo exclusivo ya está corriendo, el suyo se salta y el de detrás
         adelanta — dura lo que dure ese job y no compensa complicar el número.
         """
@@ -366,7 +385,11 @@ class JobQueue:
                 (i, j) for i, j in enumerate(self._jobs)
                 if j.status == JobStatus.PENDING
             ]
-        pendientes.sort(key=lambda par: (_is_client_edit_job(par[1]), par[0]))
+        pendientes.sort(key=lambda par: (
+            _is_client_edit_job(par[1]),
+            -_client_priority(par[1]) if _is_client_edit_job(par[1]) else 0,
+            par[0],
+        ))
         return {j.id: puesto for puesto, (_i, j) in enumerate(pendientes, start=1)}
 
     def get_running(self) -> Job | None:
@@ -427,9 +450,13 @@ class JobQueue:
                     # pendientes — así Presidentes/Pronósticos/etc. no esperan
                     # detrás de la cola de clientes. Dentro de cada grupo se
                     # respeta el orden de la lista (FIFO + reorden manual).
+                    # Entre clientes, antes el de plan más alto
+                    # (`queue_priority`); a igual prioridad, orden de llegada.
                     pending = next(
                         (j for j in eligible if not _is_client_edit_job(j)), None,
-                    ) or (eligible[0] if eligible else None)
+                    ) or (
+                        max(eligible, key=_client_priority) if eligible else None
+                    )
                     if pending is not None:
                         break
                     self._cond.wait(timeout=2.0)
@@ -501,6 +528,12 @@ class JobQueue:
                 record_job_metric(job)
             except Exception as e:
                 print(f"[JobQueue] record_job_metric error: {e}")
+
+            for hook in list(self._finish_hooks):
+                try:
+                    hook(self, job)
+                except Exception as e:
+                    print(f"[JobQueue] finish hook error: {e}")
 
     # ----------------------------------------------------------
     # Persistencia

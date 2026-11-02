@@ -120,6 +120,22 @@ Para añadir una herramienta nueva:
    - La última escribe en un final temporal, que se copia a
      `TIKTOK_EDITOR/Usuarios/<user>/salida/` con nombre versionado.
 
+### Clientes web (nebulabsmedia.com) — planes, cola y revisión automática (nov 2026)
+
+- **Límites por plan web**: manda el `planId` de la cuenta web (`nebulabs:user:{email}`),
+  no la suscripción vieja del backend: `config.WEB_PLAN_DAILY` (Básico 3, Pro 5,
+  Studio 10, Escala/`agencia` 15, VIP 5). Sin plan = prueba: `trialVideos` gratis
+  y luego 402. Los admins no tienen límite.
+- **Prioridad**: `params.queue_priority` (`config.WEB_PLAN_PRIORITY`, VIP el
+  primero). El worker coge el de mayor prioridad entre ediciones de cliente y
+  FIFO a igualdad; `posiciones_pendientes()` usa el mismo orden.
+- **Revisor automático** (`web_upload.auto_review_hook`, hook de
+  `JobQueue.add_finish_hook`): entregable → se aprueba solo; si no, se re-edita
+  hasta `EDITOR_AUTO_REVIEW_RETRIES` (2) veces sin gastar cuota; si sigue mal,
+  queda en `webday_attention:{user}:{day}` y se avisa al operador por email
+  (`EDITOR_OPERATOR_EMAIL`, o la cuenta SMTP). Se apaga con Redis
+  `settings:auto_review` = 0 (vuelve la aprobación manual).
+
 ## Variables de entorno
 
 ```env
