@@ -315,13 +315,18 @@ def _alternar(lista: list[dict]) -> list[dict]:
 
 def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
               previos: dict[str, dt.date] | None = None,
-              n: int = config.POR_TANDA) -> list[tuple[list[dict], dt.date | None]]:
+              n: int = config.POR_TANDA,
+              grupo=None) -> list[tuple[list[dict], dt.date | None]]:
     """Reparte en tandas de `POR_TANDA` respetando el ORDEN fijo, salvo dos
     cosas que obligan a esperar (sin bloquear a los demás):
 
     - la fecha mínima de su carpeta (`desde`);
     - que el mismo producto no se publique dos veces en menos de
       `SEPARACION_MISMO_PRODUCTO` días.
+
+    `grupo(f)`: una tanda nunca mezcla grupos (2/11: los vídeos de una tarea
+    de Campañas de creadores van en tandas solo suyas; con el filtro de la
+    tarea, «Tanda completada» cerraba también lo de fuera, que quedaba oculto).
 
     Lo subido no espera nunca (ya está publicado) y una tanda solo con subidos
     no gasta día. `previos`: producto → día en que ya va en una tanda fija.
@@ -369,31 +374,36 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
         c = _clave_producto(f)
         ultimo[c] = max(ultimo.get(c, fecha), fecha)
 
+    g_de = grupo or (lambda f: "")
     salida: list[tuple[list[dict], dt.date | None]] = []
     esperan: list[dict] = []
-    cur: list[dict] = []
-    fecha: dt.date | None = None
+    # Una tanda en curso por grupo; `abiertos` = grupos con tanda a medias, en orden.
+    curs: dict[str, list[dict]] = {}
+    fechas: dict[str, dt.date | None] = {}
+    abiertos: list[str] = []
 
-    def cerrar() -> None:
-        nonlocal cur, fecha
-        if cur:
-            salida.append((cur, fecha))
-        cur, fecha = [], None
+    def cerrar(g: str) -> None:
+        if curs.get(g):
+            salida.append((curs[g], fechas.get(g)))
+        curs[g], fechas[g] = [], None
+        if g in abiertos:
+            abiertos.remove(g)
 
     hecho: set[str] = set()  # colocado o apartado a esperar
 
-    def llenar_prioritarios(desde_i: int) -> None:
+    def llenar_prioritarios(g: str, desde_i: int) -> None:
         """Al abrir una tanda entra primero lo que esperaba y ya puede, y
         después lo que tiene fecha propia (carpetas especiales) y ya está en su
         ventana: es lo que caduca, lo normal puede ir otro día."""
+        cur, fecha = curs[g], fechas[g]
         for e in list(esperan):
-            if len(cur) < n and cabe(e, fecha):
+            if len(cur) < n and g_de(e) == g and cabe(e, fecha):
                 esperan.remove(e)
                 poner(e, fecha, cur)
         for e in lista[desde_i:]:
             if len(cur) >= n:
                 break
-            if e["id"] in hecho or e["uploaded"] or not _desde(e):
+            if e["id"] in hecho or e["uploaded"] or not _desde(e) or g_de(e) != g:
                 continue
             if cabe(e, fecha):
                 hecho.add(e["id"])
@@ -403,27 +413,33 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
         if f["id"] in hecho:
             continue
         hecho.add(f["id"])
+        g = g_de(f)
+        cur = curs.setdefault(g, [])
+        if g not in abiertos:
+            abiertos.append(g)
         if f["uploaded"]:
             cur.append(f)
         else:
-            if fecha is None:
-                fecha = nuevo_dia()
-                llenar_prioritarios(i)
-            if len(cur) < n and cabe(f, fecha):
-                poner(f, fecha, cur)
+            if fechas.get(g) is None:
+                fechas[g] = nuevo_dia()
+                llenar_prioritarios(g, i)
+            if len(cur) < n and cabe(f, fechas[g]):
+                poner(f, fechas[g], cur)
             else:
                 esperan.append(f)
         if len(cur) >= n:
-            cerrar()
-    cerrar()
+            cerrar(g)
+    for g in list(abiertos):
+        cerrar(g)
 
     # Lo que sigue esperando: tandas nuevas en cuanto llegue su fecha.
     while esperan:
         minimo = min(requisito(e) for e in esperan)
         fecha = nuevo_dia(minimo)
+        primero = next((e for e in esperan if cabe(e, fecha)), None)
         cur = []
         for e in list(esperan):
-            if len(cur) < n and cabe(e, fecha):
+            if primero and len(cur) < n and g_de(e) == g_de(primero) and cabe(e, fecha):
                 esperan.remove(e)
                 poner(e, fecha, cur)
         if not cur:  # no debería pasar; evita un bucle infinito
@@ -431,6 +447,9 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
             hueco["usados"] = 0
             continue
         salida.append((cur, fecha))
+    # Con varios grupos una tanda se llena después de abrir otra: por fecha
+    # (las solo de subidos, sin fecha, delante, como antes).
+    salida.sort(key=lambda x: (x[1] is not None, x[1] or dt.date.min))
     return salida
 
 
@@ -475,6 +494,14 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         fuera_tiktok = {f["id"] for f in solo_meta}
         lista = [f for f in lista if f["id"] not in fuera_tiktok]
     por_id = {f["id"]: f for f in lista}
+    # Tareas de Campañas de creadores: cada tanda nueva es de UNA tarea o sin tarea.
+    from src.mis_tandas import tareas as tareas_mod
+
+    lista_tareas = [t for t in tareas_mod.listar(usuario) if tareas_mod.activa(t)]
+    tareas_de = {f["id"]: tareas_mod.de_fila(f, lista_tareas) for f in lista} if lista_tareas else {}
+
+    def grupo_de(f: dict) -> str:
+        return "|".join(sorted(tareas_de.get(f["id"], [])))
 
     dia = dt.datetime.now(_TZ).date()
     hoy = sum(
@@ -502,6 +529,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     todos = {f["id"]: f for f in completa}
     fijas = _fijas(usuario)
     cambio = False
+    sacados: set[str] = set()  # rehechos que salen de su tanda: van a una NUEVA
     for t in fijas:
         listo = t.setdefault("listo", {})
         marcados = set(t.get("rehacer") or [])
@@ -521,6 +549,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
                 t["rehacer"] = sorted(marcados - fuera)
                 for i in fuera:
                     listo.pop(i, None)
+                sacados |= fuera
                 cambio = True
             continue
         quedan = []
@@ -540,6 +569,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
             ):  # rehecho, o formato nuevo del producto (otro vídeo)
                 marcados.discard(i)
                 listo.pop(i, None)
+                sacados.add(i)
                 cambio = True
                 continue  # rehecho: fuera, se reparte de nuevo
             quedan.append(i)
@@ -548,6 +578,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         t["rehacer"] = sorted(marcados)
 
     grupos: list[tuple[list[dict], dt.date | None, bool]] = []  # (vídeos, fecha, cerrada)
+    abiertas_info: list[tuple[dict, list[dict], dt.date]] = []  # (fija, vídeos, fecha)
     previos: dict[str, dt.date] = {}
     for t in fijas:
         items = [por_id[i] for i in t.get("ids", []) if i in por_id]
@@ -563,7 +594,46 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
                 if not _cerrado(f):
                     c = _clave_producto(f)
                     previos[c] = max(previos.get(c, fecha), fecha)
+            abiertas_info.append((t, items, fecha))
         grupos.append((items, fecha, cerrada))
+
+    # 1b) Una abierta fijada a medio llenar (se fijan las 2 primeras aunque
+    #     tengan 3 vídeos) se sigue llenando con lo nuevo de SU grupo, en vez
+    #     de abrir detrás tandas de 3 o 4.
+    en_fijas = {i for t in fijas for i in t.get("ids", [])}
+    sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO)
+    subido_dia: dict[str, dt.date] = {}
+    for f in lista:
+        if f["uploaded"] and f["uploaded_at"]:
+            d = dt.datetime.fromtimestamp(f["uploaded_at"], _TZ).date()
+            c = _clave_producto(f)
+            subido_dia[c] = max(subido_dia.get(c, d), d)
+    libres = [f for f in lista if f["id"] not in en_fijas and f["id"] not in sacados and not _cerrado(f)]
+    for t, items, fecha in abiertas_info:
+        gs = {grupo_de(f) for f in items}
+        if len(gs) != 1 or len(items) >= n_tanda:
+            continue  # mezclada de antes o llena: no se toca
+        g = gs.pop()
+        prods = {_clave_producto(f) for f in items}
+        for f in list(libres):
+            if len(items) >= n_tanda:
+                break
+            c = _clave_producto(f)
+            if grupo_de(f) != g or c in prods:
+                continue
+            d = _desde(f)
+            if d and fecha < d:
+                continue
+            otros = [x for x in (previos.get(c), subido_dia.get(c)) if x]
+            if any(abs((fecha - x).days) < sep.days for x in otros):
+                continue
+            items.append(f)
+            t.setdefault("ids", []).append(f["id"])
+            t.setdefault("listo", {})[f["id"]] = f["video_listo_at"]
+            libres.remove(f)
+            prods.add(c)
+            previos[c] = max(previos.get(c, fecha), fecha)
+            cambio = True
 
     # 2) El resto se reparte detrás de las fijas. Se fijan las primeras
     #    abiertas y toda tanda llena; una a medio llenar al final se sigue
@@ -579,7 +649,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     abiertas_fijas = sum(1 for _, _, c in grupos if not c)
     historicas: list[tuple[list[dict], dt.date | None, bool]] = []
     nuevas: list[tuple[list[dict], dt.date | None, bool]] = []
-    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos, n_tanda):
+    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos, n_tanda, grupo_de):
         if all(f["uploaded"] for f in grupo):
             historicas.append((grupo, None, True))
             continue
@@ -630,10 +700,6 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
         v["epoca"] = epo.get(v["id"]) or _epoca_defecto(v)
         v["habla"] = habla(v)
     # Tareas de Campañas de creadores: etiqueta por vídeo + progreso.
-    from src.mis_tandas import tareas as tareas_mod
-
-    lista_tareas = [t for t in tareas_mod.listar(usuario) if tareas_mod.activa(t)]
-    tareas_de = {f["id"]: tareas_mod.de_fila(f, lista_tareas) for f in lista} if lista_tareas else {}
     esperando = [_publica(f) for f in sin_stock]
     for v in meta_items + esperando + [v for t in salida for v in t.get("items", [])]:
         v["tareas"] = tareas_de.get(v["id"], [])

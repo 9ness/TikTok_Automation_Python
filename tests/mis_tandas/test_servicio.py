@@ -243,3 +243,38 @@ def test_rehecho_sale_aunque_su_tanda_este_cerrada(redis, monkeypatch):
     assert "pov|s|c|4" in [x["id"] for t in d["tandas"] for x in t["items"]]
     todas = servicio.tandas("ness", todas=True)["tandas"]
     assert "pov|s|c|4" not in [x["id"] for x in todas[0]["items"]]
+
+
+def _con_tarea(monkeypatch, ids_tarea):
+    """Una tarea activa «t1» que casa con los vídeos de `ids_tarea`."""
+    from src.mis_tandas import tareas as tareas_mod
+
+    monkeypatch.setattr(tareas_mod, "listar", lambda u: [{"id": "t1"}])
+    monkeypatch.setattr(tareas_mod, "activa", lambda t, ahora=None: True)
+    monkeypatch.setattr(tareas_mod, "de_fila", lambda f, ts: ["t1"] if f["id"] in ids_tarea else [])
+    monkeypatch.setattr(tareas_mod, "resumen", lambda ts, fs, ahora=None: [])
+
+
+def test_tanda_de_una_tarea_no_mezcla_otros_videos(redis, monkeypatch):
+    # 2/11: la bici (sin tarea) iba en una tanda de la tarea; con el filtro no
+    # se veía y «Tanda completada» la dejó cerrada sin subir.
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(12)]
+    de_tarea = {f"pov|s|c|{i}" for i in range(0, 12, 2)}
+    _sin_precalentar(monkeypatch, lista)
+    _con_tarea(monkeypatch, de_tarea)
+    d = servicio.tandas("ness")
+    for t in d["tandas"]:
+        ids = {x["id"] for x in t["items"]}
+        assert ids <= de_tarea or not (ids & de_tarea)
+    assert sorted(x["id"] for t in d["tandas"] for x in t["items"]) == sorted(f["id"] for f in lista)
+
+
+def test_abierta_a_medias_se_sigue_llenando(redis, monkeypatch):
+    # Se fijan las 2 primeras abiertas aunque tengan 3 vídeos: lo que se monta
+    # después entra en ellas en vez de abrir tandas de 3 o 4.
+    lista = [fila(f"pov|s|c|{i}", orden_at=i) for i in range(3)]
+    _sin_precalentar(monkeypatch, lista)
+    assert [t["total"] for t in servicio.tandas("ness")["tandas"]] == [3]
+    lista += [fila(f"pov|s|c|{i}", orden_at=i) for i in range(3, 8)]
+    d = servicio.tandas("ness")
+    assert [t["total"] for t in d["tandas"]] == [8]
