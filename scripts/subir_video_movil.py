@@ -30,6 +30,7 @@ import io
 import json
 import os
 import re
+import unicodedata
 import subprocess
 import sys
 import time
@@ -484,13 +485,18 @@ def producto(it: dict) -> None:
             break
         print(f"AVISO enlace: no se pegó (intento {intento + 1})", flush=True)
         al_portapapeles(it["nombre_enlace"][:30])   # copia fresca: así vuelve a salir el chip
-    if not campo or campo["text"].strip() != it["nombre_enlace"][:30].strip():
+    # Gboard autocorrige lo tecleado («Cubrecolchon» → «Cubre colchón»): vale si solo cambian
+    # espacios, tildes y mayúsculas
+    plano = lambda t: unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode().replace(" ", "").lower()  # noqa: E731
+    igual = (plano(campo["text"]) == plano(nombre)) if campo and nombre.isascii() else (campo and campo["text"].strip() == nombre)
+    if not igual:
         captura("4_enlace")
         raise SystemExit("El nombre del enlace no se ha pegado (4_enlace)")
+    puesto = campo["text"].strip()
     tecla(4, 1.5)
     if not pulsar(r"edit_anchor_add_button", 5):
         raise SystemExit("No veo «Añadir» del enlace (4_enlace)")
-    if not buscar(re.escape(it["nombre_enlace"][:30].strip()), 3):
+    if not buscar(re.escape(puesto), 3):
         captura("4_enlace")
         raise SystemExit("El producto no aparece en la publicación (4_enlace)")
 

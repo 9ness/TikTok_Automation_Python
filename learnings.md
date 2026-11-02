@@ -1327,3 +1327,4 @@
 - 2026-11-02 · Omni (GenAI Pro) ignora «without touching»: en la ronda 10 salieron manos tocando el producto en 8 de 20 clips → en el prompt, «No hands, arms or people appear in the frame at any moment», y aun así recortar con `inicios`/`duraciones` los tramos con mano (2 reintentos: uno limpio; el otro cambió el juego de ollas → descartado).
 - 2026-11-02 · Pestaña de Chrome en segundo plano (CDP) no registra clics en GenAI → abrir la propia con `Target.createTarget newWindow:true`.
 - 2026-11-02 · `subir_video_movil.py`: Keep no saca «Seleccionar todo» con un nombre de enlace corto en latín («Shilajit») → si el nombre es ASCII se teclea directo con `input text` (espacio = `%s`).
+- 2026-11-02 · Gboard autocorrige el nombre del enlace tecleado («Cubrecolchon» → «Cubre colchón») → en latín se acepta si solo cambian espacios/tildes/mayúsculas; en árabe, igualdad exacta (normalizar a ASCII dejaría vacío y pasaría siempre).
