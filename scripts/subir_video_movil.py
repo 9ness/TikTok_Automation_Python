@@ -455,8 +455,21 @@ def producto(it: dict) -> None:
                     tap(*c, 4)
     if not buscar(r"edit_anchor_name_input", intentos=3):
         raise SystemExit("No se abrió el nombre del enlace (4_producto, 4_tras_anadir)")
-    al_portapapeles(it["nombre_enlace"][:30])
-    for intento in range(3):
+    nombre = it["nombre_enlace"][:30].strip()
+    if nombre.isascii():
+        # En latín se teclea: Keep con un texto corto no saca «Seleccionar todo» (2/11)
+        campo = buscar(r"edit_anchor_name_input", intentos=3)
+        tap(campo["x"], campo["y"], 1.5)
+        tecla(123, 0.3)
+        for _ in range(35):
+            adb("shell", "input", "keyevent", "67")
+        for c in nombre:
+            adb("shell", "input", "text", "%s" if c == " " else (c if c.isalnum() else f"'{c}'"))
+        pulsar(r"^Cancelar$", 1.5, 1)
+        campo = buscar(r"edit_anchor_name_input", intentos=2)
+    else:
+        al_portapapeles(nombre)
+    for intento in range(0 if nombre.isascii() else 3):
         # a veces Gboard enseña sus iconos en vez del chip y el toque abre «Usar el Traductor de Google»
         pulsar(r"^Cancelar$", 1.5, 1)
         campo = buscar(r"edit_anchor_name_input", intentos=3)
