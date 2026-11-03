@@ -1077,13 +1077,14 @@ def _auto_review(queue: JobQueue, job) -> None:
     out_name = os.path.basename(job.result_path) if job.result_path else None
     score = _job_score(job) if job.status == JobStatus.COMPLETED else None
     retries = int(params.get("auto_retry") or 0)
+    mount_path = Path(user_input_day_folder(user.name, day)) / source
     if job.status == JobStatus.COMPLETED and out_name and _job_deliverable(job, score):
         # Última mirada: los fotogramas. Un fallo visual (subtítulo cortado,
         # negros) no se arregla re-editando igual → retener y avisar. Si la
         # revisión no se puede hacer (None), se aprueba como antes.
         from src.editor_auto.services import revision_visual
 
-        rv = revision_visual.revisar(job.result_path)
+        rv = revision_visual.revisar(job.result_path, original=str(mount_path) if source else None)
         if rv is None or rv.get("entregable"):
             _approve_output(user.id, day, out_name)
             _maybe_notify_ready(user, day, queue)
@@ -1094,7 +1095,6 @@ def _auto_review(queue: JobQueue, job) -> None:
                           job.status.value, retries)
         return
 
-    mount_path = Path(user_input_day_folder(user.name, day)) / source
     if source and retries < AUTO_REVIEW_MAX_RETRIES and os.path.exists(mount_path):
         try:
             new_id = _enqueue_video(

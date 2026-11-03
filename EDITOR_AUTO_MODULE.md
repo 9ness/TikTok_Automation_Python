@@ -135,10 +135,14 @@ Para añadir una herramienta nueva:
   queda en `webday_attention:{user}:{day}` y se avisa al operador por email
   (`EDITOR_OPERATOR_EMAIL`, o la cuenta SMTP). Se apaga con Redis
   `settings:auto_review` = 0 (vuelve la aprobación manual).
-  Antes de aprobar, **revisión visual** (`services/revision_visual.py`, prompt
-  `prompts/revision_visual.md`): hoja de 12 fotogramas → Haiku + negros/congelados
-  por ffmpeg, ~0,001 $ y ~20 s. Si ve un fallo se retiene y avisa (no re-edita);
-  si no puede revisar, aprueba. Se apaga con `EDITOR_AUTO_REVISION_VISUAL=0`.
+  Antes de aprobar, **revisión final** (`services/revision_visual.py`, prompt
+  `prompts/revision_visual.md`): ffmpeg (negros, congelados, silencio total ≥5 s,
+  sin audio, A/V desfasado) + geometría sin IA frente al original (desplazado,
+  aplastado, girado: los modelos no lo ven) + hoja de 16 fotogramas → Haiku
+  (subtítulos cortados/superpuestos/atascados, texto en la cara, corrupción).
+  ~0,0007 $; banco 3/11: 23/25 sin falsos positivos, Sonnet no mejora. Si falla
+  se retiene y avisa (no re-edita); si no puede revisar, aprueba. Se apaga con
+  `EDITOR_AUTO_REVISION_VISUAL=0`.
 
 ## Variables de entorno
 
