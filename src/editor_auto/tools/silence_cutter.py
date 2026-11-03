@@ -2267,7 +2267,14 @@ class SilenceCutterTool:
             # APRENDIZAJE: si tras todo quedó un defecto de SENTIDO confirmado y
             # grave, escríbelo como lección → el motor no lo repetirá en los
             # próximos vídeos (idempotente por fingerprint). Solo el 1º (anti-spam).
-            for d in (audit.get("coherence_issues") or [])[:1]:
+            # APAGADO por defecto (nov 2026): con Claude el 'why' cambia en cada
+            # llamada → el fingerprint nunca casa, y el juez también acusa faltas
+            # falsas ('date' que sí se oye). En 6 pases del bench metió 9 lecciones
+            # de UN vídeo, reventó el cap y cambiaba el prompt de todos los demás.
+            # Las lecciones se consolidan a mano; `EDITOR_AUTO_APRENDER_LECCIONES=1`
+            # lo vuelve a encender.
+            _aprender = os.getenv("EDITOR_AUTO_APRENDER_LECCIONES", "") == "1"
+            for d in (audit.get("coherence_issues") or [])[:1] if _aprender else []:
                 if d.get("confirmed") and int(d.get("severity", 0) or 0) >= 2:
                     import hashlib
                     fp = hashlib.sha1(
@@ -3065,6 +3072,80 @@ def _build_false_starts_payload(words: list[dict], language: str) -> dict:
     }
 
 
+def _p2tok(t: str) -> str:
+    t = unicodedata.normalize("NFKD", str(t).lower()).encode("ascii", "ignore").decode()
+    return re.sub(r"[^\w]", "", t)
+
+
+def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
+    """¿El corte de la pasada 2 es una retoma REAL? (candado, nov 2026: Haiku
+    cortaba 'date' → «mantengo 'prisa'», el único 'la liaba', «He tenido
+    varias», «mira», o desalineaba índices y se llevaba «disco»).
+    · Solo muletillas → vale.
+    · Las palabras de [i0..i1] tienen que ser las que dice `first_attempt`.
+    · `kept_version` tiene que estar en el texto que QUEDA alrededor del corte.
+    · Una retoma REPITE algo: alguna palabra no-muletilla de lo cortado vuelve a
+      salir pegada al corte (justo antes o justo después)."""
+    toks = [t for t in (_p2tok(words[k].get("word", "")) for k in range(i0, i1 + 1)) if t]
+    if toks and all(t in _FILLER_TOKENS for t in toks):
+        return True
+    first = [t for t in (_p2tok(x) for x in str(cut.get("first_attempt") or "").split()) if t]
+    if first:
+        comunes = sum(1 for t in toks if t in first)
+        sobran = [t for t in toks if t not in first and t not in _FILLER_TOKENS]
+        if comunes < 0.6 * len(toks) or sobran:
+            return False
+    kept = [t for t in (_p2tok(x) for x in str(cut.get("kept_version") or "").split()) if t]
+    n = len(toks)
+    if kept:
+        head = kept[: min(3, len(kept))]
+        lo = max(0, i0 - len(kept) - 2)
+        hi = min(len(words), i1 + 1 + len(kept) + 8)
+        seq = [_p2tok(w.get("word", "")) for w in words[lo:i0] + words[i1 + 1:hi]]
+        seq = [t for t in seq if t]
+        if not any(seq[j:j + len(head)] == head for j in range(len(seq))):
+            return False
+    cerca = [
+        _p2tok(w.get("word", ""))
+        for w in words[max(0, i0 - n - 2):i0] + words[i1 + 1:i1 + 1 + n + 4]
+    ]
+    propios = {t for t in toks if t not in _FILLER_TOKENS and len(t) >= 2}
+    # «bueno no te creas» → «20 euros»: 'te'/'no' salen cerca de cualquier
+    # cosa. Si lo cortado tiene palabras de 3+ letras, la repetida es una de esas.
+    largos = {t for t in propios if len(t) >= 3}
+    if largos:
+        propios = largos
+    return any(
+        t in propios or any(len(t) >= 4 and len(p) >= 4 and t[:4] == p[:4] for p in propios)
+        for t in cerca if t
+    )
+
+
+def _pass2_realign(cut: dict, i0: int, i1: int, words: list[dict]) -> tuple[int, int]:
+    """Haiku a veces da bien el `first_attempt` pero mal los índices (cintia,
+    nov 2026: «este con florecitas ×3» = 9 palabras con rango [107-129]).
+    Si las palabras de [i0..i1] no son las de `first_attempt`, busca esa
+    secuencia exacta cerca (±12) y devuelve sus índices; si no, los de antes."""
+    first = [t for t in (_p2tok(x) for x in str(cut.get("first_attempt") or "").split()) if t]
+    if not first:
+        return i0, i1
+    toks = [t for t in (_p2tok(words[k].get("word", "")) for k in range(i0, i1 + 1)) if t]
+    if toks == first:
+        return i0, i1
+    lo, hi = max(0, i0 - 12), min(len(words), i1 + 13)
+    idx = [(k, _p2tok(words[k].get("word", ""))) for k in range(lo, hi)]
+    idx = [(k, t) for k, t in idx if t]
+    n = len(first)
+    hits = [
+        (idx[j][0], idx[j + n - 1][0])
+        for j in range(len(idx) - n + 1)
+        if [t for _, t in idx[j:j + n]] == first
+    ]
+    if not hits:
+        return i0, i1
+    return min(hits, key=lambda h: abs(h[0] - i0))
+
+
 def _parse_false_starts_cuts(
     result: Any, words: list[dict], log, *, provider: str,
 ) -> list[tuple[float, float, dict]]:
@@ -3085,9 +3166,20 @@ def _parse_false_starts_cuts(
             continue
         if not (0 <= i0 <= i1 < len(words)):
             continue
+        r0, r1 = _pass2_realign(cut, i0, i1, words)
+        if (r0, r1) != (i0, i1):
+            log(f"[silence_cutter]   ↔ {provider} pass2 realineado [{i0}-{i1}] → [{r0}-{r1}]")
+            i0, i1 = r0, r1
         t0 = float(words[i0]["start"])
         t1 = float(words[i1]["end"])
         if t1 - t0 > 0.05:
+            if not _pass2_cut_grounded(cut, i0, i1, words):
+                log(
+                    f"[silence_cutter]   ↩ {provider} {cut.get('kind') or '?'} [{i0}-{i1}] "
+                    f"'{cut.get('first_attempt') or ''}' DESCARTADO: no hay retoma real "
+                    f"('{cut.get('kept_version') or ''}' no repite lo cortado)"
+                )
+                continue
             intervals.append((t0, t1, cut))
             kept = cut.get("kept_version") or ""
             first = cut.get("first_attempt") or ""
@@ -5240,13 +5332,13 @@ def _ai_coherence_judge(
         system = _with_lessons(prompt_path.read_text(encoding="utf-8"), "coherence")
     except OSError as e:
         return {"error": f"prompt no leíble: {e}"}
+    payload = {
+        "language": language, "original": orig_text,
+        "rendered": out_text, "cuts_summary": cuts_summary,
+    }
     try:
         data = openai_client.analyze_transcript_json(
-            system_prompt=system,
-            user_payload={
-                "language": language, "original": orig_text,
-                "rendered": out_text, "cuts_summary": cuts_summary,
-            },
+            system_prompt=system, user_payload=payload,
             model=_COHERENCE_MODEL, temperature=0.0, seed=_COHERENCE_SEED,
         )
         if call_budget is not None and call_budget:
@@ -5259,6 +5351,84 @@ def _ai_coherence_judge(
     flat_out = _flat(out_text)
     out_tokset = set(_ntok(t) for t in out_text.split())
     out_tokset.discard("")
+
+    defects = _coh_parse_defects(
+        data, flat_orig=flat_orig, flat_out=flat_out, out_tokset=out_tokset,
+        words=words, flat=_flat, ntok=_ntok,
+    )
+    # SE OYE EN EL RENDER (nov 2026, candado): 'date' es una palabra que Whisper
+    # coloca mal (fantasma recolocada) → por tiempos parece cortada aunque el
+    # render la dice, y el self-heal "restauraba" audio y hundía la nota 76→39.
+    # Si TODA palabra de contenido acusada sale en la transcripción real del
+    # render al menos tantas veces como en el original, la falta no existe.
+    if defects:
+        from collections import Counter
+        c_orig = Counter(_ntok(t) for t in orig_text.split())
+        c_rend = Counter(_ntok(t) for t in str((deep or {}).get("out_text") or "").split())
+        oidas = [
+            x for x in defects
+            if x["_content_lost"] and all(c_rend[t] >= c_orig[t] > 0 for t in x["_content_lost"])
+        ]
+        if oidas:
+            log(
+                "[silence_cutter] 👂 coherencia: descartadas "
+                f"{len(oidas)} falta(s) que sí se oyen en el render "
+                f"({', '.join(sorted(set().union(*(x['_content_lost'] for x in oidas))))})"
+            )
+            defects = [x for x in defects if x not in oidas]
+    # DOBLE CONSULTA (nov 2026): con Claude no hay temperatura 0 ni seed y el
+    # juez inventaba una falta distinta en cada render ("date", "escucha",
+    # "espera más de cerca como") → la nota (min acústico/coherencia) bailaba
+    # 76↔100 con el mismo corte. Si la 1ª respuesta acusa algo, se pregunta otra
+    # vez y solo cuenta lo que repite (misma palabra de contenido perdida). Una
+    # falta real (la proteína cortada) sale en las dos; el ruido no. La 2ª
+    # llamada no gasta presupuesto del self-heal (sí se cobra en costes).
+    if defects and bool(config.get("coherence_double_check", True)):
+        try:
+            data2 = openai_client.analyze_transcript_json(
+                system_prompt=system, user_payload=payload,
+                model=_COHERENCE_MODEL, temperature=0.0, seed=_COHERENCE_SEED + 1,
+            )
+            d2 = _coh_parse_defects(
+                data2, flat_orig=flat_orig, flat_out=flat_out, out_tokset=out_tokset,
+                words=words, flat=_flat, ntok=_ntok,
+            )
+            toks2 = set().union(*(x["_content_lost"] for x in d2)) if d2 else set()
+            kept = [x for x in defects if x["_content_lost"] & toks2]
+            if len(kept) < len(defects):
+                log(
+                    "[silence_cutter] 🔁 coherencia: descartadas "
+                    f"{len(defects) - len(kept)} falta(s) que no repite la 2ª consulta"
+                )
+            defects = kept
+        except Exception as e:  # noqa: BLE001
+            log(f"[silence_cutter] ⚠️ 2ª consulta de coherencia falló (se usa la 1ª): {e}")
+    for x in defects:
+        x.pop("_content_lost", None)
+
+    penalty = sum(_COH_SEV_PENALTY[x["severity"]] for x in defects)
+    coh_score = max(0, 100 - penalty)
+    needs_rq = any(x["severity"] >= 2 for x in defects)
+    # Fallos "accionables": graves Y arreglables con restauración → el self-heal
+    # los reintenta. Un defecto grave NO arreglable detiene el loop (retención).
+    fallos = sum(
+        1 for x in defects
+        if x["severity"] >= 2 and x.get("fixable") and x.get("restore_span")
+    )
+    return {
+        "coherence_score": coh_score, "defects": defects,
+        "coherence_needs_requeue": needs_rq, "coherence_fallos": fallos,
+    }
+
+
+def _coh_parse_defects(
+    data, *, flat_orig: str, flat_out: str, out_tokset: set,
+    words: list[dict], flat, ntok,
+) -> list[dict]:
+    """Filtra la respuesta del juez de coherencia: citas que existen y palabra de
+    contenido que de verdad falta del render. Cada defecto lleva `_content_lost`
+    (set de tokens) para cruzarlo con la 2ª consulta."""
+    _flat, _ntok = flat, ntok
     defects: list[dict] = []
     for d in (data or {}).get("defects", []) or []:
         if not d.get("confirmed"):
@@ -5292,21 +5462,11 @@ def _ai_coherence_judge(
             continue
         sev = min(3, max(1, int(d.get("severity", 2) or 2)))
         span = _locate_text_in_words(mt, words)
-        defects.append({**d, "severity": sev, "restore_span": span})
-
-    penalty = sum(_COH_SEV_PENALTY[x["severity"]] for x in defects)
-    coh_score = max(0, 100 - penalty)
-    needs_rq = any(x["severity"] >= 2 for x in defects)
-    # Fallos "accionables": graves Y arreglables con restauración → el self-heal
-    # los reintenta. Un defecto grave NO arreglable detiene el loop (retención).
-    fallos = sum(
-        1 for x in defects
-        if x["severity"] >= 2 and x.get("fixable") and x.get("restore_span")
-    )
-    return {
-        "coherence_score": coh_score, "defects": defects,
-        "coherence_needs_requeue": needs_rq, "coherence_fallos": fallos,
-    }
+        defects.append({
+            **d, "severity": sev, "restore_span": span,
+            "_content_lost": set(content_lost),
+        })
+    return defects
 
 
 def _count_coherence_fallos(audit: dict) -> int:
@@ -6812,6 +6972,29 @@ def _is_real_content_word(
     return contiguous
 
 
+def _glued_to_next_word(
+    w: dict, next_w: dict | None, *, max_gap_s: float = 0.12,
+) -> bool:
+    """¿La palabra va PEGADA a la siguiente (habla continua)? Las alucinaciones
+    de Whisper flotan sueltas en el silencio; un arranque flojo («si», «date»)
+    va unido a lo que sigue. Excluye muletillas y tokens típicos de alucinación."""
+    if next_w is None:
+        return False
+    tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+    if (
+        len(tok) < 2
+        or tok in _FILLER_TOKENS
+        or tok in _WHISPER_HALLUCINATION_TOKENS
+    ):
+        return False
+    try:
+        we, ns = float(w["end"]), float(next_w["start"])
+        dur = we - float(w["start"])
+    except (KeyError, ValueError, TypeError):
+        return False
+    return 0.0 < dur <= 1.2 and -0.05 <= ns - we <= max_gap_s
+
+
 def _filter_phantom_words(
     words: list[dict],
     silero_silence_intervals: list[tuple[float, float]],
@@ -6857,20 +7040,24 @@ def _filter_phantom_words(
         word_dur = we - ws
         word_mid = (ws + we) / 2.0
         is_phantom = False
+        hit: tuple[float, float] | None = None
         for ss, se in long_silences:
             # (a) Palabra totalmente dentro
             if ss <= ws and we <= se:
                 is_phantom = True
+                hit = (ss, se)
                 break
             # (b) Mid dentro + palabra corta
             if ss <= word_mid <= se and word_dur < 0.6:
                 is_phantom = True
+                hit = (ss, se)
                 break
             # (c) Overlap > min_overlap_pct de la duración de la palabra
             if word_dur > 0:
                 overlap = max(0.0, min(we, se) - max(ws, ss))
                 if overlap / word_dur >= min_overlap_pct:
                     is_phantom = True
+                    hit = (ss, se)
                     break
         # Guarda de contenido: voz floja real (no alucinación) → NO fantasma.
         if is_phantom and _is_real_content_word(
@@ -6878,6 +7065,28 @@ def _filter_phantom_words(
             words[i + 1] if i + 1 < len(words) else None,
         ):
             is_phantom = False
+        # Palabra CORTA que arranca frase pegada a la siguiente («si tienes
+        # moto», «date prisa», candado nov 2026): Silero no oye el arranque
+        # flojo y se perdía. No es fantasma; si de verdad es inaudible, la
+        # capa de amplitud (`_drop_words_inside_silences`) la sigue quitando.
+        if is_phantom and _glued_to_next_word(
+            w, words[i + 1] if i + 1 < len(words) else None,
+        ):
+            is_phantom = False
+        # Palabra MAL COLOCADA, no inventada («date» a 85,4 s cuando se dice a
+        # 87,4 s, justo antes de «prisa»): tras el silencio hay voz sin palabra
+        # antes de la siguiente → se recoloca ahí en vez de borrarla.
+        if is_phantom and hit is not None and i + 1 < len(words):
+            tok = re.sub(r"[^\wáéíóúñü]", "", str(w.get("word", "")).lower())
+            try:
+                ns = float(words[i + 1]["start"])
+            except (KeyError, ValueError, TypeError):
+                ns = -1.0
+            hueco = ns - hit[1]
+            if tok and tok not in _WHISPER_HALLUCINATION_TOKENS and 0.3 <= hueco <= 1.0:
+                clean.append({**w, "start": round(hit[1], 3), "end": round(ns, 3),
+                              "relocated": True})
+                continue
         if is_phantom:
             phantoms.append(w)
         else:

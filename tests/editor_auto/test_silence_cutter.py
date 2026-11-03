@@ -632,7 +632,9 @@ class TestFilterPhantomWords:
 
     def test_word_inside_long_silence_is_phantom(self):
         # Palabra "fantasma" Whisper completamente dentro de silencio Silero ≥0.7s
-        words = [_w(0, 0.0, 0.3), _w(1, 1.0, 1.2), _w(2, 3.0, 3.2)]
+        # La siguiente empieza pegada al fin del silencio: no hay voz sin
+        # palabra donde recolocarla (si la hubiera, sería «date prisa»).
+        words = [_w(0, 0.0, 0.3), _w(1, 1.0, 1.2), _w(2, 2.6, 3.2)]
         silero_silences = [(0.5, 2.5)]  # 2s, contiene la palabra idx=1
         clean, phantoms = _filter_phantom_words(
             words, silero_silences, min_silence_for_phantom_s=0.7,
@@ -960,3 +962,135 @@ class TestCountByReason:
             "head_silence": 1, "false_start": 2,
             "noise_gap": 1, "unknown": 1,
         }
+
+
+class TestCoherenceDoubleCheck:
+    """La 2ª consulta del juez filtra las faltas que no se repiten."""
+
+    def _run(self, monkeypatch, respuestas, deep=None):
+        from src.editor_auto.api import openai_client
+        from src.editor_auto.tools import silence_cutter as sc
+
+        it = iter(respuestas)
+        monkeypatch.setattr(openai_client, "is_configured", lambda: True)
+        monkeypatch.setattr(openai_client, "analyze_transcript_json", lambda **k: next(it))
+        monkeypatch.setattr(sc, "_coherence_prescreen", lambda c: False)
+        texto = "hoy os enseño el candado con alarma que suena muy fuerte date cuenta proteína"
+        words = [
+            {"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4}
+            for i, w in enumerate(texto.split())
+        ]
+        # Se corta "date" (índice 10) y "proteína" (índice 12).
+        keeps = [(0.0, 4.95), (5.5, 5.95)]
+        return sc._ai_coherence_judge(
+            words=words, deep=deep or {}, keep_intervals=keeps, language="es",
+            log=lambda _: None, call_budget=[5], config={},
+        )
+
+    @staticmethod
+    def _d(mt):
+        return {"confirmed": True, "missing_text": mt, "severity": 2, "fixable": True}
+
+    def test_falta_que_no_se_repite_se_descarta(self, monkeypatch):
+        r = self._run(monkeypatch, [
+            {"defects": [self._d("date"), self._d("proteína")]},
+            {"defects": [self._d("proteína")]},
+        ])
+        assert [d["missing_text"] for d in r["defects"]] == ["proteína"]
+        assert all("_content_lost" not in d for d in r["defects"])
+
+    def test_falta_que_se_oye_en_el_render_se_descarta(self, monkeypatch):
+        r = self._run(monkeypatch, [
+            {"defects": [self._d("date"), self._d("proteína")]},
+            {"defects": [self._d("date"), self._d("proteína")]},
+        ], deep={"out_text": "hoy os enseño el candado con alarma que suena muy fuerte date cuenta"})
+        assert [d["missing_text"] for d in r["defects"]] == ["proteína"]
+
+    def test_sin_faltas_no_hay_segunda_llamada(self, monkeypatch):
+        r = self._run(monkeypatch, [{"defects": []}])
+        assert r["coherence_score"] == 100
+
+
+class TestPhantomArranqueFlojo:
+    """«si tienes moto»: palabra corta pegada a la siguiente no es fantasma."""
+
+    def test_arranque_pegado_se_conserva(self):
+        from src.editor_auto.tools.silence_cutter import _filter_phantom_words
+        words = [
+            {"word": "si", "start": 5.68, "end": 6.02},
+            {"word": "tienes", "start": 6.08, "end": 6.40},
+            {"word": "y", "start": 10.2, "end": 10.5},
+            {"word": "gracias", "start": 12.0, "end": 12.4},
+        ]
+        clean, ph = _filter_phantom_words(words, [(0.0, 6.0), (9.0, 13.0)])
+        assert [w["word"] for w in clean] == ["si", "tienes"]
+        assert [w["word"] for w in ph] == ["y", "gracias"]
+
+
+class TestPass2Grounded:
+    """La pasada 2 solo corta retomas reales."""
+
+    @staticmethod
+    def _w(texto):
+        return [{"word": w, "start": i * 0.4, "end": i * 0.4 + 0.3} for i, w in enumerate(texto.split())]
+
+    def test_rechaza_y_acepta(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("va a estar segura date prisa porque la acaban de reponer")
+        assert not g({"kind": "redundant_restatement", "kept_version": "prisa"}, 4, 4, w)
+        w = self._w("y la moto la liaba esta es simple")
+        assert not g({"kind": "abandoned_phrase", "kept_version": "la liaba"}, 3, 4, w)
+        w = self._w("he he tenido varias y esta")
+        assert g({"kind": "abandoned_phrase", "kept_version": "he tenido varias"}, 0, 0, w)
+        w = self._w("así que que si quieres tener")
+        assert g({"kind": "redundant_restatement", "kept_version": "así que si quieres"}, 2, 2, w)
+        w = self._w("es que y ya hay restock")
+        assert g({"kind": "stuttered_word", "kept_version": "ya hay restock"}, 2, 2, w)
+
+    def test_retoma_lejana_o_sin_repeticion(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("ahí está activada otro pitido para ver que está activada")
+        assert not g({"kind": "redundant_restatement", "first_attempt": "activada",
+                      "kept_version": "para ver que está activada"}, 2, 2, w)
+        w = self._w("moto he tenido varias y esta con este cable")
+        assert not g({"kind": "abandoned_phrase", "first_attempt": "he tenido varias y",
+                      "kept_version": "esta con este cable"}, 1, 4, w)
+        w = self._w("y esta con con este cable está increíble")
+        assert g({"kind": "wrong_then_correct", "first_attempt": "y esta con",
+                  "kept_version": "con este cable"}, 0, 2, w)
+        w = self._w("esto en el esto en el disco y no")
+        assert not g({"kind": "redundant_restatement", "first_attempt": "esto en el",
+                      "kept_version": "esto en el disco"}, 3, 6, w)
+        assert g({"kind": "redundant_restatement", "first_attempt": "esto en el",
+                  "kept_version": "esto en el disco"}, 0, 2, w)
+
+
+    def test_repeticion_de_palabra_corta_no_basta(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("una pasta no pues no te creas 20 euros te lo dejo")
+        assert not g({"kind": "wrong_then_correct", "first_attempt": "no te creas",
+                      "kept_version": "20 euros"}, 4, 6, w)
+
+    def test_realinea_indices(self):
+        from src.editor_auto.tools.silence_cutter import _parse_false_starts_cuts
+        w = self._w("mira este con florecitas este con florecitas este con florecitas blancas azul marino y este liso")
+        res = {"cuts": [{"kind": "exact_repetition", "start_word_idx": 1, "end_word_idx": 14,
+                         "first_attempt": "este con florecitas este con florecitas",
+                         "kept_version": "este con florecitas blancas"}]}
+        out = _parse_false_starts_cuts(res, w, lambda _m: None, provider="t")
+        assert len(out) == 1
+        assert out[0][0] == w[1]["start"] and out[0][1] == w[6]["end"]
+
+
+class TestPhantomRecolocada:
+    def test_date_antes_de_prisa(self):
+        from src.editor_auto.tools.silence_cutter import _filter_phantom_words
+        words = [
+            {"word": "segura", "start": 84.98, "end": 85.38},
+            {"word": "date", "start": 85.5, "end": 86.3},
+            {"word": "prisa", "start": 87.76, "end": 88.1},
+        ]
+        clean, ph = _filter_phantom_words(words, [(85.4, 87.4)])
+        assert not ph
+        d = [w for w in clean if w["word"] == "date"][0]
+        assert d["start"] == 87.4 and d["end"] == 87.76
