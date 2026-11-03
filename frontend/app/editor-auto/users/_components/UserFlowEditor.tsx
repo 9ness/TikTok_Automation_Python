@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { api } from "@/lib/api";
 import {
   useArrowStickers,
   useEditorAutoTools,
@@ -282,6 +283,7 @@ function StepCard({
       {open && (
         <div className="border-t bg-muted/30 p-3">
           <p className="mb-3 text-xs text-muted-foreground">{tool.description}</p>
+          {tool.tool_id === "vip_overlays" && <EstiloDesdeVideo onApply={onApplyPreset} />}
           <div className="space-y-3">
             {tool.config_schema.map((field) => (
               <ConfigField
@@ -294,6 +296,53 @@ function StepCard({
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Sube un vídeo que le gusta al cliente y rellena el estilo VIP con lo que
+ *  ve la IA (colores, letra, densidad, gancho, fotos, zooms y notas). No
+ *  guarda: queda en el formulario hasta que se pulse Guardar flujo. */
+function EstiloDesdeVideo({ onApply }: { onApply: (config: Record<string, unknown>) => void }) {
+  const [estado, setEstado] = useState<"idle" | "cargando" | "ok" | "error">("idle");
+  const [msg, setMsg] = useState("");
+  const subir = async (file: File | undefined) => {
+    if (!file) return;
+    setEstado("cargando");
+    setMsg("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const cfg = await api.post<Record<string, unknown>>(
+        "/api/v1/editor-auto/tools/vip-overlays/estilo",
+        fd,
+      );
+      onApply(cfg);
+      setEstado("ok");
+      setMsg("Estilo aplicado. Revisa y guarda el flujo.");
+    } catch (e) {
+      setEstado("error");
+      setMsg(e instanceof Error ? e.message : "No se pudo sacar el estilo");
+    }
+  };
+  return (
+    <div className="mb-3 rounded-md border border-dashed p-2">
+      <Label className="text-xs sm:text-sm">Copiar estilo de un vídeo de referencia</Label>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Input
+          type="file"
+          accept="video/*"
+          className="h-8 w-full text-xs sm:w-auto"
+          disabled={estado === "cargando"}
+          onChange={(e) => subir(e.target.files?.[0])}
+        />
+        {estado === "cargando" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+      {msg && (
+        <p className={`mt-1 break-words text-xs ${estado === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+          {msg}
+        </p>
       )}
     </div>
   );

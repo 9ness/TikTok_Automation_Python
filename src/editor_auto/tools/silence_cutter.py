@@ -1371,6 +1371,35 @@ class SilenceCutterTool:
             except Exception as e:  # noqa: BLE001
                 ctx.on_log(f"[silence_cutter] ⚠️ Limpieza de sueltas falló: {e}")
 
+        # SONIDOS DE DEMOSTRACIÓN (pitido/alarma del producto): no son voz, así
+        # que todo lo anterior los trata como pausa. Se calculan sobre los keeps
+        # YA limpios y se vuelven a unir en CADA render (principal, self-heal,
+        # salvage, barrido): la higiene de bordes y los cortes correctivos no
+        # pueden quitarlos, y la auditoría no los cuenta como silencio/residuo.
+        _demo_spans: list[tuple[float, float]] = []
+        if bool(config.get("keep_demo_sounds", True)) and keep_intervals:
+            try:
+                _demo_spans = _detect_demo_sounds(
+                    keep_intervals, words, _silero_voice,
+                    [(s, e) for (s, e, src) in cuts_with_source if src in _CONTENT_CUT_SOURCES],
+                    tmp_audio,
+                )
+                if _demo_spans:
+                    keep_intervals = _union_intervals(keep_intervals, _demo_spans)
+                    ctx.on_log(
+                        f"[silence_cutter] 🔔 {len(_demo_spans)} sonido(s) de demostración "
+                        f"conservado(s) (pitido/alarma del producto): "
+                        + ", ".join(f"[{a:.2f}-{b:.2f}]" for a, b in _demo_spans)
+                    )
+                    diagnostic["phases"]["demo_sounds"] = {
+                        "n": len(_demo_spans), "spans": [list(x) for x in _demo_spans],
+                    }
+            except Exception as e:  # noqa: BLE001
+                ctx.on_log(f"[silence_cutter] ⚠️ Sonidos de demostración falló: {e}")
+
+        def _con_demo(k: list[tuple[float, float]]) -> list[tuple[float, float]]:
+            return _union_intervals(k, _demo_spans) if _demo_spans and k else k
+
         # Proyecto editable — para el retoque manual: input original, palabras
         # Whisper y los tramos conservados. run.py lo coloca junto al output.
         _write_edit_project(
@@ -1473,6 +1502,11 @@ class SilenceCutterTool:
                         )
             except Exception as e:  # noqa: BLE001
                 ctx.on_log(f"[silence_cutter] ⚠️ Boost de palabras flojas falló: {e}")
+        # El pitido/alarma se graba lejos del micro y queda muy por debajo de la
+        # voz: +6 dB SOLO al sonido (sin el margen, que toca el habla vecina).
+        _boost_spans = list(_boost_spans) + [
+            (a + 0.15, b - 0.25, 6.0) for a, b in _demo_spans if b - a > 0.45
+        ]
         _apply_cuts_ffmpeg(
             input_path=input_path,
             output_path=output_path,
@@ -1496,6 +1530,7 @@ class SilenceCutterTool:
             def _full_audit(
                 kints: list[tuple[float, float]],
                 audit_path: str | None = None,
+                coh_prev: dict | None = None,
             ) -> dict:
                 """Audit acústico + AUDIT PROFUNDO (re-transcribe el RESULTADO
                 y lo compara token a token contra lo esperado). Devuelve el
@@ -1511,6 +1546,23 @@ class SilenceCutterTool:
                     words=words,
                     stretched_spans=stretched_spans,
                 )
+                # Un sonido de demostración conservado a propósito NO es una
+                # pausa larga: fuera de los silencios internos y de la nota.
+                if _demo_spans and audit.get("internal_silences_preview"):
+                    _keep_sil = []
+                    for _si in audit["internal_silences_preview"]:
+                        _a, _b = _si.get("input_start"), _si.get("input_end")
+                        _m = None if _a is None or _b is None else (float(_a) + float(_b)) / 2.0
+                        if _m is not None and any(da - 0.3 <= _m <= db + 0.3 for da, db in _demo_spans):
+                            continue
+                        _keep_sil.append(_si)
+                    _n_drop = len(audit["internal_silences_preview"]) - len(_keep_sil)
+                    if _n_drop:
+                        audit["internal_silences_preview"] = _keep_sil
+                        audit["n_internal_silences"] = max(0, int(audit.get("n_internal_silences") or 0) - _n_drop)
+                        if isinstance(audit.get("quality_score"), int):
+                            audit["quality_score"] = min(100, audit["quality_score"] + 3 * _n_drop)
+                            audit["verdict"] = _verdict_for_score(audit["quality_score"])
                 # RESIDUO SIN VOZ: tramos conservados que no contienen palabra
                 # hablada (dead-air/tos/chasquido que sobrevivió). El juez no lo
                 # medía → un 100 podía traer basura visible ('empieza tarde sin
@@ -1519,7 +1571,9 @@ class SilenceCutterTool:
                 # leve interior.
                 try:
                     n_res, res_edge, res_prev = _count_residue_islands(
-                        kints, voiced_words or words,
+                        kints,
+                        list(voiced_words or words)
+                        + [{"start": a, "end": b} for a, b in _demo_spans],
                     )
                     audit["n_residue_islands"] = n_res
                     audit["residue_head_tail"] = res_edge
@@ -1593,7 +1647,28 @@ class SilenceCutterTool:
                 # audit profundo, coste Whisper 0). El score se pliega con min():
                 # solo puede BAJAR → un 100 significa que pasó acústico + palabras
                 # + SENTIDO. Es la pasada que convierte el 100 en una nota fiable.
-                if (
+                # `coh_prev`: el candidato solo quita audio SIN palabras respecto
+                # al mejor render → el sentido no puede cambiar; se hereda su
+                # veredicto (el juez es ruidoso: re-preguntarle inventaba fallos
+                # en frases intactas y tiraba un corte de silencio limpio).
+                if coh_prev is not None and isinstance(coh_prev.get("coherence_score"), int):
+                    coh = {
+                        "coherence_score": coh_prev["coherence_score"],
+                        "defects": coh_prev.get("coherence_issues") or [],
+                        "coherence_needs_requeue": coh_prev.get("coherence_needs_requeue"),
+                        "coherence_fallos": coh_prev.get("coherence_fallos", 0),
+                    }
+                    if isinstance(audit.get("quality_score"), int):
+                        audit["quality_score"] = min(audit["quality_score"], coh["coherence_score"])
+                        audit["verdict"] = _verdict_for_score(audit["quality_score"])
+                    audit.update({
+                        "coherence_score": coh["coherence_score"],
+                        "coherence_issues": coh["defects"],
+                        "coherence_needs_requeue": bool(coh["coherence_needs_requeue"]),
+                        "coherence_fallos": int(coh["coherence_fallos"] or 0),
+                        "coherence_inherited": True,
+                    })
+                elif (
                     bool(config.get("ai_coherence_judge_enabled", True))
                     and isinstance(audit.get("deep"), dict)
                     and audit["deep"].get("out_text")
@@ -1789,6 +1864,7 @@ class SilenceCutterTool:
                         new_keeps = _extend_last_keep_to_word_tail(
                             new_keeps, tmp_audio, video_duration
                         )
+                    new_keeps = _con_demo(new_keeps)
                     kept_now = sum(b - a for a, b in new_keeps)
                     kept_before = sum(b - a for a, b in best_keeps)
                     if not new_keeps or kept_now < max(3.0, 0.25 * kept_before):
@@ -1840,7 +1916,21 @@ class SilenceCutterTool:
                     # a igualdad de fallos de palabra, preferimos mayor score.
                     prev_best = best_score
                     prev_fallos = _count_word_fallos(best_audit)
-                    cand_audit = _full_audit(new_keeps, audit_path=tmp_out)
+                    _quitado = [(a, b) for a, b in _subtract_intervals(best_keeps, new_keeps)
+                                if b - a > 0.03]
+                    _solo_silencio = (
+                        bool(_quitado)
+                        and not [1 for a, b in _subtract_intervals(new_keeps, best_keeps)
+                                 if b - a > 0.03]
+                        and not any(
+                            min(qb, float(w["end"])) - max(qa, float(w["start"])) > 0.04
+                            for qa, qb in _quitado for w in words
+                        )
+                    )
+                    cand_audit = _full_audit(
+                        new_keeps, audit_path=tmp_out,
+                        coh_prev=best_audit if _solo_silencio else None,
+                    )
                     cand_score = cand_audit.get("quality_score")
                     cand_fallos = _count_word_fallos(cand_audit)
                     # Clave LEXICOGRÁFICA (menor = mejor): 1º fallos de SENTIDO,
@@ -1855,6 +1945,9 @@ class SilenceCutterTool:
                             _count_word_fallos(a),
                             _count_leftover_fallos(a),
                             -(a.get("quality_score") or 0),
+                            # a igualdad (p. ej. el score lo topa la coherencia
+                            # heredada), menos silencios largos es mejor
+                            int(a.get("n_silences_remaining", 0) or 0),
                         )
                     accepted = isinstance(cand_score, int) and _qkey(cand_audit) < _qkey(best_audit)
                     salvaged = False
@@ -1929,6 +2022,7 @@ class SilenceCutterTool:
                                 salv_keeps = _extend_last_keep_to_word_tail(
                                     salv_keeps, tmp_audio, video_duration,
                                 )
+                            salv_keeps = _con_demo(salv_keeps)
                             kept_salv = sum(b - a for a, b in salv_keeps)
                             if salv_keeps and kept_salv >= max(3.0, 0.25 * kept_before):
                                 tmp_out2 = output_path + ".salv.mp4"
@@ -2075,6 +2169,7 @@ class SilenceCutterTool:
                             _sw_keeps = _extend_last_keep_to_word_tail(
                                 _sw_keeps, tmp_audio, video_duration,
                             )
+                        _sw_keeps = _con_demo(_sw_keeps)
                         _kept_sw = sum(b - a for a, b in _sw_keeps)
                         _kept_bf = sum(b - a for a, b in best_keeps)
                         if _sw_keeps and _kept_sw >= max(3.0, 0.5 * _kept_bf):
@@ -2817,6 +2912,54 @@ def _normalize_word_for_match(w: str) -> str:
     return _NGRAM_NORMALIZE_RE.sub("", (w or "").lower())
 
 
+_NGRAM_LINK_WORDS = frozenset({
+    "el", "la", "los", "las", "un", "una", "en", "con", "a", "al", "de", "del",
+    "mi", "tu", "su", "the", "a", "on", "in", "to", "with",
+})
+
+
+def _is_parallel_enumeration(
+    normalized: list[str], gram: list[str], mid_idx: int, next_idx: int,
+    mid_end: int | None = None,
+) -> bool:
+    """«esto en el MANILLAR, esto en el DISCO»: la misma estructura con OTRO
+    sustantivo completo es una enumeración (dos sitios, dos cosas), no un
+    reinicio. Caso candado-alarma (3/11/2026): se cortaba «en el manillar».
+    Lo interpuesto [mid_idx, mid_end) puede llevar artículos/preposiciones
+    delante («el manillar», Whisper parte el n-grama a veces en «esto en»);
+    tiene que quedar UNA palabra de contenido, y tras la 2ª copia (saltando
+    también artículos) otra distinta y sin raíz común. «ahora están / ahora
+    estamos» (corrección real) y «en la ma / en la mesa» siguen cortándose."""
+    if mid_end is None:
+        mid_end = mid_idx + 1
+    if not gram or mid_idx < 0 or mid_end > len(normalized):
+        return False
+    mid = normalized[mid_idx:mid_end]
+    # «en el | manillar esto | en el disco»: el «esto» final repite la palabra
+    # de ANTES del n-grama — es la misma estructura vista desplazada.
+    g0 = mid_idx - len(gram)
+    t = 1
+    while len(mid) > 1 and g0 - t >= 0 and mid[-1] == normalized[g0 - t]:
+        mid = mid[:-1]
+        t += 1
+    lead = 0
+    while lead < len(mid) - 1 and mid[lead] in _NGRAM_LINK_WORDS:
+        lead += 1
+    if len(mid) - lead != 1:
+        return False
+    if gram[-1] not in _NGRAM_LINK_WORDS and lead == 0:
+        return False
+    j = next_idx
+    while j < len(normalized) and j < next_idx + 2 and normalized[j] in _NGRAM_LINK_WORDS:
+        j += 1
+    if j >= len(normalized):
+        return False
+    a, b = mid[-1], normalized[j]
+    if len(a) < 5 or len(b) < 4 or a == b:
+        return False
+    return a[:3] != b[:3]
+
+
 def _detect_repeated_ngrams(
     words: list[dict],
     *,
@@ -2879,6 +3022,9 @@ def _detect_repeated_ngrams(
                 t_a_end = float(words[i + n - 1]["end"])
                 t_b_start = float(words[b0]["start"])
                 if t_b_start - t_a_end > max_gap_between_grams_s:
+                    continue
+                if k in (1, 2) and _is_parallel_enumeration(
+                        normalized, gram_a, i + n, b0 + n, mid_end=b0):
                     continue
                 # Cortar el PRIMER intento + las palabras interpuestas [i .. b0-1];
                 # conservar la 2ª copia (la buena).
@@ -4040,6 +4186,128 @@ def _rescue_silero_islands_in_noise_gaps(
     if not n:
         return keep_intervals, 0
     return _merge_intervals(new_keeps), n
+
+
+_DEMO_SOUND_TRIGGER = re.compile(
+    r"^(pit|suen|son[aoóei]|sonid|alarm|escuch|oy[eo]s?$|o[ií]r$|ruid|clic|click|"
+    r"zumb|vibr|beep|sound|listen|hear|noise|ring)"
+)
+
+
+def _detect_demo_sounds(
+    keep_intervals: list[tuple[float, float]],
+    words: list[dict],
+    voice_intervals: list[tuple[float, float]],
+    content_cuts: list[tuple[float, float]],
+    audio_path: str,
+    *,
+    min_db_over_floor: float = 18.0,
+    min_centroid_hz: float = 1800.0,
+    min_peak_hz: float = 1500.0,
+    min_tonal_frac: float = 0.25,
+    min_frames: int = 3,
+    trigger_window_s: float = 8.0,
+    merge_gap_s: float = 1.2,
+    pad_pre_s: float = 0.15,
+    pad_post_s: float = 0.25,
+    max_total_s: float = 10.0,
+) -> list[tuple[float, float]]:
+    """SONIDOS DE DEMOSTRACIÓN del producto (pitido, alarma, timbre) que el
+    corte trató como pausa. Caso real candado-alarma (3/11/2026): «la
+    activarías [pip]», «empieza a sonar loquísimo [alarma 3 s]» — sin voz, así
+    que silero/IA lo cortaban como ruido y el vídeo enseñaba la alarma sin que
+    sonara. Es lo que más vende de un producto que suena.
+
+    Firma acústica (medida en candado + corpus): tono agudo y puro — centroide
+    ≥1,8 kHz, pico espectral ≥1,5 kHz que concentra ≥25 % de la energía, ≥18 dB
+    sobre el suelo — FUERA de la voz silero, de la cabecera/cola y de cortes de
+    CONTENIDO, y con una palabra que lo anuncie a ≤8 s (pitido/suena/alarma/
+    escucha…). En el corpus de regresión no dispara (no-op). Devuelve los
+    tramos (tiempo de input) que hay que conservar; [] si nada."""
+    if not words or not os.path.exists(audio_path):
+        return []
+    trig = []
+    for w in words:
+        t = unicodedata.normalize("NFKD", str(w.get("word", w.get("text", ""))).lower())
+        t = re.sub(r"[^a-zñ]", "", "".join(c for c in t if not unicodedata.combining(c)))
+        if t and _DEMO_SOUND_TRIGGER.match(t):
+            trig.append((float(w.get("start", 0.0)), float(w.get("end", 0.0))))
+    if not trig:
+        return []
+    import wave
+    try:
+        with wave.open(audio_path, "rb") as wf:
+            sr = wf.getframerate(); n_ch = wf.getnchannels()
+            sampwidth = wf.getsampwidth(); raw = wf.readframes(wf.getnframes())
+    except Exception:  # noqa: BLE001
+        return []
+    if sampwidth != 2 or sr <= 0:
+        return []
+    import numpy as np
+    audio = np.frombuffer(raw, dtype=np.int16)
+    if n_ch > 1:
+        audio = audio.reshape(-1, n_ch).mean(axis=1)
+    audio = audio.astype(np.float64) / 32768.0
+    win = int(0.10 * sr); hop = int(0.05 * sr)
+    if win <= 0 or len(audio) < win:
+        return []
+    hann = np.hanning(win)
+    freqs = np.fft.rfftfreq(win, 1.0 / sr)
+    frames = []
+    for i in range(0, len(audio) - win, hop):
+        x = audio[i:i + win]
+        rms = 20.0 * float(np.log10(np.sqrt(np.mean(x * x)) + 1e-9))
+        mag = np.abs(np.fft.rfft(x * hann))
+        tot = float(mag.sum()) + 1e-12
+        k = int(mag.argmax())
+        pk = float((mag[max(0, k - 2):k + 3] ** 2).sum()) / (float((mag ** 2).sum()) + 1e-12)
+        frames.append((i / sr, rms, float((mag * freqs).sum()) / tot, pk, float(freqs[k])))
+    if not frames:
+        return []
+    floor = float(np.percentile([f[1] for f in frames], 15))
+    first_w = min(float(w.get("start", 0.0)) for w in words)
+    last_w = max(float(w.get("end", 0.0)) for w in words)
+    voice = [(float(a), float(b)) for a, b in (voice_intervals or []) if b > a]
+    events: list[list] = []
+    for t, rms, cent, pk, fk in frames:
+        c = t + 0.05
+        if not (rms > floor + min_db_over_floor and cent >= min_centroid_hz
+                and fk >= min_peak_hz and pk >= min_tonal_frac):
+            continue
+        if c <= first_w or c >= last_w or any(a <= c <= b for a, b in voice):
+            continue
+        if events and t - events[-1][1] <= 0.6:
+            events[-1][1] = t + 0.10; events[-1][2] += 1
+        else:
+            events.append([t, t + 0.10, 1])
+    keeps = [(float(a), float(b)) for a, b in keep_intervals]
+    ccuts = [(float(a), float(b)) for a, b in (content_cuts or []) if b > a]
+    spans: list[tuple[float, float]] = []
+    for s, e, n in events:
+        if n < min_frames:
+            continue
+        ov = sum(max(0.0, min(e, b) - max(s, a)) for a, b in keeps)
+        if ov >= 0.5 * (e - s):                       # ya se oye
+            continue
+        if any(a < e and b > s for a, b in ccuts):    # la IA lo quitó a propósito
+            continue
+        if not any(ts <= e + trigger_window_s and te >= s - trigger_window_s for ts, te in trig):
+            continue
+        spans.append((max(0.0, s - pad_pre_s), e + pad_post_s))
+    if not spans:
+        return []
+    merged: list[tuple[float, float]] = []
+    for a, b in sorted(spans):
+        if merged and a - merged[-1][1] <= merge_gap_s:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], b))
+        else:
+            merged.append((a, b))
+    out, total = [], 0.0
+    for a, b in merged:
+        if total + (b - a) > max_total_s:
+            break
+        out.append((round(a, 3), round(b, 3))); total += b - a
+    return out
 
 
 def _detect_mumbled_word_boosts(

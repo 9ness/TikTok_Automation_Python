@@ -409,6 +409,24 @@ class TestDetectRepeatedNgrams:
             w["word"] = ["hola", "que", "tal", "estás", "yo", "bien", "y", "tú"][i]
         assert _detect_repeated_ngrams(words) == []
 
+    @staticmethod
+    def _frase(texto, paso=0.25):
+        return [{"idx": i, "word": w, "start": i * paso, "end": i * paso + 0.2}
+                for i, w in enumerate(texto.split())]
+
+    def test_enumeracion_paralela_no_es_reinicio(self):
+        # Candado 3/11/2026: «esto en el manillar esto en el disco» son dos
+        # sitios, no un reinicio — con 3-grama o partido en «esto en».
+        for t in ("enganchas esto en el manillar esto en el disco y listo",
+                  "enganchas esto en el manillar esto en disco y listo"):
+            assert _detect_repeated_ngrams(self._frase(t)) == [], t
+
+    def test_reinicios_reales_se_siguen_cortando(self):
+        for t in ("aprovecha que ahora están aprovecha que ahora estamos",
+                  "ponlo en la ma ponlo en la mesa ya",
+                  "esto costaba doce esto costaba doce euros"):
+            assert len(_detect_repeated_ngrams(self._frase(t))) == 1, t
+
     def test_2gram_repetition(self):
         # "esto costaba esto costaba doce euros" → detecta "esto costaba" [0-1]
         # como repetido en [2-3]. Mantiene el segundo.

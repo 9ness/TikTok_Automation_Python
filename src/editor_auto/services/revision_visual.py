@@ -72,13 +72,13 @@ def _aspecto(probe: dict) -> float | None:
     return None
 
 
-def _fotogramas(video: str, dur: float) -> list:
+def _fotogramas(video: str, dur: float, n: int = N_FOTOGRAMAS) -> list:
     from PIL import Image
 
     frames = []
     with tempfile.TemporaryDirectory() as tmp:
-        for i in range(N_FOTOGRAMAS):
-            t = dur * (i + 0.5) / N_FOTOGRAMAS
+        for i in range(n):
+            t = dur * (i + 0.5) / n
             p = os.path.join(tmp, f"{i:02d}.jpg")
             subprocess.run(
                 ["ffmpeg", "-v", "error", "-threads", "2", "-ss", f"{t:.2f}", "-i", video,

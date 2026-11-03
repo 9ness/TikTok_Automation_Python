@@ -79,3 +79,10 @@
 - No cortes a medias afirmaciones de venta: precios, beneficios, llamadas a la
   acción. O se conserva la afirmación entera o se elimina entera — un precio
   a medias hace perder la venta.
+
+## Enumeraciones paralelas [repetition]
+
+- "esto en el manillar, esto en el disco" NO es un reinicio: es una lista de
+  pasos con la misma estructura y un final distinto. Solo es reinicio si la
+  primera copia queda cortada ("ponlo en la ma… ponlo en la mesa") o se repite
+  idéntica.

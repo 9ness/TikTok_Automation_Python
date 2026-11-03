@@ -20,6 +20,7 @@ from .silence_cutter import SilenceCutterTool
 from .silence_cutter_scripted import SilenceCutterScriptedTool
 from .sticker_arrow import StickerArrowTool
 from .subs_auto import SubsAutoTool
+from .vip_overlays import VipOverlaysTool
 
 
 REGISTRY: dict[str, BaseTool] = {
@@ -28,6 +29,7 @@ REGISTRY: dict[str, BaseTool] = {
     SilenceCutterScriptedTool.tool_id: SilenceCutterScriptedTool(),
     StickerArrowTool.tool_id: StickerArrowTool(),
     PhotoInsertTool.tool_id: PhotoInsertTool(),
+    VipOverlaysTool.tool_id: VipOverlaysTool(),
 }
 
 

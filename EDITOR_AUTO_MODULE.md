@@ -87,6 +87,7 @@ editable por usuario sin tablas separadas.
 | Tool ID | Peso | API externas | Coste | Notas |
 |---|---|---|---|---|
 | `silence_cutter` | 10 | Silero VAD (local) + Claude Haiku (OpenAI de respaldo) | tokens Claude/OpenAI | Cortes A/V con concat MoviePy |
+| `vip_overlays`   | 60 | faster-whisper (local) + Claude Haiku | ~0,003 $ | Edición VIP: gancho, rótulos, zooms, fotos, SFX |
 | `subs_auto`      | 90 | faster-whisper (local) | — | Reusa `src/subtitles*.py` |
 
 **Position weight**: menor peso = se ejecuta antes. `silence_cutter`
@@ -143,6 +144,29 @@ Para añadir una herramienta nueva:
   ~0,0007 $; banco 3/11: 23/25 sin falsos positivos, Sonnet no mejora. Si falla
   se retiene y avisa (no re-edita); si no puede revisar, aprueba. Se apaga con
   `EDITOR_AUTO_REVISION_VISUAL=0`.
+
+### Edición VIP automática con el estilo del cliente (nov 2026)
+
+`tools/vip_overlays.py` repite sola la edición VIP hecha a mano del candado
+(`agentes/trabajo/candado_demo/vip/vip.py`):
+- **Estilo = config de la herramienta en el flujo del usuario**: colores de las
+  píldoras por rol (alerta/dato/ok/neutro, o un preset), fuente, densidad de
+  rótulos, gancho, fotos, zooms, SFX, color y `notas_estilo` (texto libre que
+  lee la IA). Al ser por usuario, su estilo se repite en todos sus vídeos.
+- **Estilo desde un vídeo de referencia**: en el flujo del usuario, la tarjeta
+  «Edición VIP» tiene «Copiar estilo de un vídeo de referencia» →
+  `POST /api/v1/editor-auto/tools/vip-overlays/estilo` → `services/estilo_vip.py`
+  (24 fotogramas → Claude visión, ~0,002 $) rellena el formulario; se guarda
+  con «Guardar flujo». CLI: `python -m src.editor_auto.services.estilo_vip <video>`.
+- **Plan**: Haiku (`prompts/vip_plan.md`) con las palabras y sus tiempos + los
+  sonidos fuertes sin voz (candidatos a gancho: alarma, pitido) → gancho
+  (rótulo, dato y tramo que se COPIA al principio con temblor), rótulos,
+  zooms y fotos. `_sanitize` impone límites: sin solapes, ≤50 % con zoom.
+- **Render**: una pasada de ffmpeg (zoom por fotograma con `scale eval=frame`
+  + `crop`, píldoras/tarjetas PIL con "pop", SFX sintetizados + boom, loudnorm).
+  Peso 60: los tiempos ya son los cortados y fotos/flecha/subtítulos van encima
+  (transcriben su salida, así que el gancho copiado no los descuadra).
+  Si algo falla, copia la entrada y el flujo sigue.
 
 ## Variables de entorno
 
