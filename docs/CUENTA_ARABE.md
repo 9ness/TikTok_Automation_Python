@@ -226,6 +226,20 @@ y nunca los dos a la vez si queda poca RAM.
 |---|---|
 | Vídeos: `scripts/subir_video_movil.py` | **Calibrado el 29/10 en el Mi 8** (ronda 6). Uso: `todo <ronda> <n> ["AAAA-MM-DD HH:MM"]` (con hora = programado en TikTok, hora de Madrid) y `programar <ronda> 05=2026-10-29T23:49 06=…` (cola, uno tras otro; si una hora queda a <35 min la corre). Lanzar con `flock /tmp/subir_video.lock`. Lee `SUBIDA.json` de la ronda y apunta en `SUBIDAS.log` |
 | Carruseles: `scripts/subir_carrusel_movil.py` | Calibrado para el OPPO; falta pasarlo al Mi 8 |
+| **Vídeos desde el 3/11: `scripts/subir_comprobacion_movil.py`** | **El camino obligatorio ahora** (Néstor). `PYTHONPATH=<repo> ~/nav-venv/bin/python scripts/subir_comprobacion_movil.py <ronda> <n>` |
+
+**Subida por «Comprobación previa» (3/11/2026).** Ficha del producto
+(`https://www.tiktok.com/view/product/<id>`, con TikTok reiniciado o cae en la Tienda) →
+deslizar → panel «Gana X € por cada venta» → «Crear ahora» (si sale «Añadir al escaparate»,
+se añade y se reabre) → «Vídeos» (540, 1278; no sale en el volcado) → «Cambiar nombre del
+producto»: el nombre del enlace se escribe LETRA A LETRA (`input text` de golpe pierde letras;
+sin acentos) → letras rojas «Haz una comprobación previa de tu vídeo» (700, 371) →
+«Comprobación de infracciones»: + → Biblioteca de fotos → Galería → Álbumes › Otros › Hmizat
+(o el selector ya abre en el álbum) → caption árabe por Keep + chip de Gboard → «Publicar»
+viene activado → «Comprobar» → «Entendido». Resultado en ≤10 min y se publica solo si pasa.
+**Cupo diario**: 6 comprobaciones (el 3/11; contador «N de 6» tras la primera). Cada día
+mirar el contador: si pasa a 10, se suben 10. Las pantallas de comprobación son web: textos
+por OCR.
 
 Cómo lo hace el script de vídeos (por si TikTok cambia la UI):
 - Busca por `uiautomator dump`; lo que no sale en el dump (menús flotantes, listas) por OCR (tesseract spa, psm 11).
@@ -249,7 +263,7 @@ Reglas del Mi 8:
 - **Perfiles**: `snssdk1233://user/profile/<uid>` (el https abre una web con
   banner de cookies).
 - **En bucles de bash**: `adb ... </dev/null`, si no adb se come la entrada.
-- **Prohibido**: «Crear ahora» y «Retirar».
+- **Prohibido**: «Retirar». («Crear ahora» SÍ desde el 3/11: es la entrada a la comprobación previa.)
 - **Al acabar**: `rm /sdcard/u.xml`, HOME y bloquear.
 
 ## 6. Usuario web `nes_bugallo`
