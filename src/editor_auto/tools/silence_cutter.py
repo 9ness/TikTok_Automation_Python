@@ -3116,7 +3116,7 @@ def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
     if largos:
         propios = largos
     return any(
-        t in propios or any(len(t) >= 4 and len(p) >= 4 and t[:4] == p[:4] for p in propios)
+        t in propios or any(len(t) >= 5 and len(p) >= 5 and t[:4] == p[:4] for p in propios)
         for t in cerca if t
     )
 
@@ -6119,6 +6119,13 @@ def _refine_keep_edges_to_valley(
     return _merge_intervals(out), n_ref
 
 
+_NUM_WORDS_ES = frozenset({
+    "uno", "una", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho",
+    "nueve", "diez", "once", "doce", "quince", "veinte", "treinta", "cuarenta",
+    "cincuenta", "cien", "ciento", "mil", "euros", "euro", "dolares",
+})
+
+
 def _ai_completeness_review(
     keep_intervals: list[tuple[float, float]],
     words: list[dict],
@@ -6226,6 +6233,22 @@ def _ai_completeness_review(
                 f"[silence_cutter] 🛑 Completitud rechazada (seg {i}): el "
                 f"recorte '{' '.join(d[2] for d in dropped)}' no empieza en "
                 f"límite de cláusula."
+            )
+            continue
+        # Y debe ACABAR colgado (nov 2026: Haiku quitaba frases enteras como
+        # «y la traigo aquí escondida en este cacharrito»). Más de 3 palabras
+        # solo si la última es de enlace, muletilla o número ('…por ocho').
+        last_tok = re.sub(r"[^\wáéíóúñü]", "", str(dropped[-1][2]).lower())
+        if n > 3 and not (
+            last_tok in _AUDIT_STOPWORDS
+            or last_tok in _FILLER_TOKENS
+            or last_tok.isdigit()
+            or last_tok in _NUM_WORDS_ES
+            or len(last_tok) <= 3
+        ):
+            log(
+                f"[silence_cutter] 🛑 Completitud rechazada (seg {i}): "
+                f"'{' '.join(d[2] for d in dropped)}' acaba en frase completa."
             )
             continue
         a, b = out[i]

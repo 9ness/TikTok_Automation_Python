@@ -1071,6 +1071,12 @@ class TestPass2Grounded:
         assert not g({"kind": "wrong_then_correct", "first_attempt": "no te creas",
                       "kept_version": "20 euros"}, 4, 6, w)
 
+    def test_prefijo_corto_no_es_repeticion(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("si vale 100 deberías invertir en uno de estos esto te va a dar una tranquilidad")
+        assert not g({"kind": "abandoned_phrase", "first_attempt": "deberías invertir en uno de estos",
+                      "kept_version": "esto te va a dar"}, 3, 8, w)
+
     def test_realinea_indices(self):
         from src.editor_auto.tools.silence_cutter import _parse_false_starts_cuts
         w = self._w("mira este con florecitas este con florecitas este con florecitas blancas azul marino y este liso")
@@ -1094,3 +1100,28 @@ class TestPhantomRecolocada:
         assert not ph
         d = [w for w in clean if w["word"] == "date"][0]
         assert d["start"] == 87.4 and d["end"] == 87.76
+
+
+class TestCompletitudFraseEntera:
+    """La revisión de completitud no quita frases que acaban bien."""
+
+    def _run(self, monkeypatch, texto, n):
+        from src.editor_auto.api import openai_client
+        from src.editor_auto.tools import silence_cutter as sc
+
+        monkeypatch.setattr(openai_client, "is_configured", lambda: True)
+        monkeypatch.setattr(openai_client, "analyze_transcript_json",
+                            lambda **k: {"fixes": [{"i": 0, "drop_last_words": n}]})
+        words = [{"word": w, "start": i * 0.4, "end": i * 0.4 + 0.3} for i, w in enumerate(texto.split())]
+        keeps = [(0.0, words[-1]["end"] + 0.05), (words[-1]["end"] + 3.0, words[-1]["end"] + 5.0)]
+        out, _ = sc._ai_completeness_review(keeps, words, language="es", log=lambda _m: None)
+        return out[0][1] < keeps[0][1]
+
+    def test_no_quita_frase_completa(self, monkeypatch):
+        assert not self._run(
+            monkeypatch,
+            "pero espera esto no es lo mejor mira siempre se me olvida la suplementación "
+            "y la traigo aquí escondida en este cacharrito", 8)
+
+    def test_quita_precio_colgado(self, monkeypatch):
+        assert self._run(monkeypatch, "es un termo muy bueno y están solo por ocho", 4)
