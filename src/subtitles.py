@@ -54,9 +54,12 @@ def _get_whisper_model(model_size: str = "base"):
     _cpu_threads = int(_os.environ.get("WHISPER_CPU_THREADS", "0") or "0")
     _cpu_kw = {"cpu_threads": _cpu_threads} if _cpu_threads > 0 else {}
 
-    # Intento GPU primero (si hay CUDA), fallback a CPU
+    # Intento GPU primero (si hay CUDA), fallback a CPU. `WHISPER_CUDA_COMPUTE`
+    # (opcional): las GPU Pascal (GTX 10xx, el PC de casa) no admiten float16 →
+    # "int8"; sin definir, float16 como siempre.
+    _cuda_compute = _os.environ.get("WHISPER_CUDA_COMPUTE", "float16") or "float16"
     try:
-        _WHISPER_MODEL = WhisperModel(model_size, device="cuda", compute_type="float16")
+        _WHISPER_MODEL = WhisperModel(model_size, device="cuda", compute_type=_cuda_compute)
         print(f"🎙️ faster-whisper cargado en GPU (modelo: {model_size})")
     except Exception:
         _WHISPER_MODEL = WhisperModel(model_size, device="cpu", compute_type="int8", **_cpu_kw)

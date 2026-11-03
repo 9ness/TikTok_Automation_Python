@@ -1076,12 +1076,24 @@ def _auto_review(queue: JobQueue, job) -> None:
 
     out_name = os.path.basename(job.result_path) if job.result_path else None
     score = _job_score(job) if job.status == JobStatus.COMPLETED else None
+    retries = int(params.get("auto_retry") or 0)
     if job.status == JobStatus.COMPLETED and out_name and _job_deliverable(job, score):
-        _approve_output(user.id, day, out_name)
-        _maybe_notify_ready(user, day, queue)
+        # Última mirada: los fotogramas. Un fallo visual (subtítulo cortado,
+        # negros) no se arregla re-editando igual → retener y avisar. Si la
+        # revisión no se puede hacer (None), se aprueba como antes.
+        from src.editor_auto.services import revision_visual
+
+        rv = revision_visual.revisar(job.result_path)
+        if rv is None or rv.get("entregable"):
+            _approve_output(user.id, day, out_name)
+            _maybe_notify_ready(user, day, queue)
+            return
+        logger.info("[auto_review] %s · %s retenido por revisión visual: %s",
+                    user.name, source, revision_visual.resumen(rv))
+        _retener_y_avisar(user, day, source, f"revisión visual: {revision_visual.resumen(rv)}"[:500],
+                          job.status.value, retries)
         return
 
-    retries = int(params.get("auto_retry") or 0)
     mount_path = Path(user_input_day_folder(user.name, day)) / source
     if source and retries < AUTO_REVIEW_MAX_RETRIES and os.path.exists(mount_path):
         try:
@@ -1102,6 +1114,12 @@ def _auto_review(queue: JobQueue, job) -> None:
             return
 
     # Agotados los intentos: retener y avisar.
+    motivo = (job.error or "").splitlines()[0][:300] if job.status == JobStatus.FAILED else f"score {score}"
+    _retener_y_avisar(user, day, source, motivo, job.status.value, retries)
+
+
+def _retener_y_avisar(user, day: str, source: str, motivo: str, estado: str, retries: int) -> None:
+    """Deja el vídeo "en revisión" (no se entrega) y avisa al operador por email."""
     try:
         get_editor_redis().sadd(f"{_ATTENTION_KEY}{user.id}:{day}", source)
     except Exception:
@@ -1109,13 +1127,12 @@ def _auto_review(queue: JobQueue, job) -> None:
     try:
         from src.editor_auto.services import email_notify
         if email_notify.is_configured():
-            motivo = (job.error or "").splitlines()[0][:300] if job.status == JobStatus.FAILED else f"score {score}"
             email_notify.send_operator_alert(
                 f"[Editor] Revisar vídeo de {user.name} ({day})",
                 [
                     f"Cliente: {user.name} · {user.account_email or ''}",
                     f"Día: {day} · Vídeo: {source}",
-                    f"Estado: {job.status.value} · {motivo}",
+                    f"Estado: {estado} · {motivo}",
                     f"Intentos automáticos: {retries}",
                     "Revísalo en el panel admin (aprobar o re-editar).",
                 ],
