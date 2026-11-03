@@ -42,7 +42,8 @@ ajustan sin bloquear a los demás:
   🔁); cuando se vuelve a montar (sube su `video_listo_at`) sale de ella y
   entra en una tanda nueva.
 - **Una tanda solo se cierra con «Tanda completada»**: aunque esté toda subida
-  sigue a la vista hasta que el operador la complete.
+  sigue a la vista hasta que alguien la complete. **Si la has subido tú (10/10
+  o la tanda entera), ciérrala tú** con `completar_tanda` (ver abajo).
 - **Lo que aún no está en ninguna tanda y está sin stock no ocupa sitio**: sale
   en «⏳ Esperando stock» y, al quitarle el 🚫, entra en la siguiente que toque.
 
@@ -81,8 +82,12 @@ Botón «✓ Tanda completada» en la cabecera (pide confirmación): CIERRA la t
 y la siguiente queda la primera (`POST /api/v1/mis-tandas/completar {ids}`
 con TODOS los de la tanda). **No marca nada como subido**: lo que no se subió
 se queda sin subir dentro de esa tanda («Ver las N tandas cerradas»), y ahí
-sigue teniendo su botón Subido. Un agente no lo usa salvo que el operador lo
-pida.
+sigue teniendo su botón Subido.
+
+**Agentes (regla de Néstor, 3/11/2026):** cuando termines de SUBIR una tanda
+entera —vídeos o fotos/carruseles, 10/10 o todo lo que tenga— la CIERRAS en el
+acto: `completar_tanda(ids=[todos los id de la tanda])`, con `fotos=True` si es
+de carruseles. No la dejes abierta. Si no la has terminado de subir, no la cierres.
 
 ## Descargas
 
@@ -137,6 +142,8 @@ un nicho nuevo en Mis tandas, **asígnale color** en
   `zip` (todas) y `zip_pendientes`; por carrusel, `id`, `hechas`/`diapositivas`,
   `subido` y su `zip`. `marcar_tanda(id, subido=True, fotos=True)` marca un
   carrusel (`subido` y/o `sin_stock`; también **solo si te lo pide el operador**).
+- `completar_tanda(ids, fotos=False)` — «Tanda completada». **Obligatorio** en
+  cuanto acabes de subir una tanda entera (vídeos o, con `fotos=True`, carruseles).
 
 - `semaforo_tanda(id, color, motivo)` — la revisión antes de subir (ver
   «Semáforo»). Esto SÍ lo puedes hacer sin que te lo pidan cuando te encarguen

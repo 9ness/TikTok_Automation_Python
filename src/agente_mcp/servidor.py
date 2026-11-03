@@ -725,6 +725,17 @@ async def marcar_tanda(ctx: Context, id: str, subido: bool | None = None,
 
 
 @_herramienta(structured_output=False)
+async def completar_tanda(ctx: Context, ids: list[str], fotos: bool = False) -> str:
+    """«✓ Tanda completada»: CIERRA una tanda de «Mis tandas» y la siguiente
+    queda la primera. `ids` = TODOS los de la tanda (salen de `mis_tandas`,
+    o de `mis_tandas(fotos=True)` con `fotos=True` para una de carruseles).
+    No marca nada como subido. OBLIGATORIO al terminar de subir una tanda
+    entera (10/10, o la tanda completa): no la dejes abierta."""
+    ruta = "/api/v1/mis-tandas/fotos/completar" if fotos else "/api/v1/mis-tandas/completar"
+    return _json(await Interno(_usuario(ctx)).post(ruta, {"ids": list(ids)}))
+
+
+@_herramienta(structured_output=False)
 async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") -> str:
     """Semáforo de revisión de un vídeo de «Mis tandas» (`id` sale de `mis_tandas`),
     para que el operador sepa qué se puede subir sin riesgo de sanción:

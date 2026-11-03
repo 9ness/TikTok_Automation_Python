@@ -235,7 +235,9 @@ suelta sobre la foto.
    hashtags (en TikTok, los MISMOS de los vídeos — configuración de hashtags
    del POV BOF — más los de moda si es ropa/calzado/bolsos; los de la IA,
    `hashtags_ia`, se usan en Meta), y lo marca **Subido** en Mis tandas › Fotos
-   (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide).
+   (`marcar_tanda(id, subido=True, fotos=True)`, solo si te lo pide). Si los
+   subes tú y terminas la tanda (10/10 o entera), ciérrala en el acto:
+   `completar_tanda(ids=[todos los de la tanda], fotos=True)`.
 6. **Instagram/Facebook/Threads**: con su enlace de Amazon/SHEIN, se programa
    con `encolar_carrusel` (ver `guia("multiplataforma")` › Carruseles).
 
