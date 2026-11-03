@@ -28,6 +28,10 @@
 >   gris en Android. Se abre en `/navegador/visor.html#password=…` (barra: ⌨️ teclado, 📋 pegar, ↻).
 > - Alternativa con terminal: `deploy/navegador_vps.ps1` (túnel SSH a `localhost:6080`).
 
+> **Segundo navegador en el PC de casa (3/11/2026):** mismo montaje en el WSL del PC
+> del operador, con la IP de casa. Accesos › «🏠 PC de casa», ruta `/navegador-casa/`,
+> agentes por túnel SSH al CDP. Detalle: [`navegador_casa/README.md`](navegador_casa/README.md).
+
 ## Para qué
 
 Las imágenes y los clips se generan SIEMPRE en la web (Google Flow, GenAI Pro,

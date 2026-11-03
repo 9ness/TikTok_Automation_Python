@@ -20,6 +20,24 @@ operador** salvo que aparezca un login, una verificación o un CAPTCHA.
 > desde un navegador que salga por la IP del VPS.** El Chrome aparte de
 > [`navegador-proxy-es.md`](navegador-proxy-es.md) (9223) queda para IPTV. **Social1 de pago está en ESTE Chrome (9222)**, no en el 9223.
 
+## 0. Hay DOS navegadores: VPS y PC de casa (3/11/2026)
+
+Para repartir el trabajo, el PC de casa del operador tiene el mismo Chrome
+(Accesos › «🏠 PC de casa»; instalación en
+[`deploy/navegador_casa/README.md`](../../../../deploy/navegador_casa/README.md)).
+Sale por la IP de casa, así que **no gasta proxy residencial**. Solo existe con el
+PC encendido y la sesión de Windows iniciada.
+
+```bash
+ssh ness@100.125.167.31 .local/bin/navegador on     # json | off, igual que aquí
+ssh -f -N -L 9322:127.0.0.1:9222 ness@100.125.167.31  # su CDP queda en 127.0.0.1:9322 del VPS
+```
+Y te conectas a `http://127.0.0.1:9322` igual que al 9222 (`connect_over_cdp`, o
+`@playwright/mcp --cdp-endpoint http://127.0.0.1:9322`). Al acabar, mata el túnel
+(`pkill -f 9322:127.0.0.1:9222`) y `navegador off` en el PC. Si dos agentes trabajan
+a la vez, **uno en cada navegador**: no compartáis pestañas. Lo descargado cae en el
+disco del PC (`~/Downloads` de Ubuntu): súbelo con `scp` al VPS y bórralo allí.
+
 ## 1. Qué hay
 
 - Un **Chrome estable con pantalla virtual** que guarda las sesiones en su perfil

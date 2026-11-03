@@ -76,6 +76,19 @@
 		reverse_proxy 172.18.0.1:6080
 	}
 
+	# El mismo navegador en el PC de casa del operador (WSL, deploy/navegador_casa/):
+	# websockify escucha solo en su IP de Tailscale; Caddy llega por el host.
+	@navegadorcasa path /navegador-casa /navegador-casa/*
+	handle @navegadorcasa {
+		forward_auth api:8000 {
+			uri /api/v1/navegador/auth
+			header_up -Upgrade
+			header_up -Connection
+		}
+		uri strip_prefix /navegador-casa
+		reverse_proxy 100.125.167.31:6080
+	}
+
 	# Panel de agentes del VPS (Mini App de Telegram «👾 Agentes» de los
 	# asistentes). Servicio del HOST `panel-agentes.service` (~/panel-agentes),
 	# en el bridge 172.18.0.1:8792 (ufw solo abre 172.18.0.0/16). La auth la hace

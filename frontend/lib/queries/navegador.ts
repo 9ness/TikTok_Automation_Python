@@ -4,8 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
-/** Estado del Chrome remoto del VPS (Flow / Magnific sin el PC encendido). */
+/** Dónde vive el Chrome: el del VPS o el del PC de casa (WSL, por Tailscale). */
+export type MaquinaNavegador = "vps" | "casa";
+
+/** Estado del Chrome remoto (Flow / Magnific sin el PC del operador delante). */
 export interface EstadoNavegador {
+  /** Solo `casa`: el PC no responde (apagado, sin sesión de Windows o sin Tailscale). */
+  sin_conexion?: boolean;
   encendido: boolean;
   chrome_mb: number;
   disponible_mb: number;
@@ -15,28 +20,29 @@ export interface EstadoNavegador {
   pestanas: { titulo: string; host: string }[];
 }
 
-const KEY = ["navegador", "estado"];
+const key = (maquina: MaquinaNavegador) => ["navegador", "estado", maquina];
 
-export function useEstadoNavegador(activo = true) {
+export function useEstadoNavegador(activo = true, maquina: MaquinaNavegador = "vps") {
   return useQuery<EstadoNavegador>({
-    queryKey: KEY,
-    queryFn: () => api.get<EstadoNavegador>("/api/v1/navegador/estado"),
+    queryKey: key(maquina),
+    queryFn: () => api.get<EstadoNavegador>(`/api/v1/navegador/estado?maquina=${maquina}`),
     enabled: activo,
     refetchInterval: 10_000,
     retry: false,
   });
 }
 
-export function useAccionNavegador() {
+export function useAccionNavegador(maquina: MaquinaNavegador = "vps") {
   const qc = useQueryClient();
   return useMutation<EstadoNavegador, Error, "encender" | "apagar">({
-    mutationFn: (accion) => api.post<EstadoNavegador>(`/api/v1/navegador/${accion}`, {}),
-    onSuccess: (estado) => qc.setQueryData(KEY, estado),
+    mutationFn: (accion) =>
+      api.post<EstadoNavegador>(`/api/v1/navegador/${accion}?maquina=${maquina}`, {}),
+    onSuccess: (estado) => qc.setQueryData(key(maquina), estado),
   });
 }
 
 /** La contraseña de la pantalla remota (solo admin). */
-export async function pedirClaveNavegador(): Promise<string> {
-  const r = await api.get<{ clave: string }>("/api/v1/navegador/clave");
+export async function pedirClaveNavegador(maquina: MaquinaNavegador = "vps"): Promise<string> {
+  const r = await api.get<{ clave: string }>(`/api/v1/navegador/clave?maquina=${maquina}`);
   return r.clave;
 }

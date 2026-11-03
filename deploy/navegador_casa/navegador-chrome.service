@@ -1,0 +1,19 @@
+[Unit]
+Description=Chrome del agente en el PC de casa (CDP solo local; IP de casa, residencial)
+After=navegador-pantalla.service
+Requires=navegador-pantalla.service
+PartOf=navegador.target
+
+[Service]
+Environment=DISPLAY=:99
+ExecStart=/usr/bin/google-chrome \
+  --user-data-dir=%h/.navegador-agente/perfil \
+  --disk-cache-dir=%h/.navegador-agente/cache --disk-cache-size=209715200 \
+  --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 \
+  --no-first-run --no-default-browser-check --disable-dev-shm-usage \
+  --disable-gpu --disable-sync --disable-translate \
+  --disable-features=MediaRouter,Translate \
+  --window-position=0,0 --window-size=1440,900 \
+  https://labs.google/fx/tools/flow
+Restart=on-failure
+RestartSec=5

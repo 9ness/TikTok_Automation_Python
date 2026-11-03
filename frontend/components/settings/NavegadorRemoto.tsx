@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMe } from "@/lib/queries/auth";
 import {
+  type MaquinaNavegador,
   pedirClaveNavegador,
   useAccionNavegador,
   useEstadoNavegador,
@@ -18,12 +19,30 @@ import {
  *  apaga desde aquí (gasta ~1 GB de RAM mientras está encendido y se apaga solo
  *  tras un rato sin nadie), y «Abrir» va a `/navegador/`, que Caddy protege con
  *  el mismo login de la app.
+ *
+ *  `maquina="casa"` es el mismo montaje en el PC de casa del operador (WSL, por
+ *  Tailscale; `deploy/navegador_casa/`): sale por la IP de casa y se abre en
+ *  `/navegador-casa/`. Si el PC está apagado, lo dice en vez de dar error.
  */
-export function NavegadorRemoto() {
+const TEXTOS: Record<MaquinaNavegador, { titulo: string; ruta: string; desc: string }> = {
+  vps: {
+    titulo: "🖥️ Navegador remoto · VPS",
+    ruta: "/navegador",
+    desc: "Chrome dentro del servidor, para generar en Flow y Magnific sin el PC. Enciéndelo cuando lo necesites y ábrelo desde aquí, en el móvil o en cualquier ordenador.",
+  },
+  casa: {
+    titulo: "🏠 Navegador remoto · PC de casa",
+    ruta: "/navegador-casa",
+    desc: "Chrome dentro del PC de casa (sin ventana en tu pantalla), con la conexión de casa. Sirve para repartir: unos agentes generan aquí y otros en el VPS. Necesita el PC encendido y con la sesión de Windows iniciada.",
+  },
+};
+
+export function NavegadorRemoto({ maquina = "vps" }: { maquina?: MaquinaNavegador }) {
   const me = useMe();
   const esAdmin = me.data?.rol === "admin";
-  const estado = useEstadoNavegador(esAdmin);
-  const accion = useAccionNavegador();
+  const estado = useEstadoNavegador(esAdmin, maquina);
+  const accion = useAccionNavegador(maquina);
+  const t = TEXTOS[maquina];
 
   if (!esAdmin) return null;
 
@@ -39,8 +58,8 @@ export function NavegadorRemoto() {
    *  en Android. */
   async function abrir() {
     try {
-      const clave = await pedirClaveNavegador();
-      window.location.href = `/navegador/visor.html#password=${encodeURIComponent(clave)}`;
+      const clave = await pedirClaveNavegador(maquina);
+      window.location.href = `${t.ruta}/visor.html#password=${encodeURIComponent(clave)}`;
     } catch {
       toast.error("No se pudo abrir el navegador");
     }
@@ -48,7 +67,7 @@ export function NavegadorRemoto() {
 
   async function copiarClave() {
     try {
-      await navigator.clipboard.writeText(await pedirClaveNavegador());
+      await navigator.clipboard.writeText(await pedirClaveNavegador(maquina));
       toast.success("Contraseña copiada — pégala al abrir el navegador");
     } catch {
       toast.error("No se pudo copiar la contraseña");
@@ -59,8 +78,12 @@ export function NavegadorRemoto() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-          🖥️ Navegador remoto
-          {e ? (
+          {t.titulo}
+          {e?.sin_conexion ? (
+            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+              PC sin conexión
+            </span>
+          ) : e ? (
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                 e.encendido
@@ -75,9 +98,10 @@ export function NavegadorRemoto() {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">
-          Chrome dentro del servidor, para generar en Flow y Magnific sin el PC. Enciéndelo
-          cuando lo necesites y ábrelo desde aquí, en el móvil o en cualquier ordenador.
-          {e?.encendido
+          {t.desc}
+          {e?.sin_conexion
+            ? " Ahora no responde: enciende el PC e inicia sesión en Windows."
+            : e?.encendido
             ? ` Usa unos ${e.chrome_mb} MB y se apaga solo tras ${e.autoapagado_min} min sin uso.`
             : " Apagado no gasta nada."}
         </p>
@@ -124,7 +148,7 @@ export function NavegadorRemoto() {
           ) : (
             <Button
               size="sm"
-              disabled={cambiando || estado.isLoading}
+              disabled={cambiando || estado.isLoading || !!e?.sin_conexion}
               onClick={() => accion.mutate("encender")}
             >
               {cambiando ? (

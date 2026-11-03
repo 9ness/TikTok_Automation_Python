@@ -1,0 +1,6 @@
+[Unit]
+Description=Apagar el navegador del PC de casa si nadie lo usa
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/navegador auto

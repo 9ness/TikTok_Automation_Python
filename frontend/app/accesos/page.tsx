@@ -46,8 +46,9 @@ export default function AccesosPage() {
         <p className="text-sm text-muted-foreground">Esta pantalla es solo del administrador.</p>
       ) : (
         <>
-          {/* El navegador con sus botones (encender / abrir / apagar). */}
+          {/* Los navegadores con sus botones (encender / abrir / apagar): VPS y PC de casa. */}
           <NavegadorRemoto />
+          <NavegadorRemoto maquina="casa" />
 
           {/* Renovar el login de Claude del VPS (caduca ~cada mes). */}
           <SesionClaudeVps />

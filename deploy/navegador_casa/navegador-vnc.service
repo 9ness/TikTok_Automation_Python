@@ -1,0 +1,13 @@
+[Unit]
+Description=noVNC de la pantalla :99 (solo tailnet; lo publica el Caddy del VPS con login de admin)
+After=navegador-pantalla.service
+Requires=navegador-pantalla.service
+PartOf=navegador.target
+
+[Service]
+# En WSL /tmp/.X11-unix es de WSLg: Xvfb solo deja el socket abstracto, así que se espera a que :99 responda.
+# x11vnc solo en localhost; websockify en la IP de Tailscale (no se ve desde internet ni desde la LAN).
+ExecStart=/bin/sh -c 'until DISPLAY=:99 xdotool getdisplaygeometry >/dev/null 2>&1; do sleep 1; done; sleep 1; IP=$(tailscale ip -4 | head -1); x11vnc -display :99 -rfbauth %h/.vnc/passwd -localhost -forever -shared -noxdamage -rfbport 5900 & exec websockify --web %h/.local/share/navegador/web $IP:6080 127.0.0.1:5900'
+Restart=on-failure
+RestartSec=5
+Nice=10

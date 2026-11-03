@@ -40,6 +40,8 @@ Endpoints:
     POST /admin/claude-login/iniciar|codigo|cancelar — renovar esa sesión desde la web
     GET  /admin/navegador/clave   — contraseña de la pantalla (solo admin)
     POST /admin/navegador/on|off  — encender / apagar ese Chrome (`/usr/local/bin/navegador`)
+    GET  /admin/navegador-casa/estado|clave, POST …/on|off — lo mismo en el PC de casa
+                                    (WSL por Tailscale; `ssh <NAVEGADOR_CASA_SSH> .local/bin/navegador …`)
     GET  /admin/claves            — variables de los .env de ~/proyectos, enmascaradas
     POST /admin/claves            — {proyecto, variable, valor}: guarda y prueba (`claves_proyectos.py`)
 """
@@ -84,6 +86,16 @@ MAX_BODY_BYTES = 5_000_000
 # Cualquier otro nombre se rechaza con 400 — evita que un atacante con la
 # API key reinicie servicios arbitrarios del docker-compose del host.
 ALLOWED_SERVICES = {"api", "web", "caddy"}
+# Navegador del PC de casa (deploy/navegador_casa/): se maneja por SSH de Tailscale.
+NAVEGADOR_CASA_SSH = os.environ.get("NAVEGADOR_CASA_SSH", "ness@100.125.167.31")
+
+
+def _cmd_navegador(accion: str, casa: bool = False) -> list[str]:
+    """`navegador <accion>` en el VPS (sudo) o en el PC de casa (SSH por Tailscale)."""
+    if casa:
+        return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+                NAVEGADOR_CASA_SSH, ".local/bin/navegador", accion]
+    return ["sudo", "-n", "/usr/local/bin/navegador", accion]
 
 
 def _run(cmd: list[str], timeout: int = 30, cwd: str | None = None) -> tuple[int, str, str]:
@@ -278,6 +290,20 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self._handle_navegador("json")
             return
 
+        if path == "/admin/navegador-casa/estado":
+            self._handle_navegador("json", casa=True)
+            return
+
+        if path == "/admin/navegador-casa/clave":
+            if not self._check_admin_auth():
+                return
+            rc, out, _e = _run(_cmd_navegador("clave", casa=True), timeout=20)
+            if rc == 0 and out.strip():
+                self._json_response(200, {"clave": out.strip()})
+            else:
+                self._json_response(500, {"error": "sin clave (¿PC de casa apagado?)"})
+            return
+
         if path == "/admin/claude-login/estado":
             self._handle_claude_login("estado")
             return
@@ -354,6 +380,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
 
         if path in ("/admin/navegador/on", "/admin/navegador/off"):
             self._handle_navegador(path.rsplit("/", 1)[1])
+            return
+
+        if path in ("/admin/navegador-casa/on", "/admin/navegador-casa/off"):
+            self._handle_navegador(path.rsplit("/", 1)[1], casa=True)
             return
 
         if path == "/admin/claves":
@@ -437,17 +467,23 @@ class WebhookHandler(BaseHTTPRequestHandler):
         LOG.info("claves: %s/%s %s (prueba=%s)", proyecto, variable, r["accion"], r["prueba"])
         self._json_response(200, r)
 
-    def _handle_navegador(self, accion: str) -> None:
-        """Enciende/apaga el Chrome remoto y devuelve su estado (JSON)."""
+    def _handle_navegador(self, accion: str, casa: bool = False) -> None:
+        """Enciende/apaga el Chrome remoto (VPS o PC de casa) y devuelve su estado (JSON)."""
         if not self._check_admin_auth():
             return
         if accion in ("on", "off"):
-            _run(["sudo", "-n", "/usr/local/bin/navegador", accion], timeout=60)
-        rc, out, err = _run(["sudo", "-n", "/usr/local/bin/navegador", "json"], timeout=20)
+            _run(_cmd_navegador(accion, casa), timeout=60)
+        rc, out, err = _run(_cmd_navegador("json", casa), timeout=20)
         try:
             data = json.loads(out.strip().splitlines()[-1]) if rc == 0 and out.strip() else None
         except (json.JSONDecodeError, IndexError):
             data = None
+        if data is None and casa:
+            # PC apagado, sin sesión de Windows o sin Tailscale: no es un error del servidor.
+            self._json_response(200, {"encendido": False, "sin_conexion": True, "chrome_mb": 0,
+                                      "disponible_mb": 0, "inactivo_s": 0,
+                                      "autoapagado_min": 45, "pestanas": []})
+            return
         if data is None:
             self._json_response(500, {"error": err or out or "sin respuesta de navegador"})
             return
