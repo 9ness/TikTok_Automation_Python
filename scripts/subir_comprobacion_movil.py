@@ -91,7 +91,10 @@ m.tap(540, d['y'] - 180 if d['y'] > 700 else 660, 2)   # el nodo ocupa el bloque
 m.pegar(); m.tecla(4, 2)
 if m.buscar(r'Añade una descripción', 1) and not any(re.search(r'#tiktokshop', x['text']) for x in m.nodos()):
     falla('caption sin pegar')
-prod = m.buscar('(?i)' + re.escape(nombre[:12]), 2)
+# el producto vinculado no sale en el volcado (allí solo está el caption, que también lo nombra):
+# OCR en la fila de debajo de «Vincula un producto»
+v = m.ocr(r'Vincula')
+prod = v and m.ocr(re.escape(nombre[:10]), (0, v[1], 1080, v[1] + 260))
 if not prod: falla('producto vinculado no coincide')
 foto(f'antes_{int(n):02d}')
 debe(r'^\s*Comprobar$', 4)
