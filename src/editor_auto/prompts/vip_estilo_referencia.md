@@ -7,6 +7,8 @@ Saca el ESTILO de edición (no el contenido), para repetirlo en sus próximos v�
 - Fotos o imágenes de apoyo superpuestas: cualquier imagen rectangular con borde o sombra encima del vídeo (otra moto, una calle, una persona…). Basta con UN fotograma que la tenga → true.
 - Tipo de letra que más se parece, de esta lista: {fuentes}.
 - Color: ¿saturado/contrastado o natural?
+- Subtítulos (el texto de lo que se dice, que cambia en cada fotograma): ¿hay?, cuántas palabras salen a la vez, altura, color de la letra y si UNA palabra va de otro color (la que se está diciendo), en píldora/caja o subrayada.
+- Flecha final (la que señala abajo al carrito, suele salir en los últimos fotogramas): color, si es una o varias seguidas, y dónde está.
 
 Responde SOLO JSON con estas claves (si algo no se ve, pon el valor por defecto que se indica):
 {"color_alerta": "#RRGGBB" (fondo de rótulos de problema/urgencia, defecto #E61E2D),
@@ -17,4 +19,8 @@ Responde SOLO JSON con estas claves (si algo no se ve, pon el valor por defecto 
  "densidad_rotulos": "baja"|"media"|"alta",
  "gancho": true|false, "fotos": true|false, "zooms": true|false, "color_grade": true|false,
  "rotulo_y_pct": número 5-60 (altura del centro de los rótulos, % desde arriba; defecto 16),
+ "subs": {"hay": true|false, "palabras": 1-6 (cuántas a la vez), "y_pct": número 40-92 (centro de los subtítulos, % desde arriba),
+          "color_texto": "#RRGGBB", "resaltado": "color"|"pildora"|"subrayado"|"ninguno", "color_resaltado": "#RRGGBB",
+          "mayusculas": true|false},
+ "flecha": {"hay": true|false, "color": "#RRGGBB", "triple": true|false (varias flechas seguidas), "x_pct": 0-100, "y_pct": 0-100 (centro)},
  "notas_estilo": "2-4 frases para el editor: tono, ritmo, qué tipo de rótulos, qué evitar"}

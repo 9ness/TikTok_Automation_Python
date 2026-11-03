@@ -52,3 +52,29 @@ def test_clean_text_sin_emojis():
 def test_clean_text_respeta_decibelios():
     assert _clean_text("110 dB") == "110 dB"
     assert _clean_text("110db") == "110 dB"
+
+
+class TestEstiloFlujo:
+    """El estilo de la referencia también rellena subtítulos y flecha."""
+
+    def test_subs(self):
+        from src.editor_auto.services.estilo_vip import _subs_cfg
+        cfg = _subs_cfg({"hay": True, "palabras": 3, "y_pct": 68, "color_texto": "#ffffff",
+                         "resaltado": "color", "color_resaltado": "#ffd600", "mayusculas": True})
+        assert cfg == {"highlight_mode": "color_swap", "text_color": "#FFFFFF",
+                       "highlight_color": "#FFD600", "max_words": 3, "y_position": 0.68,
+                       "case_mode": "UPPERCASE"}
+        assert _subs_cfg({"hay": False}) == {}
+
+    def test_flecha_triple_naranja(self, tmp_path, monkeypatch):
+        from src.editor_auto.services import estilo_vip
+        for n in ("flecha_roja.mov", "flecha_naranja.mov", "flecha_abajo_triple_naranja.mov",
+                  "flecha_abajo_triple_roja.mov", "flecha_triple_naranja.mov"):
+            (tmp_path / n).write_bytes(b"x")
+        monkeypatch.setattr("src.editor_auto.tools.sticker_arrow.arrows_folder", lambda: str(tmp_path))
+        cfg = estilo_vip._flecha_cfg({"hay": True, "color": "#F7931E", "triple": True,
+                                      "x_pct": 50, "y_pct": 88})
+        assert cfg == {"sticker_file": "flecha_abajo_triple_naranja.mov", "color_mode": "fixed",
+                       "position_x_pct": 50.0, "position_y_pct": 88.0}
+        sola = estilo_vip._flecha_cfg({"hay": True, "color": "#E02020", "triple": False})
+        assert sola["sticker_file"] == "flecha_roja.mov"

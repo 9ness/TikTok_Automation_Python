@@ -76,7 +76,88 @@ def estilo_desde_video(video: str) -> dict:
     except (TypeError, ValueError):
         pass
     cfg["notas_estilo"] = str(data.get("notas_estilo") or "")[:1500]
+    # Lo que no es de vip_overlays (subtítulos, flecha) va aparte: la UI lo
+    # mezcla en esos pasos del flujo si el usuario los tiene.
+    flujo = {}
+    subs = _subs_cfg(data.get("subs"))
+    if subs:
+        flujo["subs_auto"] = subs
+    flecha = _flecha_cfg(data.get("flecha"))
+    if flecha:
+        flujo["sticker_arrow"] = flecha
+    if flujo:
+        cfg["_flujo"] = flujo
     return cfg
+
+
+_RESALTADO = {"color": "color_swap", "pildora": "pill", "subrayado": "underline",
+              "ninguno": "none"}
+
+
+def _clamp(v, lo: float, hi: float) -> float | None:
+    try:
+        return max(lo, min(hi, float(v)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _subs_cfg(d) -> dict:
+    """Estilo de subtítulos visto en la referencia → config parcial de `subs_auto`."""
+    if not isinstance(d, dict) or d.get("hay") is False:
+        return {}
+    out: dict = {}
+    modo = _RESALTADO.get(str(d.get("resaltado", "")).lower())
+    if modo:
+        out["highlight_mode"] = modo
+    for k_in, k_out in (("color_texto", "text_color"), ("color_resaltado", "highlight_color")):
+        if _HEX.match(str(d.get(k_in, ""))):
+            out[k_out] = d[k_in].upper()
+    n = _clamp(d.get("palabras"), 1, 6)
+    if n is not None:
+        out["max_words"] = int(round(n))
+    y = _clamp(d.get("y_pct"), 40, 92)
+    if y is not None:
+        out["y_position"] = round(y / 100, 3)
+    if isinstance(d.get("mayusculas"), bool):
+        out["case_mode"] = "UPPERCASE" if d["mayusculas"] else "None"
+    return out
+
+
+# Color de cada nombre del banco de flechas (`flecha_<forma>_<color>.mov`).
+_COLORES_FLECHA = {
+    "roja": (230, 40, 40), "naranja": (255, 140, 0), "amarilla": (253, 215, 50),
+    "verde": (34, 197, 94), "cyan": (34, 211, 238), "azul": (40, 100, 235),
+    "morada": (140, 60, 200), "rosa": (245, 110, 170), "blanca": (245, 245, 245),
+    "negra": (20, 20, 20), "beige": (225, 205, 165), "marron": (125, 80, 45),
+    "burdeos": (128, 20, 45),
+}
+
+
+def _flecha_cfg(d) -> dict:
+    """Flecha vista en la referencia → la del banco más parecida (color y si es
+    triple), fija en vez de "inteligente", y en el mismo sitio."""
+    from src.editor_auto.tools.sticker_arrow import arrows_folder
+
+    if not isinstance(d, dict) or d.get("hay") is False or not _HEX.match(str(d.get("color", ""))):
+        return {}
+    c = tuple(int(d["color"][i:i + 2], 16) for i in (1, 3, 5))
+    try:
+        banco = sorted(p.name for p in Path(arrows_folder()).glob("flecha_*.mov"))
+    except Exception:  # noqa: BLE001
+        return {}
+    # Solo formas que apuntan al carrito: sencilla o triple hacia abajo.
+    forma = r"abajo_triple_" if d.get("triple") else r""
+    pool = [(n, _COLORES_FLECHA[m.group(1)]) for n in banco
+            if (m := re.fullmatch(rf"flecha_{forma}([a-z]+)\.mov", n)) and m.group(1) in _COLORES_FLECHA]
+    if not pool:
+        return {}
+    nombre = min(pool, key=lambda p: sum((a - b) ** 2 for a, b in zip(p[1], c)))[0]
+    out: dict = {"sticker_file": nombre, "color_mode": "fixed"}
+    x = _clamp(d.get("x_pct"), 0, 100)
+    y = _clamp(d.get("y_pct"), 0, 100)
+    if x is not None and y is not None:
+        out["position_x_pct"], out["position_y_pct"] = round(x, 1), round(y, 1)
+    return out
 
 
 if __name__ == "__main__":  # python -m src.editor_auto.services.estilo_vip <video>

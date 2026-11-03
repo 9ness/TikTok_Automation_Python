@@ -103,11 +103,17 @@ export function UserFlowEditor({ userId }: { userId: string }) {
     );
   };
 
+  // `_flujo` (lo trae "copiar estilo de un vídeo"): config de OTROS pasos
+  // —subtítulos, flecha— que se mezcla en ellos si están en el flujo.
   const applyPresetToStep = (idx: number, presetCfg: Record<string, unknown>) => {
+    const { _flujo, ...cfg } = presetCfg;
+    const otros = (_flujo ?? {}) as Record<string, Record<string, unknown>>;
     setSteps(
-      steps.map((s, i) =>
-        i === idx ? { ...s, config: { ...s.config, ...presetCfg } } : s,
-      ),
+      steps.map((s, i) => {
+        if (i === idx) return { ...s, config: { ...s.config, ...cfg } };
+        const extra = otros[s.tool_id];
+        return extra ? { ...s, config: { ...s.config, ...extra } } : s;
+      }),
     );
   };
 
@@ -302,7 +308,8 @@ function StepCard({
 }
 
 /** Sube un vídeo que le gusta al cliente y rellena el estilo VIP con lo que
- *  ve la IA (colores, letra, densidad, gancho, fotos, zooms y notas). No
+ *  ve la IA (colores, letra, densidad, gancho, fotos, zooms y notas), y de
+ *  paso los subtítulos y la flecha si están en el flujo. No
  *  guarda: queda en el formulario hasta que se pulse Guardar flujo. */
 function EstiloDesdeVideo({ onApply }: { onApply: (config: Record<string, unknown>) => void }) {
   const [estado, setEstado] = useState<"idle" | "cargando" | "ok" | "error">("idle");
@@ -320,7 +327,7 @@ function EstiloDesdeVideo({ onApply }: { onApply: (config: Record<string, unknow
       );
       onApply(cfg);
       setEstado("ok");
-      setMsg("Estilo aplicado. Revisa y guarda el flujo.");
+      setMsg("Estilo aplicado (también a subtítulos y flecha si están en el flujo). Revisa y guarda.");
     } catch (e) {
       setEstado("error");
       setMsg(e instanceof Error ? e.message : "No se pudo sacar el estilo");
