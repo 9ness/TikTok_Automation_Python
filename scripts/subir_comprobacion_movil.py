@@ -55,16 +55,30 @@ if DESDE != 'video':
     time.sleep(3)
     if not any(x['clase'].endswith('EditText') for x in m.nodos()):
         m.tap(540, 1278, 4)                   # «Vídeos» de «¿Cómo quieres promocionar…?» (no sale en el volcado)
+    if ve(r'Añadir producto al', 2):          # diálogo nuevo (4/11): «¿Añadir producto al vídeo?» → «Añadir»
+        debe(r'^\s*Añadir$', 4)
     campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
     if not campo: falla('no sale «Cambiar nombre del producto»')
-    m.tap(campo['x'], campo['y'], 1.5)
-    m.tecla('KEYCODE_MOVE_END', .3)
-    for _ in range(45): m.adb("shell","input","keyevent","67")
-    nombre = unicodedata.normalize('NFKD', it['nombre_enlace']).encode('ascii','ignore').decode()
-    for ch in nombre:
-        m.adb("shell","input","text","%s" if ch == ' ' else ch); time.sleep(.35)
-    time.sleep(1)
-    campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
+    for intento in range(2):                  # con el móvil cargado se cuela un espacio o se pierde una letra
+        m.tap(campo['x'], campo['y'], 1.5)
+        m.tecla('KEYCODE_MOVE_END', .3)
+        for _ in range(45): m.adb("shell","input","keyevent","67")
+        if intento == 0:
+            for ch in nombre:
+                m.adb("shell","input","text","%s" if ch == ' ' else ch); time.sleep(.35)
+        else:                                 # «Colageno» salía «Colage no» letra a letra (y por palabras se
+            m.tecla(4, 1)                     #   comía letras): se pega desde el portapapeles, como el caption
+            m.al_portapapeles(nombre); time.sleep(2)
+            campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
+            if not campo: falla('al volver de Keep no veo el nombre')
+            m.tap(campo['x'], campo['y'], 1.5); m.tecla('KEYCODE_MOVE_END', .3)
+            for _ in range(45): m.adb("shell","input","keyevent","67")
+            m.pegar()
+        time.sleep(1)
+        campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
+        if campo and campo['text'].strip().lower() == nombre.lower(): break
+        print(f'nombre mal escrito ({campo and campo["text"]!r}), reintento')
+        if not campo: break
     if not campo or campo['text'].strip().lower() != nombre.lower(): falla(f'nombre mal escrito: {campo and campo["text"]!r}')
     m.tap(700, 371, 4)                        # letras rojas «Haz una comprobación previa de tu vídeo» (enlace dentro del texto)
     if not ve(r'Sube un', 5): falla('no sale la comprobación')
