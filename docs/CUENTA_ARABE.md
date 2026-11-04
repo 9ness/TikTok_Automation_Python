@@ -279,8 +279,9 @@ Entra con su PIN (lo elige la primera vez) y **solo ve dos pantallas**:
   formato que las de Néstor (`estadisticas:ventas:nes_bugallo`). Se leen del Mi 8
   **cada semana** y se guardan con `guardar_estadisticas` (guía
   `estadisticas.md`).
-  - PENDIENTE: los scripts de `scripts/estadisticas_movil/` están calibrados
-    para el OPPO; adaptarlos al Mi 8.
+  - Mi 8: `scripts/estadisticas_movil/dias_mi8.py DESDE..HASTA` (día a día, con comisión).
+    La rutina semanal de los miércoles (`~/rutinas/cuenta-arabe-semanal.md`) lo lanza y apunta
+    la comisión de cada día en el panel (fuente 4, «Cuenta Árabe (Ness/Buga)»).
 
 Sin «Mis tandas»: el contenido lo preparan los agentes.
 

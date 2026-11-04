@@ -10,7 +10,11 @@ Los datos NO salen de ninguna API: se leen de la app de TikTok en el móvil
 (OPPO por ADB, ver `comun/` y la memoria del móvil) y se guardan con el MCP.
 La cuenta árabe de Bugallo se lee del **Xiaomi Mi 8** cada semana y se guarda
 con el token de `nes_bugallo` (`docs/CUENTA_ARABE.md` §6; los scripts de abajo
-están calibrados para el OPPO y falta adaptarlos al Mi 8).
+están calibrados para el OPPO). En el Mi 8 se usa
+`scripts/estadisticas_movil/dias_mi8.py DESDE..HASTA` (4/11/2026): día a día por el filtro
+«Personalizado › Día», lee GMV, ventas, impresiones, clics y comisión por OCR (la página Datos
+es web y el volcado sale vacío; en días pasados la comisión está en la pestaña «Comisiones») y
+deja `dias_mi8.json`. La comisión de cada día va al panel (`ganancia_dia_apuntar`, fuente 4).
 
 ## Dónde se leen
 
