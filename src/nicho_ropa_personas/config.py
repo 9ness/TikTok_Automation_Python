@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from src.rutas_drive import AI_PRO_REL
 
 REDIS_PREFIX = os.getenv("NICHO_ROPA_PERSONAS_REDIS_PREFIX", "nicho_ropa_personas:")
 
@@ -108,7 +109,7 @@ def _sin_comentario(texto: str) -> str:
 # el operador no decide nada por producto.
 # Ruta COMPLETA desde la raíz del mount, igual que `DRIVE_UPLOAD_ROOT` del
 # POV BOF: el mount empieza en "Mi unidad", no dentro de NEBULABS.
-AUDIO_DRIVE_SUBDIR = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer"
+AUDIO_DRIVE_SUBDIR = f"{AI_PRO_REL}/Nicho_Ropa_Personas/audios/mujer"
 
 # ---------------------------------------------------------------------------
 # Montaje
@@ -127,7 +128,7 @@ VIDEO_TARGET_S = 8.0
 # ---------------------------------------------------------------------------
 # Salida
 # ---------------------------------------------------------------------------
-DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas"
+DRIVE_UPLOAD_ROOT = f"{AI_PRO_REL}/Nicho_Ropa_Personas"
 
 
 def video_dir() -> Path:

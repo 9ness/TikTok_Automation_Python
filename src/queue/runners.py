@@ -4339,9 +4339,13 @@ def _salida_ugc(
     from src.nicho_general import config as ugc_config
     from src.nicho_pov_bof.services.audio_bank import mount_root
 
+    from src.rutas_drive import AI_PRO_REL
+
     raiz = mount_root()
+    # Antes colgaba de `TIKTOK_SHOP_AI_PRO` en la RAÍZ del Drive (otra carpeta
+    # distinta de la del Programa 4); desde nov 2026 va con el resto del AI Pro.
     base = (
-        raiz / "TIKTOK_SHOP_AI_PRO" / "Nicho_General" if raiz
+        raiz / AI_PRO_REL / "Nicho_General" if raiz
         else Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_general"
     )
     carpeta = base / (usuario or "ness") / folder

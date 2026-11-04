@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from src.rutas_drive import a_absoluta, a_relativa, absolutizar, relativizar
+
 from src.cuenta_piloto.config import REDIS_PREFIX
 
 
@@ -79,7 +81,7 @@ class CuentaPilotoRedis:
         if raw is None:
             return None
         try:
-            return json.loads(raw) if isinstance(raw, str) else raw
+            return absolutizar(json.loads(raw) if isinstance(raw, str) else raw)
         except json.JSONDecodeError:
             return None
 
@@ -101,13 +103,13 @@ class CuentaPilotoRedis:
                 out.append(None)
                 continue
             try:
-                out.append(json.loads(raw) if isinstance(raw, str) else raw)
+                out.append(absolutizar(json.loads(raw) if isinstance(raw, str) else raw))
             except (json.JSONDecodeError, TypeError):
                 out.append(None)
         return out
 
     def set_json(self, key: str, value: dict | list) -> bool:
-        body = json.dumps(value, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(relativizar(value), ensure_ascii=False).encode("utf-8")
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)
         return result == "OK"
 
@@ -125,19 +127,22 @@ class CuentaPilotoRedis:
         return self._post(f"del/{self._enc(self._full_key(key))}") is not None
 
     def sadd(self, key: str, member: str) -> bool:
-        result = self._post(f"sadd/{self._enc(self._full_key(key))}/{self._enc(member)}")
+        result = self._post(f"sadd/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}")
         return result is not None
 
     def srem(self, key: str, member: str) -> bool:
-        result = self._post(f"srem/{self._enc(self._full_key(key))}/{self._enc(member)}")
+        result = self._post(f"srem/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}")
         return result is not None
 
     def smembers(self, key: str) -> list[str]:
         result = self._get(f"smembers/{self._enc(self._full_key(key))}")
-        return list(result or [])
+        return [a_absoluta(x) for x in (result or [])]
 
     def sismember(self, key: str, member: str) -> bool:
-        result = self._get(f"sismember/{self._enc(self._full_key(key))}/{self._enc(member)}")
+        result = self._get(f"sismember/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}")
+        if not result and a_relativa(member) != member:
+            # Dato viejo sin migrar: el miembro se guardó como ruta absoluta.
+            result = self._get(f"sismember/{self._enc(self._full_key(key))}/{self._enc(a_absoluta(member))}")
         return bool(result)
 
 

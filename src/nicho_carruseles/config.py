@@ -42,6 +42,7 @@ from src.nicho_pov_bof.config import (  # noqa: E402,F401
     fuente_canonica,
     fuentes_a_barrer,
 )
+from src.rutas_drive import AI_PRO_REL
 
 # Las fotos salen de Flow en vertical, como el vídeo. Se enseña al lado del
 # prompt porque el generador no lo deduce del texto.
@@ -144,7 +145,7 @@ CATEGORIAS_APTAS = tuple(ESCENARIO_POR_CATEGORIA)
 # En NUESTRO Drive montado, no en el compartido del curso (que es solo lectura)
 # y NUNCA en `api_uploads/` — eso se purga a las 24h y aquí una tanda de chicas
 # tarda días en gastarse. Mismo criterio que Cuenta Piloto.
-CARRUSELES_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Carruseles"
+CARRUSELES_ROOT = f"{AI_PRO_REL}/Nicho_Carruseles"
 
 # Subcarpetas por tipo de foto. Las `_txt` guardan la versión con el texto ya
 # quemado: se conservan las dos para poder volver a quemar con otro mensaje sin

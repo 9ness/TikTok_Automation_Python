@@ -36,6 +36,7 @@ from src.nicho_pov_bof.config import (  # noqa: E402,F401
     fuentes_a_barrer,
     source_path,
 )
+from src.rutas_drive import AI_PRO_REL
 
 
 def prompts_dir() -> Path:
@@ -79,7 +80,7 @@ def video_dir() -> Path:
 
     raiz = mount_root()
     if raiz:
-        destino = raiz / "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_BOF_Cine" / "videos"
+        destino = raiz / f"{AI_PRO_REL}/Nicho_BOF_Cine" / "videos"
     else:
         destino = Path(os.getenv("API_TEMP_ROOT", "/tmp")) / "nicho_bof_cine" / "videos"
     destino.mkdir(parents=True, exist_ok=True)

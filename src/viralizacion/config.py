@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from src.rutas_drive import AI_PRO_REL
 
 # ---------------------------------------------------------------------------
 # Ponentes soportados
@@ -352,7 +353,7 @@ def redis_prefix() -> str:
 # Drive de destino (subida del batch final)
 # ---------------------------------------------------------------------------
 DRIVE_REMOTE = "gdrive:"
-DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/VIRALIZACION"
+DRIVE_UPLOAD_ROOT = f"{AI_PRO_REL}/VIRALIZACION"
 
 
 def sanitize_account_name(nombre_cuenta: str) -> str:

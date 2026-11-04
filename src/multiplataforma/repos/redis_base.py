@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from src.rutas_drive import a_absoluta, a_relativa, absolutizar, relativizar
+
 from src.multiplataforma.config import redis_prefix
 
 
@@ -72,25 +74,25 @@ class MultiplataformaRedis:
         if raw is None:
             return None
         try:
-            return json.loads(raw) if isinstance(raw, str) else raw
+            return absolutizar(json.loads(raw) if isinstance(raw, str) else raw)
         except json.JSONDecodeError:
             return None
 
     def set_json(self, key: str, value: dict | list) -> bool:
-        body = json.dumps(value, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(relativizar(value), ensure_ascii=False).encode("utf-8")
         return self._post(f"set/{self._enc(self._full_key(key))}", body=body) == "OK"
 
     def delete(self, key: str) -> bool:
         return self._post(f"del/{self._enc(self._full_key(key))}") is not None
 
     def sadd(self, key: str, member: str) -> bool:
-        return self._post(f"sadd/{self._enc(self._full_key(key))}/{self._enc(member)}") is not None
+        return self._post(f"sadd/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}") is not None
 
     def srem(self, key: str, member: str) -> bool:
-        return self._post(f"srem/{self._enc(self._full_key(key))}/{self._enc(member)}") is not None
+        return self._post(f"srem/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}") is not None
 
     def smembers(self, key: str) -> list[str]:
-        return list(self._get(f"smembers/{self._enc(self._full_key(key))}") or [])
+        return [a_absoluta(x) for x in (self._get(f"smembers/{self._enc(self._full_key(key))}") or [])]
 
 
 _INSTANCE: MultiplataformaRedis | None = None

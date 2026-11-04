@@ -31,6 +31,7 @@ REDIS_PREFIX = os.getenv("NICHO_POV_BOF_LARGO_REDIS_PREFIX", "nicho_pov_bof_larg
 # Las MISMAS fuentes del Nicho POV BOF: mismo Drive, mismas carpetas, mismas
 # fotos. Se importan para que añadir una fuente valga para los dos.
 from src.nicho_pov_bof.config import SOURCES, source_path  # noqa: E402,F401
+from src.rutas_drive import AI_PRO_REL
 
 # ---------------------------------------------------------------------------
 # Clips
@@ -991,7 +992,7 @@ VOZ_SILENCIO = (
 # ---------------------------------------------------------------------------
 # Salida
 # ---------------------------------------------------------------------------
-DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF_Largo"
+DRIVE_UPLOAD_ROOT = f"{AI_PRO_REL}/Nicho_POV_BOF_Largo"
 
 
 def video_dir() -> Path:

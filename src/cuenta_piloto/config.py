@@ -27,12 +27,13 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from src.rutas_drive import AI_PRO_REL
 
 REDIS_PREFIX = os.getenv("CUENTA_PILOTO_REDIS_PREFIX", "cuenta_piloto:")
 
 # Ruta COMPLETA desde la raíz del mount (el mount empieza en "Mi unidad", no
 # dentro de NEBULABS), igual que `DRIVE_UPLOAD_ROOT` del resto del programa.
-DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Cuenta_Piloto"
+DRIVE_UPLOAD_ROOT = f"{AI_PRO_REL}/Cuenta_Piloto"
 
 # Formatos aceptados en la subida.
 FOTO_EXTS = {".jpg", ".jpeg", ".png", ".webp"}

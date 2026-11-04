@@ -38,8 +38,9 @@ from pathlib import Path
 
 from src.replicar_viral import servicio
 from src.replicar_viral.servicio import ErrorReplica
+from src.rutas_drive import AI_PRO_REL
 
-RAIZ_DRIVE = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Replicar_Viral"
+RAIZ_DRIVE = f"{AI_PRO_REL}/Replicar_Viral"
 INDICE_VIDEOS = "replicar_viral:videos:{usuario}"
 TIPO = "video"
 MODOS: dict[str, str] = {

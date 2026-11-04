@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+from src.rutas_drive import AI_PRO_REL
 
 # ---------------------------------------------------------------------------
 # Drive de origen (SOLO LECTURA)
@@ -168,19 +169,19 @@ MIS_PRODUCTOS_POR_CARPETA = 10
 # llega a X ventas antes de una fecha. Cada cuántos días hay que mirar si ha
 # habido venta para no perderlas de vista (`services/reembolsables.py`).
 REVISAR_CADA_DIAS = 3
-MIS_PRODUCTOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/mis_productos"
-TEMPORADA_Q4_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/temporada_q4"
+MIS_PRODUCTOS_ROOT = f"{AI_PRO_REL}/Nicho_POV_BOF/mis_productos"
+TEMPORADA_Q4_ROOT = f"{AI_PRO_REL}/Nicho_POV_BOF/temporada_q4"
 PRODUCTOS_FISICOS_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_fisicos"
+    f"{AI_PRO_REL}/Nicho_POV_BOF/productos_fisicos"
 )
 PRODUCTOS_FISICOS_ANA_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_fisicos_ana"
+    f"{AI_PRO_REL}/Nicho_POV_BOF/productos_fisicos_ana"
 )
 CARRUSELES_VIRALES_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/carruseles_virales"
+    f"{AI_PRO_REL}/Nicho_POV_BOF/carruseles_virales"
 )
 TAREAS_PRODUCTOS_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/tareas_productos"
+    f"{AI_PRO_REL}/Nicho_POV_BOF/tareas_productos"
 )
 
 # Los dos catálogos que sube el operador, y cómo se llaman sus carpetas por
@@ -207,10 +208,10 @@ def es_catalogo_operador(source: str) -> bool:
 # el ZIP ("Carpeta 26"), no se numeran solas: así resubir el mismo ZIP cae
 # siempre en la misma carpeta y se puede comparar.
 PRODUCTOS_WEB_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/productos_web"
+    f"{AI_PRO_REL}/Nicho_POV_BOF/productos_web"
 )
 INVENTARIO_GENERAL_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/inventario_general"
+    f"{AI_PRO_REL}/Nicho_POV_BOF/inventario_general"
 )
 
 # Los catálogos que entran por ZIP de la web del curso. Comparten TODO el
@@ -225,7 +226,7 @@ CATALOGOS_ZIP: dict[str, str] = {
 def es_catalogo_zip(source: str) -> bool:
     return source in CATALOGOS_ZIP
 
-TOP_VENDIDOS_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Top_Vendidos"
+TOP_VENDIDOS_ROOT = f"{AI_PRO_REL}/Top_Vendidos"
 TOP_VENDIDOS_PREFIJO = "Top"
 
 
@@ -981,7 +982,7 @@ def redis_prefix() -> str:
 # Salida (FASE 2 — todavía sin usar)
 # ---------------------------------------------------------------------------
 # Mismo patrón que VIRALIZACION: todo cuelga de TIKTOK_SHOP_AI_PRO.
-DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF"
+DRIVE_UPLOAD_ROOT = f"{AI_PRO_REL}/Nicho_POV_BOF"
 
 
 # ---------------------------------------------------------------------------

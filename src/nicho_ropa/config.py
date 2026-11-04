@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from src.rutas_drive import AI_PRO_REL
 
 # ---------------------------------------------------------------------------
 # Drive de origen (SOLO LECTURA)
@@ -95,7 +96,7 @@ def catalogo_de_genero(genero: str) -> str:
     return "web"
 SEPARADOR_WEB = "__"
 PRENDAS_WEB_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/prendas_web"
+    f"{AI_PRO_REL}/Nicho_Ropa_Sin_Personas/prendas_web"
 )
 
 # Los catálogos del OPERADOR, igual que en el POV BOF: una prenda se graba
@@ -116,7 +117,7 @@ GENEROS_OPERADOR: dict[str, str] = {
     "hombre_tareas": "👔 Hombre · tareas",
 }
 MIS_PRENDAS_ROOT = (
-    "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/mis_prendas"
+    f"{AI_PRO_REL}/Nicho_Ropa_Sin_Personas/mis_prendas"
 )
 # Cuántas prendas entran en cada carpeta. Diez, como en todo lo demás.
 MIS_PRENDAS_POR_CARPETA = 10
@@ -2672,7 +2673,7 @@ def prompt_imagen() -> str:
 # Salida
 # ---------------------------------------------------------------------------
 # Mismo patrón que el resto del Programa 4: todo cuelga de TIKTOK_SHOP_AI_PRO.
-DRIVE_UPLOAD_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas"
+DRIVE_UPLOAD_ROOT = f"{AI_PRO_REL}/Nicho_Ropa_Sin_Personas"
 
 
 def video_dir() -> Path:

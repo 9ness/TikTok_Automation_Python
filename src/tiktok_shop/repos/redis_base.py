@@ -15,6 +15,8 @@ from typing import Any
 
 import requests
 
+from src.rutas_drive import a_absoluta, a_relativa, absolutizar, relativizar
+
 from src.tiktok_shop.config import redis_prefix
 
 
@@ -84,7 +86,7 @@ class ShopRedis:
         if raw is None:
             return None
         try:
-            return json.loads(raw) if isinstance(raw, str) else raw
+            return absolutizar(json.loads(raw) if isinstance(raw, str) else raw)
         except json.JSONDecodeError:
             return None
 
@@ -109,13 +111,13 @@ class ShopRedis:
                 out.append(None)
                 continue
             try:
-                out.append(json.loads(raw) if isinstance(raw, str) else raw)
+                out.append(absolutizar(json.loads(raw) if isinstance(raw, str) else raw))
             except (json.JSONDecodeError, TypeError):
                 out.append(None)
         return out
 
     def set_json(self, key: str, value: dict | list) -> bool:
-        body = json.dumps(value, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(relativizar(value), ensure_ascii=False).encode("utf-8")
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)
         return result == "OK"
 
@@ -153,23 +155,23 @@ class ShopRedis:
 
     def sadd(self, key: str, member: str) -> bool:
         result = self._post(
-            f"sadd/{self._enc(self._full_key(key))}/{self._enc(member)}"
+            f"sadd/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}"
         )
         return result is not None
 
     def srem(self, key: str, member: str) -> bool:
         result = self._post(
-            f"srem/{self._enc(self._full_key(key))}/{self._enc(member)}"
+            f"srem/{self._enc(self._full_key(key))}/{self._enc(a_relativa(member))}"
         )
         return result is not None
 
     def smembers(self, key: str) -> list[str]:
         result = self._get(f"smembers/{self._enc(self._full_key(key))}")
-        return list(result or [])
+        return [a_absoluta(x) for x in (result or [])]
 
     def lpush(self, key: str, value: str) -> int:
         result = self._post(
-            f"lpush/{self._enc(self._full_key(key))}/{self._enc(value)}"
+            f"lpush/{self._enc(self._full_key(key))}/{self._enc(a_relativa(value))}"
         )
         try:
             return int(result or 0)
@@ -178,7 +180,7 @@ class ShopRedis:
 
     def lrange(self, key: str, start: int = 0, stop: int = -1) -> list[str]:
         result = self._get(f"lrange/{self._enc(self._full_key(key))}/{start}/{stop}")
-        return list(result or [])
+        return [a_absoluta(x) for x in (result or [])]
 
     def ltrim(self, key: str, start: int, stop: int) -> bool:
         """LTRIM key start stop — recorta la lista en sitio."""

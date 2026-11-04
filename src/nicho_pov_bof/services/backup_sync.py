@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Callable
 
 from src.nicho_pov_bof import config
+from src.rutas_drive import PROYECTO_REL
 
 OnLog = Callable[[str], None]
 _noop: OnLog = lambda _: None
@@ -47,7 +48,7 @@ SRC_PATH = f"{SRC_REMOTE}{config.SHARED_ROOT}"
 # sueltas en la raíz. Se hace una copia casi cada día y en un mes la raíz del
 # proyecto eran quince carpetas de backup y tres de trabajo: encontrar
 # `TIKTOK_SHOP_AI_PRO` en el móvil obligaba a bajar media pantalla.
-BACKUP_PARENT = "NEBULABS_AUTOMATED_TIKTOK"
+BACKUP_PARENT = PROYECTO_REL
 BACKUP_DIR = "BACKUPS_Productos_Espana"
 BACKUP_PREFIX = "BACKUP_Productos_Espana"
 

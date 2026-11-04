@@ -22,6 +22,7 @@ import shutil
 import threading
 import time
 from pathlib import Path
+from src.rutas_drive import AI_PRO_REL
 
 PLATAFORMAS: tuple[str, ...] = ("instagram", "facebook", "threads", "pinterest")
 TIPOS: tuple[str, ...] = ("producto", "prueba_viral", "carrusel", "foto")
@@ -167,7 +168,7 @@ EXTENSIONES_SERVIBLES = (".mp4", ".mov", ".jpg", ".jpeg", ".png")
 # Ruta COMPLETA desde la raíz del mount (como `DRIVE_UPLOAD_ROOT` del resto
 # del Programa 4). Por cuenta: `<raíz>/<slug>/{viralizacion,producto}/` y,
 # dentro de cada una, `publicados/` con lo ya subido a todas las plataformas.
-AI_PRO_SUBDIR = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO"
+AI_PRO_SUBDIR = AI_PRO_REL
 DRIVE_SUBDIR = f"{AI_PRO_SUBDIR}/Multiplataforma"
 CARPETAS_INGESTA: dict[str, str] = {"viralizacion": "prueba_viral", "producto": "producto", "fotos": "foto"}
 CARPETA_PUBLICADOS = "publicados"

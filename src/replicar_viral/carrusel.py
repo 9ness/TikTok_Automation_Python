@@ -37,9 +37,10 @@ import requests
 
 from src.replicar_viral import catalogo, musica, servicio
 from src.replicar_viral.servicio import ErrorReplica
+from src.rutas_drive import AI_PRO_REL
 
 PROMPT = Path(__file__).parent / "prompts" / "replicar_carrusel.md"
-RAIZ_DRIVE = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Replicar_Carrusel"
+RAIZ_DRIVE = f"{AI_PRO_REL}/Replicar_Carrusel"
 MAX_DIAPOS = 12
 LADO_GEMINI = 1080
 ROLES = ("gancho", "problema", "producto", "prueba", "cta")

@@ -45,13 +45,14 @@ from pathlib import Path
 import requests
 
 from src.pronosticos.redis_client import UpstashRedis
+from src.rutas_drive import PROYECTO_REL
 
 FISH_TTS_URL = "https://api.fish.audio/v1/tts"
 FISH_MODEL = os.environ.get("FISH_MODEL_VIDEO_HABLADO", "s2.1-pro-free")
 FISH_USD_PER_MILLON_BYTES = 15.0
 FONDOS_URL = "https://masterpicksai.com/api/backgrounds"
 DRIVE = Path(os.environ.get("DRIVE_MOUNT", "/mnt/drive"))
-CLIPS = DRIVE / "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS/BIBLIOTECA_PRONOSTICOS_CLIPS"
+CLIPS = DRIVE / f"{PROYECTO_REL}/TIKTOK_CR/TIKTOK_ASSETS/BIBLIOTECA_PRONOSTICOS_CLIPS"
 
 # Voces de Fish que pasaron el primer filtro (14-oct-2026). `f0` = tono medio.
 VOCES = {

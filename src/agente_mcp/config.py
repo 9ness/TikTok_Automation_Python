@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import os
 from pathlib import Path
+from src.rutas_drive import AI_PRO_REL
 
 GUIAS_DIR = Path(__file__).resolve().parent / "guias"
 
@@ -68,7 +69,7 @@ def url_mcp(usuario: str) -> str:
 # MCP deja ahí las fotos y el plan de cada producto, el agente guarda al lado
 # lo que genera, y el MCP lo sube a la app desde ahí. Es lo único que funciona
 # igual para un agente de escritorio y para uno de servidor.
-BANDEJA_ROOT = "NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente"
+BANDEJA_ROOT = f"{AI_PRO_REL}/_agente"
 
 
 def bandeja_dir(usuario: str) -> Path:
