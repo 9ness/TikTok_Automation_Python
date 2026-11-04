@@ -175,12 +175,19 @@ def _copy(src: str, dst: str) -> str:
 def _probe(path: str) -> dict:
     out = json.loads(subprocess.check_output(
         ["ffprobe", "-v", "error", "-show_entries",
-         "stream=codec_type,width,height,r_frame_rate:format=duration", "-of", "json", path],
+         "stream=codec_type,width,height,r_frame_rate:stream_tags=rotate:stream_side_data=rotation"
+         ":format=duration", "-of", "json", path],
         timeout=60))
     sv = next(s for s in out["streams"] if s.get("codec_type") == "video")
     num, _, den = (sv.get("r_frame_rate") or "30/1").partition("/")
     fps = float(num) / float(den or 1) if float(den or 1) else 30.0
-    return {"dur": float(out["format"]["duration"]), "w": int(sv["width"]), "h": int(sv["height"]),
+    w, h = int(sv["width"]), int(sv["height"])
+    # móvil en vertical: ffmpeg autorrota, así que los filtros ven el lado corto como ancho
+    rot = (sv.get("tags") or {}).get("rotate") or next(
+        (d.get("rotation") for d in sv.get("side_data_list") or [] if "rotation" in d), 0)
+    if abs(int(float(rot or 0))) % 180 == 90:
+        w, h = h, w
+    return {"dur": float(out["format"]["duration"]), "w": w, "h": h,
             "fps": fps if 10 < fps < 121 else 30.0,
             "audio": any(s.get("codec_type") == "audio" for s in out["streams"])}
 

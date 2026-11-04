@@ -7,7 +7,10 @@ Lo que dice el cliente:
 
 Reglas:
 - Pon SOLO las claves que el cliente pida o que se deduzcan sin duda de lo que dice. Lo que no mencione, OMÍTELO (no pongas valores por defecto): se queda como ya lo tiene.
-- Colores con nombre → hex razonable (amarillo #FFD600, rojo #E61E2D, verde #1EB95A, naranja #FF8C00, blanco #FFFFFF, negro #0F0F0F, azul #2864EB, rosa #F56EAA, morado #8C3CC8).
+- Colores con nombre → hex razonable (amarillo #FFD600, rojo #E61E2D, verde #1EB95A, verde fosforito/flúor #39FF14, naranja #FF8C00, blanco #FFFFFF, negro #0F0F0F, azul #2864EB, azul oscuro/marino #12305E, rosa #F56EAA, rosa pastel #F7B6D2, lila #C8A2E8, morado #8C3CC8).
+- Los color_* de rótulos son el FONDO de la cajita; la letra se pone sola en contraste. "Rótulos blancos con fondo azul" → azul; "rótulos amarillos con letra negra" → amarillo.
+- Si da colores para los rótulos o para el vídeo en general sin decir cuál es para qué (un color de acento, "tonos rosa y lila"), reparte esa paleta en las cuatro claves color_* (un solo color → las cuatro iguales). Así los rótulos salen con sus colores.
+- "Sin flecha" / "nada de flecha" → "flecha": {"hay": false}.
 - "Que la palabra que dice salga de otro color" = resaltado "color". "En una cajita/píldora" = "pildora".
 - "Abajo del todo" ≈ y 85; "por la mitad" ≈ 50; "arriba" ≈ 15 (rótulos) o 45 (subtítulos, nunca más arriba).
 - "Sin fotos", "sin zooms", "nada de textos grandes" → false / densidad "baja". "Muchos textos" → "alta".
@@ -21,7 +24,7 @@ Responde SOLO JSON, con estas claves posibles (todas opcionales salvo notas_esti
  "densidad_rotulos": "baja"|"media"|"alta",
  "gancho": true|false (texto grande al principio), "fotos": true|false (fotos de apoyo), "zooms": true|false, "color_grade": true|false (colores más vivos),
  "rotulo_y_pct": 5-60,
- "subs": {"palabras": 1-6, "y_pct": 40-92, "color_texto": "#RRGGBB", "resaltado": "color"|"pildora"|"subrayado"|"ninguno", "color_resaltado": "#RRGGBB", "mayusculas": true|false},
- "flecha": {"color": "#RRGGBB", "triple": true|false, "x_pct": 0-100, "y_pct": 0-100},
+ "subs": {"palabras": 1-6, "y_pct": 40-92, "color_texto": "#RRGGBB", "resaltado": "color"|"pildora"|"subrayado"|"ninguno", "color_resaltado": "#RRGGBB", "mayusculas": true|false, "tamano": "pequeno"|"normal"|"grande"|"gigante"},
+ "flecha": {"hay": true|false, "color": "#RRGGBB", "triple": true|false, "x_pct": 0-100, "y_pct": 0-100},
  "notas_estilo": "..."}
 Dentro de "subs" y "flecha" pon también solo lo que diga.

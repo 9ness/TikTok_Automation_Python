@@ -159,3 +159,26 @@ def test_texto_no_se_corta_a_mitad_de_palabra():
     from src.editor_auto.tools.vip_overlays import _clean_text
     assert _clean_text("¿A ti te gusta Elsa Pataky?", 28) == "¿A TI TE GUSTA ELSA PATAKY?"
     assert _clean_text("¿A ti te gusta Elsa Pataky?", 22) == "¿A TI TE GUSTA ELSA"
+
+
+def test_sin_flecha_apaga_el_paso():
+    from src.editor_auto.services.estilo_vip import _a_config
+    cfg = _a_config({"flecha": {"hay": False}, "notas_estilo": "Sin flecha."}, {})
+    assert cfg["_flujo"]["sticker_arrow"] == {"enabled": False}
+
+
+def test_probe_gira_video_vertical(monkeypatch):
+    import json as _j
+    from src.editor_auto.tools import vip_overlays as v
+    out = {"streams": [{"codec_type": "video", "width": 1280, "height": 720, "r_frame_rate": "30/1",
+                        "side_data_list": [{"rotation": -90}]}], "format": {"duration": "10"}}
+    monkeypatch.setattr(v.subprocess, "check_output", lambda *a, **k: _j.dumps(out).encode())
+    info = v._probe("x.mp4")
+    assert (info["w"], info["h"]) == (720, 1280)
+
+
+def test_subs_gigantes_y_pildora_con_letra_oscura():
+    from src.editor_auto.services.estilo_vip import _subs_cfg
+    assert _subs_cfg({"tamano": "gigante"})["font_scale"] == 0.075
+    cfg = _subs_cfg({"resaltado": "pildora", "color_texto": "#0F0F0F", "palabras": 3})
+    assert cfg["max_words"] == 1

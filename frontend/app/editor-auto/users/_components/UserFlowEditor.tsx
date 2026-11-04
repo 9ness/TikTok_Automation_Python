@@ -111,8 +111,15 @@ export function UserFlowEditor({ userId }: { userId: string }) {
     setSteps(
       steps.map((s, i) => {
         if (i === idx) return { ...s, config: { ...s.config, ...cfg } };
-        const extra = otros[s.tool_id];
-        return extra ? { ...s, config: { ...s.config, ...extra } } : s;
+        const patch = otros[s.tool_id];
+        if (!patch) return s;
+        // `enabled` no es config: "sin flecha" apaga el paso entero.
+        const { enabled, ...extra } = patch;
+        return {
+          ...s,
+          enabled: typeof enabled === "boolean" ? enabled : s.enabled,
+          config: { ...s.config, ...extra },
+        };
       }),
     );
   };

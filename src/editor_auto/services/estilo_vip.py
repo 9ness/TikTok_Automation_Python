@@ -103,6 +103,8 @@ def _a_config(data: dict, fuentes: dict[str, str]) -> dict:
     subs = _subs_cfg(data.get("subs"))
     if subs:
         flujo["subs_auto"] = subs
+    if isinstance(data.get("flecha"), dict) and data["flecha"].get("hay") is False:
+        flujo["sticker_arrow"] = {"enabled": False}  # la UI apaga el paso, no lo borra
     flecha = _flecha_cfg(data.get("flecha"))
     if flecha:
         flujo["sticker_arrow"] = flecha
@@ -141,7 +143,18 @@ def _subs_cfg(d) -> dict:
         out["y_position"] = round(y / 100, 3)
     if isinstance(d.get("mayusculas"), bool):
         out["case_mode"] = "UPPERCASE" if d["mayusculas"] else "None"
+    if d.get("tamano") in _TAMANO_SUBS:
+        out["font_scale"] = _TAMANO_SUBS[d["tamano"]]
+    # Letra oscura en píldora: las palabras que no se dicen quedarían oscuras
+    # sobre el vídeo → de una en una, así todo lo visible va dentro.
+    tc = out.get("text_color", "")
+    if out.get("highlight_mode") == "pill" and _HEX.match(tc) and \
+            sum(int(tc[i:i + 2], 16) for i in (1, 3, 5)) < 200:
+        out["max_words"] = 1
     return out
+
+
+_TAMANO_SUBS = {"pequeno": 0.035, "normal": 0.045, "grande": 0.06, "gigante": 0.075}
 
 
 # Color de cada nombre del banco de flechas (`flecha_<forma>_<color>.mov`).
