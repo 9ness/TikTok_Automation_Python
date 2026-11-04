@@ -47,12 +47,13 @@ services:
       # Paths de assets DENTRO del container — el `.env` del host puede tener
       # `/home/nebulabsai/gdrive/...` (path absoluto del host) pero ahí dentro
       # solo existe `/mnt/drive`. Estos overrides ganan al `env_file`.
-      TIKTOK_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS"
-      TIKTOK_SHOP_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP"
+      # La carpeta del proyecto sale de NEBULABS_DRIVE_DIR (docs/DRIVE.md).
+      TIKTOK_ROOT_PATH: "/mnt/drive/${CR_DRIVE_DIR:-${NEBULABS_DRIVE_DIR:-NEBULABS_AUTOMATED_TIKTOK}/TIKTOK_CR}/TIKTOK_ASSETS"
+      TIKTOK_SHOP_ROOT_PATH: "/mnt/drive/${NEBULABS_DRIVE_DIR:-NEBULABS_AUTOMATED_TIKTOK}/TIKTOK_SHOP"
       # TIKTOK_EDITOR aún no existe en Drive — la app la crea lazy como
       # hermana de TIKTOK_CR/TIKTOK_SHOP la primera vez que se crea un
       # usuario (vía `resolve_editor_root` → `ensure_user_folders`).
-      TIKTOK_EDITOR_ROOT_PATH: "/mnt/drive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
+      TIKTOK_EDITOR_ROOT_PATH: "/mnt/drive/${NEBULABS_DRIVE_DIR:-NEBULABS_AUTOMATED_TIKTOK}/TIKTOK_EDITOR"
       # Programa 4 — Viralización: assets LOCALES (gancho/audios/paisajes/música).
       # NO van por Drive montado (ficheros pesados reutilizados). Path DENTRO
       # del container; el bind de abajo mapea el dir del host.
