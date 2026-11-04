@@ -144,6 +144,9 @@ class VipOverlaysTool:
             plan = _plan(words, info["dur"], eventos, cfg, ctx)
             if not plan:
                 return _copy(input_path, output_path)
+            g = plan.setdefault("gancho", {}) if isinstance(plan.get("gancho"), dict) else None
+            if g is not None and cfg.get("gancho_clip") and not g.get("clip"):
+                g["clip"] = _clip_por_sonido(eventos, words)  # la IA a veces no lo propone
             plan = _sanitize(plan, info["dur"], cfg)
             ctx.on_log("[vip] Plan: " + json.dumps(plan, ensure_ascii=False)[:900])
             ctx.on_progress(0.65, "🖼️ Preparando gráficos…")
@@ -239,6 +242,24 @@ def _sound_events(wav: str, words: list[dict], min_db: float = 15.0) -> list[dic
         return []
 
 
+def _clip_por_sonido(eventos: list[dict], words: list[dict]) -> dict | None:
+    """El sonido fuerte sin voz (después de los 2 primeros s) como clip de gancho:
+    1,5-3 s alrededor de él, sin empezar ni acabar a mitad de una palabra."""
+    ev = [e for e in eventos if e["t0"] > 2.0]
+    if not ev:
+        return None
+    e = max(ev, key=lambda e: (e["db_sobre_fondo"], e["t1"] - e["t0"]))
+    a, b = e["t0"] - 0.3, max(e["t1"] + 0.3, e["t0"] + 1.5)
+    for w in words:
+        s, t = float(w.get("start", 0)), float(w.get("end", 0))
+        if s < a < t:
+            a = s
+        if s < b < t:
+            b = t
+    b = min(b, a + 3.0)
+    return {"t0": round(a, 2), "t1": round(b, 2)}
+
+
 # ---------------------------------------------------------------------------
 # Plan (IA) y saneado
 # ---------------------------------------------------------------------------
@@ -283,6 +304,24 @@ def _clean_text(t: str, n: int = 22) -> str:
     return re.sub(r"(\d)\s?DB\b", r"\1 dB", t)
 
 
+_COLORES_STOCK = {
+    "rojo": "#E53935", "roja": "#E53935", "naranja": "#FB8C00", "amarillo": "#FDD835",
+    "amarilla": "#FDD835", "verde": "#43A047", "azul": "#1E88E5", "morado": "#8E24AA",
+    "morada": "#8E24AA", "lila": "#B39DDB", "rosa": "#EC407A", "blanco": "#FAFAFA",
+    "blanca": "#FAFAFA", "negro": "#212121", "negra": "#212121", "gris": "#9E9E9E",
+    "beige": "#D7C4A3", "marron": "#6D4C41", "marrón": "#6D4C41", "dorado": "#D4AF37",
+    "plateado": "#C0C0C0", "plata": "#C0C0C0", "turquesa": "#26C6DA", "granate": "#7B1F2A",
+}
+
+
+def _hex_color(c) -> str:
+    """Nombre de color (o #hex) → #hex; '' si no se reconoce."""
+    t = str(c or "").strip().lower()
+    if re.fullmatch(r"#[0-9a-f]{6}", t):
+        return t.upper()
+    return _COLORES_STOCK.get(t.split()[0] if t else "", "")
+
+
 def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
     """Recorta a la duración, quita solapes y aplica los límites del estilo."""
     def span(d, mn=0.4, mx=6.0):
@@ -308,11 +347,23 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
         if s and txt:
             rol = r.get("rol") if r.get("rol") in ("alerta", "dato", "ok", "neutro") else "neutro"
             top.append({"tipo": "rotulo", "texto": txt, "rol": rol, "t0": s[0], "t1": s[1]})
+    st = plan.get("stock")
+    if isinstance(st, dict):
+        s = span(st, 1.0, 3.5)
+        quedan = [_hex_color(c) for c in (st.get("quedan") or [])[:6]]
+        quedan = [c for c in quedan if c]
+        agot = max(0, min(6 - len(quedan), int(_num(st.get("agotados")))))
+        if s and quedan:
+            top.append({"tipo": "stock", "quedan": quedan, "agotados": agot,
+                        "t0": s[0], "t1": s[1]})
     if cfg.get("fotos"):
         for f in (plan.get("fotos") or [])[: int(cfg.get("max_fotos") or 0)]:
             s, q = span(f, 1.0, 3.5), str(f.get("busqueda") or "").strip()[:80]
             if s and q:
                 top.append({"tipo": "foto", "busqueda": q, "t0": s[0], "t1": s[1]})
+    stk = next((x for x in top if x["tipo"] == "stock"), None)
+    if stk:  # la tarjeta manda: fuera los rótulos que la pisan (suelen decir lo mismo)
+        top = [x for x in top if x is stk or x["t1"] <= stk["t0"] - 0.1 or x["t0"] >= stk["t1"] + 0.1]
     top.sort(key=lambda x: x["t0"])
     limpio = []
     for it in top:
@@ -341,7 +392,8 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
                 tot += z["t1"] - z["t0"]
         zooms = kept
     return {"gancho": gancho, "rotulos": [x for x in limpio if x["tipo"] == "rotulo"],
-            "fotos": [x for x in limpio if x["tipo"] == "foto"], "zooms": zooms,
+            "fotos": [x for x in limpio if x["tipo"] == "foto"],
+            "stock": next((x for x in limpio if x["tipo"] == "stock"), None), "zooms": zooms,
             "nota": str(plan.get("nota") or "")[:300]}
 
 
@@ -386,6 +438,35 @@ def _pill(text: str, bg: tuple, sz: int, maxw: int, cfg: dict, path: str, rot: f
     d.text((20 + pad[0], 20 + pad[1] - bb[1] // 2), text, font=f, fill=_ink(bg))
     if rot:
         im = im.rotate(rot, expand=True, resample=Image.BICUBIC)
+    im.save(path)
+    return path
+
+
+def _stock(quedan: list[str], agotados: int, k: float, cfg: dict, path: str) -> str:
+    """Tarjeta oscura «QUEDAN» con un círculo por color y los agotados tachados."""
+    from PIL import Image, ImageDraw
+    k *= 1.6  # en la referencia la tarjeta ocupa casi el ancho del vídeo
+    r, gap, pad = int(30 * k), int(22 * k), int(30 * k)
+    n = len(quedan) + agotados
+    f = _font(cfg, int(34 * k))
+    bb = f.getbbox("QUEDAN")
+    w = max(n * 2 * r + (n - 1) * gap, bb[2]) + pad * 2
+    h = pad + bb[3] + int(18 * k) + 2 * r + pad
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((0, 0, w - 1, h - 1), radius=int(26 * k), fill=(25, 25, 25, 225))
+    d.text(((w - bb[2]) // 2, pad - bb[1]), "QUEDAN", font=f, fill=(255, 255, 255, 255))
+    x0, cy = (w - (n * 2 * r + (n - 1) * gap)) // 2, pad + bb[3] + int(18 * k) + r
+    lw = max(3, int(5 * k))
+    for i in range(n):
+        cx = x0 + i * (2 * r + gap) + r
+        box = (cx - r, cy - r, cx + r, cy + r)
+        if i < len(quedan):
+            d.ellipse(box, fill=_rgba(quedan[i]), outline=(255, 255, 255, 255), width=lw)
+        else:
+            d.ellipse(box, outline=(200, 200, 200, 255), width=lw)
+            o = int(r * 0.7)
+            d.line((cx - o, cy - o, cx + o, cy + o), fill=(200, 200, 200, 255), width=lw)
     im.save(path)
     return path
 
@@ -479,6 +560,11 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
                   str(tmp / f"r{i}.png"), rots[i % len(rots)])
         ovl.append((p, r["t0"] + off, r["t1"] + off, y_rot))
         sfx_at.append(("pop", r["t0"] + off))
+    st = plan.get("stock")
+    if st:
+        ovl.append((_stock(st["quedan"], st["agotados"], k, cfg, str(tmp / "stock.png")),
+                    st["t0"] + off, st["t1"] + off, y_rot))
+        sfx_at.append(("pop", st["t0"] + off))
     if plan["fotos"]:
         from .photo_insert import _search_and_download
         for i, f in enumerate(plan["fotos"]):
@@ -580,5 +666,7 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg VIP: {proc.stderr[-600:]}")
+    if clip:  # el gancho es un trozo repetido: sin subtítulos encima
+        ctx.extras.setdefault("sin_subs", []).append((0.0, round(off, 3)))
     ctx.on_log(f"[vip] ✅ {len(ovl)} gráficos · {len(zs)} zooms · gancho "
                f"{'copiado ' + format(off, '.1f') + 's' if clip else 'solo rótulo'} · {plan.get('nota', '')}")

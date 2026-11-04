@@ -87,6 +87,7 @@ def run_flow(
 
     current_input = input_video_path
     temp_outputs: list[str] = []
+    extras: dict = {}  # lo comparten todos los pasos del job (ToolContext.extras)
 
     try:
         for i, step in enumerate(ordered):
@@ -139,6 +140,7 @@ def run_flow(
                 temp_folder=temp_folder,
                 on_log=on_log,
                 on_progress=_sub_progress,
+                extras=extras,
             )
             result_path = tool.run(
                 input_path=current_input,

@@ -19,7 +19,7 @@ Las herramientas DEBEN:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
 
@@ -39,6 +39,11 @@ class ToolContext:
     # Sub-progreso de la herramienta actual [0..1]. El orchestrator inyecta
     # un wrapper que reescala al rango global del job antes de propagar.
     on_progress: SubProgress
+    # Lo que una herramienta deja para las siguientes del MISMO job (el
+    # orquestador pasa el mismo dict a todos los pasos). Claves en uso:
+    #   "sin_subs": [(t0, t1), ...] → tramos de salida sin subtítulos
+    #               (vip_overlays: el gancho copiado al principio).
+    extras: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -227,6 +227,14 @@ class SubsAutoTool:
                     "Whisper no detectó palabras. Prueba un modelo más grande."
                 )
             ctx.on_log(f"[subs_auto] {len(words)} palabras transcritas")
+            # Tramos que otra herramienta pidió sin subtítulos (el gancho VIP:
+            # es un trozo repetido del vídeo y ya lleva su rótulo).
+            huecos = [(float(a), float(b)) for a, b in (ctx.extras.get("sin_subs") or [])]
+            fuera = [w for w in words if not any(
+                a - 0.05 <= (float(w["start"]) + float(w["end"])) / 2 < b for a, b in huecos)]
+            if huecos and fuera:
+                ctx.on_log(f"[subs_auto] {len(words) - len(fuera)} palabra(s) sin subtítulo en {huecos}")
+                words = fuera
         finally:
             try:
                 os.remove(tmp_audio)

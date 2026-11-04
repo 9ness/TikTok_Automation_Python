@@ -85,3 +85,40 @@ class TestEstiloFlujo:
         assert cfg == {"zooms": False, "notas_estilo": "Sin zooms."}  # ni preset ni defectos
         cfg = _a_config({"color_dato": "#ffd600"}, {})
         assert cfg == {"color_dato": "#FFD600", "preset": "personalizado"}
+
+
+def test_extras_compartido_por_defecto_vacio():
+    from src.editor_auto.tools.base import ToolContext
+    a = ToolContext(user_id="u", user_name="u", job_id="j", temp_folder="/tmp",
+                    on_log=lambda m: None, on_progress=lambda *a: None)
+    b = ToolContext(user_id="u", user_name="u", job_id="j", temp_folder="/tmp",
+                    on_log=lambda m: None, on_progress=lambda *a: None)
+    a.extras["x"] = 1
+    assert b.extras == {}  # cada job empieza limpio; el orquestador pasa el suyo
+
+
+class TestStock:
+    def test_stock_colores_y_agotados(self):
+        from src.editor_auto.tools.vip_overlays import _sanitize
+        cfg = {"densidad_rotulos": "media", "fotos": False, "zooms": False, "gancho": False}
+        plan = {"stock": {"t0": 40, "t1": 42.5, "quedan": ["rojo", "amarilla", "fucsia"],
+                          "agotados": 2}}
+        st = _sanitize(plan, 60.0, cfg)["stock"]
+        assert st["quedan"] == ["#E53935", "#FDD835"] and st["agotados"] == 2
+        plan["rotulos"] = [{"texto": "QUEDAN 2", "t0": 41, "t1": 43, "rol": "dato"},
+                           {"texto": "SE AGOTA", "t0": 36, "t1": 38, "rol": "alerta"}]
+        out = _sanitize(plan, 60.0, cfg)
+        assert [r["texto"] for r in out["rotulos"]] == ["SE AGOTA"] and out["stock"]
+
+    def test_sin_colores_no_hay_stock(self):
+        from src.editor_auto.tools.vip_overlays import _sanitize
+        cfg = {"densidad_rotulos": "media", "fotos": False, "zooms": False, "gancho": False}
+        assert _sanitize({"stock": {"t0": 1, "t1": 3, "quedan": []}}, 60.0, cfg)["stock"] is None
+
+
+def test_clip_por_sonido_no_corta_palabras():
+    from src.editor_auto.tools.vip_overlays import _clip_por_sonido
+    ev = [{"t0": 1.0, "t1": 1.6, "db_sobre_fondo": 40}, {"t0": 34.5, "t1": 35.4, "db_sobre_fondo": 30}]
+    words = [{"start": 33.9, "end": 34.4}, {"start": 35.6, "end": 36.2}]
+    assert _clip_por_sonido(ev, words) == {"t0": 33.9, "t1": 36.2}
+    assert _clip_por_sonido(ev[:1], words) is None
