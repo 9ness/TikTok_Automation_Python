@@ -2622,34 +2622,18 @@ def _level_audio(src: str, dst: str, *, log=None) -> bool:
         return False
 
 
-def _transcribe_deepgram(
-    audio_path: str, *, language: str = "es", model: str = "nova-2",
+def _deepgram_words(
+    payload: bytes, *, language: str | None, model: str = "nova-3", offset: float = 0.0,
 ) -> list[dict]:
-    """Transcribe con Deepgram (timestamps por palabra más precisos que Whisper
-    en audio ruidoso). Devuelve el MISMO formato que `_transcribe`:
-    [{word, start, end}]. Requiere `DEEPGRAM_API_KEY`. Lanza si falla → el
-    caller cae a Whisper. Audio nivelado 16k mono (mismo pre-proceso)."""
+    """Una llamada a Deepgram (WAV 16k mono) → [{word, start, end}] + coste."""
     import json
-    import tempfile
     import urllib.request
     key = os.getenv("DEEPGRAM_API_KEY", "").strip()
     if not key:
         raise RuntimeError("DEEPGRAM_API_KEY no configurada")
-    wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
-    try:
-        subprocess.run(
-            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", audio_path,
-             "-ac", "1", "-ar", "16000", "-vn", wav],
-            check=True, timeout=180,
-        )
-        payload = open(wav, "rb").read()
-    finally:
-        try:
-            os.remove(wav)
-        except OSError:
-            pass
+    idioma = f"language={language}" if language else "detect_language=true"
     url = (
-        f"https://api.deepgram.com/v1/listen?model={model}&language={language}"
+        f"https://api.deepgram.com/v1/listen?model={model}&{idioma}"
         "&punctuate=true&smart_format=true"
     )
     req = urllib.request.Request(
@@ -2658,18 +2642,123 @@ def _transcribe_deepgram(
     )
     with urllib.request.urlopen(req, timeout=300) as r:
         resp = json.load(r)
+    try:
+        from src.cost_tracking import record_deepgram
+        record_deepgram(
+            audio_seconds=float(resp.get("metadata", {}).get("duration") or 0.0),
+            model=model,
+        )
+    except Exception:  # noqa: BLE001 — el tracking nunca rompe el job
+        pass
     words = (
         resp.get("results", {}).get("channels", [{}])[0]
         .get("alternatives", [{}])[0].get("words", [])
     )
-    out: list[dict] = []
-    for w in words:
-        out.append({
-            "word": str(w.get("punctuated_word") or w.get("word", "")),
-            "start": float(w.get("start", 0.0)),
-            "end": float(w.get("end", 0.0)),
-        })
-    return out
+    return [{
+        "word": str(w.get("punctuated_word") or w.get("word", "")),
+        "start": float(w.get("start", 0.0)) + offset,
+        "end": float(w.get("end", 0.0)) + offset,
+    } for w in words]
+
+
+def _deepgram_uniform_runs(words: list[dict], min_len: int = 6) -> list[tuple[int, int]]:
+    """Rachas [i0, i1] de palabras pegadas y con la MISMA duración (±2 ms).
+    Es la huella de Deepgram cuando no alinea un tramo: reparte el tiempo a
+    partes iguales y esconde las pausas (candado 4/11/2026: 47 palabras de
+    0,286 s y 1,5 s de silencio tragado antes de «Date prisa»)."""
+    runs: list[tuple[int, int]] = []
+    i0 = 0
+    for i in range(1, len(words) + 1):
+        ok = i < len(words) and (
+            abs((words[i]["end"] - words[i]["start"])
+                - (words[i - 1]["end"] - words[i - 1]["start"])) < 0.002
+            and abs(words[i]["start"] - words[i - 1]["end"]) < 0.002
+        )
+        if not ok:
+            if i - i0 >= min_len:
+                runs.append((i0, i - 1))
+            i0 = i
+    return runs
+
+
+def _transcribe_deepgram(
+    audio_path: str, *, language: str | None = "es", model: str | None = None,
+) -> list[dict]:
+    """Transcribe con Deepgram (timestamps por palabra más precisos que Whisper
+    en audio ruidoso). Devuelve el MISMO formato que `_transcribe`:
+    [{word, start, end}]. Requiere `DEEPGRAM_API_KEY`. Lanza si falla → el
+    caller cae a Whisper. Audio nivelado 16k mono (mismo pre-proceso).
+    Los tramos que Deepgram no alinea (palabras repartidas a partes iguales)
+    se vuelven a pedir recortados: con menos audio sí los alinea. Igual con los
+    huecos de >3 s sin palabras: nova-2 llegó a dejar de transcribir a mitad
+    del audio (nebulabs__vid 4/11/2026: paró en 18,7 s de 28) → modelo por
+    defecto nova-3 (mismo precio) y los huecos se re-piden por si acaso."""
+    import tempfile
+    import wave
+    model = model or os.getenv("EDITOR_DEEPGRAM_MODEL", "nova-3")
+    wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    crop = tempfile.NamedTemporaryFile(suffix=".wav", delete=False).name
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", audio_path,
+             "-ac", "1", "-ar", "16000", "-vn", wav],
+            check=True, timeout=180,
+        )
+        out = _deepgram_words(open(wav, "rb").read(), language=language, model=model)
+        for i0, i1 in reversed(_deepgram_uniform_runs(out)):
+            t0, t1 = out[i0]["start"], out[i1]["end"]
+            ss = max(0.0, t0 - 3.0)
+            try:
+                subprocess.run(
+                    ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                     "-ss", f"{ss:.3f}", "-t", f"{(t1 + 3.0) - ss:.3f}", "-i", wav, crop],
+                    check=True, timeout=60,
+                )
+                nuevas = _deepgram_words(
+                    open(crop, "rb").read(), language=language, model=model, offset=ss,
+                )
+            except Exception:  # noqa: BLE001 — si falla, se queda la racha
+                continue
+            lo = out[i0 - 1]["end"] if i0 > 0 else 0.0
+            hi = out[i1 + 1]["start"] if i1 + 1 < len(out) else float("inf")
+            tramo = [w for w in nuevas if lo - 0.05 <= w["start"] and w["end"] <= hi + 0.05
+                     and t0 - 0.5 <= w["start"] <= t1 + 0.5]
+            if len(tramo) < 0.7 * (i1 - i0 + 1) or _deepgram_uniform_runs(tramo):
+                continue
+            out[i0:i1 + 1] = tramo
+        # Huecos largos sin palabras (cabeza, medio, cola) → re-pedir el tramo.
+        try:
+            with wave.open(wav, "rb") as f:
+                dur = f.getnframes() / float(f.getframerate())
+        except Exception:  # noqa: BLE001
+            dur = out[-1]["end"] if out else 0.0
+        bordes = [0.0] + [x for w in out for x in (w["start"], w["end"])] + [dur]
+        huecos = [(bordes[k], bordes[k + 1]) for k in range(0, len(bordes) - 1, 2)
+                  if bordes[k + 1] - bordes[k] > 3.0]
+        for a, b in reversed(huecos[:6]):
+            ss = max(0.0, a - 1.0)
+            try:
+                subprocess.run(
+                    ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                     "-ss", f"{ss:.3f}", "-t", f"{min(60.0, b + 1.0 - ss):.3f}", "-i", wav, crop],
+                    check=True, timeout=60,
+                )
+                nuevas = _deepgram_words(
+                    open(crop, "rb").read(), language=language, model=model, offset=ss,
+                )
+            except Exception:  # noqa: BLE001
+                continue
+            dentro = [w for w in nuevas if a + 0.05 <= w["start"] and w["end"] <= b - 0.05]
+            if dentro and not _deepgram_uniform_runs(dentro):
+                k = next((i for i, w in enumerate(out) if w["start"] >= b - 0.05), len(out))
+                out[k:k] = dentro
+        return out
+    finally:
+        for f in (wav, crop):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
 
 def _transcribe(
@@ -2956,8 +3045,10 @@ def _is_parallel_enumeration(
         return False
     if gram[-1] not in _NGRAM_LINK_WORDS and lead == 0:
         return False
+    # Salta artículos/preposiciones tras la 2ª copia, también un titubeo entre
+    # ellos («esto en LA EN EL disco», Deepgram, 4/11/2026): hasta 4.
     j = next_idx
-    while j < len(normalized) and j < next_idx + 2 and normalized[j] in _NGRAM_LINK_WORDS:
+    while j < len(normalized) and j < next_idx + 4 and normalized[j] in _NGRAM_LINK_WORDS:
         j += 1
     if j >= len(normalized):
         return False
@@ -3096,6 +3187,18 @@ def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
         if comunes < 0.6 * len(toks) or sobran:
             return False
     kept = [t for t in (_p2tok(x) for x in str(cut.get("kept_version") or "").split()) if t]
+    if str(cut.get("kind") or "") == "redundant_restatement" and kept:
+        # «Ahí está activada» → cortar «Otro pitido para ver que está activada»
+        # (candado, 4/11/2026): si lo cortado dice algo que la versión que se
+        # queda NO dice (una palabra de contenido sin pareja), no es la misma
+        # frase repetida, es información nueva → se queda.
+        nuevas = [
+            t for t in toks
+            if len(t) >= 5 and t not in _AUDIT_STOPWORDS
+            and not any(t[:4] == k[:4] for k in kept if len(k) >= 4)
+        ]
+        if nuevas:
+            return False
     n = len(toks)
     if kept:
         head = kept[: min(3, len(kept))]
@@ -3105,6 +3208,13 @@ def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
         seq = [t for t in seq if t]
         if not any(seq[j:j + len(head)] == head for j in range(len(seq))):
             return False
+        if str(cut.get("kind") or "") != "redundant_restatement":
+            # Una RETOMA va justo DESPUÉS de lo cortado. Si la versión buena
+            # solo aparece antes («esto en el manillar, [esto en la en el]
+            # disco», candado 4/11/2026), el corte se come contenido.
+            despues = [t for t in (_p2tok(w.get("word", "")) for w in words[i1 + 1:i1 + 4 + len(head)]) if t]
+            if not any(despues[j:j + len(head)] == head for j in range(min(3, len(despues)))):
+                return False
     cerca = [
         _p2tok(w.get("word", ""))
         for w in words[max(0, i0 - n - 2):i0] + words[i1 + 1:i1 + 1 + n + 4]

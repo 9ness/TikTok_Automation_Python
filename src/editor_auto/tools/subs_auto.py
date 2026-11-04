@@ -214,7 +214,8 @@ class SubsAutoTool:
                 # Whisper [0..1] → sub-slot [0.10..0.55] de esta herramienta.
                 ctx.on_progress(0.10 + frac * 0.45, msg)
 
-            words = transcribe_with_reference(
+            from src.editor_auto.asr import transcribe_words
+            words = transcribe_words(
                 tmp_audio,
                 reference_script=ref,
                 model_size=config.get("model_size", "large-v3"),

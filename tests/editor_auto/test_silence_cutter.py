@@ -418,7 +418,9 @@ class TestDetectRepeatedNgrams:
         # Candado 3/11/2026: «esto en el manillar esto en el disco» son dos
         # sitios, no un reinicio — con 3-grama o partido en «esto en».
         for t in ("enganchas esto en el manillar esto en el disco y listo",
-                  "enganchas esto en el manillar esto en disco y listo"):
+                  "enganchas esto en el manillar esto en disco y listo",
+                  # Deepgram 4/11/2026: titubeo entre la 2ª copia y el sustantivo.
+                  "enganchas esto en el manillar esto en la en el disco y no"):
             assert _detect_repeated_ngrams(self._frase(t)) == [], t
 
     def test_reinicios_reales_se_siguen_cortando(self):
@@ -1065,6 +1067,25 @@ class TestPass2Grounded:
                   "kept_version": "esto en el disco"}, 0, 2, w)
 
 
+    def test_retoma_tiene_que_ir_despues(self):
+        # Candado 4/11/2026: cortar «esto en la en el» dejaba «manillar, disco».
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("enganchas esto en el manillar esto en la en el disco y no")
+        assert not g({"kind": "exact_repetition", "first_attempt": "esto en la en",
+                      "kept_version": "esto en el disco"}, 5, 9, w)
+
+    def test_reformulacion_con_informacion_nueva_se_queda(self):
+        # Candado 4/11/2026: «Ahí está activada. Otro pitido para ver que está
+        # activada» — el pitido es información nueva, no la misma frase.
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("ahí está activada otro pitido para ver que está activada y ahora nada")
+        assert not g({"kind": "redundant_restatement",
+                      "first_attempt": "otro pitido para ver que está activada",
+                      "kept_version": "ahí está activada"}, 3, 9, w)
+        w = self._w("te lo dejo en el carrito te lo dejo en el carrito naranja")
+        assert g({"kind": "redundant_restatement", "first_attempt": "te lo dejo en el carrito",
+                  "kept_version": "te lo dejo en el carrito naranja"}, 0, 5, w)
+
     def test_repeticion_de_palabra_corta_no_basta(self):
         from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
         w = self._w("una pasta no pues no te creas 20 euros te lo dejo")
@@ -1125,3 +1146,17 @@ class TestCompletitudFraseEntera:
 
     def test_quita_precio_colgado(self, monkeypatch):
         assert self._run(monkeypatch, "es un termo muy bueno y están solo por ocho", 4)
+
+
+class TestDeepgramRachasUniformes:
+    """Deepgram, cuando no alinea un tramo, reparte el tiempo a partes iguales."""
+
+    def test_detecta_racha_y_respeta_lo_normal(self):
+        from src.editor_auto.tools.silence_cutter import _deepgram_uniform_runs as r
+        uni = [{"word": f"w{i}", "start": 10 + i * 0.286, "end": 10 + (i + 1) * 0.286}
+               for i in range(8)]
+        normal = [{"word": "a", "start": 0.0, "end": 0.2}, {"word": "b", "start": 0.3, "end": 0.8},
+                  {"word": "c", "start": 0.8, "end": 0.9}]
+        assert r(normal + uni) == [(3, 10)]
+        assert r(normal) == []
+        assert r(uni[:5]) == []

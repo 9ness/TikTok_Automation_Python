@@ -269,8 +269,11 @@ Esto es lo que hace que el editor "actúe como un humano que revisa su corte":
   detectar 429 → abortar y reencolar + alerta de saldo.
 - **Tarifa gpt-5.4 cableada a ojo** en `cost_tracking.py` ($1.25/$10 por 1M) con
   comentario "calibrar con /costs". Las cifras de coste tienen esa incertidumbre.
-- **Producción en Whisper** (Deepgram evaluado, NO adoptado; flag
-  `EDITOR_ASR_PROVIDER`).
+- **Producción en Deepgram desde el 4/11/2026** (`EDITOR_ASR_PROVIDER=deepgram`,
+  Whisper de respaldo). Ojo: Deepgram a veces no alinea un tramo y reparte las
+  palabras a partes iguales (esconde pausas) → `_deepgram_uniform_runs` lo
+  detecta y re-pide el tramo recortado. Si ves pausas largas que no se cortan,
+  busca rachas de duración idéntica en el `editproject_*.json`.
 
 ---
 

@@ -196,7 +196,8 @@ def _transcribe(video: str, wav: str, cfg: dict, ctx: ToolContext) -> list[dict]
     try:
         from src.subtitles_only import extract_audio_from_video, transcribe_with_reference
         extract_audio_from_video(video, wav)
-        words = transcribe_with_reference(
+        from src.editor_auto.asr import transcribe_words
+        words = transcribe_words(
             wav, reference_script=None, model_size=cfg.get("whisper_model_size", "large-v3"),
             language=cfg.get("ai_language", "es") or None, audio_type="speech",
             progress_callback=lambda f, m: ctx.on_progress(0.05 + f * 0.4, m),

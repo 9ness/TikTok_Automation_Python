@@ -295,7 +295,8 @@ def _transcribe(input_path: str, config: dict, ctx: ToolContext) -> list[dict]:
         tmp_dir.mkdir(parents=True, exist_ok=True)
         tmp_audio = str(tmp_dir / f"photo_insert_{ctx.job_id}_{int(time.time())}.wav")
         extract_audio_from_video(input_path, tmp_audio)
-        words = transcribe_with_reference(
+        from src.editor_auto.asr import transcribe_words
+        words = transcribe_words(
             tmp_audio,
             reference_script=None,
             model_size=config.get("whisper_model_size", "large-v3"),

@@ -50,6 +50,7 @@ OPENAI_GPT4O_INPUT_PER_1M = 2.50
 OPENAI_GPT4O_OUTPUT_PER_1M = 10.00
 # OpenAI Whisper API: $0.006 por minuto de audio
 OPENAI_WHISPER_PER_MIN = 0.006
+DEEPGRAM_PER_MIN = 0.0043   # nova-2/nova-3 pre-grabado, pago por uso (nov 2026)
 # MiniMax speech-02-turbo: $0.06 por 1000 caracteres (≈ TikTok Shop config)
 MINIMAX_TTS_PER_1K_CHARS = 0.06
 
@@ -335,6 +336,19 @@ def record_openai_whisper(*, audio_seconds: float, detail: str | None = None) ->
         unit_label="seconds",
         cost_usd=cost,
         detail=detail,
+    ))
+    return cost
+
+
+def record_deepgram(*, audio_seconds: float, model: str = "nova-3") -> float:
+    """Deepgram transcripción pre-grabada (nova-2/3, $0.0043/min)."""
+    cost = (audio_seconds / 60.0) * DEEPGRAM_PER_MIN
+    _add_line(CostLine(
+        kind="deepgram",
+        units=audio_seconds,
+        unit_label="seconds",
+        cost_usd=cost,
+        detail=model,
     ))
     return cost
 

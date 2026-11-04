@@ -261,7 +261,8 @@ class StickerArrowTool:
                     tmp_dir / f"sticker_arrow_{ctx.job_id}_{int(time.time())}.wav"
                 )
                 extract_audio_from_video(input_path, tmp_audio)
-                words = transcribe_with_reference(
+                from src.editor_auto.asr import transcribe_words
+                words = transcribe_words(
                     tmp_audio,
                     reference_script=None,
                     model_size=config.get("whisper_model_size", "large-v3"),

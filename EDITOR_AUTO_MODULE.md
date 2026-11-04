@@ -197,8 +197,14 @@ Reusa `UPSTASH_REDIS_REST_URL/_TOKEN` ya compartidas entre programas.
   self-heal corrige con lo que encuentran; ver `EDITOR_DEBUGGING.md` §2.
 - `cost_tracking.py` añadió rates para `gpt-4o` ($2.50/$10.00 por 1M
   input/output tokens) — match por prefix del nombre del modelo.
-- `Whisper local` (`faster-whisper`) y `Silero VAD` corren en local y
-  no generan coste de API — no se registran.
+- Transcripción: con `EDITOR_ASR_PROVIDER=deepgram` (producción desde el
+  4/11/2026) TODAS las herramientas (cortador, VIP, flecha, subtítulos, fotos)
+  transcriben con Deepgram nova-3 (`EDITOR_DEEPGRAM_MODEL`) vía `src/editor_auto/asr.py`
+  (`record_deepgram`, ~0,0043 $/min). Si Deepgram falla, Whisper local de
+  respaldo. Motivo: Whisper large-v3 en CPU tardaba 450 s y llenaba los 10 GB
+  del contenedor; con Deepgram ~200 s y ~2,7 GB. Los tramos que Deepgram no
+  alinea (palabras a partes iguales) y los huecos >3 s se re-piden recortados
+  (`_deepgram_uniform_runs`). `Silero VAD` sigue en local, sin coste.
 
 ## Dependencias añadidas
 

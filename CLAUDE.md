@@ -687,6 +687,7 @@ PIXABAY_API_KEY=...
 # TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
 # ANTHROPIC_API_KEY_EDITOR_AUTO — silence_cutter usa Claude Haiku (OpenAI de respaldo)
+# EDITOR_ASR_PROVIDER=deepgram + DEEPGRAM_API_KEY — transcripción de todo el editor (src/editor_auto/asr.py; Whisper de respaldo)
 
 # === Programa 4 — Tiktok Shop AI Pro (Viralización) ===
 # Path raíz LOCAL (no Drive) de assets: gancho/audios/paisajes/música.
