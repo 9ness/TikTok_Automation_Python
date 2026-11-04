@@ -16,6 +16,7 @@ Reglas:
 Responde SOLO JSON, con estas claves posibles (todas opcionales salvo notas_estilo):
 {"color_alerta": "#RRGGBB" (rótulos de problema/urgencia), "color_dato": "#RRGGBB" (cifras/pasos),
  "color_ok": "#RRGGBB" (beneficios), "color_neutro": "#RRGGBB",
+ "tono": "impacto" (enérgico, colores fuertes) | "limpio" (elegante, sobrio, blanco y negro) | "neon" (juvenil, flúor) — solo si describe el ambiente y NO da colores de rótulos,
  "fuente": "nombre exacto de esta lista: {fuentes}",
  "densidad_rotulos": "baja"|"media"|"alta",
  "gancho": true|false (texto grande al principio), "fotos": true|false (fotos de apoyo), "zooms": true|false, "color_grade": true|false (colores más vivos),

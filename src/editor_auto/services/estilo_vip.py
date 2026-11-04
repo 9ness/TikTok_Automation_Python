@@ -83,6 +83,8 @@ def _a_config(data: dict, fuentes: dict[str, str]) -> dict:
             cfg[k] = data[k].upper()
     if cfg:  # los colores solo cuentan en "personalizado"; sin colores, su preset sigue
         cfg["preset"] = "personalizado"
+    elif data.get("tono") in ("impacto", "limpio", "neon"):
+        cfg["preset"] = data["tono"]  # sin colores concretos, la paleta del tono
     if data.get("fuente") in fuentes:
         cfg["font_path"] = fuentes[data["fuente"]]
     if data.get("densidad_rotulos") in ("baja", "media", "alta"):

@@ -39,6 +39,19 @@ _WHISPER_MODEL = None
 _WHISPER_MODEL_SIZE = None
 
 
+def _claro(color) -> bool:
+    """True si el color (#hex o tupla RGB) es claro (luminancia > 170)."""
+    try:
+        if isinstance(color, str):
+            h = color.lstrip("#")
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        else:
+            r, g, b = color[:3]
+        return 0.299 * r + 0.587 * g + 0.114 * b > 170
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _get_whisper_model(model_size: str = "base"):
     global _WHISPER_MODEL, _WHISPER_MODEL_SIZE
     if _WHISPER_MODEL is not None and _WHISPER_MODEL_SIZE == model_size:
@@ -415,6 +428,8 @@ def render_chunk_image(
                 text_fill = per_word_color
             else:
                 text_fill = s["text_color"]
+            if is_active and mode == "pill" and _claro(s["highlight_color"]) and _claro(text_fill):
+                text_fill = "#111111"  # blanco sobre píldora amarilla/blanca no se lee
             cdraw.text(
                 (x, y_base),
                 word_text,

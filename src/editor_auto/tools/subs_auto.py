@@ -235,6 +235,11 @@ class SubsAutoTool:
             if huecos and fuera:
                 ctx.on_log(f"[subs_auto] {len(words) - len(fuera)} palabra(s) sin subtítulo en {huecos}")
                 words = fuera
+            corr = ctx.extras.get("correcciones") or []
+            if corr:
+                n = _corregir_nombres(words, corr)
+                if n:
+                    ctx.on_log(f"[subs_auto] {n} nombre(s) corregidos: {corr}")
         finally:
             try:
                 os.remove(tmp_audio)
@@ -273,3 +278,46 @@ class SubsAutoTool:
         )
         ctx.on_progress(1.0, "✅ Subtítulos aplicados")
         return output_path
+
+
+def _corregir_nombres(words: list[dict], correcciones: list[dict]) -> int:
+    """Cambia en las palabras lo que Whisper oyó mal por cómo se escribe
+    («el sapataky» → «Elsa Pataky»). Busca lo oído con tolerancia (0,8), porque
+    esta transcripción no es la misma que leyó la IA. Devuelve cuántas cambió."""
+    import difflib
+    import re
+
+    def norm(t: str) -> str:
+        return re.sub(r"[^\wáéíóúñü]", "", str(t).lower())
+
+    def txt(w: dict) -> str:
+        return str(w.get("word", w.get("text", "")))
+
+    def poner(w: dict, t: str) -> None:
+        w["word" if "word" in w else "text"] = t
+
+    hechas = 0
+    for c in correcciones:
+        oido = [norm(x) for x in str(c.get("oido", "")).split() if norm(x)]
+        bien = str(c.get("bien", "")).split()
+        if not oido or not bien:
+            continue
+        objetivo, n, i = "".join(oido), len(oido), 0
+        while i + n <= len(words):
+            trozo = "".join(norm(txt(w)) for w in words[i:i + n])
+            if trozo and difflib.SequenceMatcher(None, trozo, objetivo).ratio() >= 0.8:
+                cola = re.sub(r"^.*?([^\wáéíóúñü]*)$", r"\1", txt(words[i + n - 1]).strip())
+                if len(bien) == n:
+                    for w, b in zip(words[i:i + n], bien):
+                        poner(w, b)
+                else:
+                    poner(words[i], " ".join(bien))
+                    words[i]["end"] = words[i + n - 1]["end"]
+                    del words[i + 1:i + n]
+                poner(words[i + min(n, len(bien)) - 1], txt(words[i + min(n, len(bien)) - 1]) + cola)
+                hechas += 1
+                i += min(n, len(bien))
+            else:
+                i += 1
+    return hechas
+

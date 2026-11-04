@@ -149,6 +149,8 @@ class VipOverlaysTool:
                 g["clip"] = _clip_por_sonido(eventos, words)  # la IA a veces no lo propone
             plan = _sanitize(plan, info["dur"], cfg)
             ctx.on_log("[vip] Plan: " + json.dumps(plan, ensure_ascii=False)[:900])
+            if plan["correcciones"]:  # para que los subtítulos escriban bien los nombres
+                ctx.extras["correcciones"] = plan["correcciones"]
             ctx.on_progress(0.65, "🖼️ Preparando gráficos…")
             _render(input_path, output_path, plan, info, cfg, tmp, ctx)
             ctx.on_progress(1.0, f"✅ VIP: {len(plan['rotulos'])} rótulos, "
@@ -299,7 +301,9 @@ def _num(v, default=0.0) -> float:
 
 def _clean_text(t: str, n: int = 22) -> str:
     t = "".join(ch for ch in str(t or "") if ord(ch) < 0x2000 or ch in "€")
-    t = re.sub(r"\s+", " ", t).strip().upper()[:n]
+    t = re.sub(r"\s+", " ", t).strip().upper()
+    if len(t) > n:  # nunca a mitad de palabra («ELSA PA»)
+        t = t[:n + 1].rsplit(" ", 1)[0] if " " in t[:n + 1] else t[:n]
     # unidades que en mayúsculas cambian de sentido o quedan raras
     return re.sub(r"(\d)\s?DB\b", r"\1 dB", t)
 
@@ -332,8 +336,10 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
         return a, min(b, a + mx)
 
     g = plan.get("gancho") or {}
-    gancho = {"texto": _clean_text(g.get("texto")) if cfg.get("gancho") else "",
-              "dato": _clean_text(g.get("dato"), 10) if cfg.get("gancho") else "", "clip": None}
+    gancho = {"texto": _clean_text(g.get("texto"), 28) if cfg.get("gancho") else "",
+              "dato": _clean_text(g.get("dato"), 10) if cfg.get("gancho") else "", "clip": None,
+              "foto": str(g.get("foto") or "").strip()[:80]
+              if cfg.get("gancho") and cfg.get("fotos") else ""}
     c = g.get("clip") if cfg.get("gancho_clip") else None
     if isinstance(c, dict):
         s = span(c, 1.2, 3.0)
@@ -394,7 +400,11 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
     return {"gancho": gancho, "rotulos": [x for x in limpio if x["tipo"] == "rotulo"],
             "fotos": [x for x in limpio if x["tipo"] == "foto"],
             "stock": next((x for x in limpio if x["tipo"] == "stock"), None), "zooms": zooms,
-            "nota": str(plan.get("nota") or "")[:300]}
+            "nota": str(plan.get("nota") or "")[:300],
+            "correcciones": [{"oido": str(c.get("oido"))[:40], "bien": str(c.get("bien"))[:40]}
+                             for c in (plan.get("correcciones") or [])[:8]
+                             if isinstance(c, dict) and c.get("oido") and c.get("bien")
+                             and str(c["oido"]).lower() != str(c["bien"]).lower()]}
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +561,14 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
     if g.get("texto"):
         ovl.append((_pill(g["texto"], col["alerta"], int(82 * k), int(W * 0.9), cfg,
                           str(tmp / "g0.png"), -3), 0.0, gl, int(H * 0.135)))
+    if g.get("foto"):  # la persona/marca que nombra el gancho: lo que más engancha
+        from .photo_insert import _search_and_download
+        img = _search_and_download(query=g["foto"], dest=str(tmp / "gf.png"),
+                                   prefer_google=False, log=ctx.on_log)
+        if img:
+            ovl.append((_card(img, str(tmp / "gfc.png"), int(W * 0.55), 3), 0.15, gl,
+                        int(H * 0.21)))
+            sfx_at.append(("whoosh", 0.15))
     if g.get("dato"):
         ovl.append((_pill(g["dato"], col["dato"], int(150 * k), int(W * 0.8), cfg,
                           str(tmp / "g1.png"), 4), 0.35, gl, int(H * 0.47)))

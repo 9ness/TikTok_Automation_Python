@@ -34,7 +34,7 @@ def test_sanitize_respeta_estilo_apagado():
     plan = {"gancho": {"texto": "hola", "clip": {"t0": 10, "t1": 12}},
             "zooms": [{"t0": 1, "t1": 3}], "fotos": [{"busqueda": "x", "t0": 5, "t1": 7}]}
     out = _sanitize(plan, 30.0, _cfg(gancho=False, gancho_clip=False, zooms=False, fotos=False))
-    assert out["gancho"] == {"texto": "", "dato": "", "clip": None}
+    assert out["gancho"] == {"texto": "", "dato": "", "clip": None, "foto": ""}
     assert out["zooms"] == [] and out["fotos"] == []
 
 
@@ -122,3 +122,40 @@ def test_clip_por_sonido_no_corta_palabras():
     words = [{"start": 33.9, "end": 34.4}, {"start": 35.6, "end": 36.2}]
     assert _clip_por_sonido(ev, words) == {"t0": 33.9, "t1": 36.2}
     assert _clip_por_sonido(ev[:1], words) is None
+
+
+def test_tono_elige_paleta_sin_colores():
+    from src.editor_auto.services.estilo_vip import _a_config
+    assert _a_config({"tono": "limpio", "notas_estilo": "x"}, {})["preset"] == "limpio"
+    assert _a_config({"tono": "limpio", "color_dato": "#FFD600"}, {})["preset"] == "personalizado"
+
+
+def test_pildora_clara_texto_oscuro():
+    from src.subtitles import _claro
+    assert _claro("#FFD600") and _claro((255, 255, 255)) and not _claro("#E61E2D")
+
+
+def test_foto_del_gancho_solo_con_fotos():
+    from src.editor_auto.tools.vip_overlays import _sanitize
+    plan = {"gancho": {"texto": "¿TE GUSTA ELSA PATAKY?", "foto": "Elsa Pataky"}}
+    cfg = {"densidad_rotulos": "media", "fotos": True, "zooms": False, "gancho": True}
+    assert _sanitize(plan, 30.0, cfg)["gancho"]["foto"] == "Elsa Pataky"
+    assert _sanitize(plan, 30.0, {**cfg, "fotos": False})["gancho"]["foto"] == ""
+
+
+def test_corregir_nombres_en_subs():
+    from src.editor_auto.tools.subs_auto import _corregir_nombres
+    w = [{"word": "tanto", "start": 0, "end": .3}, {"word": "el", "start": .3, "end": .4},
+         {"word": "Sapataki,", "start": .4, "end": .9}, {"word": "como", "start": .9, "end": 1.1}]
+    assert _corregir_nombres(w, [{"oido": "el sapataky", "bien": "Elsa Pataky"}]) == 1
+    assert [x["word"] for x in w] == ["tanto", "Elsa", "Pataky,", "como"]
+    w2 = [{"word": "de", "start": 0, "end": .2}, {"word": "in", "start": .2, "end": .3},
+          {"word": "cite", "start": .3, "end": .6}]
+    _corregir_nombres(w2, [{"oido": "in cite", "bien": "Incite"}])
+    assert [x["word"] for x in w2] == ["de", "Incite"] and w2[1]["end"] == .6
+
+
+def test_texto_no_se_corta_a_mitad_de_palabra():
+    from src.editor_auto.tools.vip_overlays import _clean_text
+    assert _clean_text("¿A ti te gusta Elsa Pataky?", 28) == "¿A TI TE GUSTA ELSA PATAKY?"
+    assert _clean_text("¿A ti te gusta Elsa Pataky?", 22) == "¿A TI TE GUSTA ELSA"
