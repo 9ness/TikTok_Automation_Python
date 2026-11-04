@@ -78,3 +78,10 @@ class TestEstiloFlujo:
                        "position_x_pct": 50.0, "position_y_pct": 88.0}
         sola = estilo_vip._flecha_cfg({"hay": True, "color": "#E02020", "triple": False})
         assert sola["sticker_file"] == "flecha_roja.mov"
+
+    def test_texto_solo_cambia_lo_que_dice(self):
+        from src.editor_auto.services.estilo_vip import _a_config
+        cfg = _a_config({"zooms": False, "notas_estilo": "Sin zooms."}, {})
+        assert cfg == {"zooms": False, "notas_estilo": "Sin zooms."}  # ni preset ni defectos
+        cfg = _a_config({"color_dato": "#ffd600"}, {})
+        assert cfg == {"color_dato": "#FFD600", "preset": "personalizado"}

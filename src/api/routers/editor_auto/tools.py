@@ -7,7 +7,7 @@ import shutil
 import tempfile
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from src.api.dependencies import get_current_user
@@ -71,3 +71,19 @@ async def estilo_vip_desde_video(
             os.remove(path)
         except OSError:
             pass
+
+
+@router.post("/vip-overlays/estilo-texto")
+async def estilo_vip_desde_texto(
+    _user: Annotated[str, Depends(get_current_user)],
+    texto: Annotated[str, Body(embed=True, min_length=3, max_length=3000)],
+) -> dict[str, Any]:
+    """El cliente cuenta con palabras cómo quiere su edición → misma config
+    parcial que `/vip-overlays/estilo`, pero solo con lo que diga (~0,0005 $).
+    NO guarda nada."""
+    from src.editor_auto.services.estilo_vip import estilo_desde_texto
+
+    try:
+        return await run_in_threadpool(estilo_desde_texto, texto)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"No pude sacar el estilo: {e}") from e

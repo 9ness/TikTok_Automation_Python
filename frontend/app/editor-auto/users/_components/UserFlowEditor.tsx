@@ -307,23 +307,21 @@ function StepCard({
   );
 }
 
-/** Sube un vídeo que le gusta al cliente y rellena el estilo VIP con lo que
- *  ve la IA (colores, letra, densidad, gancho, fotos, zooms y notas), y de
- *  paso los subtítulos y la flecha si están en el flujo. No
- *  guarda: queda en el formulario hasta que se pulse Guardar flujo. */
+/** Estilo VIP de dos formas: el cliente lo CUENTA con palabras (solo cambia
+ *  lo que diga) o sube un vídeo que le gusta (la IA lo copia entero). Las dos
+ *  rellenan también subtítulos y flecha si están en el flujo. No guarda:
+ *  queda en el formulario hasta que se pulse Guardar flujo. */
 function EstiloDesdeVideo({ onApply }: { onApply: (config: Record<string, unknown>) => void }) {
   const [estado, setEstado] = useState<"idle" | "cargando" | "ok" | "error">("idle");
   const [msg, setMsg] = useState("");
-  const subir = async (file: File | undefined) => {
-    if (!file) return;
+  const [texto, setTexto] = useState("");
+  const pedir = async (ruta: string, body: FormData | { texto: string }) => {
     setEstado("cargando");
     setMsg("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
       const cfg = await api.post<Record<string, unknown>>(
-        "/api/v1/editor-auto/tools/vip-overlays/estilo",
-        fd,
+        `/api/v1/editor-auto/tools/vip-overlays/${ruta}`,
+        body,
       );
       onApply(cfg);
       setEstado("ok");
@@ -333,21 +331,45 @@ function EstiloDesdeVideo({ onApply }: { onApply: (config: Record<string, unknow
       setMsg(e instanceof Error ? e.message : "No se pudo sacar el estilo");
     }
   };
+  const subir = (file: File | undefined) => {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    pedir("estilo", fd);
+  };
+  const cargando = estado === "cargando";
   return (
-    <div className="mb-3 rounded-md border border-dashed p-2">
-      <Label className="text-xs sm:text-sm">Copiar estilo de un vídeo de referencia</Label>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
+    <div className="mb-3 space-y-2 rounded-md border border-dashed p-2">
+      <Label className="text-xs sm:text-sm">Cómo quiere el cliente su edición (con sus palabras)</Label>
+      <Textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        rows={3}
+        className="text-xs sm:text-sm"
+        placeholder="Ej.: subtítulos amarillos de 3 palabras con la que dice en blanco, flecha naranja triple al final, sin zooms, pocos textos y sin fotos."
+        disabled={cargando}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          className="h-8"
+          disabled={cargando || texto.trim().length < 3}
+          onClick={() => pedir("estilo-texto", { texto })}
+        >
+          Aplicar descripción
+        </Button>
+        <span className="text-xs text-muted-foreground">o copia el estilo de un vídeo:</span>
         <Input
           type="file"
           accept="video/*"
           className="h-8 w-full text-xs sm:w-auto"
-          disabled={estado === "cargando"}
+          disabled={cargando}
           onChange={(e) => subir(e.target.files?.[0])}
         />
-        {estado === "cargando" && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        {cargando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
       {msg && (
-        <p className={`mt-1 break-words text-xs ${estado === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+        <p className={`break-words text-xs ${estado === "error" ? "text-destructive" : "text-muted-foreground"}`}>
           {msg}
         </p>
       )}

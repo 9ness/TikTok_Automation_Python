@@ -1,4 +1,4 @@
-"""Estilo VIP desde un vídeo de referencia del cliente.
+"""Estilo VIP desde un vídeo de referencia del cliente, o contado con palabras.
 
 El cliente enseña un vídeo con la edición que le gusta y de ahí sale la config
 de `vip_overlays` (colores de las píldoras, fuente, densidad, zooms, notas
@@ -22,6 +22,7 @@ from .revision_visual import _fotogramas, _hoja
 N_FOTOGRAMAS = 24
 
 _PROMPT = Path(__file__).resolve().parent.parent / "prompts" / "vip_estilo_referencia.md"
+_PROMPT_TEXTO = _PROMPT.with_name("vip_estilo_texto.md")
 _FONTS = Path(__file__).resolve().parents[3] / "assets" / "fonts"
 _HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -32,8 +33,6 @@ def _fuentes() -> dict[str, str]:
 
 def estilo_desde_video(video: str) -> dict:
     """Devuelve la config parcial de `vip_overlays` para ese estilo. Lanza si falla."""
-    from src.editor_auto.api import claude_client
-
     dur = float(subprocess.check_output(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", video],
         timeout=60).decode().strip())
@@ -41,14 +40,28 @@ def estilo_desde_video(video: str) -> dict:
     fuentes = _fuentes()
     instr = (_PROMPT.read_text(encoding="utf-8").replace("{n}", str(N_FOTOGRAMAS))
              .replace("{dur}", f"{dur:.0f}").replace("{fuentes}", ", ".join(fuentes)))
+    data = _pedir([
+        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                     "data": base64.b64encode(jpg).decode()}},
+        {"type": "text", "text": instr}])
+    return _a_config(data, fuentes)
+
+
+def estilo_desde_texto(texto: str) -> dict:
+    """Lo mismo, pero el cliente lo cuenta con palabras. Solo trae lo que diga:
+    lo que no mencione no se toca en su flujo. Una llamada de texto (~0,0005 $)."""
+    fuentes = _fuentes()
+    instr = (_PROMPT_TEXTO.read_text(encoding="utf-8").replace("{fuentes}", ", ".join(fuentes))
+             .replace("{texto}", texto.strip()[:3000]))
+    return _a_config(_pedir([{"type": "text", "text": instr}]), fuentes)
+
+
+def _pedir(content: list) -> dict:
+    from src.editor_auto.api import claude_client
+
     m = claude_client.modelo()
     resp = claude_client._client().messages.create(
-        model=m, max_tokens=16000,
-        messages=[{"role": "user", "content": [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
-                                         "data": base64.b64encode(jpg).decode()}},
-            {"type": "text", "text": instr}]}],
-    )
+        model=m, max_tokens=16000, messages=[{"role": "user", "content": content}])
     try:
         cost_tracking.record_claude(input_tokens=int(resp.usage.input_tokens or 0),
                                     output_tokens=int(resp.usage.output_tokens or 0),
@@ -58,12 +71,18 @@ def estilo_desde_video(video: str) -> dict:
     raw = "".join(b.text for b in resp.content if b.type == "text")
     if "{" not in raw:
         raise RuntimeError(f"estilo_vip: la IA no devolvió JSON (stop_reason={resp.stop_reason})")
-    data = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+    return json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
 
-    cfg: dict = {"preset": "personalizado"}
+
+def _a_config(data: dict, fuentes: dict[str, str]) -> dict:
+    """JSON de la IA → config parcial de vip_overlays (+ `_flujo` para el resto).
+    Una clave ausente no se pone: con texto, lo que el cliente no dijo se queda."""
+    cfg: dict = {}
     for k in ("color_alerta", "color_dato", "color_ok", "color_neutro"):
         if _HEX.match(str(data.get(k, ""))):
             cfg[k] = data[k].upper()
+    if cfg:  # los colores solo cuentan en "personalizado"; sin colores, su preset sigue
+        cfg["preset"] = "personalizado"
     if data.get("fuente") in fuentes:
         cfg["font_path"] = fuentes[data["fuente"]]
     if data.get("densidad_rotulos") in ("baja", "media", "alta"):
@@ -71,11 +90,11 @@ def estilo_desde_video(video: str) -> dict:
     for k in ("gancho", "fotos", "zooms", "color_grade"):
         if isinstance(data.get(k), bool):
             cfg[k] = data[k]
-    try:
-        cfg["rotulo_y_pct"] = max(5.0, min(60.0, float(data.get("rotulo_y_pct", 16))))
-    except (TypeError, ValueError):
-        pass
-    cfg["notas_estilo"] = str(data.get("notas_estilo") or "")[:1500]
+    y = _clamp(data.get("rotulo_y_pct"), 5, 60)
+    if y is not None:
+        cfg["rotulo_y_pct"] = y
+    if data.get("notas_estilo"):
+        cfg["notas_estilo"] = str(data["notas_estilo"])[:1500]
     # Lo que no es de vip_overlays (subtítulos, flecha) va aparte: la UI lo
     # mezcla en esos pasos del flujo si el usuario los tiene.
     flujo = {}
@@ -162,4 +181,6 @@ def _flecha_cfg(d) -> dict:
 
 if __name__ == "__main__":  # python -m src.editor_auto.services.estilo_vip <video>
     import sys
-    print(json.dumps(estilo_desde_video(sys.argv[1]), ensure_ascii=False, indent=1))
+    arg = sys.argv[1]
+    f = estilo_desde_video if len(arg) < 255 and Path(arg).is_file() else estilo_desde_texto
+    print(json.dumps(f(arg), ensure_ascii=False, indent=1))
