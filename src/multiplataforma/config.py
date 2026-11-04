@@ -155,6 +155,8 @@ HTTP_TIMEOUT_S = float(os.getenv("MULTIPLATAFORMA_HTTP_TIMEOUT_S", "60"))
 UPLOAD_TIMEOUT_S = float(os.getenv("MULTIPLATAFORMA_UPLOAD_TIMEOUT_S", "600"))
 POLL_INTERVALO_S = float(os.getenv("MULTIPLATAFORMA_POLL_INTERVALO_S", "10"))
 POLL_MAX_S = float(os.getenv("MULTIPLATAFORMA_POLL_MAX_S", "600"))
+# Segundos que se sigue sondeando un contenedor de IG en ERROR (suele pasar a FINISHED).
+IG_GRACIA_ERROR_S = float(os.getenv("MULTIPLATAFORMA_IG_GRACIA_ERROR_S", "180"))
 
 # Vida de la URL firmada del vídeo (IG/Threads lo descargan al crear el
 # contenedor; con unas horas sobra).

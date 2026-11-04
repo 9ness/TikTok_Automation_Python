@@ -155,12 +155,24 @@ def test_instagram_contenedor_en_error_se_reintenta_con_otro():
         ("GET", "/c-malo", {"status_code": "ERROR"}),
     ])
     try:
-        InstagramClient("tok", http=g.cliente()).publicar(
+        InstagramClient("tok", http=g.cliente(), sleep=lambda _s: None).publicar(
             "17841", caption="x", video_url="https://x/v.mp4", previo={"container_id": "c-malo"})
     except ErrorPublicacion as e:
         assert e.reintentable and e.parcial["container_id"] == ""
     else:
         raise AssertionError("debía fallar")
+
+def test_instagram_error_pasajero_se_espera():
+    estados = iter(["ERROR", "ERROR", "FINISHED"])
+    g = Grabadora([
+        ("GET", "content_publishing_limit", {"data": [{"quota_usage": 0}]}),
+        ("POST", "/17841/media_publish", {"id": "m3"}),
+        ("GET", "/c-lento", lambda _r: {"status_code": next(estados)}),
+    ])
+    res = InstagramClient("tok", http=g.cliente(), sleep=lambda _s: None).publicar(
+        "17841", caption="x", video_url="https://x/v.mp4", previo={"container_id": "c-lento"})
+    assert res["media_id"] == "m3"
+
 
 def test_pinterest_pin_de_video(tmp_path):
     video = tmp_path / "v.mp4"

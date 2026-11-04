@@ -132,9 +132,19 @@ class InstagramClient(ClienteBase):
             self._anotar("GET", url, params={"fields": "status_code,status"}, nota="sondeo hasta FINISHED")
             return
 
+        errores = [0]
+
         def consultar() -> str:
             j = self._request("GET", url, params={"fields": "status_code,status", "access_token": self.token})
-            return j.get("status_code") or ""
+            estado = (j.get("status_code") or "").upper()
+            # Meta da ERROR pasajeros que el MISMO contenedor convierte en FINISHED al
+            # rato (4/11: dos intentos seguidos en ERROR, los dos FINISHED minutos
+            # después). Antes de darlo por malo se sigue sondeando IG_GRACIA_ERROR_S.
+            if estado == "ERROR":
+                errores[0] += 1
+                if errores[0] * (self.poll_intervalo or 1) <= config.IG_GRACIA_ERROR_S:
+                    return "ERROR_PASAJERO"
+            return estado
 
         try:
             self._esperar(consultar, ok=("FINISHED", "PUBLISHED"), malos=("ERROR", "EXPIRED"),
