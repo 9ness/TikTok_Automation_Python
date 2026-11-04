@@ -5,7 +5,7 @@
 # <REDIS_DATA_PATH>/dump.rdb (y quitar appendonlydir) y arrancarlo.
 set -euo pipefail
 DATOS="${REDIS_DATA_PATH:-/mnt/HC_Volume_106974679/redis-data}"
-DESTINO="/home/nebulabsai/gdrive/_backups/redis"
+DESTINO="/home/nebulabsai/gdrive/Nebulabs/_backups/redis"   # docs/DRIVE.md (antes _backups/redis)
 mkdir -p "$DESTINO"
 antes=$(docker exec tiktok-redis redis-cli LASTSAVE)
 docker exec tiktok-redis redis-cli BGSAVE >/dev/null
