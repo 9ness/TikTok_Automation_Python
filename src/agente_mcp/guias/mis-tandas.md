@@ -34,6 +34,8 @@ ajustan sin bloquear a los demás:
   segundo espera. Cuenta también lo ya subido. Desde oct 2026 cada producto
   lleva DOS versiones (los dos modos del Largo que mejor le encajen, de 3
   clips): la segunda sale a los 2 días (8 oct 2026: antes 5).
+  **Excepción: nestor2** (`SEPARACION_USUARIO`, 4/11/2026) publica el mismo
+  producto varias veces el mismo día: sus tandas se llenan hasta 10 sin separar.
 - **Las tandas que se enseñan quedan FIJADAS** (`mis_tandas:fijas:<usuario>`:
   las dos primeras abiertas y toda tanda llena). Un vídeo **no sale nunca** de
   su tanda: subido o sin stock se queda en su sitio con su marca y NO entra uno

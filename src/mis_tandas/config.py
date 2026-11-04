@@ -16,6 +16,14 @@ TANDAS_DIA: dict[str, int] = {"ness": 1, "ana": 1, "mauro": 1, "nestor2": 1}
 # El mismo producto (otro modo del Largo, la copia de Q4…) no se publica dos
 # veces en menos de estos días: el segundo espera.
 SEPARACION_MISMO_PRODUCTO = 2  # 8 oct 2026: 2 días (Q4: hasta 5 vídeos por producto; con 5 días eran ~3 semanas)
+# Por usuario: nestor2 saca MUCHOS vídeos del mismo producto que vende
+# (4/11/2026: el dispensador de celo salía uno por tanda); sin separación, las
+# tandas se llenan hasta su tope con lo que haya, sea del producto que sea.
+SEPARACION_USUARIO: dict[str, int] = {"nestor2": 0}
+
+
+def separacion(usuario: str) -> int:
+    return SEPARACION_USUARIO.get(usuario or "ness", SEPARACION_MISMO_PRODUCTO)
 
 # Cuánto vale la lista ya leída (por usuario y proceso). Los botones la
 # corrigen en el sitio, así que esto solo decide cada cuánto se ven los vídeos

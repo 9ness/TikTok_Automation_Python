@@ -316,7 +316,7 @@ def _alternar(lista: list[dict]) -> list[dict]:
 def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
               previos: dict[str, dt.date] | None = None,
               n: int = config.POR_TANDA,
-              grupo=None) -> list[tuple[list[dict], dt.date | None]]:
+              grupo=None, sep_dias: int | None = None) -> list[tuple[list[dict], dt.date | None]]:
     """Reparte en tandas de `POR_TANDA` respetando el ORDEN fijo, salvo dos
     cosas que obligan a esperar (sin bloquear a los demás):
 
@@ -332,7 +332,7 @@ def _repartir(lista: list[dict], dia: dt.date, por_dia: int,
     no gasta día. `previos`: producto → día en que ya va en una tanda fija.
     Devuelve [(vídeos, fecha o None si está cerrada)].
     """
-    sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO)
+    sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO if sep_dias is None else sep_dias)
     ultimo: dict[str, dt.date] = dict(previos or {})
     for f in lista:
         if f["uploaded"] and f["uploaded_at"]:
@@ -601,7 +601,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     #     tengan 3 vídeos) se sigue llenando con lo nuevo de SU grupo, en vez
     #     de abrir detrás tandas de 3 o 4.
     en_fijas = {i for t in fijas for i in t.get("ids", [])}
-    sep = dt.timedelta(days=config.SEPARACION_MISMO_PRODUCTO)
+    sep = dt.timedelta(days=config.separacion(usuario))
     subido_dia: dict[str, dt.date] = {}
     for f in lista:
         if f["uploaded"] and f["uploaded_at"]:
@@ -619,7 +619,7 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
             if len(items) >= n_tanda:
                 break
             c = _clave_producto(f)
-            if grupo_de(f) != g or c in prods:
+            if grupo_de(f) != g or (c in prods and sep.days > 0):
                 continue
             d = _desde(f)
             if d and fecha < d:
@@ -649,7 +649,8 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     abiertas_fijas = sum(1 for _, _, c in grupos if not c)
     historicas: list[tuple[list[dict], dt.date | None, bool]] = []
     nuevas: list[tuple[list[dict], dt.date | None, bool]] = []
-    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos, n_tanda, grupo_de):
+    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos, n_tanda, grupo_de,
+                                  config.separacion(usuario)):
         if all(f["uploaded"] for f in grupo):
             historicas.append((grupo, None, True))
             continue

@@ -143,6 +143,13 @@ def test_mismo_producto_separado(redis, monkeypatch):
     assert (b - a).days >= config.SEPARACION_MISMO_PRODUCTO
 
 
+def test_nestor2_mismo_producto_llena_la_tanda(redis, monkeypatch):
+    lista = [fila(f"rv|{i}", titulo="Dispensador", orden_at=i) for i in range(12)]
+    _sin_precalentar(monkeypatch, lista)
+    d = servicio.tandas("nestor2")
+    assert [len(t["items"]) for t in d["tandas"]] == [10, 2]
+
+
 def test_aleatorios_se_intercalan_sin_tocar_las_primeras_tandas():
     from src.mis_tandas import config, servicio
 
