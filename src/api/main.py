@@ -33,6 +33,7 @@ if not hasattr(PIL.Image, "ANTIALIAS"):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS  # type: ignore[attr-defined]
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -302,6 +303,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.info("JobQueue: todos los workers cerrados limpiamente.")
         except Exception as e:
             logger.warning("Graceful drain falló (no crítico): %s", e)
+
+        # Salir YA. Con la cola vacía no queda nada que guardar, pero Python,
+        # al terminar, espera a los hilos de los `ThreadPoolExecutor` que
+        # dejaron a medias las peticiones cortadas (listados del Drive montado
+        # de 1-2 min): el contenedor viejo tardaba ~110 s en morir y la API
+        # seguía caída todo ese rato (5/11/2026).
+        # Solo en el servidor de verdad: con TestClient (pytest) esto mataría
+        # los tests.
+        if "uvicorn" in os.path.basename(_sys.argv[0] if _sys.argv else ""):
+            logger.info("API: cierre limpio terminado — saliendo sin esperar hilos sueltos.")
+            logging.shutdown()
+            os._exit(0)
 
 
 def create_app() -> FastAPI:
