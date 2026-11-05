@@ -374,10 +374,14 @@ def _extract_entities(
 
 
 def _search_and_download(
-    *, query: str, dest: str, prefer_google: bool, log,
+    *, query: str, dest: str, prefer_google: bool, log, verificar: bool = True,
 ) -> str | None:
     """Busca imágenes para `query` y descarga la primera válida a `dest`
     (re-codificada a PNG con PIL para garantizar compatibilidad ffmpeg).
+
+    `verificar`: antes de aceptarla, Haiku mira que la imagen muestre lo
+    buscado (el buscador a veces devuelve otra cosa: «piel radiante mujer
+    sonriendo» → una planta). Mejor sin foto que con una que no pega.
     Devuelve la ruta o None."""
     try:
         from src.tiktok_shop.utils.image_search import search_product_images
@@ -387,14 +391,78 @@ def _search_and_download(
     except Exception as e:
         log(f"[photo_insert] búsqueda falló para '{query}': {e}")
         return None
+    revisadas = 0
     for r in results:
         url = (r or {}).get("link", "")
         if not url:
             continue
-        if _download_and_normalize(url, dest):
-            log(f"[photo_insert] ✅ imagen de '{query}' descargada.")
-            return dest
+        if not _download_and_normalize(url, dest):
+            continue
+        if verificar and revisadas < _MAX_VERIFICACIONES:
+            revisadas += 1
+            ok = _foto_encaja(dest, query)
+            if ok is False:
+                log(f"[photo_insert] ✗ la imagen {revisadas} no encaja con '{query}' — pruebo otra.")
+                continue
+        elif verificar:
+            break  # agotadas las comprobaciones: sin foto antes que una dudosa
+        log(f"[photo_insert] ✅ imagen de '{query}' descargada.")
+        return dest
+    if verificar and revisadas:
+        log(f"[photo_insert] ⚠️ ninguna imagen encaja con '{query}' — va sin foto.")
+    try:
+        os.remove(dest)
+    except OSError:
+        pass
     return None
+
+
+_MAX_VERIFICACIONES = 4
+_PROMPT_FOTO = Path(__file__).resolve().parent.parent / "prompts" / "foto_encaja.md"
+
+
+def _foto_encaja(path: str, query: str) -> bool | None:
+    """True/False según Haiku; None si no se pudo comprobar (se acepta)."""
+    try:
+        import base64
+        from io import BytesIO
+
+        from PIL import Image
+
+        from src import cost_tracking
+        from src.editor_auto.api import claude_client
+
+        if not claude_client.activo():
+            return None
+        img = Image.open(path).convert("RGB")
+        img.thumbnail((512, 512))
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=80)
+        m = claude_client.modelo()
+        resp = claude_client._client().messages.create(
+            model=m, max_tokens=2000, output_config={"effort": "low"},
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg",
+                                             "data": base64.b64encode(buf.getvalue()).decode()}},
+                {"type": "text", "text": _PROMPT_FOTO.read_text(encoding="utf-8").replace("{busqueda}", query)},
+            ]}],
+        )
+        try:
+            cost_tracking.record_claude(
+                input_tokens=int(resp.usage.input_tokens or 0),
+                output_tokens=int(resp.usage.output_tokens or 0),
+                model=m, detail=f"editor_auto.foto_encaja ({m})",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        txt = "".join(b.text for b in resp.content if b.type == "text").strip().upper()
+        if txt.startswith("SI") or txt.startswith("SÍ"):
+            return True
+        if txt.startswith("NO"):
+            return False
+        return None
+    except Exception:  # noqa: BLE001 — sin comprobación, se acepta como antes
+        return None
 
 
 def _download_and_normalize(url: str, dest: str) -> bool:
