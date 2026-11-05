@@ -95,7 +95,7 @@ editable por usuario sin tablas separadas.
 `settings:manual_approval` = 1 el auto-revisor re-edita solo lo malo y deja lo
 bueno «en revisión»; un agente lo revisa (cron `scripts/vigilar_revision_clientes.sh`
 cada 5 min → rutina `~/rutinas/revision-clientes-nebulabs.md` →
-`scripts/revision_clientes.py pendientes|aprobar|rehacer`, que habla con la API
+`scripts/revision_clientes.sh pendientes|aprobar|rehacer`, que habla con la API
 por HTTP). Aprobar el último del día manda el email «listos» (activado por
 defecto: solo no se avisa a quien lo apagó). Los pasos que pone el equipo a
 mano (`vip_overlays`) se conservan al re-sincronizar con el estilo de la web.
