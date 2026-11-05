@@ -303,14 +303,28 @@ _ARROW_CX, _ARROW_CY = 0.22, 0.82
 _ARROW_SCALE_W = 0.16   # ancho de la flecha = 16% del ancho del vídeo
 
 # Orden canónico (= ARROW_SHAPES del admin). Se rota por versión con desfase
-# por producto → variedad usando SOLO flechas reales.
-_ARROW_FILES = [
+# por producto → variedad usando SOLO flechas reales. Sale del catálogo común
+# (`src/catalogo_edicion/catalogo.json`, `tiktok_shop: true`): para sumar
+# colores a las cuentas propias se marca allí, no aquí.
+_ARROW_FILES_FIJAS = [
     "flecha_roja.mov", "flecha_negra.mov", "flecha_blanca.mov",
     "flecha_amarilla.mov", "flecha_cyan.mov", "flecha_verde.mov",
     "flecha_avanza_blanca.mov", "flecha_avanza_roja.mov",
     "flecha_triple_blanca.mov", "flecha_3d_roja.mov",
     "flecha_3d_amarilla.mov", "flecha_abajo_triple_blanca.mov",
 ]
+
+
+def _flechas_tiktok_shop() -> list[str]:
+    try:
+        from src.catalogo_edicion import flechas
+        fl = [f["fichero"] for f in flechas("tiktok_shop") if f.get("animacion", "bucle") == "bucle"]
+    except Exception:  # noqa: BLE001 — catálogo ilegible → las de siempre
+        fl = []
+    return fl or list(_ARROW_FILES_FIJAS)
+
+
+_ARROW_FILES = _flechas_tiktok_shop()
 
 
 def _arrows_dir() -> str:

@@ -89,6 +89,12 @@ editable por usuario sin tablas separadas.
 | `silence_cutter` | 10 | Silero VAD (local) + Claude Haiku (OpenAI de respaldo) | tokens Claude/OpenAI | Cortes A/V con concat MoviePy |
 | `vip_overlays`   | 60 | faster-whisper (local) + Claude Haiku | ~0,003 $ | Edición VIP: gancho, rótulos, zooms, fotos, SFX |
 | `subs_auto`      | 90 | faster-whisper (local) | — | Reusa `src/subtitles*.py` |
+| `sticker_arrow`  | — | — | — | Flecha CTA (`.mov` de `Assets/flechas/`) |
+
+**Flechas y estilos de subtítulos del cliente** salen del catálogo común
+[`src/catalogo_edicion/`](src/catalogo_edicion/README.md): solo lo aprobado
+(`editor_auto: true`) se ofrece en la web y en el modo «Inteligente»; las de
+Navidad son de «entrada» (se reproducen una vez y se quedan señalando).
 
 **Position weight**: menor peso = se ejecuta antes. `silence_cutter`
 DEBE ir antes que cualquier overlay porque modifica timestamps. El

@@ -30,24 +30,18 @@ from src.editor_auto.tools import REGISTRY
 # lee estas claves directamente, así que el resultado coincide con la web.
 # highlight_mode ∈ {pill, color_swap, underline, box_outline, glow, none}.
 # Cada estilo: text/hl/stroke/sw(stroke px)/mode(highlight)/pill + font (ttf).
-_PRESET_STYLES: dict[str, dict] = {
-    "clean":         {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 2, "mode": "none",       "pill": False, "font": "Montserrat-ExtraBold.ttf"},
-    "purple-pill":   {"text": "#FFFFFF", "hl": "#7C3AED", "stroke": "#000000", "sw": 0, "mode": "pill",       "pill": True,  "font": "Montserrat-Black.ttf"},
-    "red-pill":      {"text": "#FFFFFF", "hl": "#EF2D2D", "stroke": "#000000", "sw": 0, "mode": "pill",       "pill": True,  "font": "Montserrat-Black.ttf"},
-    "blue-pill":     {"text": "#FFFFFF", "hl": "#2563EB", "stroke": "#000000", "sw": 0, "mode": "pill",       "pill": True,  "font": "Montserrat-Black.ttf"},
-    "yellow-swap":   {"text": "#FFFFFF", "hl": "#FDE047", "stroke": "#000000", "sw": 2, "mode": "color_swap", "pill": False, "font": "Montserrat-Black.ttf"},
-    "cyan-swap":     {"text": "#FFFFFF", "hl": "#22D3EE", "stroke": "#000000", "sw": 2, "mode": "color_swap", "pill": False, "font": "Montserrat-Black.ttf"},
-    "anton-cyan":    {"text": "#22D3EE", "hl": "#22D3EE", "stroke": "#000000", "sw": 0, "mode": "glow",       "pill": False, "font": "anton.ttf", "case": "UPPERCASE"},
-    "anton-white":   {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 2, "mode": "none",       "pill": False, "font": "anton.ttf", "case": "UPPERCASE"},
-    "marker":        {"text": "#FDE047", "hl": "#FDE047", "stroke": "#000000", "sw": 1, "mode": "none",       "pill": False, "font": "PermanentMarker-Regular.ttf"},
-    "caveat":        {"text": "#FDE047", "hl": "#FDE047", "stroke": "#000000", "sw": 1, "mode": "none",       "pill": False, "font": "Caveat-Bold.ttf"},
-    "bangers":       {"text": "#FFFFFF", "hl": "#FDE047", "stroke": "#000000", "sw": 2, "mode": "color_swap", "pill": False, "font": "Bangers-Regular.ttf"},
-    "luckiest":      {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 2, "mode": "none",       "pill": False, "font": "LuckiestGuy-Regular.ttf"},
-    "fredoka":       {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 3, "mode": "none",       "pill": False, "font": "Fredoka-SemiBold.ttf"},
-    "typewriter":    {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 1, "mode": "none",       "pill": False, "font": "CourierPrime-Bold.ttf"},
-    "italic-shadow": {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 1, "mode": "none",       "pill": False, "font": "Montserrat-BlackItalic.ttf"},
-}
+def _preset_styles() -> dict[str, dict]:
+    """Estilos del catálogo común (`src/catalogo_edicion/catalogo.json`,
+    bloque `motor` de cada uno). Se lee en cada llamada (cacheado por mtime):
+    un estilo nuevo aprobado entra sin reiniciar."""
+    from src.catalogo_edicion import cargar
+    return {s["id"]: s["motor"] for s in cargar().get("subtitulos", []) if s.get("motor")}
+
+
 _DEFAULT_PRESET_ID = "clean"
+# Por si el catálogo no se pudiera leer: el «Limpio» de siempre.
+_CLEAN_FALLBACK = {"text": "#FFFFFF", "hl": "#FFFFFF", "stroke": "#000000", "sw": 2,
+                   "mode": "none", "pill": False, "font": "Montserrat-ExtraBold.ttf"}
 
 # Extensiones de sticker válidas (mismas que acepta sticker_arrow).
 _ARROW_EXTS = (".mov", ".webm", ".gif", ".apng", ".png")
@@ -65,24 +59,33 @@ _KNOWN_ARROWS = {
 
 
 def _list_arrow_files() -> set[str]:
-    """Escanea `Assets/flechas/` y devuelve las flechas OFRECIBLES. Así las
-    flechas nuevas que se añadan en el futuro entran solas (selector manual y
-    modo Inteligente) sin tocar código. Excluye fuentes/backups (*_source*,
-    *_original*). Si el escaneo falla, cae al set estático conocido."""
+    """Flechas del catálogo común que existen en `Assets/flechas/`.
+
+    Solo las del catálogo: un fichero suelto en la carpeta (copias rotas,
+    `_source`…) no se ofrece hasta que se aprueba con
+    `scripts/catalogo_edicion.py aprobar`. Incluye las ocultas al cliente
+    (`editor_auto: false`) para que quien ya la tenía guardada siga igual.
+    Si el escaneo falla (mount caído), el set estático conocido."""
     import os
+    from src.catalogo_edicion import flechas
     from src.editor_auto.config import arrows_folder
-    out: set[str] = set()
     try:
-        for fn in os.listdir(arrows_folder()):
-            low = fn.lower()
-            if not low.endswith(_ARROW_EXTS):
-                continue
-            if "_source" in low or "_original" in low or "_backup" in low:
-                continue
-            out.add(fn)
+        en_disco = set(os.listdir(arrows_folder()))
     except OSError:
-        pass
+        en_disco = set()
+    out = {f["fichero"] for f in flechas() if f["fichero"] in en_disco}
     return out or set(_KNOWN_ARROWS)
+
+
+def _smart_pool(available: set[str]) -> list[str]:
+    """Candidatas del modo Inteligente: aprobadas, de bucle y marcadas
+    `inteligente` (las de Navidad no: son una animación, no una flecha)."""
+    from src.catalogo_edicion import flechas
+    pool = [f["fichero"] for f in flechas("editor_auto")
+            if f.get("inteligente") and f.get("animacion", "bucle") == "bucle"
+            and f["fichero"] in available]
+    return sorted(pool) or sorted(available)
+
 
 # Mapa fontId (web `FONTS`) → candidatos de filename de fuente (registry).
 # Se resuelve con fonts_registry.find_by_path (primer match disponible).
@@ -168,7 +171,8 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
 
     mode = "phrase" if sub.get("mode") == "phrase" else "word"
     pid = sub.get("presetId")
-    ps = _PRESET_STYLES.get(pid, _PRESET_STYLES[_DEFAULT_PRESET_ID])
+    presets = _preset_styles()
+    ps = presets.get(pid) or presets.get(_DEFAULT_PRESET_ID) or _CLEAN_FALLBACK
     # Formato de mayúsculas elegido por el cliente (botón "Formato" tipo TikTok).
     # "none" = respeta el caso natural del preset; el resto lo fuerza.
     _CASE_MAP = {"upper": "UPPERCASE", "lower": "lowercase", "title": "Title Case", "none": None}
@@ -204,7 +208,8 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
         "y_position": y,
         "font_scale": font_scale,
         # "una palabra" fuerza 1; "varias" usa 4.
-        "max_words": 1 if mode == "word" else 4,
+        # Un estilo puede fijar cuántas («Karaoke verde» de FrutiNovelas: 2).
+        "max_words": 1 if mode == "word" else int(ps.get("max_palabras") or 4),
         # Animación de entrada: pop (escala+fade) SOLO en "una palabra"; en
         # "varias" no animamos (solo cambia el resaltado de la palabra activa).
         "entrance_anim": "pop" if mode == "word" else "none",
@@ -239,10 +244,11 @@ def _build_arrow_step(arr: dict) -> ToolStep:
         "color_mode": "smart" if smart else "fixed",
         # Candidatas del modo Inteligente = TODAS las flechas reales de la
         # carpeta (las nuevas entran solas).
-        "candidate_stickers": sorted(available) if smart else [],
+        "candidate_stickers": _smart_pool(available) if smart else [],
         "position_x_pct": round(_clamp(_f(arr.get("x"), 0.5) * 100, 0, 100), 1),
         "position_y_pct": round(_clamp(_f(arr.get("y"), 0.5) * 100, 0, 100), 1),
-        "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 80), 1),
+        # Hasta 100 %: las animaciones de Navidad ocupan casi todo el ancho.
+        "scale_width_pct": round(_clamp(25.0 * _f(arr.get("scale"), 1.0), 5, 100), 1),
         "rotation_deg": rot,
     }
     return ToolStep(tool_id="sticker_arrow", enabled=True, config=_with_defaults("sticker_arrow", arrow_overrides))

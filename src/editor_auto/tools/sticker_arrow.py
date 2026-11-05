@@ -163,7 +163,7 @@ class StickerArrowTool:
              "type": "float", "min": 0.0, "max": 100.0, "step": 1.0},
             {"key": "scale_width_pct",
              "label": "Tamaño (% del ancho del vídeo)",
-             "type": "float", "min": 5.0, "max": 80.0, "step": 1.0},
+             "type": "float", "min": 5.0, "max": 100.0, "step": 1.0},
             {"key": "rotation_deg",
              "label": "Rotación (grados, 0–359)",
              "type": "int", "min": 0, "max": 359, "step": 15},
@@ -449,6 +449,7 @@ class StickerArrowTool:
             flip_horizontal=bool(config.get("flip_horizontal", False)),
             flip_vertical=bool(config.get("flip_vertical", False)),
             log=ctx.on_log,
+            de_entrada=_es_de_entrada(sticker_path),
         )
         ctx.on_progress(1.0, "✅ Sticker aplicado")
         return output_path
@@ -457,6 +458,16 @@ class StickerArrowTool:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def _es_de_entrada(sticker_path: str) -> bool:
+    """Flecha del catálogo que se reproduce UNA vez (Navidad: la caja se
+    abre y saca la flecha) en vez de repetirse en bucle."""
+    try:
+        from src.catalogo_edicion import es_de_entrada
+        return es_de_entrada(os.path.basename(sticker_path))
+    except Exception:  # noqa: BLE001 — sin catálogo, bucle como siempre
+        return False
+
+
 def _resolve_sticker_path(filename: str) -> str | None:
     """Resuelve `filename` contra `Assets/flechas/`. Acepta solo basename;
     rechaza rutas absolutas o `..` para evitar leer fuera de la carpeta."""
@@ -824,6 +835,7 @@ def _apply_overlay_ffmpeg(
     flip_horizontal: bool = False,
     flip_vertical: bool = False,
     log,
+    de_entrada: bool = False,
 ) -> None:
     """FFmpeg overlay con stream_loop infinito del sticker.
 
@@ -850,6 +862,12 @@ def _apply_overlay_ffmpeg(
 
     `-stream_loop -1` repite el MOV/WebM si su duración es menor que la
     ventana de overlay (típico: loop de 2s para ventana de 4s).
+
+    `de_entrada` (animaciones del catálogo como las de Navidad): sin bucle;
+    el sticker empieza en su fotograma 0 justo al abrirse la PRIMERA ventana
+    (`setpts`) y, al acabarse, `overlay` repite su último fotograma (la
+    flecha quieta señalando) mientras duren las ventanas. En bucle, la caja
+    se volvería a abrir a mitad y arrancaría en un fotograma cualquiera.
     """
     if not windows:
         raise RuntimeError("sticker_arrow: lista de windows vacía")
@@ -905,18 +923,21 @@ def _apply_overlay_ffmpeg(
     enable_expr = "+".join(
         f"between(t,{ws:.3f},{we:.3f})" for ws, we in windows
     )
+    desfase = f",setpts=PTS-STARTPTS+{windows[0][0]:.3f}/TB" if de_entrada else ""
     filter_complex = (
-        f"[1:v]{pre_chain}scale={sticker_w_px}:-2,format=rgba[s];"
+        f"[1:v]{pre_chain}scale={sticker_w_px}:-2,format=rgba{desfase}[s];"
         f"[0:v][s]overlay="
         f"x=(main_w*{px})-(overlay_w/2):"
         f"y=(main_h*{py})-(overlay_h/2):"
-        f"enable='{enable_expr}'[v]"
+        + ("eof_action=repeat:" if de_entrada else "")
+        + f"enable='{enable_expr}'[v]"
     )
+    bucle = [] if de_entrada else ["-stream_loop", "-1"]
 
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "warning",
         "-i", input_path,
-        "-stream_loop", "-1", "-i", sticker_path,
+        *bucle, "-i", sticker_path,
         "-filter_complex", filter_complex,
         "-map", "[v]", "-map", "0:a?",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",

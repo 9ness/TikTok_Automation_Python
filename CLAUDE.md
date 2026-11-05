@@ -819,7 +819,9 @@ Cada programa vive aislado en `src/<programa>/` con: `config.py`, `models/`,
 `repos/`, `services/`, `pipeline/`, `prompts/*.md`. **Nunca se comparte
 lógica entre programas** — solo módulos transversales (`src/locutor.py`,
 `src/cost_tracking.py`, `src/fonts_registry.py`, `src/queue/*`,
-`src/subtitles*`, etc.).
+`src/subtitles*`, etc.). Flechas CTA y estilos de subtítulos: catálogo común
+[`src/catalogo_edicion/`](src/catalogo_edicion/README.md) (Editor Auto + TikTok Shop + web
+Nebulabs Media; lo nuevo se aprueba a mano con `scripts/catalogo_edicion.py`).
 
 API: `src/api/routers/<programa>/` + `src/api/schemas/<programa>/`.
 Frontend: `frontend/app/<programa>/` + `frontend/lib/queries/<programa>.ts`.
