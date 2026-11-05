@@ -208,7 +208,7 @@ def mcp(herramienta: str, argumentos: dict) -> dict:
         "Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
     for intento in range(3):   # la factory a veces no contesta (2/11): reintenta en vez de tirar la fase
         try:
-            r = json.load(urllib.request.urlopen(req, timeout=90))
+            r = json.load(urllib.request.urlopen(req, timeout=240))   # mis_tandas de ness tarda > 90 s (5/11)
             break
         except (TimeoutError, OSError) as e:
             if intento == 2:
@@ -226,14 +226,24 @@ CACHE = TMP / "tandas.json"
 
 def carrusel(cid: str) -> dict:
     """De la caché del lote si existe (una sola llamada al MCP para todos)."""
+    def buscar(datos: dict) -> dict | None:
+        for t in datos["tandas"]:
+            for c in t.get("items", t.get("carruseles", [])):
+                if c.get("id") == cid:
+                    return c
+        return None
+
     if CACHE.exists():
-        datos = json.loads(CACHE.read_text())
-    else:
-        datos = mcp("mis_tandas", {"fotos": True})
-    for t in datos["tandas"]:
-        for c in t.get("items", t.get("carruseles", [])):
-            if c.get("id") == cid:
-                return c
+        c = buscar(json.loads(CACHE.read_text()))
+        if c:
+            return c
+    # Caché vieja o inexistente (4/11: «No encuentro» → force-stop y reintento): se pide fresca y se guarda
+    datos = mcp("mis_tandas", {"fotos": True})
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    CACHE.write_text(json.dumps(datos, ensure_ascii=False))
+    c = buscar(datos)
+    if c:
+        return c
     raise SystemExit(f"No encuentro el carrusel {cid} en Mis tandas")
 
 
