@@ -31,6 +31,7 @@ PROMPT = Path(__file__).parent / "prompts" / "replicar.md"
 MODELO = "gemini-2.5-flash"
 CLAVE = "replicar_viral:{id}"
 INDICE = "replicar_viral:indice:{usuario}"
+MAX_INDICE = 5000   # con 200, cada réplica nueva sacaba de Mis tandas a una vieja aunque estuviera en verde (5/11)
 MAX_S = 60
 
 
@@ -253,7 +254,7 @@ def guardar(doc: dict, *, indexar: bool = True) -> None:
         return
     usuario = doc.get("usuario") or "ness"
     indice = r.get_json(INDICE.format(usuario=usuario)) or {"ids": []}
-    indice["ids"] = [doc["id"]] + [i for i in indice.get("ids", []) if i != doc["id"]][:199]
+    indice["ids"] = [doc["id"]] + [i for i in indice.get("ids", []) if i != doc["id"]][:MAX_INDICE - 1]
     r.set_json(INDICE.format(usuario=usuario), indice)
 
 

@@ -208,7 +208,7 @@ def mcp(herramienta: str, argumentos: dict) -> dict:
         "Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
     for intento in range(3):   # la factory a veces no contesta (2/11): reintenta en vez de tirar la fase
         try:
-            r = json.load(urllib.request.urlopen(req, timeout=240))   # mis_tandas de ness tarda > 90 s (5/11)
+            r = json.load(urllib.request.urlopen(req, timeout=420))   # mis_tandas de ness tarda ~5 min (5/11)
             break
         except (TimeoutError, OSError) as e:
             if intento == 2:
