@@ -220,10 +220,10 @@ Añade al final (o ajusta si ya existen):
 
 ```env
 # Path del mount rclone — apunta directo al subdirectorio TIKTOK_ASSETS
-# dentro de NEBULABS_AUTOMATED_TIKTOK. En el mount Linux NO aparece "Mi unidad"
+# dentro de Nebulabs/TikTok. En el mount Linux NO aparece "Mi unidad"
 # como subcarpeta (eso es solo cosa de Drive Desktop en Windows); el contenido
 # de "Mi unidad" se ve directamente desde la raíz del mount.
-TIKTOK_ROOT_PATH=/home/nebulabsai/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS
+TIKTOK_ROOT_PATH=/home/nebulabsai/gdrive/Nebulabs/TikTok/Creator Reward/TIKTOK_ASSETS
 ```
 
 Los outputs (vídeos finales) se escriben directos al mount (subcarpeta
@@ -622,7 +622,7 @@ journalctl -u tiktok-factory -n 100
 ### "Los vídeos no aparecen en Drive"
 ```bash
 # Verifica que el archivo existe en el mount (caché local rclone):
-ls -la ~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS/BIBLIOTECA_VIDEOS_TERMINADOS/
+ls -la ~/gdrive/Nebulabs/TikTok/Creator Reward/TIKTOK_ASSETS/BIBLIOTECA_VIDEOS_TERMINADOS/
 # Mira logs de subida de rclone (cualquier upload pendiente o error):
 tail -100 /var/log/rclone.log | grep -iE "upload|error"
 # Forzar flush de caché a Drive ahora mismo:
