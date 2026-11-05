@@ -129,12 +129,78 @@ logger = logging.getLogger("api")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
+# Segundos que se le dan al proceso para cerrar por las buenas tras la señal
+# de parar; luego, si la cola no tiene nada en marcha, sale a la fuerza.
+_PARADA_MAX_S = 30
+
+
+def _vigilar_parada() -> None:
+    """Al recibir SIGTERM/SIGINT, un hilo aparte garantiza que el proceso
+    muere en `_PARADA_MAX_S` aunque haya peticiones atascadas.
+
+    Por qué (5/11/2026, 12 min de caída): uvicorn cancela las peticiones que
+    pasan del plazo, pero una petición SÍNCRONA corre en un hilo, y un hilo no
+    se puede cancelar: uvicorn se queda esperándolo. Un listado de «Productos
+    España» con rclone o un lote de guiones lanzado desde la web tardan muchos
+    minutos, y todo ese rato la API está sin servicio y el contenedor nuevo
+    sin arrancar. Los TRABAJOS DE LA COLA sí se respetan: con alguno en marcha
+    se espera a que acabe (para eso están `stop_grace_period` y la guarda de
+    `deploy_safe.sh`).
+
+    Se encadena con el manejador de uvicorn (que sigue haciendo su cierre
+    normal) y solo bajo uvicorn: en pytest no se toca nada.
+    """
+    import signal
+    import threading
+    import time
+
+    if "uvicorn" not in os.path.basename(_sys.argv[0] if _sys.argv else ""):
+        return
+
+    def _vigia() -> None:
+        time.sleep(_PARADA_MAX_S)
+        while True:
+            try:
+                from src.api.dependencies import get_queue
+
+                n = get_queue().n_running_jobs()
+            except Exception:  # noqa: BLE001
+                n = 0
+            if n == 0:
+                logger.warning("Parada: %ds sin cerrar y sin trabajos en marcha — salida forzada.",
+                               _PARADA_MAX_S)
+                logging.shutdown()
+                os._exit(0)
+            time.sleep(5)
+
+    lanzado = threading.Event()
+
+    def _encadenar(sig: int) -> None:
+        previo = signal.getsignal(sig)
+
+        def _manejador(signum, frame):  # noqa: ANN001
+            if not lanzado.is_set():
+                lanzado.set()
+                threading.Thread(target=_vigia, name="vigia-parada", daemon=True).start()
+            if callable(previo):
+                previo(signum, frame)
+
+        signal.signal(sig, _manejador)
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            _encadenar(sig)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("no se pudo vigilar la señal %s: %s", sig, e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup / shutdown hooks. Aquí solo logueamos — Redis es lazy
     (cliente HTTP REST de Upstash, sin pool persistente)."""
     settings = get_settings()
     logger.info("API starting | host=%s port=%d", settings.host, settings.port)
+    _vigilar_parada()
     # Más hilos para los endpoints síncronos (por defecto anyio deja 40). Hay
     # muchos que esperan a Drive/rclone (miniaturas, listados): con 40 una
     # pantalla de Mis tandas los ocupaba todos y el resto de la app esperaba
