@@ -116,7 +116,7 @@ Description=noVNC de la pantalla :99 (solo tailnet)
 After=navegador-pantalla.service
 [Service]
 User=nebulabsai
-ExecStart=/bin/sh -c 'x11vnc -display :99 -rfbauth /home/nebulabsai/.vnc/passwd -localhost -forever -shared -rfbport 5900 & exec websockify --web /usr/share/novnc 100.122.102.10:6080 localhost:5900'
+ExecStart=/bin/sh -c 'x11vnc -display :99 -rfbauth /home/nebulabsai/.vnc/passwd -localhost -forever -shared -rfbport 5900 & exec websockify --web /usr/share/novnc 172.18.0.1:6080 127.0.0.1:5900'
 Restart=on-failure
 [Install]
 WantedBy=multi-user.target
@@ -128,7 +128,7 @@ systemctl enable --now navegador-pantalla navegador-chrome navegador-vnc
 ufw allow in on tailscale0 to any port 6080 proto tcp comment 'noVNC navegador (solo tailnet)'
 ```
 
-`100.122.102.10` es la IP de Tailscale del VPS (`tailscale ip -4`). noVNC NO se
+`100.96.125.108` es la IP de Tailscale del VPS grande (`vps-trabajo`; antes, en Hetzner, era `100.122.102.10`) (`tailscale ip -4`). noVNC NO se
 publica en Caddy.
 
 ## IP residencial (20/10/2026)
@@ -136,16 +136,15 @@ Todo el Chrome 9222 navega por el proxy residencial ES: drop-in
 `navegador-chrome.service.d/proxy-es.conf` (`--proxy-server=http://127.0.0.1:8899`,
 `--force-webrtc-ip-handling-policy=disable_non_proxied_udp`) + `proxy-reenvio.service`
 (`~/.config/proxy_es/reenvio.py`, añade la auth; credencial en `~/.config/proxy_es/env`).
-Motivo: Google forzó «Demuestra que eres tú» + cambio de contraseña al ver la IP de
-Hetzner. Comprobar: `curl -s -x http://127.0.0.1:8899 https://ipinfo.io/json` → `"country": "ES"`.
-Si el proxy cae, Chrome se queda sin red (a propósito: nunca salir por Hetzner).
+Motivo: Google forzó «Demuestra que eres tú» + cambio de contraseña al ver la IP del
+servidor (entonces Hetzner; hoy Contabo, igual de «servidor»). Comprobar: `curl -s -x http://127.0.0.1:8899 https://ipinfo.io/json` → `"country": "ES"`.
+Si el proxy cae, Chrome se queda sin red (a propósito: nunca salir por la IP del servidor).
 
 ## Entrar el operador (una vez, y cuando caduque la sesión)
 
-- **Con Tailscale** en el móvil o en el PC (misma cuenta que el VPS):
-  `http://100.122.102.10:6080/vnc.html` → contraseña del VNC.
-- **Sin Tailscale, desde el PC**: `ssh -L 6080:100.122.102.10:6080 root@62.238.19.31`
-  y abrir `http://localhost:6080/vnc.html`.
+- **Desde el móvil o el PC (con Tailscale)**:
+  la página «Navegador remoto» de Ajustes en factory (noVNC escucha en `172.18.0.1:6080`, la red de Docker; no en la IP de Tailscale).
+- **Desde el PC con SSH**: `deploy/navegador_vps.ps1` (túnel `ssh -L 6080:172.18.0.1:6080 root@13.140.211.41` y abre noVNC).
 
 Dentro: entrar en Google (Flow y GenAI Pro) y en Magnific, y aceptar lo que
 pidan. El perfil `~/.navegador-agente` guarda las sesiones. **No borrarlo.**

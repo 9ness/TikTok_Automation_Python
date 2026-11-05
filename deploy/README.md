@@ -1,4 +1,9 @@
-# Despliegue en VPS Hetzner — TikTok Automation Python
+# Despliegue en VPS — TikTok Automation Python
+
+> **Histórico.** Esta guía es la instalación original en Hetzner (2026). Desde el 4-nov-2026 todo corre en
+> Contabo: VPS grande `vps-trabajo` (13.140.211.41, API, agentes, navegador) y VPS pequeño `vps-webs`
+> (13.140.211.14, webs públicas). Datos actuales: [`SERVER_ACCESS.md`](SERVER_ACCESS.md). Los pasos siguen
+> sirviendo de referencia cambiando la IP.
 
 Guía completa paso a paso para correr la app en un servidor en la nube
 y acceder desde el móvil vía Tailscale Funnel.
@@ -515,7 +520,7 @@ curl http://127.0.0.1:9000/health   # → {"status":"ok"}
 
 1. Ve a https://github.com/9ness/TikTok_Automation_Python/settings/hooks
 2. **Add webhook**
-3. **Payload URL**: `http://62.238.19.31:9000/deploy`
+3. **Payload URL**: `http://13.140.211.41:9000/deploy` (VPS grande; actualizado el 5-nov-2026)
 4. **Content type**: `application/json`
 5. **Secret**: pega el token del paso 1 (debe coincidir EXACTAMENTE con WEBHOOK_SECRET del .env)
 6. **Which events?**: "Just the push event"

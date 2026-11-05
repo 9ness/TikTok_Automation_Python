@@ -2,9 +2,9 @@
 # Abre el navegador del VPS (Chrome con pantalla virtual) en tu navegador del PC.
 #   1) enciende el Chrome del VPS (`navegador on`), 2) abre el túnel SSH, 3) abre noVNC.
 # La contraseña de la pantalla está en el VPS, solo para root:
-#   ssh root@62.238.19.31 "cat /root/navegador_vnc_password.txt"
-# Al terminar de trabajar: `ssh root@62.238.19.31 navegador off` (libera ~1-2 GB de RAM).
-$vps = "root@62.238.19.31"
+#   ssh root@13.140.211.41 navegador clave
+# Al terminar de trabajar: `ssh root@13.140.211.41 navegador off` (libera ~1-2 GB de RAM).
+$vps = "root@13.140.211.41"
 ssh $vps "navegador on" | Out-Null
 $tunel = Start-Process ssh -ArgumentList "-N","-L","6080:172.18.0.1:6080",$vps -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 3

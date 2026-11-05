@@ -1,6 +1,8 @@
 # Acceso al VPS — runbook rápido
 
-Notas de acceso al servidor Hetzner para tareas comunes (editar `.env`,
+> Migrado de Hetzner a **Contabo** el 4-nov-2026 (el servidor de Hetzner `nebulabs-vps` está borrado).
+
+Notas de acceso al VPS grande (`vps-trabajo`) para tareas comunes (editar `.env`,
 revisar logs, reiniciar servicios). Para el setup inicial completo ver
 [`deploy/README.md`](README.md).
 
@@ -10,23 +12,21 @@ revisar logs, reiniciar servicios). Para el setup inicial completo ver
 
 | Campo | Valor |
 |---|---|
-| Proveedor | Hetzner Cloud (Console: `nebulabs-vps`, project `NeBulabs-AI`) |
-| Tipo | CX33 — 4 vCPU, 8 GB RAM, 80 GB disco |
-| IP pública | `62.238.19.31` |
-| Región | Helsinki (eu-central) |
+| Proveedor | Contabo Cloud VPS (`vps-trabajo`) |
+| Tipo | 8 vCPU, 23 GB RAM, 145 GB disco (+8 GB swap) |
+| IP pública | `13.140.211.41` · Tailscale `100.96.125.108` |
+| VPS de las webs | `vps-webs`: `13.140.211.14` · Tailscale `100.83.196.101` (Caddy público, panel, links, Mora, tiktok-web) |
 | Usuario root | `root` (acceso por SSH key) |
 | Usuario app | `nebulabsai` (home: `/home/nebulabsai`) |
 | Repo en servidor | `/home/nebulabsai/TikTok_Automation_Python/` |
 
 ---
 
-## Disco extra (Hetzner Volume, 40 GB)
+## Datos grandes (`/mnt/HC_Volume_106974679`)
 
-El disco del sistema (80 GB) se quedaba corto. Desde el 28-sep-2026 hay un
-**Volume** de 40 GB (`volume-hel1-1`, id 106974679, ext4) montado en
-`/mnt/HC_Volume_106974679` (fstab con `nofail`: si no está, el server arranca
-igual). Se amplía en caliente desde la consola de Hetzner (pestaña Volumes);
-NO se puede reducir.
+En Hetzner era un Volume aparte; en Contabo es una **carpeta del disco principal** con la misma ruta
+(se conservó al migrar para no tocar `.env` ni servicios). Ya no hay volumen que ampliar: el límite es
+el disco de 145 GB.
 
 | Carpeta del volumen | Qué es | Quién la usa |
 |---|---|---|
@@ -55,11 +55,11 @@ Reglas:
 ## Conectar por SSH (PowerShell / Terminal)
 
 ```powershell
-ssh root@62.238.19.31
+ssh root@13.140.211.41
 ```
 
 Entras directo si tienes la clave SSH configurada localmente. Si te
-pide password es la del servidor (Hetzner Console → Reset root password
+pide password es la del servidor (panel de Contabo → reset de contraseña
 si no la recuerdas).
 
 ---
@@ -124,11 +124,11 @@ dicen en un minuto si el problema es del servidor o del cliente:
 
 ```bash
 # 1. Qué commit corre y si el último deploy acabó bien (sin auth)
-curl -s http://62.238.19.31:9000/version
+curl -s http://13.140.211.41:9000/version
 
 # 2. Contenedores vivos (API_KEY = la del .env)
-curl -s http://62.238.19.31:9000/admin/docker/ps -H "X-API-Key: $API_KEY"
-curl -s http://62.238.19.31:9000/admin/system   -H "X-API-Key: $API_KEY"
+curl -s http://13.140.211.41:9000/admin/docker/ps -H "X-API-Key: $API_KEY"
+curl -s http://13.140.211.41:9000/admin/system   -H "X-API-Key: $API_KEY"
 
 # 3. ¿Resuelve el nombre en DNS públicos? (si aquí SÍ, es el cliente)
 dig +short @1.1.1.1 tiktok-factory.tailbff00e.ts.net
@@ -141,14 +141,10 @@ curl -so /dev/null -w '%{http_code}\n' \
   https://tiktok-factory.tailbff00e.ts.net/
 ```
 
-**Plan B inmediato para el operador**: `http://62.238.19.31` sirve la app sin
-DNS ni Tailscale (Caddy escucha en el 80 con `DOMAIN` vacío). Es HTTP, así que
-solo para salir del paso.
+**Plan B inmediato para el operador**: `https://13-140-211-14.sslip.io` (mismo Caddy del VPS de
+las webs, sin depender del DNS del dominio).
 
-**Arreglo definitivo pendiente**: un subdominio propio (tienen
-`nebulabsmedia.com`) con un registro A a `62.238.19.31` y ese nombre añadido al
-`Caddyfile` — Caddy saca el certificado solo y la app deja de depender de
-Tailscale. Falta que el operador cree el DNS.
+El subdominio propio ya existe: `factory.nebulabsmedia.com` (registro A en Vercel → `13.140.211.14`).
 
 ## Las DOS puertas de entrada (y por qué hay dos)
 
@@ -159,9 +155,9 @@ de Tailscale:
 
 | URL | Quién la sirve | Notas |
 |---|---|---|
-| **`https://factory.nebulabsmedia.com`** | Caddy en `62.238.19.31:443` | **La buena.** Dominio propio, certificado de Let's Encrypt, sin Tailscale de por medio. |
-| `https://62-238-19-31.sslip.io` | Caddy, mismo sitio | Reserva por si el DNS del dominio falla. `sslip.io` resuelve `<ip-con-guiones>` a esa IP. |
-| `http://62.238.19.31` | Caddy en `:80` | **Redirige** al dominio. Antes servía la app en claro a quien probara la IP. |
+| **`https://factory.nebulabsmedia.com`** | Caddy del VPS pequeño (`13.140.211.14:443`) → API del grande por Tailscale (`100.96.125.108:8080`) | **La buena.** Dominio propio, certificado de Let's Encrypt, sin Tailscale de por medio. |
+| `https://13-140-211-14.sslip.io` | Caddy, mismo sitio | Reserva por si el DNS del dominio falla. `sslip.io` resuelve `<ip-con-guiones>` a esa IP. |
+| `http://13.140.211.14` | Caddy en `:80` | **Redirige** al dominio. Antes servía la app en claro a quien probara la IP. |
 | `https://tiktok-factory.tailbff00e.ts.net:8443` | Tailscale Funnel → portero `:8090` | La vieja. Depende de que Tailscale publique el nombre — dejó de hacerlo el 4/9/2026. |
 
 ### Cuando el Funnel deja de resolver
@@ -192,9 +188,10 @@ comprar dominio ni crear DNS. Cuando haya uno propio, se cambia esa línea del
 
 Tres cosas viven FUERA del repo, en esta máquina, y hay que saberlas:
 
-1. **`docker-compose.override.yml`** (root, no está en git): Caddy publica
-   `62.238.19.31:443` y no `0.0.0.0:443`, porque tailscaled ya escucha en el
-   `:443` de las IPs del tailnet y chocarían.
+1. **`docker-compose.override.yml`** (root, no está en git): en el VPS grande Caddy solo publica el
+   `:8080`, y una regla `DOCKER-USER` (también en `/etc/ufw/after.rules`) lo cierra a todo lo que no
+   venga por `tailscale0`. Lo público lo sirve el Caddy del VPS pequeño (`/etc/caddy/Caddyfile`,
+   `default_bind 13.140.211.14` para no chocar con tailscaled en el `:443`).
 2. **`juegos-bridge.socket` / `.service`**: el portero del código
    (`juegos-server`) escucha solo en `127.0.0.1:8090` y desde el contenedor de
    Caddy no se alcanza. Este puente de systemd lo abre en `172.18.0.1:8091`.
