@@ -1,4 +1,5 @@
 ## Pendiente
+- [ ] **Drive Nebulabs — lo que falta (5/11/2026)**: esperar las decisiones de Néstor (tarea manual 40 del panel: dudosas, «Personal», NINTENDO_PS4 fuera de la carpeta compartida, PAQUETE duplicado, `_raiz_antigua`, rotación de backups de chats, renombrar TIKTOK_EDITOR/TIKTOK_SHOP, carpetas por cuenta). El panel solo tiene el cambio de `CARPETA_DEF`; falta que un agente pueda adjuntar .md/.pdf a su tarea y el botón «Empezar» (ver ~/relevos/drive-organizacion.md). Ver docs/DRIVE.md.
 
 ### 🇲🇦 Cuenta árabe (Mi 8) + usuario `nes_bugallo` («Ness/Bugallo», PIN 1111) (29 oct 2026) — ver `docs/CUENTA_ARABE.md` §7
 - [ ] Perfil de la cuenta (ya en el Mi 8, 29/10): Néstor elige nombre (propuestos «Hmizat Spain 🇪🇸🇲🇦» · «Souq Spain 🛍️» · «Dar Shop 🏠») y cambia el @; el agente hace la foto y pone foto + bio por ADB.
