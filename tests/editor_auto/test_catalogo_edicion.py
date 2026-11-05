@@ -142,3 +142,51 @@ def test_overlay_normal_en_bucle(monkeypatch):
     cmd = _cmd_overlay(monkeypatch, False)
     fc = cmd[cmd.index("-filter_complex") + 1]
     assert "-stream_loop" in cmd and "setpts" not in fc
+
+
+# --- revisión por agente / VIP del equipo ------------------------------------
+def test_conservar_vip_del_equipo():
+    from src.editor_auto.models import ToolStep
+    from src.editor_auto.services.style_mapper import build_tool_flow, conservar_pasos_del_equipo
+    anterior = [ToolStep(tool_id="silence_cutter", enabled=True, config={}),
+                ToolStep(tool_id="vip_overlays", enabled=True, config={"estilo": "x"})]
+    nuevo = conservar_pasos_del_equipo(build_tool_flow({}), anterior)
+    ids = [s.tool_id for s in nuevo]
+    assert ids.count("silence_cutter") == 1 and ids[-1] == "vip_overlays"
+    assert nuevo[-1].config == {"estilo": "x"}
+    assert [s.tool_id for s in conservar_pasos_del_equipo(build_tool_flow({}), None)] == ["silence_cutter", "subs_auto"]
+
+
+def _review(monkeypatch, gate: bool):
+    import types
+    from src.api.routers.editor_auto import web_upload as w
+    from src.queue.models import JobMode, JobStatus
+    from src.editor_auto import config as cfg
+    from src.editor_auto.services import revision_visual
+
+    aprobados, avisos = [], []
+    user = types.SimpleNamespace(id="u1", name="cli", account_email="c@x.es")
+    monkeypatch.setattr(w, "UserRepo", lambda: types.SimpleNamespace(get=lambda _i: user))
+    monkeypatch.setattr(w, "_get_day_jobs", lambda *_a: [{"job_id": "j1", "filename": "a.mp4"}])
+    monkeypatch.setattr(w, "_job_score", lambda _j: 97)
+    monkeypatch.setattr(w, "_job_deliverable", lambda *_a: True)
+    monkeypatch.setattr(w, "_approve_output", lambda *a: aprobados.append(a))
+    monkeypatch.setattr(w, "_maybe_notify_ready", lambda *a: avisos.append(a))
+    monkeypatch.setattr(revision_visual, "revisar", lambda *_a, **_k: {"entregable": True})
+    monkeypatch.setattr(cfg, "auto_review_enabled", lambda: True)
+    monkeypatch.setattr(cfg, "manual_approval_enabled", lambda: gate)
+    job = types.SimpleNamespace(id="j1", mode=JobMode.EDITOR_AUTO, status=JobStatus.COMPLETED,
+                                params={"output_subdir": "2026-11-05", "user_id": "u1", "source_filename": "a.mp4"},
+                                result_path="/x/a_editado.mp4", error=None)
+    w._auto_review(None, job)
+    return aprobados, avisos
+
+
+def test_con_aprobacion_manual_lo_bueno_espera_al_agente(monkeypatch):
+    aprobados, avisos = _review(monkeypatch, gate=True)
+    assert aprobados == [] and avisos == []
+
+
+def test_sin_aprobacion_manual_se_entrega_solo(monkeypatch):
+    aprobados, avisos = _review(monkeypatch, gate=False)
+    assert len(aprobados) == 1 and len(avisos) == 1

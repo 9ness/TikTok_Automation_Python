@@ -169,7 +169,8 @@ def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
         if r.get_str(notified_key):
             return  # ya avisado
         acc = get_web_account_repo().get(user.account_email) or {}
-        if not acc.get("notifyEmail"):
+        # Activado por defecto: solo no se avisa a quien lo apagó en su panel.
+        if acc.get("notifyEmail") is False:
             return
         email = (acc.get("email") or user.account_email or "").strip()
         if not email or not email_notify.is_configured():
@@ -602,7 +603,7 @@ def web_send_to_edit(
 
     # Sincroniza el flujo de edición con el estilo ACTUAL del cliente (web).
     from src.editor_auto.repos.web_account_repo import get_web_account_repo
-    from src.editor_auto.services.style_mapper import build_tool_flow
+    from src.editor_auto.services.style_mapper import build_tool_flow, conservar_pasos_del_equipo
     account = get_web_account_repo().get(user.account_email)
     plan = _user_plan(user)
     # El plan de la WEB manda: los planes viejos del backend recortan tools
@@ -611,7 +612,8 @@ def web_send_to_edit(
     if web_plan:
         plan = None
     priority = web_priority(user, account)
-    tool_flow = build_tool_flow((account or {}).get("styleConfig"))
+    # + los pasos que puso el equipo a mano (VIP): la web no los conoce.
+    tool_flow = conservar_pasos_del_equipo(build_tool_flow((account or {}).get("styleConfig")), user.tool_flow)
     # El plan limita las herramientas: si el estilo del cliente incluye una tool
     # que su plan NO cubre (p.ej. sticker_arrow en Starter), la DESCARTAMOS en
     # silencio en vez de fallar el envío — el vídeo se edita con las permitidas.
@@ -1055,7 +1057,9 @@ def _auto_review(queue: JobQueue, job) -> None:
         `AUTO_REVIEW_MAX_RETRIES` veces (sin gastar cuota del cliente);
       · si sigue mal → queda retenido "en revisión" y se avisa al operador.
     Apagable con `settings:auto_review` = 0 (vuelve la aprobación manual)."""
-    from src.editor_auto.config import AUTO_REVIEW_MAX_RETRIES, auto_review_enabled
+    from src.editor_auto.config import (
+        AUTO_REVIEW_MAX_RETRIES, auto_review_enabled, manual_approval_enabled,
+    )
 
     params = job.params or {}
     if job.mode != JobMode.EDITOR_AUTO or not params.get("output_subdir") or not params.get("user_id"):
@@ -1086,6 +1090,13 @@ def _auto_review(queue: JobQueue, job) -> None:
 
         rv = revision_visual.revisar(job.result_path, original=str(mount_path) if source else None)
         if rv is None or rv.get("entregable"):
+            if manual_approval_enabled():
+                # Aprobación manual activa: lo bueno espera a que lo mire el
+                # equipo (o el agente de `scripts/revision_clientes.py`), que
+                # al aprobar dispara el email. Lo malo se sigue re-editando solo.
+                logger.info("[auto_review] %s · %s listo (score %s) → espera aprobación",
+                            user.name, source, score)
+                return
             _approve_output(user.id, day, out_name)
             _maybe_notify_ready(user, day, queue)
             return

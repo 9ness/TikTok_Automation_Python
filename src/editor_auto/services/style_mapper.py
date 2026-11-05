@@ -224,6 +224,18 @@ def build_tool_flow(style: dict | None) -> list[ToolStep]:
     return steps
 
 
+# Herramientas que el estilo de la web genera. Cualquier OTRA del flujo (p. ej.
+# `vip_overlays`, que pone el equipo a los clientes VIP con su estilo) no sale
+# de la web y no se puede perder al re-sincronizar.
+_TOOLS_DE_LA_WEB = {"silence_cutter", "subs_auto", "sticker_arrow"}
+
+
+def conservar_pasos_del_equipo(nuevo: list[ToolStep], anterior: list[ToolStep] | None) -> list[ToolStep]:
+    """Flujo de la web + los pasos que añadió el equipo a mano (VIP…)."""
+    extra = [s for s in (anterior or []) if s.tool_id not in _TOOLS_DE_LA_WEB]
+    return list(nuevo) + extra
+
+
 def _build_arrow_step(arr: dict) -> ToolStep:
     """ToolStep de la flecha CTA con saneo de la flecha elegida.
 

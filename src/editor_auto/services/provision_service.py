@@ -17,7 +17,7 @@ from src.editor_auto.config import ensure_user_folders, user_folder
 from src.editor_auto.models import EditorUser
 from src.editor_auto.repos import UserRepo
 from src.editor_auto.repos.web_account_repo import get_web_account_repo
-from src.editor_auto.services.style_mapper import build_tool_flow
+from src.editor_auto.services.style_mapper import build_tool_flow, conservar_pasos_del_equipo
 
 
 def unique_user_name(base: str) -> str:
@@ -61,7 +61,8 @@ def provision_from_web(email: str) -> EditorUser | None:
         # verdad) — así el preview del panel refleja lo que el cliente eligió
         # sin esperar a un "Mandar a edición".
         if account is not None:
-            new_flow = build_tool_flow(account.get("styleConfig"))
+            new_flow = conservar_pasos_del_equipo(
+                build_tool_flow(account.get("styleConfig")), existing.tool_flow)
             if [s.model_dump() for s in existing.tool_flow] != [s.model_dump() for s in new_flow]:
                 existing.tool_flow = new_flow
                 repo.save(existing)

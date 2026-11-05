@@ -91,6 +91,15 @@ editable por usuario sin tablas separadas.
 | `subs_auto`      | 90 | faster-whisper (local) | — | Reusa `src/subtitles*.py` |
 | `sticker_arrow`  | — | — | — | Flecha CTA (`.mov` de `Assets/flechas/`) |
 
+**Revisión antes de entregar (clientes web, 5/11/2026):** con
+`settings:manual_approval` = 1 el auto-revisor re-edita solo lo malo y deja lo
+bueno «en revisión»; un agente lo revisa (cron `scripts/vigilar_revision_clientes.sh`
+cada 5 min → rutina `~/rutinas/revision-clientes-nebulabs.md` →
+`scripts/revision_clientes.py pendientes|aprobar|rehacer`, que habla con la API
+por HTTP). Aprobar el último del día manda el email «listos» (activado por
+defecto: solo no se avisa a quien lo apagó). Los pasos que pone el equipo a
+mano (`vip_overlays`) se conservan al re-sincronizar con el estilo de la web.
+
 **Flechas y estilos de subtítulos del cliente** salen del catálogo común
 [`src/catalogo_edicion/`](src/catalogo_edicion/README.md): solo lo aprobado
 (`editor_auto: true`) se ofrece en la web y en el modo «Inteligente»; las de
