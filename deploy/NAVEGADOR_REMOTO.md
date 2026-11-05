@@ -26,6 +26,8 @@
 > - Visor propio `deploy/navegador/visor.html` (sobre el `RFB` de noVNC): hay que copiarlo a
 >   `/usr/share/novnc/visor.html` en el VPS (`scp` + `chmod 644`); `vnc.html` dejaba la pantalla
 >   gris en Android. Se abre en `/navegador/visor.html#password=…` (barra: ⌨️ teclado, 📋 pegar, ↻).
+>   **Al migrar de servidor o reinstalar `novnc` se pierde**: sin él, «Abrir navegador» da un 404
+>   «File not found» de websockify (5/11/2026).
 > - Alternativa con terminal: `deploy/navegador_vps.ps1` (túnel SSH a `localhost:6080`).
 
 > **Segundo navegador en el PC de casa (3/11/2026):** mismo montaje en el WSL del PC
