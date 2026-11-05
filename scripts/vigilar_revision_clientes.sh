@@ -11,7 +11,7 @@ tmux has-session -t "$SES" 2>/dev/null && exit 0          # ya hay uno revisando
 # revisado espera el OK de Néstor y no hay que relanzar al revisor por ello.
 REV=/home/nebulabsai/rutinas/estado/revisados_nebulabs.txt
 touch "$REV"
-n=$(docker exec -e PYTHONPATH=/app tiktok-api python scripts/revision_clientes.py pendientes 2>/dev/null \
+n=$(/home/nebulabsai/proyectos/TikTok_Automation_Python/scripts/revision_clientes.sh pendientes 2>/dev/null \
     | python3 -c '
 import json, sys
 hechos = set(open(sys.argv[1]).read().split())

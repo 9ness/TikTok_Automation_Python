@@ -5,10 +5,13 @@ deja los vídeos buenos «en revisión» y re-edita solo los malos. Este script 
 lo que usa el agente revisor (rutina `revision-clientes-nebulabs.md`), DENTRO
 del contenedor de la API:
 
-    docker exec tiktok-api python scripts/revision_clientes.py pendientes
-    docker exec tiktok-api python scripts/revision_clientes.py aprobar <user_id> <día> <fichero>
-    docker exec tiktok-api python scripts/revision_clientes.py rehacer <user_id> <día> <original> [<fichero>]
-    docker exec tiktok-api python scripts/revision_clientes.py cuenta          (solo el nº: para el vigilante)
+    scripts/revision_clientes.sh pendientes
+    scripts/revision_clientes.sh aprobar <user_id> <día> <fichero>
+    scripts/revision_clientes.sh rehacer <user_id> <día> <original> [<fichero>]
+    scripts/revision_clientes.sh cuenta          (solo el nº)
+
+(`revision_clientes.sh` lo pasa por stdin al Python de `tiktok-api`: la imagen
+no copia `scripts/`.)
 
 Aprobar = el cliente ya lo ve y, cuando su día queda completo (p. ej. sus 3
 vídeos de prueba), le sale el email de «tus vídeos están listos».
@@ -20,7 +23,10 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Se ejecuta pasado por stdin al contenedor (la imagen no copia scripts/):
+# ahí no hay __file__ y el código está en /app (PYTHONPATH).
+if "__file__" in globals():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 # Todo pasa por la API que ya corre (la cola vive en SU proceso: abrir otra
