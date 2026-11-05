@@ -33,7 +33,7 @@ tests: `tests/multiplataforma/`.
 Carpetas (se crean solas al `POST /cuentas`, mkdir -p defensivo):
 
 ```
-<mount>/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Multiplataforma/<slug>/
+<mount>/Nebulabs/TikTok/TikTok Shop/Multiplataforma/<slug>/
     viralizacion/            → tipo prueba_viral
     viralizacion/publicados/
     producto/                → tipo producto
@@ -228,7 +228,7 @@ vídeo+cuenta+tipo pendiente no se duplica) · `GET /cola?todas=` ·
 `POST /tick?dry_run=true` · `POST /cuentas/{slug}/ingestar` · **público**:
 `GET /archivo/{token}` (vídeo firmado; solo sirve rutas —resueltas, sin
 symlinks ni `..`— bajo la raíz Multiplataforma, la del Programa 4
-`TIKTOK_SHOP_AI_PRO/` (vídeos de Mis tandas), `temp_work/` o `API_TEMP_ROOT`).
+`Nebulabs/TikTok/TikTok Shop/` (vídeos de Mis tandas), `temp_work/` o `API_TEMP_ROOT`).
 
 ### Enlaces por producto y resubida de Mis tandas
 

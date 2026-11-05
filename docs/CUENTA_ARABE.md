@@ -2,8 +2,8 @@
 
 > Decidido con Néstor el 29/10/2026. Socio: **Bugallo** (usuario web `nes_bugallo`, nombre visible «Ness/Bugallo»).
 > Informe del nicho con los datos (ventas, ritmo, cara/sin cara):
-> Drive `TIKTOK_SHOP_AI_PRO/_agente/nestor2/NICHO_ARABE_ES_2026-10-28.md`.
-> Lista de productos: Drive `TIKTOK_SHOP_AI_PRO/_agente/nestor2/arabe/PRODUCTOS_ARABE.md`.
+> Drive `Nebulabs/TikTok/TikTok Shop/_agente/nestor2/NICHO_ARABE_ES_2026-10-28.md`.
+> Lista de productos: Drive `Nebulabs/TikTok/TikTok Shop/_agente/nestor2/arabe/PRODUCTOS_ARABE.md`.
 
 ## 1. Qué es
 

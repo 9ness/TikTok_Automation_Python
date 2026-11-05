@@ -172,7 +172,7 @@ Para añadir una herramienta nueva:
 
 ```env
 # Path raíz Drive (opcional — autodetect por defecto)
-# TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
+# TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
 
 # IA del cortador: Claude Haiku primero, OpenAI de respaldo (oct 2026)

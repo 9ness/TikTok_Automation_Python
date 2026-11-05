@@ -80,7 +80,7 @@ mensajes») son del operador: no los toques.
 
 ## Dónde queda
 
-En el Drive: `TIKTOK_SHOP_AI_PRO/Nicho_Carruseles/<usuario>/` (original y con
+En el Drive: `Nebulabs/TikTok/TikTok Shop/Nicho_Carruseles/<usuario>/` (original y con
 texto en carpetas distintas; el vínculo foto↔producto es el nombre del
 fichero `<fuente>__<carpeta>__<producto>.jpg`).
 

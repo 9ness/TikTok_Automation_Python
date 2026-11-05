@@ -69,7 +69,7 @@ Fuente: **Montserrat-ExtraBold** (`assets/fonts/`). Emojis en color con
 
 ## Audio
 
-Ruta en Drive: `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/audios/{hombre,mujer}/`
+Ruta en Drive: `Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/audios/{hombre,mujer}/`
 Nombre: `hombre1_frase1.mp3` (voz, frase).
 
 Al detectar un audio nuevo, la app **recorta sus silencios** (sobre todo el
@@ -94,7 +94,7 @@ El operador elige solo **hombre o mujer**; la frase y la voz se sortean.
 
 ## Salida
 
-`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/videos/<carpeta de productos>/`
+`Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/videos/<carpeta de productos>/`
 Un vídeo por producto, nombrado `<n> <carpeta>.mp4` (p. ej. `1 Pront Flow.mp4`).
 Vertical **1080x1920, 30 fps**.
 

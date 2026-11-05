@@ -65,7 +65,7 @@ no se apela: se rehace el vídeo.
 | 29/9/2026 | Botas de fútbol SAIBI (Tareas Productos 9 · p10) — sanción -4 «contenido estático / slideshow» | vídeo real con movimiento de mano, voz y subtítulos; el detector lo confundió con imagen fija (escena parecida a las fotos de la ficha) | ✅ aprobada (4 puntos devueltos) |
 
 Texto y pruebas de cada caso nuevo: en el Drive,
-`TIKTOK_SHOP_AI_PRO/_apelaciones/<fecha>_<producto>/` (`apelacion.txt` +
+`Nebulabs/TikTok/TikTok Shop/_apelaciones/<fecha>_<producto>/` (`apelacion.txt` +
 imágenes numeradas en el orden en que se adjuntan). Cuando TikTok responda,
 actualiza la tabla con el resultado.
 

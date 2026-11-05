@@ -382,7 +382,7 @@ async def _bajar(api: Interno, ruta: str) -> tuple[bytes, str]:
 async def preparar_bandeja(ctx: Context, menu: str, catalogo: str, carpeta: str,
                            modo: str = "", gancho: str = "", duracion: str = "",
                            productos: list[str] | None = None) -> str:
-    """Crea en el Drive (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/<carpeta>/`)
+    """Crea en el Drive (`Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/<menú>/<carpeta>/`)
     una subcarpeta por producto con `foto_limpia.jpg`, la ficha y `PLAN.md`
     (los prompts). Ahí mismo guarda lo que generes (`imagen_1.png`,
     `clip_1.mp4`…) y súbelo con `subir_clip(ruta_bandeja=…)`. En el PC del
@@ -895,7 +895,7 @@ async def registrar_replica_video(
     sale solo en `mis_tandas` (id `rv|<id>`) con descargar, subido, sin stock,
     rehacer, semáforo y época. `modo`: `con_ia` (clips de Omni/GenAI Pro), `genjutsu`
     (el viral rehecho con Genjutsu de Higgsfield) o `sin_ia` (vídeo real o montaje sin IA). UNA fuente del vídeo:
-    `ruta_bandeja` (relativa a tu bandeja `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`,
+    `ruta_bandeja` (relativa a tu bandeja `Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/`,
     lo recomendable: no se sube nada), `archivo_id` (subido a /subir) o `url`.
     `titulo` = nombre del producto (obligatorio, el mismo que va quemado en el
     vídeo) y `product_id` o `product_url` de TikTok Shop (con uno basta).

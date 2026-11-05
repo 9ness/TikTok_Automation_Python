@@ -41,8 +41,8 @@ nichos.
 |---|---|---|
 | 📦 Mis tandas | (sin modo — no edita vídeo) | PRIMERO del menú para los tres: lo ya montado en POV BOF, POV BOF Largo y Multimodo del usuario, de 10 en 10 con fecha y época. Solo lee; subido/sin stock/rehacer escriben en el nicho de cada vídeo (`src/mis_tandas/`, guía `mis-tandas.md`). Semáforo 🟢🟡🔴 de revisión antes de subir por vídeo y montaje (`mis_tandas:semaforo:<usuario>`, MCP `semaforo_tanda`; rojo marca rehacer). Época por vídeo (`mis_tandas:epoca:<usuario>`, MCP `epoca_video`) y cuentas `SOLO_HABLADOS` (Ana): tandas de 6 hablados y mudos aparte en «Solo Meta». Filtro 🎯 por tarea de Campañas de creadores (N vídeos de productos concretos antes de una fecha; casa por ID de producto; `mis_tandas:tareas:<usuario>`, `src/mis_tandas/tareas.py`, MCP `guardar_tarea`/`tareas_tiktok`) |
 | 🔁 Replicar viral | (sin modo — solo texto) | Enlace de TikTok (lo baja tikwm) + producto del catálogo POV → Gemini ve el vídeo y devuelve guion de voz en off + prompts de 2 clips mudos de 8 s (`src/replicar_viral/`, MCP `replicar_viral`, guía `replicar-viral.md`). Se monta con el estilo `viral` del Largo (carpeta «Réplicas virales») |
-| 🎞️ Replicar virales | (sin modo — no edita vídeo) | MP4 de un viral replicado y YA MONTADO por el agente, `con_ia` (Omni) o `sin_ia` (real), con título y enlace de TikTok Shop → sale solo en Mis tandas (`rv|<id>`) con semáforo (`src/replicar_viral/video.py`, mismo Redis `replicar_viral:` con `tipo="video"` e índice propio `replicar_viral:videos:<usuario>`, MP4 en `TIKTOK_SHOP_AI_PRO/Replicar_Viral/<usuario>/`, MCP `registrar_replica_video`/`listar_replicas_video`, guía `replicar-virales.md`) |
-| 🖼️ Replicar carrusel | (sin modo — solo texto) | Enlace de un carrusel de FOTOS (tikwm `images`) + producto POV → Gemini devuelve por diapositiva rol, texto adaptado y prompt de Flow; las fotos se generan a mano, se suben y se les quema el texto con el motor de Carruseles → ZIP (`src/replicar_viral/carrusel.py`, mismo Redis `replicar_viral:` con `tipo="carrusel"`, fotos en `TIKTOK_SHOP_AI_PRO/Replicar_Carrusel/`, MCP `replicar_carrusel`/`subir_imagen_carrusel`/`descargar_carrusel`, guía `replicar-carrusel.md`). `pais` (10 de TikTok Shop Europa, `carrusel.PAISES`): virales de otros países en su idioma, con bandera. Sale también en Mis tandas |
+| 🎞️ Replicar virales | (sin modo — no edita vídeo) | MP4 de un viral replicado y YA MONTADO por el agente, `con_ia` (Omni) o `sin_ia` (real), con título y enlace de TikTok Shop → sale solo en Mis tandas (`rv|<id>`) con semáforo (`src/replicar_viral/video.py`, mismo Redis `replicar_viral:` con `tipo="video"` e índice propio `replicar_viral:videos:<usuario>`, MP4 en `Nebulabs/TikTok/TikTok Shop/Replicar_Viral/<usuario>/`, MCP `registrar_replica_video`/`listar_replicas_video`, guía `replicar-virales.md`) |
+| 🖼️ Replicar carrusel | (sin modo — solo texto) | Enlace de un carrusel de FOTOS (tikwm `images`) + producto POV → Gemini devuelve por diapositiva rol, texto adaptado y prompt de Flow; las fotos se generan a mano, se suben y se les quema el texto con el motor de Carruseles → ZIP (`src/replicar_viral/carrusel.py`, mismo Redis `replicar_viral:` con `tipo="carrusel"`, fotos en `Nebulabs/TikTok/TikTok Shop/Replicar_Carrusel/`, MCP `replicar_carrusel`/`subir_imagen_carrusel`/`descargar_carrusel`, guía `replicar-carrusel.md`). `pais` (10 de TikTok Shop Europa, `carrusel.PAISES`): virales de otros países en su idioma, con bandera. Sale también en Mis tandas |
 | 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
 | 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
 | 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
@@ -305,7 +305,7 @@ convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y los **dos catálo
 del operador**: «Muestras productos» (`mis_productos`, solo ness/nestor2 como Tareas, el slug es el viejo para
 no migrar lo ya guardado; solo IA; una muestra puede ser REEMBOLSABLE —X ventas antes de una fecha, campo `reembolso` del producto, `services/reembolsables.py` con `FUENTES_REEMBOLSO` = Muestras + los dos Productos físicos, revisar cada `REVISAR_CADA_DIAS`, MCP `reembolsables`/`marcar_reembolsable` con `catalogo`, con `importe` € que ordena la prioridad—; además en cualquier catálogo del operador varias MARCAS por producto —`fisico`, `contenido` N vídeos que se descuentan al marcar subido en Mis tandas, `q4`, `clips_reales`— y la lista `prioridades` (contenido → reembolsables por dinero → resto), `services/marcas.py`, MCP `marcar_producto`/`prioridades`, guía `pov-bof.md` §7) y «Tareas Productos» (`tareas_productos`) — muestra
 gratuita o tarea pagada, que no se trabajan igual — más «📦 Productos físicos» (`productos_fisicos`, solo ness/nestor2) y «📦 Productos físicos» de Ana (`productos_fisicos_ana`, solo ella) — oct 2026, productos que tienen en casa para grabar con gancho IA (guía `replicar-virales.md`; `usuarios` en SOURCES filtra el selector; se suben desde el menú «Subir productos», `/tiktok-shop-ai-pro/subir-productos`), «🎄 Temporada Q4» (`temporada_q4`, oct 2026: lo más vendido del Q4 anterior según EchoTik, sin saturar; ficha generada con los datos de EchoTik porque la web de TikTok pide captcha) y «🖼️ Carruseles virales» (`carruseles_virales`, COMPARTIDO: alta desde «Replicar carrusel» con foto + ficha + URL, `src/replicar_viral/catalogo.py`). Los sube él (foto limpia +
-ficha), viven en su Drive (`TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/<slug>/`) en
+ficha), viven en su Drive (`Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/<slug>/`) en
 carpetas de 10, y un producto se puede mover de uno a otro con sus fotos y sus
 datos (`mis_productos.mover_producto`). Las fotos se guardan con el MISMO
 convenio de nombres del Drive compartido (`3.png` / `3(1).png`) para que
@@ -334,7 +334,7 @@ solo se va cuando el producto no tiene guion o se pide rehacer. Los cinco textos
 el producto— y de 253-274 car, o sea vídeos de 13-20s donde se piden 10.
 
 `Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
-Las salidas futuras irán a `TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/`.
+Las salidas futuras irán a `Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/`.
 
 ### Nicho Ropa Sin Personas (mismo programa, módulo 8)
 
@@ -399,7 +399,7 @@ cuenta. La plantilla ya trae el bloque `clothing`, así que crear a la chica y
 vestirla con el producto es UN prompt, no dos.
 
 Audios locutados (5 voces de mujer, se sortea una):
-`TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Personas/audios/mujer/`.
+`Nebulabs/TikTok/TikTok Shop/Nicho_Ropa_Personas/audios/mujer/`.
 
 ### Nicho POV BOF Largo (mismo programa)
 
@@ -482,7 +482,7 @@ Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
 - **Token** = `<usuario>.<HMAC(AUTH_COOKIE_KEY, MCP_TOKEN_SALT)>`: no se guarda
   en ningún sitio; cambiar `MCP_TOKEN_SALT` revoca todos. La URL de cada uno
   sale en Settings › «Conectar una IA (MCP)» (`/api/v1/agente/mi-conexion`).
-- **Bandeja**: `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/` en el Drive — el MCP deja
+- **Bandeja**: `Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/` en el Drive — el MCP deja
   fotos + `PLAN.md` por producto, el agente guarda al lado lo que genera y el
   MCP lo sube a la app. Es lo único que vale igual para un agente de
   escritorio (Drive sincronizado) y uno del VPS (mount).
@@ -493,7 +493,7 @@ Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
 
 ### Multiplataforma — publicar fuera de TikTok (oct 2026)
 
-[`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/TIKTOK_SHOP_AI_PRO/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Enlace por producto (`enlaces:<slug>`) y resubida de Mis tandas del dueño de la cuenta, SOLO por MCP (guía `multiplataforma.md`); página pública sin login `/links/<cuenta>` para la bio. Los vídeos MUDOS de Mis tandas salen con música Mixkit mezclada (banco `Multiplataforma/_musica/<estilo>/`, `services/musica.py`). Enlaces NUNCA en TikTok. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
+[`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/Nebulabs/TikTok/TikTok Shop/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Enlace por producto (`enlaces:<slug>`) y resubida de Mis tandas del dueño de la cuenta, SOLO por MCP (guía `multiplataforma.md`); página pública sin login `/links/<cuenta>` para la bio. Los vídeos MUDOS de Mis tandas salen con música Mixkit mezclada (banco `Multiplataforma/_musica/<estilo>/`, `services/musica.py`). Enlaces NUNCA en TikTok. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
 
 ### Estadísticas — ventas de la cuenta de Néstor (oct 2026)
 
@@ -597,7 +597,7 @@ Lo que no tiene ningún otro nicho:
   reparten por orden entre los productos que no tienen. La foto 2 —el
   producto— sí es de cada uno y se sube en su tarjeta.
 - Las fotos viven en el Drive montado
-  (`TIKTOK_SHOP_AI_PRO/Nicho_Carruseles/<usuario>/`), y el original y la
+  (`Nebulabs/TikTok/TikTok Shop/Nicho_Carruseles/<usuario>/`), y el original y la
   versión con texto van en carpetas distintas: quemar sobre lo quemado deja el
   texto doble. El vínculo foto↔producto es el NOMBRE del fichero
   (`<fuente>__<carpeta>__<producto>.jpg`), no un índice en Redis.
@@ -616,7 +616,7 @@ Tres cosas que no hace ningún otro nicho:
 - **El producto nace de una SUBIDA.** Las dos fotos (limpia + ficha) las sube el
   operador; no hay Drive que recorrer ni emparejado que adivinar. Las fotos NO
   pueden ir a `api_uploads/` (se purga a las 24h): van al Drive montado en
-  `TIKTOK_SHOP_AI_PRO/Cuenta_Piloto/<usuario>/`.
+  `Nebulabs/TikTok/TikTok Shop/Cuenta_Piloto/<usuario>/`.
 - **Es por usuario**: un documento Redis por operador, sin doc compartido.
 - **VARIOS vídeos por producto** — `videos` es una LISTA y se añade con
   `product_repo.add_video()` bajo cerrojo. En el resto de nichos hay un solo
@@ -629,13 +629,13 @@ Tres cosas que no hace ningún otro nicho:
 ```env
 # === Programa 1 — Creator Reward ===
 # Path raíz de assets CR (Drive sincronizado). Auto-detect si no se define
-# (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS").
-# TIKTOK_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR/TIKTOK_ASSETS"
+# (escanea "Mi unidad/Nebulabs/TikTok/Creator Reward/TIKTOK_ASSETS").
+# TIKTOK_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/Creator Reward/TIKTOK_ASSETS"
 
 # === Programa 2 — TikTok Shop ===
 # Path raíz TikTok Shop. HERMANO de TIKTOK_CR (no anidado). Auto-detect si
-# no se define (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP").
-# TIKTOK_SHOP_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP"
+# no se define (escanea "Mi unidad/Nebulabs/TikTok/TIKTOK_SHOP").
+# TIKTOK_SHOP_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_SHOP"
 
 # Atlas Cloud (Seedance — los 3 tiers Standard/Advanced/Pro). URL default oficial.
 ATLASCLOUD_API_KEY=...
@@ -683,8 +683,8 @@ PIXABAY_API_KEY=...
 
 # === Programa 3 — Editor Auto ===
 # Path raíz TikTok Editor. HERMANO de TIKTOK_CR/TIKTOK_SHOP. Auto-detect si
-# no se define (escanea "Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR").
-# TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_EDITOR"
+# no se define (escanea "Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR").
+# TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
 # ANTHROPIC_API_KEY_EDITOR_AUTO — silence_cutter usa Claude Haiku (OpenAI de respaldo)
 # EDITOR_ASR_PROVIDER=deepgram + DEEPGRAM_API_KEY — transcripción de todo el editor (src/editor_auto/asr.py; Whisper de respaldo)
@@ -707,6 +707,12 @@ PIXABAY_API_KEY=...
 # PUBLIC_BASE_URL=https://factory.nebulabsmedia.com  # URL pública del MCP y sus enlaces
 # MCP_TOKEN_SALT=1                           # cambiarlo revoca todos los tokens del MCP
 # AGENTE_BANDEJA_DIR=                        # solo dev/tests: bandeja fuera del Drive
+# === Drive (docs/DRIVE.md, src/rutas_drive.py) — Redis guarda `drive:<ruta relativa>` ===
+# NEBULABS_DRIVE_DIR=Nebulabs/TikTok              # antes NEBULABS_AUTOMATED_TIKTOK
+# AI_PRO_DRIVE_DIR=Nebulabs/TikTok/TikTok Shop    # Programa 4 (antes …/TIKTOK_SHOP_AI_PRO)
+# CR_DRIVE_DIR=Nebulabs/TikTok/Creator Reward     # antes TIKTOK_CR (TIKTOK_ROOT_PATH sale de aquí)
+# CURSO_DRIVE_DIR=Nebulabs/TikTok/TikTok Shop/_curso   # copias/paquetes de Productos España, Skool
+# DRIVE_ALIAS_JSON='{"viejo": "nuevo"}'      # alias extra de rutas viejas (al mover carpetas)
 ```
 
 ---
@@ -802,6 +808,7 @@ herramientas del mismo grupo en el futuro.
 | [`deploy/CLAUDE_REMOTE.md`](deploy/CLAUDE_REMOTE.md) | Claude Code en el VPS (Remote Control + chat web): qué ocupa, cómo quitarlo y cómo reinstalarlo |
 | [`deploy/CODEX_REMOTE.md`](deploy/CODEX_REMOTE.md) | Codex en el VPS (remote-control con cuenta ChatGPT): qué ocupa, limpiar versiones viejas, quitarlo y reinstalarlo |
 | [`deploy/NAVEGADOR_REMOTO.md`](deploy/NAVEGADOR_REMOTO.md) | Chrome con pantalla virtual en el VPS (noVNC + CDP), MONTADO a demanda (Accesos › Navegador remoto) con las sesiones de Magnific/Flow/GenAI Pro; guía para agentes en `src/agente_mcp/guias/comun/navegador-vps.md` |
+| [`docs/DRIVE.md`](docs/DRIVE.md) | **Dónde va cada cosa en el Google Drive** (árbol `Nebulabs/`, qué está compartido, rutas viejas → nuevas, reglas para agentes) |
 | [`learnings.md`](learnings.md) | Historial técnico (1 línea por aprendizaje/fix) — **escribir al resolver bug o patrón nuevo** |
 | [`tasks.md`](tasks.md) | TODO pendientes — mover a `## ✅ Done` al cerrar |
 | [`README.md`](README.md) | Onboarding general del repo |

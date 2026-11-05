@@ -149,7 +149,7 @@ no el tope:
 ### 4. Paso 3 (azul) · «Descargar lo ya montado»
 - **«Vídeos x/y»** o **«🔗 Con URL (n)»** → a `<Carpeta>/videos/`.
 - En el VPS ya están en
-  `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF_Largo/videos/<catálogo>/<carpeta>/<nº título HHMM>.mp4`.
+  `~/gdrive/Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF_Largo/videos/<catálogo>/<carpeta>/<nº título HHMM>.mp4`.
 
 ### 5. Marcas (solo si te lo piden)
 «🏪 Escaparate», «📤 Subido», «💰 Vendió» en la última fila de la tarjeta.

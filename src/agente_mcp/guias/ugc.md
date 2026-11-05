@@ -83,8 +83,8 @@ descripción que devuelve se genera en **Flow** → guarda la imagen como
 
 ### 4. Paso 3 (azul) · «Descargar lo ya montado»
 **«Vídeos (N)»** → `<Carpeta>/videos/`. En el VPS:
-`~/gdrive/TIKTOK_SHOP_AI_PRO/Nicho_General/<usuario>/<carpeta>/ugc_<producto>_<gancho>_<dur>_<ts>.mp4`
-(búscalo también bajo `NEBULABS_AUTOMATED_TIKTOK/` si no aparece).
+`~/gdrive/Nebulabs/TikTok/TikTok Shop/Nicho_General/<usuario>/<carpeta>/ugc_<producto>_<gancho>_<dur>_<ts>.mp4`
+(búscalo también bajo `Nebulabs/TikTok/` si no aparece).
 
 ## Trampas
 

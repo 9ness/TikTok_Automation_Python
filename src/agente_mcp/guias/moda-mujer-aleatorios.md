@@ -72,7 +72,7 @@ concreto de cada modo va abajo.
 
 ### 5. Paso 4 · «Descargar lo ya montado»
 **«Vídeos x/N»** o **«🔗 Con URL (n)»** → `<Carpeta>/videos/`. En el VPS:
-`~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
+`~/gdrive/Nebulabs/TikTok/TikTok Shop/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
 
 ### 6. Marcas (solo si te lo piden)
 Tarjeta: «🏪 Escaparate · 📤 Subido · 💰 Vendió». Carpeta (por modo):

@@ -63,7 +63,7 @@ está el bloque **«👤 Tu personaje»** con su miniatura:
 5. **Tarjeta** → **«Subir»** el clip. Se monta solo.
 6. **Paso 4 · «Descargar lo ya montado»** → «Vídeos x/N» → `<Carpeta>/videos/`.
    En el VPS:
-   `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
+   `~/gdrive/Nebulabs/TikTok/TikTok Shop/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
 
 ## API útil (solo lectura)
 

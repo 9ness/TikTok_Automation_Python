@@ -110,7 +110,7 @@ tiene en casa, subidos por él con foto limpia + ficha + URL de TikTok Shop
 
 **Reparto del trabajo.** Néstor solo da de alta el producto (foto + ficha +
 enlace) y, cuando puede, sube sus tomas reales en bruto, sin cortar ni editar, a
-`TIKTOK_SHOP_AI_PRO/_agente/_clips_reales/<cuenta>/` (`nestor2` o `ana`). Si
+`Nebulabs/TikTok/TikTok Shop/_agente/_clips_reales/<cuenta>/` (`nestor2` o `ana`). Si
 el nombre del fichero no dice de qué producto es, se averigua comparando los
 fotogramas con las fotos del catálogo. TODO lo demás lo hace el agente cuando se
 le pide el vídeo: elige gancho y texto, genera el gancho IA, corta las tomas
@@ -214,9 +214,9 @@ Hay dos «📦 Productos físicos»: `productos_fisicos` (solo ness y nestor2) y
 
 ## 3. Registrar → Mis tandas → semáforo
 
-Deja el MP4 en tu bandeja (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`, por
+Deja el MP4 en tu bandeja (`Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/`, por
 ejemplo `replicas/<producto>.mp4`) y regístralo. No se sube nada: la app lo
-copia de la bandeja a `TIKTOK_SHOP_AI_PRO/Replicar_Viral/<usuario>/<id>.mp4`.
+copia de la bandeja a `Nebulabs/TikTok/TikTok Shop/Replicar_Viral/<usuario>/<id>.mp4`.
 
 ```
 registrar_replica_video(

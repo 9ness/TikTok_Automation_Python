@@ -52,7 +52,7 @@ el modo y sáltate el resto (anótalo en el informe).
 
 Claves de modo: `espejo`, `camara`, `calle_1`, `calle_2`, `gafas_coche`,
 `sarcastica`, `maniqui`. Salida en el VPS:
-`~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
+`~/gdrive/Nebulabs/TikTok/TikTok Shop/Nicho_Ropa_Sin_Personas/videos/[<usuario>/]<carpeta>/<nombre>__<modo>.mp4`.
 
 ## Con el MCP
 

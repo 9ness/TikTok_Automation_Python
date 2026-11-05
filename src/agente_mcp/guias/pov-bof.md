@@ -69,7 +69,7 @@ limpia metadatos. **El clip va mudo** (el audio se descarta).
 ### 4. Paso 3 (azul) · «Descargar lo ya montado»
 - **«Vídeos x/y»** / **«🔗 Con URL (n)»** → `<Carpeta>/videos/`.
 - En el VPS:
-  `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/Nicho_POV_BOF/videos/[<usuario>/]<carpeta>/<nº título HHMM>.mp4`
+  `~/gdrive/Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/videos/[<usuario>/]<carpeta>/<nº título HHMM>.mp4`
   (sin subcarpeta de usuario si es `ness`).
 
 ### 5. Marcas (solo si te lo piden)

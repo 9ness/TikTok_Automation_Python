@@ -166,7 +166,7 @@ operador y la app. Con el MCP la crea `preparar_bandeja`; sin él, créala tú
 con la misma forma:
 
 ```
-Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/<Carpeta N>/
+Mi unidad/Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/<menú>/<Carpeta N>/
   <nº>_<título corto>/
     PLAN.md                ← qué generar y con qué prompt (lo escribe el MCP)
     foto_limpia.jpg        ← bajada de la app (y foto_ficha.jpg)
@@ -181,9 +181,9 @@ Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>
   de su Google Drive para escritorio (`G:\Mi unidad\…` o similar). Si no
   tienes acceso al Drive, usa una carpeta en *Descargas* con la misma forma y
   sube los clips con `/subir` o con los botones de la app.
-- **Agente en el VPS:** `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente/<usuario>/`.
+- **Agente en el VPS:** `~/gdrive/Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/`.
   Los vídeos que monta la app quedan además en
-  `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/<Nicho>/videos/...`
+  `~/gdrive/Nebulabs/TikTok/TikTok Shop/<Nicho>/videos/...`
   (cada guía dice la ruta).
 - El Drive tarda un poco en sincronizar: si el MCP dice que un fichero «no
   existe», espera un minuto y reintenta.
@@ -222,7 +222,7 @@ vídeos).
    `foto_limpia.jpg`, `foto_ficha.jpg` y `PLAN.md` con cada imagen y clip a
    generar (prompt literal, qué adjuntar, frame inicial o ingredientes,
    segundos, plataformas válidas). Ruta:
-   `Mi unidad/NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/<carpeta>/<producto>/`.
+   `Mi unidad/Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/<menú>/<carpeta>/<producto>/`.
    Si no ves el Drive, `plan_producto` te da lo mismo en JSON, con enlaces de
    descarga para las fotos.
 7. Generas en Flow / GenAI Pro / Magnific y guardas **en esa misma carpeta**
@@ -282,8 +282,8 @@ decide él. Y cuando Claude vuelve a tener cuota, el vigilante le avisa
 de que ya puede decirte «sigue» (si el relevo ha parado).
 
 Para que el que siga sepa por dónde vas, **todo agente de vídeo lleva un
-`RELEVO.md`** en su bandeja: `TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<menú>/RELEVO.md`
-(en el VPS, `~/gdrive/NEBULABS_AUTOMATED_TIKTOK/…`). **Cada sesión tiene el
+`RELEVO.md`** en su bandeja: `Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/<menú>/RELEVO.md`
+(en el VPS, `~/gdrive/Nebulabs/TikTok/…`). **Cada sesión tiene el
 suyo y nunca escribe en el de otra:** si al empezar ese RELEVO.md ya «lo lleva»
 otra sesión (porque hay dos agentes en el mismo menú), el tuyo va en una
 subcarpeta con el nombre de tu sesión: `…/<menú>/<tu-sesión>/RELEVO.md`. Créalo al empezar y
