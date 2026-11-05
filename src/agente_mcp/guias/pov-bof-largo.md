@@ -62,7 +62,9 @@ no el tope:
   (`anadir_a_q4`, ver abajo) + **⚡ Épico Octubre** y **🔄 Venta Inversa**
   (`anadir_a_q4(carpeta=…)`; fijan su modo) + **🔁 Réplicas virales**
   (desde «Replicar viral») = 5.
-  Para 10 o más todavía no hay hueco en la app: avisa al operador. Apunta en
+  Para más versiones del MISMO modo: **🎁 Variantes regalo** con
+  `anadir_a_q4(productos=[ref], carpeta="Variantes regalo", copias=N)` crea N
+  copias nuevas (cada una un producto aparte, modo Regalo). Apunta en
   el informe qué modo y ángulo lleva cada versión para no repetir.
 - **Separación**: «Mis tandas» separa 2 días los vídeos del mismo producto
   (`SEPARACION_MISMO_PRODUCTO`); con 5 versiones son ~8 días. Aun así,
@@ -326,6 +328,16 @@ son nuevos, así que se puede repetir un producto ya publicado.
   ve con su modo activo.
 - Ángulo de campaña: `campanas` y [`comun/campanas.md`](comun/campanas.md). Nada
   de prometer ofertas que la ficha no tenga.
+
+### 🎁 Variantes regalo y guion escrito a mano
+
+- `anadir_a_q4(productos=["mis_productos|Mis Productos 5|8"], carpeta="Variantes regalo",
+  copias=8, clips=2)`: 8 copias NUEVAS del mismo producto (aunque ya estuviera),
+  carpeta en modo Regalo fijo. En el manifiesto van como `<ref>`, `<ref>#2`…
+- Guion a mano, sin IA: `guardar_guion(catalogo="inventario_general",
+  carpeta="Variantes regalo", producto="<número>", texto="…")` (API: `POST /guion`
+  con `texto`). Se guarda tal cual y lo locuta Fish; no lo pisa `preparar_carpeta`
+  salvo que se pida rehacer.
 
 ## Lo que aprendimos haciendo carpetas enteras (sep 2026)
 

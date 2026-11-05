@@ -288,6 +288,7 @@ def ve_carpeta_especial(folder: str, usuario: str) -> bool:
 CARPETA_EPICO_OCT = "Épico Octubre"
 CARPETA_INVERSA = "Venta Inversa"
 CARPETA_REPLICAS = "Réplicas virales"
+CARPETA_VARIANTES = "Variantes regalo"
 # En el ORDEN en que el operador las publica, y con las fechas en la
 # etiqueta: con tantas carpetas listas a la vez no sabía cuál tocaba (2 oct
 # 2026). El calendario entero está en `docs/CALENDARIO_POV_BOF_LARGO.md`.
@@ -306,6 +307,12 @@ CARPETAS_ESPECIALES: dict[str, dict] = {
     CARPETA_REPLICAS: {"manifiesto": "especial:replicas_virales:manifiesto", "temporada": False,
                        "modo": "viral", "todos": True,
                        "etiqueta": "🔁 Réplicas virales (modo Réplica viral)"},
+    # Varias COPIAS del mismo producto para hacer N vídeos de regalo distintos
+    # (p. ej. 8 de la bici): se llena con `copias` en /q4/anadir y el guion se
+    # suele escribir a mano (`/guion` con `texto`). Solo ness (5/11/2026).
+    CARPETA_VARIANTES: {"manifiesto": "especial:variantes_regalo:manifiesto", "temporada": True,
+                        "modo": "regalo",
+                        "etiqueta": "🎁 Variantes regalo (varias copias de un producto, modo Regalo)"},
     # `desde`: primer día en que se puede PUBLICAR (lo respeta «Mis tandas»).
     CARPETA_Q4: {"manifiesto": "q4:manifiesto", "temporada": True, "desde": "2026-10-28",
                  "etiqueta": "🎄 Productos Q4 · subir 28 oct-10 nov (modo Dolor/Precio)"},

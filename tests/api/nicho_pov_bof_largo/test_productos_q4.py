@@ -123,3 +123,16 @@ def test_carpeta_epico_con_su_manifiesto(tmp_path, monkeypatch):
     assert "especial:epico_octubre:manifiesto" in redis.d and "q4:manifiesto" not in redis.d
     assert (config.CATALOGO_Q4, config.CARPETA_EPICO_OCT) in guardados
     assert config.es_temporada(config.CARPETA_Q4) and not config.es_temporada(config.CARPETA_EPICO_OCT)
+
+
+def test_copias_crea_varias_aunque_ya_este(tmp_path, monkeypatch):
+    destino, redis, guardados = _prepara(tmp_path, monkeypatch)
+    ref = "inventario_general|Carpeta_22|3"
+    productos_q4.anadir([ref])
+    r = productos_q4.anadir([ref], copias=3, carpeta=config.CARPETA_VARIANTES)
+    assert [a["producto"] for a in r["añadidos"]] == ["2", "3", "4"]
+    assert [a["ref"] for a in r["añadidos"]] == [ref, f"{ref}#2", f"{ref}#3"]
+    # Pedir más copias después añade otras nuevas, no reutiliza las de antes.
+    r2 = productos_q4.anadir([ref], copias=2, carpeta=config.CARPETA_VARIANTES)
+    assert [a["ref"] for a in r2["añadidos"]] == [f"{ref}#4", f"{ref}#5"]
+    assert config.modo_de_carpeta(config.CARPETA_VARIANTES) == "regalo"

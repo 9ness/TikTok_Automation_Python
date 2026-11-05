@@ -498,7 +498,8 @@ def q4_anadir(
     if not body.refs:
         raise _bad("Dime qué productos: refs = ['<catálogo>|<carpeta>|<producto>', …]")
     try:
-        return productos_q4.anadir(body.refs, segundos_guion=body.segundos_guion, carpeta=carpeta)
+        return productos_q4.anadir(body.refs, segundos_guion=body.segundos_guion, carpeta=carpeta,
+                                   copias=body.copias)
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e
 
@@ -1226,6 +1227,7 @@ def escribir_guion(
     if (
         guardado.get("guion")
         and not body.rehacer
+        and not body.texto.strip()
         and bool(guardado.get("guion_plazos")) == plazos
         and str(guardado.get("guion_estilo") or config.ESTILO_GUION_DEFECTO) == estilo
         # Y de la misma duración: un guion de 20s no vale para un vídeo de 30.
@@ -1273,7 +1275,11 @@ def escribir_guion(
         foto = None
 
     try:
-        escrito = config.guion_de_replica(
+        texto_manual = " ".join(body.texto.split())
+        escrito = {
+            "nombre": textos.get("titulo", ""), "guion": texto_manual,
+            "subliminal": str(guardado.get("subliminal") or ""), "golpes": [],
+        } if texto_manual else config.guion_de_replica(
             str(guardado.get("replica_id") or ""), textos.get("titulo", ""),
         ) if config.es_viral(estilo) else guionista.escribir(
             titulo=textos.get("titulo", ""),
@@ -1296,7 +1302,8 @@ def escribir_guion(
     try:
         product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
-            guion=config.recortar_cta(
+            # El escrito a mano va TAL CUAL: es lo que el operador quiere oír.
+            guion=texto_manual or config.recortar_cta(
                 config.cerrar_guion(escrito["guion"], estilo), plazos=plazos, envio=envio_gratis,
             ),
             subliminal=escrito["subliminal"],

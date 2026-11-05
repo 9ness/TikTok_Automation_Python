@@ -229,6 +229,9 @@ class Q4AnadirRequest(BaseModel):
     segundos_guion: float = 24
     # Qué carpeta especial: "" = «Productos Q4»; también «Épico Octubre».
     carpeta: str = ""
+    # Copias NUEVAS de cada producto aunque ya estuviera (varios vídeos del
+    # mismo producto). 1 = lo de siempre: idempotente por ref.
+    copias: int = Field(1, ge=1, le=20)
 
 
 class MarkCompletedLargoResponse(BaseModel):
@@ -246,6 +249,9 @@ class GuionLargoRequest(BaseModel):
     producto: str
     # Reescribir aunque ya haya uno guardado (el operador no lo ve claro).
     rehacer: bool = False
+    # Guion ESCRITO A MANO: se guarda tal cual (con la CTA cuadrada como
+    # siempre) sin llamar a la IA. Vacío = lo escribe la IA.
+    texto: str = ""
 
 
 class GuionesLoteRequest(BaseModel):
