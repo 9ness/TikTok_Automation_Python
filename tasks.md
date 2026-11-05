@@ -1,4 +1,8 @@
 ## Pendiente
+- [ ] (5/11/2026) Medir el corte del próximo despliegue con el arreglo de salida inmediata (esperado ~25-30 s); si sigue alto, mirar `docker events`.
+- [ ] (5/11/2026) A/B de Haiku (esfuerzo bajo) para escenas UGC (`nicho_general/escenas.py`) y guiones de ropa (`nicho_ropa/guionista.py`): hoy en `guion_pro` (Sonnet). Si sale igual, pasarlos a `guion`.
+- [ ] (5/11/2026) Despliegue blue-green de verdad (aparcado): separar el worker de la cola del proceso HTTP (servicio `worker`) para poder tener dos API a la vez sin ejecutar trabajos dos veces.
+- [ ] (5/11/2026) `editor-auto/folders/counts` y `mis-tandas/fotos` tardan minutos en frío (listados del Drive montado): cachear o precalentar.
 - [ ] **Drive Nebulabs — lo que falta (5/11/2026)**: esperar las decisiones de Néstor (tarea manual 40 del panel: dudosas, «Personal», NINTENDO_PS4 fuera de la carpeta compartida, PAQUETE duplicado, `_raiz_antigua`, rotación de backups de chats, renombrar TIKTOK_EDITOR/TIKTOK_SHOP, carpetas por cuenta). El panel solo tiene el cambio de `CARPETA_DEF`; falta que un agente pueda adjuntar .md/.pdf a su tarea y el botón «Empezar» (ver ~/relevos/drive-organizacion.md). Ver docs/DRIVE.md.
 
 ### 🇲🇦 Cuenta árabe (Mi 8) + usuario `nes_bugallo` («Ness/Bugallo», PIN 1111) (29 oct 2026) — ver `docs/CUENTA_ARABE.md` §7
