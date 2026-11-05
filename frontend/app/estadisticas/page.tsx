@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { CompararCuentas } from "@/components/estadisticas/CompararCuentas";
 import { useMe } from "@/lib/queries/auth";
 import {
   type DiaStats,
@@ -25,12 +26,17 @@ import {
  *  árabe de Bugallo). El backend lo corta también. */
 const USUARIOS = ["ness", "nes_bugallo"];
 
+/** La opción del selector que enseña todas las cuentas juntas. */
+const COMPARAR = "__comparar";
+
 /** Cuentas de TikTok que lleva Néstor: solo `ness` ve el selector (el backend
  *  le deja pedir `usuario=`). Las que aún no tienen datos salen vacías. */
 const CUENTAS_NESS = [
   { usuario: "", nombre: "Viva Shop" },
   { usuario: "ana", nombre: "Ama Shop" },
   { usuario: "nestor2", nombre: "Casca Chollos" },
+  { usuario: "nes_bugallo", nombre: "Cuenta árabe" },
+  { usuario: COMPARAR, nombre: "⚖️ Comparar" },
 ];
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -84,7 +90,8 @@ export default function EstadisticasPage() {
   const permitido = USUARIOS.includes(me.data?.username ?? "");
   const esNess = me.data?.username === "ness";
   const [cuenta, setCuenta] = useState("");
-  const q = useEstadisticas(permitido, esNess ? cuenta : "");
+  const comparando = esNess && cuenta === COMPARAR;
+  const q = useEstadisticas(permitido && !comparando, esNess && !comparando ? cuenta : "");
   const [mesProductos, setMesProductos] = useState<string>("todos");
 
   const meses: MesStats[] = useMemo(() => q.data?.meses ?? [], [q.data]);
@@ -176,7 +183,7 @@ export default function EstadisticasPage() {
         <h1 className="flex items-center gap-2 text-lg font-bold sm:text-2xl">
           <BarChart3 className="h-5 w-5" /> Estadísticas
         </h1>
-        <p className="text-xs text-muted-foreground sm:text-sm">
+        <p className={`text-xs text-muted-foreground sm:text-sm ${comparando ? "hidden" : ""}`}>
           {q.data?.cuenta ? `Cuenta ${q.data.cuenta} · ` : ""}Última actualización:{" "}
           <span className="font-semibold text-foreground">{fecha(q.data?.actualizado)}</span>
         </p>
@@ -203,13 +210,14 @@ export default function EstadisticasPage() {
         ) : null}
       </header>
 
-      {q.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-      {q.isError ? <p className="text-sm text-red-500">No se pudieron cargar las estadísticas.</p> : null}
-      {!q.isLoading && !meses.length ? (
+      {comparando ? <CompararCuentas /> : null}
+      {!comparando && q.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
+      {!comparando && q.isError ? <p className="text-sm text-red-500">No se pudieron cargar las estadísticas.</p> : null}
+      {!comparando && !q.isLoading && !meses.length ? (
         <p className="text-sm text-muted-foreground">Aún no hay datos guardados.</p>
       ) : null}
 
-      {filas.length ? (
+      {!comparando && filas.length ? (
         <>
           <nav className="sticky top-0 z-10 -mx-3 flex gap-1 overflow-x-auto bg-background/95 px-3 py-2 backdrop-blur sm:mx-0 sm:flex-wrap sm:px-0">
             {([

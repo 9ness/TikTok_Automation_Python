@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
 
@@ -76,5 +76,16 @@ export function useEstadisticas(activo: boolean, usuario = "") {
     queryFn: () =>
       api.get<Estadisticas>(`/api/v1/estadisticas${usuario ? `?usuario=${encodeURIComponent(usuario)}` : ""}`),
     enabled: activo,
+  });
+}
+
+/** Varias cuentas a la vez, para compararlas (solo ness). Misma caché que `useEstadisticas`
+ *  salvo la suya, que allí va con `usuario` vacío. */
+export function useEstadisticasCuentas(usuarios: string[]) {
+  return useQueries({
+    queries: usuarios.map((u) => ({
+      queryKey: ["estadisticas", u],
+      queryFn: () => api.get<Estadisticas>(`/api/v1/estadisticas?usuario=${encodeURIComponent(u)}`),
+    })),
   });
 }
