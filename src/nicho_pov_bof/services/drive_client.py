@@ -558,6 +558,21 @@ def probe_dimensions(photo: dict) -> dict:
     return photo
 
 
+# Descargas de fotos a la vez (5/11/2026). «Mis tandas» pide las miniaturas de
+# golpe (60 en una pantalla) y cada una sin caché es un rclone de 1-35 s: sin
+# tope se lanzaban decenas de rclone en paralelo, Drive los frenaba y se
+# comían los hilos del servidor (toda la app iba lenta). Y la misma foto
+# pedida dos veces se bajaba dos veces, pisándose el `.part`.
+_DESCARGAS = threading.BoundedSemaphore(8)
+_POR_ID: dict[str, threading.Lock] = {}
+_POR_ID_LOCK = threading.Lock()
+
+
+def _cerrojo_de(file_id: str) -> threading.Lock:
+    with _POR_ID_LOCK:
+        return _POR_ID.setdefault(file_id, threading.Lock())
+
+
 def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     """Descarga una foto por file ID y devuelve la ruta local cacheada.
 
@@ -586,20 +601,25 @@ def fetch_photo(file_id: str, *, suffix: str = ".jpg") -> Path:
     if dest.is_file() and dest.stat().st_size > 0:
         return dest
 
-    # `copyid` es la única forma de resolver la ambigüedad de nombres
-    # duplicados: baja el fichero por su ID, no por su path.
-    tmp = dest.with_suffix(dest.suffix + ".part")
-    try:
-        _run_rclone(["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)])
-    except RuntimeError:
-        # Las fotos de la COPIA de seguridad están en nuestro Drive, y ahí el
-        # flag `--drive-shared-with-me` estorba. Como aquí solo llega el ID (no
-        # de qué fuente venía), se reintenta sin él antes de rendirse.
-        _run_rclone(
-            ["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)], shared=False,
-        )
-    if not tmp.is_file() or tmp.stat().st_size == 0:
-        tmp.unlink(missing_ok=True)
-        raise RuntimeError(f"rclone no devolvió contenido para el ID {file_id}")
-    tmp.replace(dest)
-    return dest
+    with _cerrojo_de(file_id):
+        # Otra petición la ha bajado mientras esta esperaba.
+        if dest.is_file() and dest.stat().st_size > 0:
+            return dest
+        with _DESCARGAS:
+            # `copyid` es la única forma de resolver la ambigüedad de nombres
+            # duplicados: baja el fichero por su ID, no por su path.
+            tmp = dest.with_suffix(dest.suffix + ".part")
+            try:
+                _run_rclone(["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)])
+            except RuntimeError:
+                # Las fotos de la COPIA de seguridad están en nuestro Drive, y
+                # ahí el flag `--drive-shared-with-me` estorba. Como aquí solo
+                # llega el ID (no de qué fuente venía), se reintenta sin él.
+                _run_rclone(
+                    ["backend", "copyid", config.DRIVE_REMOTE, file_id, str(tmp)], shared=False,
+                )
+        if not tmp.is_file() or tmp.stat().st_size == 0:
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError(f"rclone no devolvió contenido para el ID {file_id}")
+        tmp.replace(dest)
+        return dest

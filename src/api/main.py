@@ -134,6 +134,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     (cliente HTTP REST de Upstash, sin pool persistente)."""
     settings = get_settings()
     logger.info("API starting | host=%s port=%d", settings.host, settings.port)
+    # Más hilos para los endpoints síncronos (por defecto anyio deja 40). Hay
+    # muchos que esperan a Drive/rclone (miniaturas, listados): con 40 una
+    # pantalla de Mis tandas los ocupaba todos y el resto de la app esperaba
+    # en cola. Esperar no gasta CPU; 120 hilos dormidos son baratos.
+    try:
+        import anyio.to_thread
+
+        anyio.to_thread.current_default_thread_limiter().total_tokens = 120
+    except Exception as e:  # noqa: BLE001
+        logger.warning("no se pudo ampliar el pool de hilos: %s", e)
     from src.tiktok_shop.repos.redis_base import get_shop_redis
 
     redis = get_shop_redis()
@@ -315,8 +325,12 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
+    # `async`: no hace E/S, y así no espera turno en el pool de hilos. Siendo
+    # `def`, cuando las miniaturas de Mis tandas ocupaban todos los hilos el
+    # healthcheck fallaba y la API parecía caída (5/11/2026, 6 min tras un
+    # deploy).
     @app.get("/api/health", tags=["meta"])
-    def health() -> dict:
+    async def health() -> dict:
         from src.tiktok_shop.repos.redis_base import get_shop_redis
 
         return {

@@ -334,7 +334,7 @@ def _clips_que_caben(
         datos = generate_json(
             prompt + _formato_clips(len(clips), tope, segundos) + aviso,
             descripcion, images=None,
-            tarea="guion",
+            tarea="guion_pro",
         )
         nuevos = [_limpiar_dice(str(c)) for c in (datos or {}).get("clips") or []]
         if len(nuevos) == len(clips) and all(nuevos):
@@ -481,7 +481,7 @@ def _acortar(
         "acción del final: quita una característica entera antes que recortar "
         "por el medio — lo lee una voz en alto y una frase a trozos se oye."
     )
-    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes, tarea="guion")
+    datos = generate_json(prompt + _FORMATO + aviso, descripcion, images=imagenes, tarea="guion_pro")
     if not isinstance(datos, dict):
         return {}
     nueva = _limpiar_dice(str(datos.get("dice") or ""))
@@ -532,7 +532,7 @@ def _json_o_sin_fotos(
     ultimo: Exception | None = None
     for i, (texto, fotos, como) in enumerate(intentos):
         try:
-            return generate_json(texto, descripcion, images=fotos, tarea="guion")
+            return generate_json(texto, descripcion, images=fotos, tarea="guion_pro")
         except GeminiBlockedError as e:
             ultimo = e
             if i + 1 < len(intentos):

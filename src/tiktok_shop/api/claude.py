@@ -10,7 +10,14 @@ Mismo contrato que `gemini.generate_text` / `gemini.generate_json`, más un
     Haiku se comía la marca y la gama del título («Gazebo emergente blanco»
     por «YITAHOME Gazebo»); Sonnet bajo las clavó en 9 de 10, ~0,08 $ la
     carpeta de diez.
-  - "guion" → Sonnet 5.5, esfuerzo medio: lo que vende (guiones, escenas).
+  - "guion" → Haiku 5.5, esfuerzo BAJO (con pensamiento): guiones del POV
+    BOF / POV BOF Largo y «Replicar carrusel». A/B del 5/11/2026 con casos
+    reales: sin pensamiento Haiku se pasaba del tope en 4 de 8 guiones (un
+    clip más por vídeo) y en carruseles cambiaba el color del producto o
+    inventaba variantes; con esfuerzo bajo, 8 de 8 guiones dentro del tope y
+    a la altura de Sonnet, y carruseles correctos. Cuesta ~5-10 veces menos.
+  - "guion_pro" → Sonnet 5.5, esfuerzo medio: lo que aún no se ha probado con
+    Haiku (escenas del UGC, guiones de ropa). Para pasarlos, A/B antes.
 
 Gemini sigue siendo el respaldo, y lo único que hace con vídeo, audio o
 búsqueda web (Claude no los recibe). Cualquier fallo de Claude (sin clave,
@@ -39,11 +46,12 @@ from src.tiktok_shop.utils.logging_setup import log_info, log_warning
 MODELOS: dict[str, str] = {
     "texto": "claude-haiku-5-5",
     "lectura": "claude-sonnet-5-5",
-    "guion": "claude-sonnet-5-5",
+    "guion": "claude-haiku-5-5",
+    "guion_pro": "claude-sonnet-5-5",
 }
-ESFUERZO: dict[str, str] = {"lectura": "low", "guion": "medium"}
+ESFUERZO: dict[str, str] = {"lectura": "low", "guion": "low", "guion_pro": "medium"}
 
-Tarea = Literal["texto", "lectura", "guion"]
+Tarea = Literal["texto", "lectura", "guion", "guion_pro"]
 
 _LOGGER_NAME = "tiktok_shop.claude"
 _ENV_CLAVE = "ANTHROPIC_API_KEY_AI_PRO"
@@ -51,7 +59,7 @@ _ENV_CLAVE = "ANTHROPIC_API_KEY_AI_PRO"
 # reduce él igualmente: se mandan ya reducidas y en JPEG.
 _LADO_MAX = 2000
 _BYTES_MAX = 4_500_000
-# El pensamiento de Sonnet cuenta para max_tokens: margen aparte del texto.
+# El pensamiento cuenta para max_tokens: margen aparte del texto.
 _MARGEN_PENSAR = 16000
 _PIDE_JSON = (
     "\n\nResponde SOLO con un JSON válido: sin texto antes ni después y sin "

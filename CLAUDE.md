@@ -697,7 +697,7 @@ PIXABAY_API_KEY=...
 # CUENTA_PILOTO_REDIS_PREFIX=cuenta_piloto:  # default
 # FISH_API_KEY=sk-fish-...                   # TTS del POV BOF Largo
 # ANTHROPIC_API_KEY_AI_PRO=sk-ant-...       # textos/guiones de AI Pro (src/tiktok_shop/api/claude.py:
-#                                          #   Haiku texto, Sonnet bajo fotos, Sonnet medio guiones; Gemini de respaldo)
+#                                          #   Haiku texto, Sonnet bajo fotos, Haiku bajo guiones POV+carrusel, Sonnet medio UGC/ropa; Gemini de respaldo)
 # AI_PRO_LLM=gemini                         # vuelve todo AI Pro a Gemini sin tocar código
 # ANTHROPIC_API_KEY_EDITOR_AUTO=sk-ant-...  # IA del cortador (src/editor_auto/api/claude_client.py, Haiku;
 #                                          #   OpenAI de respaldo; EDITOR_AUTO_LLM=openai vuelve a OpenAI)

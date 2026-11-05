@@ -243,7 +243,7 @@ def escribir(
     )
     datos = generate_json(
         prompt, descripcion, images=[str(f) for f in (fotos or [])] or None,
-        tarea="guion",
+        tarea="guion_pro",
     )
     if not isinstance(datos, dict):
         raise ValueError(
@@ -355,7 +355,7 @@ def _acortar(
     datos = generate_json(
         prompt + aviso, descripcion,
         images=[str(f) for f in (fotos or [])] or None,
-        tarea="guion",
+        tarea="guion_pro",
     )
     nuevas = (datos or {}).get("escenas") if isinstance(datos, dict) else None
     if not isinstance(nuevas, list) or len(nuevas) != len(escenas):

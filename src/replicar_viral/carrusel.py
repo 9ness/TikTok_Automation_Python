@@ -191,7 +191,21 @@ def sin_cupones_afirmados(texto: str) -> str:
 _SIN_TEXTO = "No text, no letters, no captions, no watermarks, no logos added on the image."
 
 
-def _normalizar(resultado: dict, n_diapos: int, formato: str) -> dict:
+# Palabras que delatan un caption en español cuando el carrusel es de otro país.
+_ES_DELATA = re.compile(r"\b(carrito|las|los|para|muy|también|aquí)\b|ñ", re.IGNORECASE)
+
+
+def _caption_en_su_idioma(caption: str, pais: str, diapositivas: list[dict]) -> str:
+    """Haiku a veces deja el caption en español (la ficha lo está) aunque el
+    carrusel sea de Italia o Alemania (1 de 6 en el A/B del 5/11/2026). En
+    ese caso se usa el texto de la diapositiva `cta`, que sí sale en su idioma."""
+    if pais in ("ES", "AR") or not caption or not _ES_DELATA.search(caption):
+        return caption
+    cta = next((d["texto"] for d in reversed(diapositivas) if d["rol"] == "cta" and d["texto"]), "")
+    return cta.replace("\n", " ")
+
+
+def _normalizar(resultado: dict, n_diapos: int, formato: str, pais: str = "ES") -> dict:
     diapos = [d for d in (resultado.get("diapositivas") or []) if isinstance(d, dict)][:n_diapos]
     while len(diapos) < n_diapos:  # la IA se saltó alguna: hueco vacío, que se vea
         diapos.append({"rol": "producto", "texto": "", "prompt_imagen": ""})
@@ -209,7 +223,10 @@ def _normalizar(resultado: dict, n_diapos: int, formato: str) -> dict:
             "texto_original": str(d.get("texto_original") or "").strip(),
             "sale_producto": bool(d.get("sale_producto")),
             "ambiente": str(d.get("ambiente") or "").strip(),
-            "texto": sin_cupones_afirmados(str(d.get("texto") or "").strip()),
+            # « / » separa bloques en `texto_original`; en el texto que se
+            # quema sería una barra en la foto (Haiku la copiaba, 5/11/2026).
+            "texto": sin_cupones_afirmados(
+                re.sub(r"\s+/\s+", "\n", str(d.get("texto") or "").strip())),
             "usa_foto_producto": bool(d.get("usa_foto_producto")),
             "prompt_imagen": prompt,
         })
@@ -226,7 +243,8 @@ def _normalizar(resultado: dict, n_diapos: int, formato: str) -> dict:
         "apto": bool(resultado.get("apto", True)),
         "motivo_no_apto": str(resultado.get("motivo_no_apto") or ""),
         "diapositivas": salida,
-        "caption": sin_cupones_afirmados(str(resultado.get("caption") or "").strip()),
+        "caption": _caption_en_su_idioma(
+            sin_cupones_afirmados(str(resultado.get("caption") or "").strip()), pais, salida),
         "hashtags": hashtags[:8],
     }
 
@@ -313,7 +331,7 @@ def replicar(usuario: str, *, source: str, folder: str, producto: str, url: str,
             "formato": formato,
             "pais": pais,
             **({"replica_de": replica_de} if replica_de else {}),
-            **_normalizar(resultado if isinstance(resultado, dict) else {}, len(origs), formato),
+            **_normalizar(resultado if isinstance(resultado, dict) else {}, len(origs), formato, pais),
         }
         doc["musica"] = musica.completa({**doc, "musica": {"tiktok": cancion}}, {})
         servicio.guardar(doc)

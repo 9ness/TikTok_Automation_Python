@@ -21,7 +21,9 @@ Para cada diapositiva apunta:
   - `producto`: enseña el producto (revelación, detalle, en su sitio).
   - `prueba`: en uso, antes/después, resultado, varias unidades, reacción.
   - `cta`: la que manda a comprar («enlace», «carrito», «link»).
-- `texto_original`: el texto que lleva quemado, literal (vacío si no lleva).
+- `texto_original`: el texto que lleva quemado, literal (vacío si no lleva),
+  con sus saltos de línea donde el original corta (`\n`). Si lleva varios
+  bloques separados (arriba y abajo), sepáralos con ` / `.
 - `sale_producto`: si en la foto se ve el producto que vende.
 - `ambiente`: el sitio, la luz y lo que hay alrededor, en una frase.
 
@@ -43,8 +45,7 @@ lo que hace viral un carrusel es su patrón, y ese patrón es lo que se replica:
 - Mismo punto de vista (POV desde la cama, desde la bañera, en mano…) y misma
   progresión entre diapositivas (una por estancia, una por color…).
 - El cierre conserva su tipo de gancho (comparación, urgencia, «👇») pero
-  solo con lo que la ficha sostiene: una comparación de precio («más barato
-  que…») solo si la ficha trae el precio y es verdad.
+  solo con lo que la ficha sostiene (y sin cifras de precio, ver abajo).
 - Si nuestro producto no admite la misma variante (no tiene colores), busca su
   equivalente honesto (modos, sitios, situaciones) y mantén el ritmo.
 
@@ -52,11 +53,23 @@ Para cada diapositiva:
 
 **`texto`** — el que se quemará encima (en {{IDIOMA}}, natural: el idioma del país del viral):
 - Copia la FORMA del original (longitud parecida, pregunta si era pregunta,
-  emoji si llevaba emoji, el mismo tono), pero hablando de NUESTRO producto.
+  emoji si llevaba emoji, el mismo tono, **los mismos saltos de línea** `\n`
+  en el mismo sitio, mayúsculas y palabras sueltas si las había), pero
+  hablando de NUESTRO producto. Cambia solo las palabras que hablan del
+  producto del original; lo demás, lo más parecido posible.
   Nunca el texto literal del creador original.
+- **Todo en {{IDIOMA}}**: cada `texto`, el `caption` y los `hashtags`. La
+  ficha del producto está en español: tradúcela, no copies sus palabras.
+- Los bloques separados van con salto de línea `\n`, **nunca con ` / `** (eso
+  es solo para `texto_original`): lo que escribas aquí se quema tal cual.
 - Corto: se lee de un vistazo. Máximo ~90 caracteres; mejor menos.
 - Solo datos de la ficha. Nada de precios, descuentos, envíos, plazos,
   medidas, materiales ni premios que la ficha no diga.
+- **Sin cifras de precio** («8,45 €», «por menos de 20 €», «sin gastar
+  300 €»), aunque el original las ponga y la ficha las traiga: el precio
+  cambia y el carrusel se queda mintiendo. Pon el gancho sin la cifra («a un
+  precio que no te vas a creer», «rebajado ahora»). Solo si la nota de idioma
+  de arriba pide expresamente el precio, ponlo.
 - **Nada de promesas de salud ni de resultados** («cura», «alivia»,
   «adelgaza», «garantizado»…), aunque el original las haga.
 - **Cupones: nunca los afirmes.** Vale «revisa si tienes cupones»; NUNCA «tu
@@ -98,8 +111,9 @@ INGLÉS:
 Al menos una diapositiva tiene que enseñarlo (normalmente la de `producto`).
 
 Del carrusel entero:
-- `caption`: el texto de la publicación, en {{IDIOMA}}, 1-2 frases,
-  sin promesas ni cupones afirmados.
+- `caption`: el texto de la publicación, en {{IDIOMA}}, 1-2 frases cortas,
+  sin promesas, sin cupones afirmados, sin cifras de precio ni hashtags, y
+  acabando en el carrito naranja (como la diapositiva `cta`).
 - `hashtags`: 4-6, con `#`, del producto y del nicho, en {{IDIOMA}} (sin `#fyp` repetidos).
 
 Sé estricto con `apto`: `false` si el carrusel original no vende un producto
