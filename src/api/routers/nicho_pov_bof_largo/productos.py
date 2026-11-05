@@ -152,12 +152,20 @@ def _huecos(prod: dict, plazos: bool = False, envio: bool = True) -> int:
         return config.CLIPS_POR_VIDEO
     guion = config.recortar_cta(guion, plazos=plazos, envio=envio)
     clip_s = float(prod.get("clip_s") or config.CLIP_TARGET_S)
-    return max(config.CLIPS_POR_VIDEO, voz_svc.clips_para(
+    n = max(config.CLIPS_POR_VIDEO, voz_svc.clips_para(
         len(guion),
         clip_s,
         segundos_min=_minimo(prod, len(guion), clip_s),
         maximos=config.CLIPS_MAXIMOS,
     ))
+    # Guion escrito A MANO para una duración pedida (Variantes regalo, 5/11/2026):
+    # los clips los decide esa duración (24 s / 8 = 3), no el largo del texto.
+    # Si la voz sale más corta, el vídeo se recorta a ella; estirar dos clips
+    # al 75 % para llenarlos se notaba en los gestos.
+    pedidos = float(prod.get("guion_segundos") or 0)
+    if prod.get("guion_manual") and pedidos > 0 and clip_s > 0:
+        n = max(n, min(config.CLIPS_MAXIMOS, round(pedidos / clip_s)))
+    return n
 
 
 def _es_plazos(textos: dict) -> bool:
@@ -1302,6 +1310,7 @@ def escribir_guion(
     try:
         product_repo.update_product(
             body.source, body.folder, body.producto, usuario=usuario,
+            guion_manual=bool(texto_manual),
             # El escrito a mano va TAL CUAL: es lo que el operador quiere oír.
             guion=texto_manual or config.recortar_cta(
                 config.cerrar_guion(escrito["guion"], estilo), plazos=plazos, envio=envio_gratis,
