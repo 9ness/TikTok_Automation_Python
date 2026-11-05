@@ -105,6 +105,26 @@
 		reverse_proxy web:3000
 	}
 
+	# Mientras se despliega, la API no responde unos segundos (se recrea el
+	# contenedor): en vez de un 502 pelado, un aviso. Lo que pide datos
+	# (/api, /ws) recibe un 503 en JSON con `detail` —la web lo enseña como un
+	# error normal y reintenta—; una página entera, un HTML que se recarga
+	# sola a los 5 s. 5/11/2026.
+	handle_errors 502 503 504 {
+		@datos_caidos path /api/* /api /ws/*
+		handle @datos_caidos {
+			header Retry-After 15
+			header Content-Type "application/json; charset=utf-8"
+			respond `{"detail":"La app se está actualizando. Vuelve a intentarlo en unos segundos."}` 503
+		}
+		handle {
+			header Retry-After 15
+			header Content-Type "text/html; charset=utf-8"
+			header Cache-Control "no-store"
+			respond `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="5"><title>Actualizando…</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0b10;color:#e8e8f0;font-family:system-ui,sans-serif;text-align:center;padding:16px}p{color:#9a9ab0;font-size:14px}</style></head><body><div><h1 style="font-size:20px">La app se está actualizando</h1><p>Vuelve sola en unos segundos.</p></div></body></html>` 503
+		}
+	}
+
 	# Logs de acceso (json en stdout — `docker compose logs caddy`).
 	log {
 		output stdout

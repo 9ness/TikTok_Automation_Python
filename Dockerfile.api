@@ -143,4 +143,12 @@ ENV API_WORKERS=1 \
 # `stop_grace_period` (hasta 30 min de deploy colgado). Con `exec`, uvicorn
 # reemplaza a `sh` y pasa a ser PID 1 → recibe SIGTERM directo → el lifespan
 # drena la cola (instantáneo si no hay jobs) y el proceso sale al momento.
-CMD ["sh", "-c", "exec uvicorn src.api.main:app --host ${API_HOST} --port ${API_PORT} --workers ${API_WORKERS} --timeout-graceful-shutdown 1800"]
+#
+# `--timeout-graceful-shutdown 15` (5/11/2026, antes 1800): es lo que uvicorn
+# espera a que se cierren las CONEXIONES abiertas, y no a los trabajos. Los
+# WebSocket /ws/queue de las pestañas y los streams del MCP no se cierran
+# nunca solos, así que cada despliegue dejaba la API sin servicio 30 minutos
+# (deja de escuchar en el acto). Esos clientes reconectan solos. El vaciado
+# de la cola va aparte, en el lifespan, DESPUÉS de este plazo, y lo protegen
+# `stop_grace_period` y la guarda de `deploy/deploy_safe.sh`.
+CMD ["sh", "-c", "exec uvicorn src.api.main:app --host ${API_HOST} --port ${API_PORT} --workers ${API_WORKERS} --timeout-graceful-shutdown 15"]

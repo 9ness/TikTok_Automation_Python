@@ -26,7 +26,6 @@ añadir el mismo producto dos veces.
 from __future__ import annotations
 
 import re
-import shutil
 from pathlib import Path
 from typing import Callable
 
@@ -173,7 +172,10 @@ def anadir(
                     ext = Path(str(local)).suffix.lower()
                     ext = ext if ext in _EXTS else ".jpg"
                     final = destino / f"{numero}{sufijo}{ext}"
-                    shutil.copy2(local, final)
+                    # Bytes y no `shutil.copy2`: con los catálogos del operador
+                    # la foto ya está en el Drive montado y copy2 (sendfile de
+                    # FUSE a FUSE) da EIO (5/11/2026).
+                    final.write_bytes(Path(local).read_bytes())
                     copiadas.append(final)
             except Exception as e:  # noqa: BLE001
                 # Sin las dos fotos el número quedaría a medias: se deshace.
