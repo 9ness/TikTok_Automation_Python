@@ -794,11 +794,13 @@ async def tareas_tiktok(ctx: Context) -> str:
 
 
 @_herramienta(structured_output=False)
-async def estadisticas_ventas(ctx: Context) -> str:
+async def estadisticas_ventas(ctx: Context, usuario: str = "") -> str:
     """Estadísticas de ventas de TikTok Shop guardadas (ness y nes_bugallo, cada uno las suyas): por mes
     GMV, ventas, impresiones, clics y comisiones; por día visitas/clics/ventas;
-    y los productos con venta de cada mes. Guía `estadisticas.md`."""
-    return _json(await Interno(_usuario(ctx)).get("/api/v1/estadisticas"))
+    y los productos con venta de cada mes. `usuario`: solo ness, las de otra cuenta
+    suya ("ana" = Ama Shop, "nestor2" = Casca Chollos). Guía `estadisticas.md`."""
+    ruta = "/api/v1/estadisticas" + (f"?usuario={usuario}" if usuario else "")
+    return _json(await Interno(_usuario(ctx)).get(ruta))
 
 
 @_herramienta(structured_output=False)
@@ -806,8 +808,9 @@ async def guardar_estadisticas(ctx: Context, meses: list[dict] | None = None,
                                dias: list[dict] | None = None, cuenta: str | None = None,
                                actualizado: str | None = None, notas: list[str] | None = None,
                                contenidos: list[dict] | None = None,
-                               rango_pedidos: str | None = None) -> str:
-    """Guarda lo leído del panel «Datos» de la app de TikTok (ness y nes_bugallo, en la cuenta del token).
+                               rango_pedidos: str | None = None, usuario: str = "") -> str:
+    """Guarda lo leído del panel «Datos» de la app de TikTok (ness y nes_bugallo, en la cuenta del token;
+    `usuario`: solo ness, para guardarlas en otra cuenta suya: "ana" = Ama Shop, "nestor2" = Casca Chollos).
     `meses`: [{mes:"2026-06", gmv, ventas, impresiones, clics, comision,
     gmv_comision, art_comision, base_comision, productos:[{titulo, pais, gmv,
     ventas, tipo}]}] (números, no texto). `dias`: [{fecha:"2026-10-01",
@@ -821,7 +824,8 @@ async def guardar_estadisticas(ctx: Context, meses: list[dict] | None = None,
                               "actualizado": actualizado, "notas": notas,
                               "contenidos": contenidos,
                               "rango_pedidos": rango_pedidos}.items() if v is not None}
-    return _json(await Interno(_usuario(ctx)).post("/api/v1/estadisticas", body))
+    ruta = "/api/v1/estadisticas" + (f"?usuario={usuario}" if usuario else "")
+    return _json(await Interno(_usuario(ctx)).post(ruta, body))
 
 
 @_herramienta(structured_output=False)

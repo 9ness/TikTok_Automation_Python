@@ -105,9 +105,13 @@ def a_datos():
 def elegir_dia(f: datetime.date, hoy: datetime.date):
     if f == hoy:                                        # el calendario no deja elegir hoy: chip «Hoy»
         tap(*(donde("Hoy", palabras()) or (113, 297)), 4); return
-    p = donde("Personalizado", palabras()) or (690, 297)
+    pal = palabras()
+    ay = donde("Ayer", pal)                             # con avisos arriba los chips bajan; marcado en negro
+    p = donde("Personalizado", pal) or ((690, ay[1]) if ay else (690, 297))  # el OCR no lee «Personalizado»
     tap(*p, 2.5)
-    p = donde("Día", palabras()) or (197, 1720)
+    pal = palabras()
+    se = donde("Semana", pal)
+    p = donde("Día", pal) or ((197, se[1] + 112) if se else (197, 1720))
     tap(*p, 2.5)
     col = COLS[f.weekday()]
     if (f.year, f.month) == (hoy.year, hoy.month):
@@ -137,6 +141,11 @@ def elegir_dia(f: datetime.date, hoy: datetime.date):
             swipe(1250, 1650, ms=600)                  # muestra meses anteriores
         if y is None: sys.exit(f"no encuentro {cab} en el calendario")
     tap(col, y, 1.5)
+    pal = palabras()
+    if not hay("Listo", pal):                           # Ama Shop (5/11): al tocar el día el selector se cierra solo
+        time.sleep(2.5)
+        if cabecera(palabras()) and re.search(rf"(^|\s)0?{f.day}\s+{MESES[f.month - 1]}", cabecera(palabras())):
+            return
     pie = ocr_zona(cap(), 100, 1820, 880, 110)         # «3 nov 2026» bajo el calendario
     if MESES[f.month - 1] not in pie.lower().replace("0ct", "oct"):
         tap(1000, 602, 1.5)                             # cerrar el selector
@@ -145,11 +154,19 @@ def elegir_dia(f: datetime.date, hoy: datetime.date):
     tap(*p, 4)
 
 
+def cabecera(pal):
+    """La línea «4 nov 2026 GMT+1» bajo los chips, esté donde esté (los avisos de arriba la bajan)."""
+    g = [(y, x) for x, y, w, h, t in pal if t.startswith("GMT") and y < 1100]
+    if not g: return ""
+    yg = g[0][0]
+    return " ".join(t for x, y, w, h, t in sorted(pal) if abs(y - yg) < 25 and x < 700).lower()
+
+
 def leer(f: datetime.date):
     png = cap(f"d_{f}")
     pal = palabras(png)
     # cabecera «2 nov 2026 GMT+1» bajo los chips: la comprobación de verdad del día elegido
-    cab = " ".join(t for x, y, w, h, t in sorted(pal) if 360 < y < 430 and x < 700).lower()
+    cab = cabecera(pal) or " ".join(t for x, y, w, h, t in sorted(pal) if 360 < y < 430 and x < 700).lower()
     if not re.search(rf"(^|\s)0?{f.day}\s+{MESES[f.month - 1]}", cab):
         raise RuntimeError(f"la página no es de {f}: «{cab}»")
     out = {"fecha": str(f)}
@@ -159,7 +176,8 @@ def leer(f: datetime.date):
         c = sorted((y, t) for x, y, w, h, t in pal if lado(x) and e[1] + 30 < y < e[1] + 220
                    and h >= 35 and re.search(r"\d", t))
         return num(c[0][1]) if c else None
-    pestanas = [(x, y) for x, y, w, h, t in pal if t == "Comisiones" and 850 < y < 1000]
+    pestanas = [(x, y) for x, y, w, h, t in pal if t == "Comisiones"
+                and any(t2 == "Resumen" and abs(y2 - y) < 20 for _, y2, _, _, t2 in pal)]
     for clave, etiqueta in [("gmv", "GMV"), ("ventas", "Ventas"), ("impresiones", "Impresiones"),
                             ("clics", "Clics"), ("comision", "Comisiones")]:
         e = next(((x, y) for x, y, w, h, t in pal if t.startswith(etiqueta) and (x, y) not in pestanas), None)

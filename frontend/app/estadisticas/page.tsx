@@ -25,6 +25,14 @@ import {
  *  árabe de Bugallo). El backend lo corta también. */
 const USUARIOS = ["ness", "nes_bugallo"];
 
+/** Cuentas de TikTok que lleva Néstor: solo `ness` ve el selector (el backend
+ *  le deja pedir `usuario=`). Las que aún no tienen datos salen vacías. */
+const CUENTAS_NESS = [
+  { usuario: "", nombre: "Viva Shop" },
+  { usuario: "ana", nombre: "Ama Shop" },
+  { usuario: "nestor2", nombre: "Casca Chollos" },
+];
+
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 const eur = (n: number) =>
@@ -74,7 +82,9 @@ function Seccion({ id, titulo, children }: { id: string; titulo: string; childre
 export default function EstadisticasPage() {
   const me = useMe();
   const permitido = USUARIOS.includes(me.data?.username ?? "");
-  const q = useEstadisticas(permitido);
+  const esNess = me.data?.username === "ness";
+  const [cuenta, setCuenta] = useState("");
+  const q = useEstadisticas(permitido, esNess ? cuenta : "");
   const [mesProductos, setMesProductos] = useState<string>("todos");
 
   const meses: MesStats[] = useMemo(() => q.data?.meses ?? [], [q.data]);
@@ -170,6 +180,27 @@ export default function EstadisticasPage() {
           {q.data?.cuenta ? `Cuenta ${q.data.cuenta} · ` : ""}Última actualización:{" "}
           <span className="font-semibold text-foreground">{fecha(q.data?.actualizado)}</span>
         </p>
+        {esNess ? (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {CUENTAS_NESS.map((c) => (
+              <button
+                key={c.usuario || "ness"}
+                type="button"
+                onClick={() => {
+                  setCuenta(c.usuario);
+                  setMesProductos("todos");
+                }}
+                className={`rounded-md border px-2.5 py-1 text-xs sm:text-sm ${
+                  cuenta === c.usuario
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border/60 bg-card text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {c.nombre}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </header>
 
       {q.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}

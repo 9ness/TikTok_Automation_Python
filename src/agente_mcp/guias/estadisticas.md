@@ -1,7 +1,11 @@
 # Estadísticas de ventas (ness y nes_bugallo)
 
 Pantalla `/estadisticas` (menú lateral de `ness` y de `nes_bugallo`; cada uno ve
-las de SU cuenta, la del usuario del token): GMV, ventas,
+las de SU cuenta, la del usuario del token). `ness` tiene además un **selector
+de cuenta**: Viva Shop (`ness`), Ama Shop (`ana`) y Casca Chollos (`nestor2`).
+Las de esas cuentas se leen y guardan con `usuario=` (API `?usuario=ana`, MCP
+`estadisticas_ventas(usuario="ana")` / `guardar_estadisticas(..., usuario="ana")`,
+solo con token de ness); Ana y nestor2 NO entran a la pantalla. GMV, ventas,
 impresiones y clics por mes, comisiones, conversión clics → ventas con su
 previsión, día a día, y los productos con venta por tipo y país. Arriba,
 «Última actualización»: la fecha de la última lectura.
@@ -15,6 +19,11 @@ están calibrados para el OPPO). En el Mi 8 se usa
 «Personalizado › Día», lee GMV, ventas, impresiones, clics y comisión por OCR (la página Datos
 es web y el volcado sale vacío; en días pasados la comisión está en la pestaña «Comisiones») y
 deja `dias_mi8.json`. La comisión de cada día va al panel (`ganancia_dia_apuntar`, fuente 4).
+**Ama Shop** (@aama_22) también está en el Mi 8 desde el 5/11/2026: se cambia la cuenta activa
+(Perfil › nombre arriba › aama_22) y se usa el mismo script; comisión al panel con fuente 2 y datos
+con `usuario="ana"`. Al acabar, deja otra vez activa **hmizat**. En Ama Shop la página Datos lleva
+dos avisos arriba que bajan la página y el selector «Día» se cierra solo al tocar el día: el
+script ya lo contempla (busca la línea «… GMT+1» y los chips donde estén).
 
 ## Dónde se leen
 

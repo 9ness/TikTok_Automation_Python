@@ -69,10 +69,12 @@ export interface Estadisticas {
   contenidos?: ContenidoStats[];
 }
 
-export function useEstadisticas(activo: boolean) {
+/** `usuario`: solo ness, la de otra cuenta suya (selector de la pantalla). */
+export function useEstadisticas(activo: boolean, usuario = "") {
   return useQuery<Estadisticas>({
-    queryKey: ["estadisticas"],
-    queryFn: () => api.get<Estadisticas>("/api/v1/estadisticas"),
+    queryKey: ["estadisticas", usuario],
+    queryFn: () =>
+      api.get<Estadisticas>(`/api/v1/estadisticas${usuario ? `?usuario=${encodeURIComponent(usuario)}` : ""}`),
     enabled: activo,
   });
 }
