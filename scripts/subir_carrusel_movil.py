@@ -49,9 +49,48 @@ USUARIO = os.environ.get("MCP_USUARIO", "ness")
 
 
 # ---------------------------------------------------------------- adb básico
-def adb(*args: str, timeout: int = 60) -> str:
-    r = subprocess.run(["adb", "-s", SERIAL, *args], capture_output=True, text=True, timeout=timeout)
-    return r.stdout
+def reconectar() -> bool:
+    """El OPPO va por Tailscale y a ratos sale «offline» (2/11): reconecta y comprueba con un echo."""
+    for _ in range(6):
+        try:
+            subprocess.run(["adb", "disconnect", SERIAL], capture_output=True, timeout=10)
+            subprocess.run(["adb", "connect", SERIAL], capture_output=True, timeout=20)
+            r = subprocess.run(["adb", "-s", SERIAL, "shell", "echo", "ok"], capture_output=True, text=True, timeout=10)
+            if r.stdout.strip() == "ok":
+                return True
+        except subprocess.TimeoutExpired:
+            pass
+        time.sleep(5)
+    return False
+
+
+def adb_run(args: list, timeout: int = 25, text: bool = True):
+    """adb con reintento: si se cuelga o sale offline, reconecta y repite (antes moría a los 60 s)."""
+    for intento in range(4):
+        try:
+            r = subprocess.run(["adb", "-s", SERIAL, *args], capture_output=True, text=text, timeout=timeout)
+            err = r.stderr if text else r.stderr.decode(errors="ignore")
+            if not re.search(r"device offline|not found|no devices|closed", err):
+                return r
+        except subprocess.TimeoutExpired:
+            pass
+        print(f"  adb caído ({' '.join(args[:3])}): reconecto [{intento + 1}/4]", flush=True)
+        reconectar()
+    raise SystemExit("ADB: el móvil no responde tras 4 reconexiones")
+
+
+def adb(*args: str, timeout: int = 25) -> str:
+    return adb_run(list(args), timeout).stdout
+
+
+def screencap() -> bytes:
+    """PNG completo o reintento: si el ADB se corta a mitad llega vacío o truncado (2/11)."""
+    for _ in range(4):
+        png = adb_run(["exec-out", "screencap", "-p"], 30, text=False).stdout
+        if png[:8] == b"\x89PNG\r\n\x1a\n" and png.rstrip().endswith(b"IEND\xaeB`\x82"):
+            return png
+        reconectar()
+    return png
 
 
 def tap(x: int, y: int, espera: float = 1.5) -> None:
@@ -77,9 +116,10 @@ def escribir(texto: str) -> None:
 
 
 def nodos() -> list[dict]:
-    adb("shell", "uiautomator", "dump", "/sdcard/u.xml")
-    xml = adb("shell", "cat", "/sdcard/u.xml")
-    adb("shell", "rm", "-f", "/sdcard/u.xml")
+    xml = adb("exec-out", "uiautomator", "dump", "/dev/tty", timeout=30)   # 1 llamada en vez de 3
+    if "<node" not in xml:
+        adb("shell", "uiautomator", "dump", "/sdcard/u.xml", timeout=30)
+        xml = adb("shell", "cat", "/sdcard/u.xml")
     out = []
     for m in re.finditer(r"<node [^>]*>", xml):
         n = m.group(0)
@@ -115,8 +155,11 @@ def pulsar(patron: str, espera: float = 2.0) -> bool:
 def captura(nombre: str = "s") -> None:
     from PIL import Image
 
-    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
-    im = Image.open(io.BytesIO(png)).convert("RGB")
+    try:   # la captura es para revisar: si falla no debe tumbar la fase
+        im = Image.open(io.BytesIO(screencap())).convert("RGB")
+    except Exception as e:
+        print(f"captura {nombre}: falló ({e})")
+        return
     im.resize((im.width // 3, im.height // 3)).save(TMP / "sh" / f"{nombre}.jpg", quality=80)
     print(f"captura: {TMP / 'sh' / (nombre + '.jpg')}")
 
@@ -125,7 +168,7 @@ def texto_pantalla() -> str:
     """Texto de la mitad de arriba por OCR (la lista de productos no sale en el volcado)."""
     from PIL import Image
 
-    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
+    png = screencap()
     im = Image.open(io.BytesIO(png)).convert("L")
     im.crop((0, 0, im.width, im.height // 2)).save(TMP / "sh" / "ocr.png")
     return subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
@@ -136,7 +179,7 @@ def texto_zona(y0: int, y1: int) -> str:
     """OCR de una franja horizontal (coordenadas reales de la pantalla)."""
     from PIL import Image
 
-    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
+    png = screencap()
     Image.open(io.BytesIO(png)).convert("L").crop((0, y0, 1440, y1)).save(TMP / "sh" / "ocr.png")
     return subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
                           capture_output=True, text=True).stdout
@@ -148,7 +191,7 @@ def sin_resultados() -> bool:
 
     if buscar(r"No se han encontrado", intentos=1):
         return True
-    png = subprocess.run(["adb", "-s", SERIAL, "exec-out", "screencap", "-p"], capture_output=True).stdout
+    png = screencap()
     im = Image.open(io.BytesIO(png)).convert("L")
     im.crop((0, int(im.height * .25), im.width, int(im.height * .5))).save(TMP / "sh" / "ocr.png")
     t = subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
@@ -163,7 +206,15 @@ def mcp(herramienta: str, argumentos: dict) -> dict:
               "params": {"name": herramienta, "arguments": argumentos}}
     req = urllib.request.Request(url, json.dumps(cuerpo).encode(), {
         "Content-Type": "application/json", "Accept": "application/json, text/event-stream"})
-    r = json.load(urllib.request.urlopen(req, timeout=120))
+    for intento in range(3):   # la factory a veces no contesta (2/11): reintenta en vez de tirar la fase
+        try:
+            r = json.load(urllib.request.urlopen(req, timeout=90))
+            break
+        except (TimeoutError, OSError) as e:
+            if intento == 2:
+                raise SystemExit(f"MCP {herramienta}: sin respuesta ({e})")
+            print(f"  MCP {herramienta} sin respuesta: reintento", flush=True)
+            time.sleep(10)
     texto = r["result"]["content"][0]["text"]
     if r["result"].get("isError"):
         raise SystemExit(f"MCP {herramienta}: {texto}")
@@ -229,7 +280,8 @@ def al_escaparate(pid: str) -> bool:
             sin_stock(pid, "«Sin existencias» en la ficha (6_panel)")
         if buscar(r"Información de la promoción", intentos=1):
             break
-    if buscar(r"(Añadido al escaparate|En el escaparate|Quitar del escaparate)", intentos=1):
+    # ya añadido: el botón del panel pasa a «Descubrir más» (2/11, comprobado en el OPPO)
+    if buscar(r"(Añadido al escaparate|En el escaparate|Quitar del escaparate|Descubrir más)", intentos=1):
         return True
     if not pulsar(r"Añadir al escaparate", 4):
         # Al deslizar sube el panel «Información de la promoción»: ahí sale el stock y el botón
@@ -283,13 +335,19 @@ def lote() -> None:
             if not c.get("subido") and not c.get("sin_stock")]
 
     def uno(c: dict) -> str:
+        try:
+            return _uno(c)
+        except Exception as e:   # uno raro (sin ZIP, sin título…) no debe tumbar el lote
+            return f"{c.get('id')} · ERROR {e!r}"
+
+    def _uno(c: dict) -> str:
         d = TMP / c["id"]
         d.mkdir(parents=True, exist_ok=True)
         (d / "datos.json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
         if not any(d.glob("0*")):
             bajar_fotos(c, d)
         pid = pid_de(c)
-        return f"{c['id']} · {len(list(d.glob('0*')))} fotos · {pid} · {c['musica']['tiktok']['titulo']} · {' '.join(c['titulo'].split())}"
+        return f"{c['id']} · {len(list(d.glob('0*')))} fotos · {pid} · {((c.get('musica') or {}).get('tiktok') or {}).get('titulo')} · {' '.join((c.get('titulo') or '').split())}"
 
     with ThreadPoolExecutor(8) as ex:
         for linea in ex.map(uno, pend):
@@ -306,8 +364,12 @@ def preparar(cid: str) -> None:
         bajar_fotos(c, d)
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
     print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']}")
-    # Fuera del escaparate el producto no sale al buscarlo por ID: se añade antes de abrir el editor.
-    if not al_escaparate(pid_de(c)):
+    # La ficha del escaparate solo se abre si el producto ya falló al buscarlo por ID (marca de producto()):
+    # el producto se añade en el propio vídeo por su ID (Néstor, 2/11), y abrir la ficha costaba 1-2 min.
+    pid = pid_de(c)
+    if SIN_STOCK.exists() and pid in SIN_STOCK.read_text().split():
+        raise SystemExit(f"{pid}: ya visto sin existencias → sin stock, saltar")
+    if (TMP / f"escaparate_{pid}").exists() and not al_escaparate(pid):
         print("AVISO: no vi «Añadir al escaparate» ni que ya estuviera (mira 6_ficha); sigo")
     adb("shell", "am", "force-stop", PAQUETE)
 
@@ -417,6 +479,76 @@ def editor(cid: str) -> None:
     producto(cid)
 
 
+def rapido(cid: str) -> None:
+    """Vía rápida de Néstor (2/11): fotos al móvil → enlace del sonido → «Usar sonido» → galería → caption → producto.
+    Sin ficha del escaparate ni Favoritos (~7 min frente a ~11). Si algo no cuadra, sale con error y el
+    wrapper repite por la ruta normal (preparar + editor)."""
+    (TMP / f"inicio_{cid}").write_text(str(time.time()))
+    c = carrusel(cid)
+    d = TMP / cid
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "datos.json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
+    if not any(d.glob("0*")):
+        bajar_fotos(c, d)
+    pid = pid_de(c)
+    if SIN_STOCK.exists() and pid in SIN_STOCK.read_text().split():
+        raise SystemExit(f"{pid}: ya visto sin existencias → sin stock, saltar")
+    locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
+    print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']} (vía rápida)")
+    adb("shell", "am", "force-stop", PAQUETE)
+    limpiar()
+    adb("shell", "mkdir", "-p", CARPETA_MOVIL)
+    for p in locales:
+        destino = f"{CARPETA_MOVIL}/{cid}_{p.name}"
+        adb("push", str(p), destino)
+        adb("shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+            "-d", f"file://{destino}")
+    adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
+        "-d", c["musica"]["tiktok"]["enlace"], PAQUETE)
+    time.sleep(7)
+    for _ in range(3):                    # «Hubo un problema» al abrir en frío: «Volver a intentar»
+        if pulsar(r"^Usar sonido$", 4):
+            break
+        pulsar(r"^Volver a intentar$", 5)
+    else:
+        captura("r_sonido")
+        raise SystemExit("No veo «Usar sonido» (mira r_sonido)")
+    time.sleep(3)
+    tap(141, 2991, 3)                     # galería (miniatura abajo a la izquierda)
+    if not any(n["text"] == "carr_tmp" and n["y"] < 400 for n in nodos()):
+        tap(688, 243, 2)
+        if not pulsar(r"^carr_tmp$", 3):
+            raise SystemExit("No encuentro el álbum carr_tmp")
+    if not buscar(r"Siguiente", intentos=1):
+        pulsar(r"Selección múltiple")
+    for i in range(len(locales)):
+        fila, col = divmod(i, 3)
+        tap(417 + 477 * col, 552 + 483 * fila, 1)
+    captura("1_seleccion")
+    if not pulsar(rf"Siguiente \({len(locales)}\)", 5):
+        raise SystemExit("No veo «Siguiente (N)»: revisa la selección")
+    if not any("Sonido original" in n["text"] or n["desc"] == "Música" for n in nodos()):
+        print("AVISO: no veo el sonido puesto en el editor")
+    captura("2_sonido")
+    copiar_caption(c)                     # Keep y vuelta: el editor sigue igual
+    pulsar(r"^Siguiente$", 4)
+    tap(700, 980, 2)
+    tecla(113, 50)                        # Ctrl+V
+    time.sleep(1)
+    inicio = c["caption"][:20]
+    texto = next((html.unescape(n["text"]) for n in nodos()
+                  if n["clase"].endswith("EditText") and inicio in html.unescape(n["text"])), "")
+    if not texto:
+        raise SystemExit("El caption no se pegó")
+    sobra = texto.find(inicio)
+    if sobra > 0:
+        tecla(113, 122)
+        for _ in range(sobra):
+            tecla(112)
+    pulsar(r"^Listo$", 2)
+    producto(cid)
+
+
 def al_editor() -> None:
     """Atrás desde publicar: a veces pasa por «Vista previa» (con «Editar fotos»)."""
     tap(96, 237, 3)
@@ -480,6 +612,7 @@ def producto(cid: str) -> None:
     if re.search(r"Sin existencias|Existencias: ?0\b", texto_pantalla()):
         sin_stock(pid, "«Sin existencias» en el escaparate (3_producto)")
     if sin_resultados():
+        (TMP / f"escaparate_{pid}").write_text("1")   # el reintento de preparar abrirá la ficha y lo añadirá
         raise SystemExit(f"{pid} no sale al buscarlo: no está en el escaparate (mira 6_ficha de preparar)")
     campo = []
     for y in (840, 1044):                 # «Añadir» del único resultado: su altura cambia (la lista no sale en el dump)
@@ -542,8 +675,19 @@ def producto(cid: str) -> None:
 
 
 def publicar(cid: str) -> None:
-    if not pulsar(r"^Publicar$", 10):
+    # Publicar se pulsa UNA sola vez (repetir = duplicado). Si no se ve (ADB caído a mitad), reconecta y mira otra vez.
+    n = buscar(r"^Publicar$")
+    if not n:
+        reconectar(); time.sleep(3)
+        n = buscar(r"^Publicar$")
+    if not n:
+        captura()
         raise SystemExit("No veo el botón Publicar")
+    try:   # sin reintento: si este toque se repitiera, publicaría dos veces
+        subprocess.run(["adb", "-s", SERIAL, "shell", "input", "tap", str(n["x"]), str(n["y"])], capture_output=True, timeout=25)
+    except subprocess.TimeoutExpired:
+        print("AVISO: el toque de Publicar se colgó; NO se repite (mira la cuenta)")
+    time.sleep(10)
     r = mcp("marcar_tanda", {"id": cid, "subido": True, "fotos": True})
     print("subido en la app:", r.get("subido"))
     ini = TMP / f"inicio_{cid}"
@@ -566,4 +710,4 @@ def limpiar() -> None:
 if __name__ == "__main__":
     (TMP / "sh").mkdir(parents=True, exist_ok=True)
     fase, *resto = sys.argv[1:]
-    {"lote": lote, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[fase](*resto)
+    {"lote": lote, "rapido": rapido, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[fase](*resto)

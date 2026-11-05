@@ -113,7 +113,7 @@
 }
 
 # El :80 ya NO sirve la app: manda al dominio. Entrar por
-# `http://62.238.19.31` dejaba la herramienta abierta a cualquiera que probara
+# `http://13.140.211.41` dejaba la herramienta abierta a cualquiera que probara
 # la IP, y en claro. Ahora rebota a la puerta buena, que va por HTTPS.
 #
 # El reto de Let's Encrypt sigue funcionando: Caddy atiende
@@ -143,7 +143,7 @@
 # Eso significa que quien tenga esta dirección entra: es la misma exposición
 # que ya tenía la del Funnel, ni más ni menos. Si algún día se quiere puerta,
 # el puente `juegos-bridge.socket` (172.18.0.1:8091) ya la sirve.
-{$DOMAIN_PUBLICO:62-238-19-31.sslip.io} {
+{$DOMAIN_PUBLICO:13-140-211-41.sslip.io} {
 	import app
 }
 
@@ -206,3 +206,15 @@ dot.nebulabsmedia.com {
 # ruta /api/*. No hace falta un subdominio dedicado por ahora. Si en el futuro
 # se quiere `api.nebulabsmedia.com`, mover el DNS a un proveedor que no haga
 # catch-all (p. ej. Cloudflare) y reañadir aquí un bloque reverse_proxy api:8000.
+
+# 04/11/2026: la parte pública (TLS, web y links) está en vps-webs. vps-webs entra aquí por Tailscale
+# (100.96.125.108:8080, solo desde el tailnet) para todo lo que vive en este servidor.
+http://:8080 {
+	@dot host dot.nebulabsmedia.com
+	handle @dot {
+		reverse_proxy 172.18.0.1:8793 {
+			flush_interval -1
+		}
+	}
+	import app
+}
