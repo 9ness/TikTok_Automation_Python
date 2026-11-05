@@ -55,8 +55,10 @@ if DESDE != 'video':
     time.sleep(3)
     if not any(x['clase'].endswith('EditText') for x in m.nodos()):
         m.tap(540, 1278, 4)                   # «Vídeos» de «¿Cómo quieres promocionar…?» (no sale en el volcado)
-    if ve(r'Añadir producto al', 2):          # diálogo nuevo (4/11): «¿Añadir producto al vídeo?» → «Añadir»
-        debe(r'^\s*Añadir$', 4)
+    for _ in range(3):                        # diálogo nuevo (4/11): «¿Añadir producto al vídeo?» → «Añadir»;
+        if any(x['clase'].endswith('EditText') for x in m.nodos()): break   # a veces tarda en salir (5/11)
+        if ve(r'Añadir producto al', 2):
+            debe(r'^\s*Añadir$', 4); break
     campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
     if not campo: falla('no sale «Cambiar nombre del producto»')
     for intento in range(2):                  # con el móvil cargado se cuela un espacio o se pierde una letra
@@ -107,8 +109,13 @@ if m.buscar(r'Añade una descripción', 1) and not any(re.search(r'#tiktokshop',
     falla('caption sin pegar')
 # el producto vinculado no sale en el volcado (allí solo está el caption, que también lo nombra):
 # OCR en la fila de debajo de «Vincula un producto»
-v = m.ocr(r'Vincula')
-prod = v and m.ocr(re.escape(nombre[:10]), (0, v[1], 1080, v[1] + 260))
+prod = None
+for _ in range(3):                            # a veces queda abierto el desplegable de #hashtags y tapa la fila
+    v = m.ocr(r'Vincula')
+    prod = v and m.ocr(re.escape(nombre[:10]), (0, v[1], 1080, v[1] + 260))
+    if prod: break
+    m.tap(850, 590, 1.5)                      # quita el foco del caption (cierra las sugerencias)
+    m.adb("shell","input","swipe","540","1400","540","800"); time.sleep(2)
 if not prod: falla('producto vinculado no coincide')
 foto(f'antes_{int(n):02d}')
 debe(r'^\s*Comprobar$', 4)
