@@ -39,6 +39,10 @@ AI_PRO_REL = os.getenv("AI_PRO_DRIVE_DIR", f"{PROYECTO_REL}/TIKTOK_SHOP_AI_PRO")
 # Carpeta de Creator Reward (antes TIKTOK_CR, con TIKTOK_ASSETS dentro).
 CR_REL = os.getenv("CR_DRIVE_DIR", f"{PROYECTO_REL}/TIKTOK_CR").strip().strip("/")
 
+# Material del curso (copias de «Productos España», paquetes, Skool). Antes colgaba
+# directamente de la carpeta del proyecto.
+CURSO_REL = os.getenv("CURSO_DRIVE_DIR", PROYECTO_REL).strip().strip("/")
+
 # Rutas viejas → dónde están ahora (relativas a la raíz del Drive, sin barra final).
 # Se aplican de la más larga a la más corta. Se pueden ampliar sin tocar código con
 # `DRIVE_ALIAS_JSON` ('{"viejo/prefijo": "nuevo/prefijo"}').
@@ -48,6 +52,16 @@ if PROYECTO_REL != "NEBULABS_AUTOMATED_TIKTOK":
 if AI_PRO_REL != f"{PROYECTO_REL}/TIKTOK_SHOP_AI_PRO":
     _ALIAS_BASE["NEBULABS_AUTOMATED_TIKTOK/TIKTOK_SHOP_AI_PRO"] = AI_PRO_REL
     _ALIAS_BASE[f"{PROYECTO_REL}/TIKTOK_SHOP_AI_PRO"] = AI_PRO_REL
+if CURSO_REL != PROYECTO_REL:
+    for _d in ("BACKUPS_Productos_Espana", "BACKUPS_Skool", "PAQUETE_Productos_Espana_2026-08-19"):
+        _ALIAS_BASE[f"NEBULABS_AUTOMATED_TIKTOK/{_d}"] = f"{CURSO_REL}/{_d}"
+        _ALIAS_BASE[f"{PROYECTO_REL}/{_d}"] = f"{CURSO_REL}/{_d}"
+# La TIKTOK_SHOP_AI_PRO que había suelta en la raíz del Drive (Nicho General la usaba
+# por error): se movió dentro del Programa 4.
+_ALIAS_BASE["TIKTOK_SHOP_AI_PRO"] = os.getenv(
+    "AI_PRO_RAIZ_VIEJA_DIR", "TIKTOK_SHOP_AI_PRO").strip().strip("/")
+if _ALIAS_BASE["TIKTOK_SHOP_AI_PRO"] == "TIKTOK_SHOP_AI_PRO":
+    del _ALIAS_BASE["TIKTOK_SHOP_AI_PRO"]
 if CR_REL != f"{PROYECTO_REL}/TIKTOK_CR":
     _ALIAS_BASE["NEBULABS_AUTOMATED_TIKTOK/TIKTOK_CR"] = CR_REL
     _ALIAS_BASE[f"{PROYECTO_REL}/TIKTOK_CR"] = CR_REL
