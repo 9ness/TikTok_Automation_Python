@@ -43,7 +43,12 @@ Compartir → Añadir a pantalla de inicio.
 
 La app **avisa sola** cuando hay una versión nueva: al arrancar compara su
 `versionCode` con el que va escrito en las notas de la release `apk-latest`, y
-si es mayor saca una notificación que lleva a la descarga.
+si es mayor saca una notificación. Desde la 3.4, tocarla **actualiza dentro de
+la app**: baja la APK a su caché (barra en la notificación) y la pasa al
+instalador de Android (`PackageInstaller`), que solo pregunta «¿Actualizar?».
+La primera vez Android pide activar «Instalar apps desconocidas» para la app;
+al volver atrás sigue sola. Si algo falla, abre la descarga en el navegador
+como antes (`Actualizaciones.java`).
 
 ## ¿Cuándo hay que regenerarla?
 

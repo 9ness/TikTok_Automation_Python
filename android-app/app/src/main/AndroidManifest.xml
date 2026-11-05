@@ -19,6 +19,10 @@
     <!-- Para poder PEDIR que no se le aplique el ahorro de batería, que es lo
          que más corta las tandas largas. Lo concede el usuario. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Actualizar sin salir al navegador: la app baja su APK nueva y se la
+         pasa al instalador (PackageInstaller). La primera vez Android pide
+         activar «Instalar apps desconocidas» para esta app. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Desde Android 11 una app no ve qué otras hay instaladas salvo que las
          declare. Sin esto, mandar la ficha a TikTok por su nombre de paquete

@@ -240,6 +240,24 @@ public class MainActivity extends Activity {
         // nueva, así que hay que avisar de que existe.
         Actualizaciones.comprobar(this);
         web.loadUrl(URL_APP);
+        atenderIntent(getIntent());
+    }
+
+    /** La app ya estaba abierta (`singleTask`): la notificación llega aquí. */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        atenderIntent(intent);
+    }
+
+    /** Tocar «Hay una versión nueva» y la respuesta del instalador. */
+    private void atenderIntent(Intent intent) {
+        if (intent == null || intent.getAction() == null) return;
+        if (Actualizaciones.ACCION_ACTUALIZAR.equals(intent.getAction())) {
+            Actualizaciones.actualizar(this);
+        } else if (Actualizaciones.ACCION_ESTADO.equals(intent.getAction())) {
+            Actualizaciones.resultado(this, intent);
+        }
     }
 
     /** Los dos paquetes con los que se publica TikTok. El segundo es el que
@@ -684,6 +702,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Volviendo de dar el permiso de «Instalar apps desconocidas».
+        Actualizaciones.alVolver(this);
         // Si al volver del selector la pantalla se había recreado, aquí es
         // donde llega por fin lo que se eligió.
         avisarDeLaSeleccion();
