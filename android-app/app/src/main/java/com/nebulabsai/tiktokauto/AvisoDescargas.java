@@ -5,7 +5,10 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.drawable.Icon;
@@ -60,6 +63,27 @@ class AvisoDescargas {
     /** Si está esperando a la red en vez de bajando, para decirlo en vez de
      *  dejar la barra congelada. */
     private boolean esperando = false;
+    /** Qué dice la pausa: "Esperando red", "El servidor falla, reintentando"…
+     *  Antes todo STATUS_PAUSED salía como "Esperando red", también cuando era
+     *  el servidor (5xx, enlace caducado) y la red estaba bien. */
+    private String motivoPausa = "";
+    /** Desde cuándo está en pausa cada descarga (id → elapsedRealtime). */
+    private final Map<Long, Long> pausadaDesde = new java.util.HashMap<>();
+    /** Las que se dieron por perdidas (tope en pausa o «Cancelar»). */
+    private int fallidas = 0;
+    /** Néstor la quitó: no se vuelve a publicar hasta que haya un cambio de
+     *  verdad (otro fichero terminado o cancelado). Antes se republicaba cada
+     *  700 ms y era imposible quitarla (5/11/2026). */
+    private boolean quitada = false;
+    private int terminadasAlQuitar = 0;
+    /** Lo último publicado, para no re-notificar si no ha cambiado nada. */
+    private String ultimoPintado = "";
+
+    /** Una descarga que lleva más de esto en pausa se cancela y se avisa:
+     *  quedarse para siempre en "esperando" no ayuda a nadie. */
+    private static final long TOPE_PAUSA_MS = 10 * 60_000;
+    private static final String ACCION_CANCELAR = "com.nebulabsai.tiktokauto.CANCELAR_DESCARGAS";
+    private static final String ACCION_QUITADA = "com.nebulabsai.tiktokauto.AVISO_QUITADO";
 
     /** Dos descargas separadas por menos de esto son la MISMA tanda.
      *
@@ -80,6 +104,49 @@ class AvisoDescargas {
             CANAL, "Descargas", NotificationManager.IMPORTANCE_LOW);
         canal.setDescription("Vídeos y fotos que se están bajando");
         avisos.createNotificationChannel(canal);
+
+        BroadcastReceiver botones = new BroadcastReceiver() {
+            @Override public void onReceive(Context c, Intent i) {
+                if (ACCION_CANCELAR.equals(i.getAction())) cancelarTodo();
+                else if (ACCION_QUITADA.equals(i.getAction())) quitadaPorUsuario();
+            }
+        };
+        IntentFilter f = new IntentFilter();
+        f.addAction(ACCION_CANCELAR);
+        f.addAction(ACCION_QUITADA);
+        if (Build.VERSION.SDK_INT >= 33) {
+            this.ctx.registerReceiver(botones, f, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            this.ctx.registerReceiver(botones, f);
+        }
+    }
+
+    /** Botón «Cancelar»: borra del gestor lo que quede y cierra la tanda. */
+    private synchronized void cancelarTodo() {
+        // Cada MainActivity crea su AvisoDescargas y todas oyen el botón: la
+        // que no lleva ninguna tanda no pinta nada (sacaría "Bajando 0").
+        if (lanzadas <= 0) return;
+        if (!enMarcha.isEmpty()) {
+            long[] ids = new long[enMarcha.size()];
+            int i = 0;
+            for (Long id : enMarcha.keySet()) ids[i++] = id;
+            try { gestor.remove(ids); } catch (Exception ignorada) { }
+            fallidas += enMarcha.size();
+            terminadas += enMarcha.size();
+            enMarcha.clear();
+            pausadaDesde.clear();
+        }
+        // Las de la app (blob:) no se pueden parar desde aquí; se cierran en la cuenta.
+        if (terminadas < lanzadas) { fallidas += lanzadas - terminadas; terminadas = lanzadas; }
+        quitada = false;
+        esperando = false;
+        pintar();
+    }
+
+    private synchronized void quitadaPorUsuario() {
+        quitada = true;
+        terminadasAlQuitar = terminadas;
+        ultimoPintado = "";
     }
 
     /** Una descarga que lleva el gestor de Android (fichero por URL). */
@@ -91,6 +158,7 @@ class AvisoDescargas {
         // 17" al bajar una carpeta de 10 (los 10 de antes + los 7 de ahora).
         apuntar(nombre);
         enMarcha.put(id, nombre);
+        quitada = false;
         arrancarVigilancia();
     }
 
@@ -113,6 +181,7 @@ class AvisoDescargas {
             && ahora - ultimaAlta > VENTANA_TANDA_MS) {
             lanzadas = 0;
             terminadas = 0;
+            fallidas = 0;
         }
         ultimaAlta = ahora;
         lanzadas += 1;
@@ -154,7 +223,9 @@ class AvisoDescargas {
         // para siempre: la notificación se congelaba en "bajando 1 archivo".
         java.util.Set<Long> vistas = new java.util.HashSet<>();
         boolean algunaEsperando = false;
+        String motivo = "";
         boolean preguntaOk = false;
+        long ahora = android.os.SystemClock.elapsedRealtime();
 
         try (Cursor c = gestor.query(q)) {
             while (c != null && c.moveToNext()) {
@@ -163,7 +234,32 @@ class AvisoDescargas {
                 int estado = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
                 // Parada esperando red o esperando a reintentar. Se queda viva
                 // y sin avanzar, que es lo que parece "trabado".
-                if (estado == DownloadManager.STATUS_PAUSED) algunaEsperando = true;
+                if (estado == DownloadManager.STATUS_PAUSED) {
+                    algunaEsperando = true;
+                    int razon = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON));
+                    String m;
+                    switch (razon) {
+                        case DownloadManager.PAUSED_WAITING_FOR_NETWORK: m = "Esperando red"; break;
+                        case DownloadManager.PAUSED_QUEUED_FOR_WIFI: m = "Esperando wifi"; break;
+                        case DownloadManager.PAUSED_WAITING_TO_RETRY: m = "El servidor no responde, reintentando"; break;
+                        default: m = "En pausa";
+                    }
+                    if (motivo.isEmpty()) motivo = m;
+                    Long desde = pausadaDesde.get(id);
+                    if (desde == null) {
+                        pausadaDesde.put(id, ahora);
+                    } else if (ahora - desde > TOPE_PAUSA_MS) {
+                        // Demasiado tiempo parada: se cancela y se cuenta como fallida.
+                        try { gestor.remove(id); } catch (Exception ignorada) { }
+                        enMarcha.remove(id);
+                        pausadaDesde.remove(id);
+                        terminadas += 1;
+                        fallidas += 1;
+                        continue;
+                    }
+                } else {
+                    pausadaDesde.remove(id);
+                }
                 long lleva = c.getLong(
                     c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
                 long mide = c.getLong(
@@ -171,7 +267,9 @@ class AvisoDescargas {
                 if (estado == DownloadManager.STATUS_SUCCESSFUL
                     || estado == DownloadManager.STATUS_FAILED) {
                     enMarcha.remove(id);
+                    pausadaDesde.remove(id);
                     terminadas += 1;
+                    if (estado == DownloadManager.STATUS_FAILED) fallidas += 1;
                     continue;
                 }
                 if (mide > 0) {
@@ -195,13 +293,16 @@ class AvisoDescargas {
         if (preguntaOk) {
             java.util.Iterator<Long> it = enMarcha.keySet().iterator();
             while (it.hasNext()) {
-                if (!vistas.contains(it.next())) {
+                Long sig = it.next();
+                if (!vistas.contains(sig)) {
                     it.remove();
+                    pausadaDesde.remove(sig);
                     terminadas += 1;
                 }
             }
         }
         esperando = algunaEsperando;
+        motivoPausa = motivo;
 
         pintar(bytesActivo, totalActivo, nombreActivo, fraccion);
 
@@ -223,8 +324,12 @@ class AvisoDescargas {
         String titulo;
         String detalle;
         if (acabado) {
-            titulo = (lanzadas == 1 ? "1 archivo listo" : lanzadas + " archivos listos");
-            detalle = lanzadas == 1 ? ultimoNombre : "Toca para abrir la carpeta";
+            int bien = Math.max(0, lanzadas - fallidas);
+            titulo = (bien == 1 ? "1 archivo listo" : bien + " archivos listos");
+            detalle = fallidas > 0
+                ? (fallidas == 1 ? "1 no se pudo bajar" : fallidas + " no se pudieron bajar")
+                    + " · vuelve a bajarlos desde la web"
+                : (lanzadas == 1 ? ultimoNombre : "Toca para abrir la carpeta");
         } else {
             int quedan = Math.max(0, lanzadas - terminadas);
             titulo = quedan == 1 ? "Bajando 1 archivo" : "Bajando " + quedan + " archivos";
@@ -234,7 +339,9 @@ class AvisoDescargas {
                 + cual;
             // Decirlo cambia mucho: una barra parada parece la app colgada,
             // y "esperando red" es algo que se puede arreglar.
-            if (esperando) titulo = "Esperando red · " + titulo.toLowerCase();
+            if (esperando) {
+                titulo = (motivoPausa.isEmpty() ? "En pausa" : motivoPausa) + " · " + titulo.toLowerCase();
+            }
         }
 
         RemoteViews vista = new RemoteViews(ctx.getPackageName(), R.layout.aviso_descargas);
@@ -265,6 +372,17 @@ class AvisoDescargas {
             }
         }
 
+        // Si la quitó, no se vuelve a sacar hasta que haya un cambio de verdad
+        // (otro fichero terminado o la tanda acabada).
+        if (quitada && !acabado && terminadas == terminadasAlQuitar) return;
+        if (quitada && (acabado || terminadas != terminadasAlQuitar)) quitada = false;
+        // Lo mismo que ya está publicado no se vuelve a publicar.
+        // Mientras está en pausa la barra no se mueve: re-publicar cada 700 ms
+        // lo mismo solo hacía que reapareciera. Bajando sí, que avanza.
+        String huella = titulo + "|" + detalle + "|" + acabado;
+        if (esperando && huella.equals(ultimoPintado)) return;
+        ultimoPintado = huella;
+
         Notification.Builder n = new Notification.Builder(ctx, CANAL)
             .setSmallIcon(R.drawable.ic_descarga)
             // Tiñe el icono y la cabecera con el cian de la marca.
@@ -274,8 +392,14 @@ class AvisoDescargas {
             .setCustomContentView(vista)
             .setOnlyAlertOnce(true)
             .setContentIntent(abrirDescargas())
+            .setDeleteIntent(difusion(ACCION_QUITADA, 2))
             .setAutoCancel(acabado)
             .setOngoing(!acabado);
+        if (!acabado) {
+            n.addAction(new Notification.Action.Builder(
+                Icon.createWithResource(ctx, R.drawable.ic_descarga),
+                "Cancelar", difusion(ACCION_CANCELAR, 1)).build());
+        }
         if (acabado) {
             // Al terminar, un botón para ir a los ficheros sin buscarlos.
             n.addAction(new Notification.Action.Builder(
@@ -289,6 +413,12 @@ class AvisoDescargas {
     private static String megas(long bytes) {
         double mb = bytes / 1024d / 1024d;
         return (mb >= 10 ? String.valueOf(Math.round(mb)) : String.format("%.1f", mb)) + " MB";
+    }
+
+    private PendingIntent difusion(String accion, int codigo) {
+        Intent i = new Intent(accion).setPackage(ctx.getPackageName());
+        return PendingIntent.getBroadcast(
+            ctx, codigo, i, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     /** Al tocar la notificación se abre la lista de descargas del móvil. */
