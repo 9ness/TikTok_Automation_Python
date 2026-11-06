@@ -1415,3 +1415,4 @@
 - 2026-11-06 · pedidos.py llevaba el swipe del Oppo (y=2700, fuera de pantalla en el Mi 8) → coordenadas según wm size
 - 2026-11-06 · pedidos.py solo cogía importes en € y perdía los de Polonia (zł), y no marcaba «Anuncios de la tienda» → lee cualquier moneda y marca anuncio; pedidos_sumar.py pasa a € y suma por ID sin duplicar
 - 2026-11-06 · `crontab <fichero>` con ruta de más de ~100 caracteres la corta, da «No such file» y no cambia nada → instalar con `crontab - < fichero` y comprobar con `crontab -l`.
+- 2026-11-06 · vídeos con bandas negras dentro de un MP4 1080x1920 (Flow dejado en 3:4 por carruseles, sin confirmar en origen) → regla general vídeo 9:16 / carrusel 3:4 y cropdetect antes del semáforo

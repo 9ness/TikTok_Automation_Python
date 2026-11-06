@@ -4,7 +4,7 @@ Lee antes [`README.md`](README.md) y las tres guías de [`comun/`](comun/).
 
 ## Qué sale
 
-**No hay vídeo.** Un carrusel de **DOS fotos 9:16** por producto, con un
+**No hay vídeo.** Un carrusel de **DOS fotos 3:4** por producto, con un
 mensaje quemado encima de cada una (lo hace la app con PIL, sin cola larga):
 
 - **Foto 1 — la chica sorprendida.** NO depende del producto, solo del
@@ -43,7 +43,7 @@ permiso.
    Se adjunta **SIEMPRE** en Flow con el prompt. Algunos escenarios tienen su
    propia referencia en su tarjeta: si la hay, usa esa.
 2. Por cada **escenario** con «faltan N»: copia su **«Prompt»** → Flow,
-   imagen, Nano Banana 2, **9:16**, adjunta la referencia + pega. Genera N
+   imagen, Nano Banana 2, **3:4**, adjunta la referencia + pega. Genera N
    imágenes (una por generación, o varias si Flow lo deja sin gastar de más).
    Revisa: chica adulta, cara de sorpresa natural, el sitio correcto, sin
    texto ni marcas, manos bien.
@@ -54,7 +54,7 @@ permiso.
 1. Descarga las fotos limpias: **«Esta carpeta (N)»** o por **categoría**
    (las de categoría son de TODOS los catálogos, solo las que aún no tienen
    foto 2).
-2. Copia el prompt de la categoría → Flow, imagen, 9:16, adjunta **la foto
+2. Copia el prompt de la categoría → Flow, imagen, 3:4, adjunta **la foto
    limpia de ESE producto** + pega. Una imagen por producto. Revisa con
    [`revision-calidad.md`](comun/revision-calidad.md) (producto idéntico,
    texto del envase sin inventar). Nombra el fichero con el número y título del

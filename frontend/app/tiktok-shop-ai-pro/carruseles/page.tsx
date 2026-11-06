@@ -605,7 +605,7 @@ export default function CarruselesPage() {
           <p className="text-center text-[10px] text-muted-foreground">
             En Flow: adjunta la foto de referencia + el prompt del escenario, en formato{" "}
             <span className="font-semibold text-cyan-500">
-              {prompts.data?.formato ?? "9:16"}
+              {prompts.data?.formato ?? "3:4"}
             </span>
             . Cada escenario va por su lado: una chica del sofá no vale para un producto
             de jardín.

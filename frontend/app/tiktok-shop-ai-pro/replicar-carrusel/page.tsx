@@ -337,7 +337,7 @@ function CarruselAbierto({ doc }: { doc: CarruselReplica }) {
         n={2}
         color="fucsia"
         titulo="Genera las fotos en Flow y súbelas"
-        hint={`Una por diapositiva, en formato ${doc.formato}. Donde dice «con foto del producto», adjunta su foto limpia en Flow. Al subirla, la app le pone el texto.`}
+        hint={`Una por diapositiva, en formato 3:4. Donde dice «con foto del producto», adjunta su foto limpia en Flow. Al subirla, la app le pone el texto.`}
         extra={`${doc.hechas}/${doc.total}`}
       >
         {doc.original?.tema && (

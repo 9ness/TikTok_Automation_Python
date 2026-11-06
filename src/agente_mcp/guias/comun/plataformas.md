@@ -8,7 +8,7 @@ abierta en el navegador). Luego el clip vuelve a la app para que lo edite.
 
 | Qué | Dónde | Notas |
 |---|---|---|
-| **Todas las imágenes** | **Google Flow** · modelo Nano Banana 2 · 9:16 | Salvo Creativos Pro, que va en 3:4 |
+| **Todas las imágenes** | **Google Flow** · modelo Nano Banana 2 | **Regla general, todas las cuentas: lo que va a vídeo, 9:16; carruseles y Creativos Pro, 3:4** |
 | Clip que **habla** (la voz va dentro del clip) | **GenAI Pro · Omni 1.1** (o Google Flow · Omni) | Omni locuta. 10 s |
 | Clip **mudo** (la voz la pone la app, o va sin voz) | **GenAI Pro · Veo** (1 crédito) | **No uses Omni**: su ventaja es el sonido y aquí se descarta. Ver tabla de abajo |
 
@@ -45,9 +45,12 @@ mismo proyecto: se satura y se congela.
 ### Imagen (Nano Banana 2)
 
 1. Modo de **crear imagen**, modelo **Nano Banana 2**, formato **9:16
-   vertical** (3:4 en Creativos Pro). **1 resultado por prompt** (no 2 ni 4:
-   gasta el doble y no hace falta). **Compruébalo cada vez que se reinicie
-   el navegador**: Flow vuelve a 4:3 horizontal y las imágenes salen
+   vertical** para vídeo y **3:4** para carruseles y Creativos Pro. **1 resultado por prompt** (no 2 ni 4:
+   gasta el doble y no hace falta). **Compruébalo SIEMPRE antes de generar**:
+   Flow recuerda el último formato y otro agente puede haberlo dejado en 3:4
+   (vídeos con bandas negras, 6/11/2026). Antes del semáforo, `cropdetect` de
+   ffmpeg debe dar 1080:1920: el tamaño del MP4 no lo delata. Al reiniciar
+   el navegador, Flow vuelve a 4:3 horizontal y las imágenes salen
    apaisadas (1200×896); un clip hecho desde una imagen apaisada sale con
    bandas negras y hay que tirarlo (oct 2026, 4 créditos de GenAI Pro).
    Mira el tamaño de lo que bajas: vertical es 768×1376.

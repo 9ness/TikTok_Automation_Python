@@ -46,7 +46,7 @@ from src.rutas_drive import AI_PRO_REL
 
 # Las fotos salen de Flow en vertical, como el vídeo. Se enseña al lado del
 # prompt porque el generador no lo deduce del texto.
-FORMATO = "9:16"
+FORMATO = "3:4"
 
 # ---------------------------------------------------------------------------
 # Qué productos valen y DÓNDE está la chica
