@@ -12,6 +12,8 @@ export interface ProductoMes {
   ventas: number;
   /** Tipo de producto (suplementos, hogar…), puesto al leerlo. */
   tipo?: string;
+  /** Pedidos del producto por origen («Vídeo», «Carrusel», «Anuncios»…). */
+  origen?: Record<string, number>;
 }
 
 export interface MesStats {

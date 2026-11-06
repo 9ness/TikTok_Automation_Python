@@ -85,6 +85,23 @@ function Seccion({ id, titulo, children }: { id: string; titulo: string; childre
   );
 }
 
+/** Suma los pedidos por origen de un mismo producto en varios meses. */
+function sumarOrigen(a?: Record<string, number>, b?: Record<string, number>) {
+  if (!a || !b) return a ?? b;
+  const out = { ...a };
+  for (const [k, v] of Object.entries(b)) out[k] = (out[k] ?? 0) + v;
+  return out;
+}
+
+/** « · 3 Vídeo · 1 Carrusel», de más a menos pedidos; sin datos, nada. */
+function textoOrigen(origen?: Record<string, number>) {
+  return Object.entries(origen ?? {})
+    .filter(([, n]) => n > 0)
+    .sort((x, y) => y[1] - x[1])
+    .map(([k, n]) => ` · ${n} ${k}`)
+    .join("");
+}
+
 export default function EstadisticasPage() {
   const me = useMe();
   const permitido = USUARIOS.includes(me.data?.username ?? "");
@@ -130,7 +147,7 @@ export default function EstadisticasPage() {
         const k = `${p.titulo}|${p.pais}`;
         const prev = por.get(k);
         por.set(k, prev
-          ? { ...prev, gmv: prev.gmv + p.gmv, ventas: prev.ventas + p.ventas, meses: prev.meses + 1 }
+          ? { ...prev, gmv: prev.gmv + p.gmv, ventas: prev.ventas + p.ventas, meses: prev.meses + 1, origen: sumarOrigen(prev.origen, p.origen) }
           : { ...p, meses: 1 });
       }
     }
@@ -434,7 +451,7 @@ export default function EstadisticasPage() {
                   <span className="w-5 shrink-0 text-muted-foreground">{i + 1}</span>
                   <span className="min-w-0 flex-1 break-words">
                     {p.titulo}
-                    <span className="ml-1 text-muted-foreground">· {p.pais}{p.tipo ? ` · ${p.tipo}` : ""}</span>
+                    <span className="ml-1 text-muted-foreground">· {p.pais}{p.tipo ? ` · ${p.tipo}` : ""}{textoOrigen(p.origen)}</span>
                   </span>
                   <span className="shrink-0 text-right font-medium">
                     {eur(p.gmv)}<br /><span className="text-muted-foreground">{p.ventas} v.</span>
