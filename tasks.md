@@ -1,4 +1,5 @@
 ## Pendiente
+- [ ] `mis_tandas(fotos=True)`: calcular `tareas` en `src/mis_tandas/fotos.py` como en los vídeos; hoy el filtro de la tarea GSBF no sale en carruseles y hay que casar por ID (6/11/2026)
 - [ ] (5/11/2026) Medir el corte del próximo despliegue con el arreglo de salida inmediata (esperado ~25-30 s); si sigue alto, mirar `docker events`.
 - [ ] (5/11/2026) A/B de Haiku (esfuerzo bajo) para escenas UGC (`nicho_general/escenas.py`) y guiones de ropa (`nicho_ropa/guionista.py`): hoy en `guion_pro` (Sonnet). Si sale igual, pasarlos a `guion`.
 - [ ] (5/11/2026) Despliegue blue-green de verdad (aparcado): separar el worker de la cola del proceso HTTP (servicio `worker`) para poder tener dos API a la vez sin ejecutar trabajos dos veces.
