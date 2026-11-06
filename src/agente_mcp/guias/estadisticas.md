@@ -58,6 +58,8 @@ No lo hagas a mano: está todo resuelto y un mes tarda ~3 min.
   distintos, porque el círculo y el globo del punto tapan la línea.
   Comprobado en mayo: suma de ventas 32 = total del mes, GMV ±0,5 %.
 - `conv.py` junta los `m_*.json` en `doc.json` con números y `tipo`.
+- **Cada día** (Néstor, 6/11/2026): Casca Chollos, Ama Shop y la cuenta árabe leen los pedidos de ayer en su rutina y los suman en Factory.
+  `MOVIL_ADB=<móvil>` elige el móvil. Se llevan los id ya sumados en un fichero para no duplicar, y `origen`/`contenidos` se mandan enteros (lo guardado + lo nuevo).
 - `pedidos.py salida.json` → un registro por pedido de **Perfil › Ganancias ›
   Pedidos de afiliados** (pestaña **Todo**, rango máx. 90 días; Néstor empezó
   en agosto, no hace falta antes). Lleva estado, tipo (Vídeo / Carousel /

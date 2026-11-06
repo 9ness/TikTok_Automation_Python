@@ -4,6 +4,7 @@
 import subprocess, re, html, json, sys, time, os
 D = os.environ.get("MOVIL_ADB", "100.123.211.22:40281")
 def adb(*a): return subprocess.run(["adb", "-s", D, *a], capture_output=True, text=True).stdout
+W, H = map(int, re.search(r"(\d+)x(\d+)", adb("shell", "wm", "size")).groups())   # el swipe vale para Oppo y Mi 8
 def dump():
     for _ in range(3):
         adb("shell", "uiautomator", "dump", "/sdcard/u.xml")
@@ -37,7 +38,7 @@ while quietos < 3:
     json.dump(list(pedidos.values()), open(sys.argv[1], "w"), ensure_ascii=False, indent=1)   # guarda en cada vuelta: un corte no pierde lo leído
     print(len(pedidos), flush=True)
     # la vista guarda TODOS los cargados y solo pide más al llegar al fondo: flings rápidos, no un swipe lento
-    for _ in range(15): adb("shell", "input", "swipe", "720", "2700", "720", "400", "80")
+    for _ in range(15): adb("shell", "input", "swipe", str(W // 2), str(H * 85 // 100), str(W // 2), str(H * 13 // 100), "80")
     time.sleep(2)
 json.dump(list(pedidos.values()), open(sys.argv[1], "w"), ensure_ascii=False, indent=1)
 from collections import Counter

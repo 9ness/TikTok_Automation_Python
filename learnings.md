@@ -1412,3 +1412,4 @@
 - 2026-11-06 · flow_dl_scroll baja fotos viejas si Flow no genera nuevas (aviso «actividad inusual») → comprobar Error antes de bajar y quitar duplicados; los scripts de ~/work/carr22 escriben en ness, no sirven para nestor2
 - 2026-11-06 · Carpetas servidas desde la copia se relistaban cada 5 min (varias llamadas rclone por carpeta) y provocaban 403 RATE_LIMIT_EXCEEDED → `drive_client._ttl_de`: lo de copia dura 6 h en memoria y Redis; el refresh manual lo salta.
 - 2026-11-06 · Social1 «You must be subscribed to filter videos»: la cuenta del 30/10 pasó a Free Plan/Canceled en una semana → mirar /account antes de buscar; sin suscripción solo queda ana.json (datos viejos)
+- 2026-11-06 · pedidos.py llevaba el swipe del Oppo (y=2700, fuera de pantalla en el Mi 8) → coordenadas según wm size
