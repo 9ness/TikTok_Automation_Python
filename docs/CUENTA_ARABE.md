@@ -277,11 +277,15 @@ Entra con su PIN (lo elige la primera vez) y **solo ve dos pantallas**:
   - `ver_subidas(mes)`.
 - **Estadísticas** (`/estadisticas`): las ventas de SU cuenta, con el mismo
   formato que las de Néstor (`estadisticas:ventas:nes_bugallo`). Se leen del Mi 8
-  **cada semana** y se guardan con `guardar_estadisticas` (guía
+  **cada día** (lo de ayer) y se guardan con `guardar_estadisticas` (guía
   `estadisticas.md`).
-  - Mi 8: `scripts/estadisticas_movil/dias_mi8.py DESDE..HASTA` (día a día, con comisión).
-    La rutina semanal de los miércoles (`~/rutinas/cuenta-arabe-semanal.md`) lo lanza y apunta
-    la comisión de cada día en el panel (fuente 4, «Cuenta Árabe (Ness/Buga)»).
+  - Rutina diaria (`~/rutinas/cuenta-arabe-diaria.md`, Paso 1b, desde 6/11/2026):
+    `scripts/estadisticas_movil/dias_mi8.py <AYER>` (con comisión, al panel: fuente 4,
+    «Cuenta Árabe (Ness/Buga)») y, si hubo ventas, `pedidos.py` para saber si vino de
+    vídeo, carrusel o anuncios y qué producto es. Los «No apto» no suman.
+  - El mes se pisa campo a campo y `contenidos` entero: se suma a lo guardado y se manda
+    completo; los ID ya contados van en `est_mi8/pedidos_contados.json`.
+  - La rutina semanal de los miércoles solo recoge los días que falten.
 
 Sin «Mis tandas»: el contenido lo preparan los agentes.
 
