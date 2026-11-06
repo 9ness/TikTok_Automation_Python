@@ -1406,3 +1406,4 @@
 - 2026-11-06 · Un error de Drive en `_fotos_en_disco` se tomaba por carpeta vacía y sacaba carruseles de Mis tandas → solo `FileNotFoundError` vacía; otro `OSError` conserva lo previo y no actualiza la caché.
 - 2026-11-06 · `test_semaforo_de_carrusel` fallaba 6 de 8 veces: `version` va en segundos enteros y el semáforo tolera 1 s, con `sleep(1.1)` no siempre cambia → `sleep(2.1)`. Al revisar un fallo intermitente, repetir el test antes de culpar al parche.
 - 2026-11-06 · `rutina-cerrar`: el pie «← N agents» sale también sin subagentes; el dato fiable es la transcripción del subagente (escrita hace <30 min) o un shell hijo.
+- 2026-11-06 · dias_mi8.py: el banner de Black Friday bajaba el «>» de Datos y el toque fijo fallaba → y sacada por OCR de «Últimos 7 días»; ojo, el OCR leyó comisión 2,0 con 2,12 € en pantalla: contrastar con la captura o el pedido

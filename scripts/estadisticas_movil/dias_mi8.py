@@ -98,7 +98,8 @@ def a_datos():
     else:
         sys.exit("no encuentro «Ver detalles» en TikTok Studio")
     tap(*ps[-1], 7)                                     # la tarjeta de la derecha: «para creadores»
-    tap(1017, 692, 6)                                   # «>» de Hoy / Últimos 7 días
+    fila = donde("Últimos", palabras()) or donde("días", palabras())   # un banner de campaña lo baja (Black Friday, 6/11)
+    tap(1017, fila[1] if fila else 692, 6)              # «>» de Hoy / Últimos 7 días
     if not hay("Personalizado", palabras()): sys.exit("no llego a Datos")
 
 
