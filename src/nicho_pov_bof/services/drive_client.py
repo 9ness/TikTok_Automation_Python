@@ -46,8 +46,29 @@ def _cache_get(key: str) -> Any | None:
     return payload
 
 
-def _cache_put(key: str, payload: Any) -> None:
-    _CACHE[key] = (time.monotonic() + config.LISTING_TTL_S, payload)
+def _ttl_de(key: str, payload: Any) -> float:
+    """Cuánto vale un listado. Lo que sale de la copia dura `_TTL_COPIA_S`.
+
+    Una carpeta servida desde la copia cuesta varias llamadas a rclone por
+    refresco (el Drive del curso y cada copia) y su contenido no cambia: con
+    los 5 minutos normales, el barrido de las ~65 carpetas llenaba el Drive de
+    `lsjson` a ráfagas y Google contestaba 403 RATE_LIMIT_EXCEEDED.
+    """
+    if key.startswith("backup-photos:"):
+        return _TTL_COPIA_S
+    if isinstance(payload, list) and any(
+        isinstance(f, dict) and f.get("desde_copia") for f in payload
+    ):
+        return _TTL_COPIA_S
+    return config.LISTING_TTL_S
+
+
+def _cache_put(key: str, payload: Any, *, edad: float = 0.0) -> None:
+    """`edad`: lo que el dato ya llevaba guardado en Redis, para que memoria y
+    Redis no sumen sus plazos. Nunca por debajo del TTL normal: un refresco que
+    falla no debe reintentarse en cada petición."""
+    vigencia = max(config.LISTING_TTL_S, _ttl_de(key, payload) - edad)
+    _CACHE[key] = (time.monotonic() + vigencia, payload)
     _ULTIMO[key] = payload
 
 
@@ -167,6 +188,7 @@ def _cacheado_sin_esperar(key: str, cargar: Callable[[], Any], sino: Any) -> Any
 
 # Las carpetas que el curso ha borrado cambian de mes en mes, no de minuto en
 # minuto: no merece la pena recalcularlo con el ritmo de los listados normales.
+# Vale también para las fotos que se sirven de la copia (`_ttl_de`).
 _TTL_COPIA_S = 6 * 3600
 
 
@@ -188,8 +210,8 @@ def _listar_cacheado(key: str, cargar: Callable[[], Any], *, refresh: bool) -> A
     en_redis = _redis_cache_get(key)
     if en_redis is not None:
         payload, edad = en_redis
-        _cache_put(key, payload)
-        if edad > config.LISTING_TTL_S:
+        _cache_put(key, payload, edad=edad)
+        if edad > _ttl_de(key, payload):
             _refrescar_en_segundo_plano(key, cargar)
         return payload
 

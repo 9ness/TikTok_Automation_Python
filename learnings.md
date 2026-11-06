@@ -1410,3 +1410,4 @@
 - 2026-11-06 · Flow con ajuste 3:4: `fwait_cdp.py` descarta lo que no es 9:16 (h<1.6w) y da TIMEOUT → poner `crop_9_16`; tras recargar, las imágenes salen por /asb/ y no por flow-content, así que fwait no las ve
 - 2026-11-06 · Fish en darija varía ±4 s entre tomas con el mismo texto → repetir hasta caer en 14,8-15,7 s antes de tocar el guion
 - 2026-11-06 · flow_dl_scroll baja fotos viejas si Flow no genera nuevas (aviso «actividad inusual») → comprobar Error antes de bajar y quitar duplicados; los scripts de ~/work/carr22 escriben en ness, no sirven para nestor2
+- 2026-11-06 · Carpetas servidas desde la copia se relistaban cada 5 min (varias llamadas rclone por carpeta) y provocaban 403 RATE_LIMIT_EXCEEDED → `drive_client._ttl_de`: lo de copia dura 6 h en memoria y Redis; el refresh manual lo salta.
