@@ -44,10 +44,11 @@ from pathlib import Path
 
 SERIAL = os.environ.get("MOVIL_ADB", "100.123.211.22:40281")
 PAQUETE = "com.zhiliaoapp.musically"
-TMP = Path("/tmp/carr")
+TMP = Path(os.environ.get("CARR_TMP", "/tmp/carr"))   # uno por móvil si van dos a la vez
 CARPETA_MOVIL = "/sdcard/Pictures/carr_tmp"
 MCP_URLS = Path(__file__).resolve().parent.parent / "MCP_URLS.local.md"
 USUARIO = os.environ.get("MCP_USUARIO", "ness")
+SONIDO_ID = os.environ.get("SONIDO_ID", "")   # sonido comercial fijo (Ama Shop), por enlace y con `rapido`: sin lista ni lupa
 
 # Puntos de la UI de TikTok por móvil. Un perfil por pantalla: escalar no basta (densidades distintas).
 PERFILES = {
@@ -293,6 +294,14 @@ CACHE = TMP / "tandas.json"
 
 
 def carrusel(cid: str) -> dict:
+    c = _carrusel(cid)
+    if SONIDO_ID:
+        c["musica"]["tiktok"] = {"titulo": f"fijo {SONIDO_ID}",
+                                 "enlace": f"https://www.tiktok.com/music/sonido-{SONIDO_ID}"}
+    return c
+
+
+def _carrusel(cid: str) -> dict:
     """De la caché del lote si existe (una sola llamada al MCP para todos)."""
     def buscar(datos: dict) -> dict | None:
         for t in datos["tandas"]:
