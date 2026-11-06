@@ -1411,3 +1411,4 @@
 - 2026-11-06 · Fish en darija varía ±4 s entre tomas con el mismo texto → repetir hasta caer en 14,8-15,7 s antes de tocar el guion
 - 2026-11-06 · flow_dl_scroll baja fotos viejas si Flow no genera nuevas (aviso «actividad inusual») → comprobar Error antes de bajar y quitar duplicados; los scripts de ~/work/carr22 escriben en ness, no sirven para nestor2
 - 2026-11-06 · Carpetas servidas desde la copia se relistaban cada 5 min (varias llamadas rclone por carpeta) y provocaban 403 RATE_LIMIT_EXCEEDED → `drive_client._ttl_de`: lo de copia dura 6 h en memoria y Redis; el refresh manual lo salta.
+- 2026-11-06 · Social1 «You must be subscribed to filter videos»: la cuenta del 30/10 pasó a Free Plan/Canceled en una semana → mirar /account antes de buscar; sin suscripción solo queda ana.json (datos viejos)
