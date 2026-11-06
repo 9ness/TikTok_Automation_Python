@@ -1430,3 +1430,4 @@
 - 2026-11-07 · Mi 8: uiautomator no vuelca en el feed de TikTok y el puzle tapa la lectura de la cuenta → leer la cuenta desde Perfil y cerrar antes el puzle con la X (Viva y Casca autorizadas por Néstor; subida_diaria.py no la pulsa sola y aborta sin subir).
 - 2026-11-07 · subida_diaria.py en el Mi 8 con reiniciar=False: sin force-stop de TikTok, para no perder la cuenta activa ni provocar otra vez el puzle.
 - 2026-11-07 · mis_tandas: las fotos no traen campo `tareas` y usan `subido`; los vídeos traen `uploaded` y `tareas` → casar carruseles con una tarea por ID de `product_url`.
+- 2026-11-07 · Omni dijo «desde la talla 44» en las dos versiones del clip aunque el prompt no lo pedía → transcribir siempre lo hablado (Deepgram + Whisper small) y, si sobra una frase al inicio, cortar el clip gratis antes de regenerar
