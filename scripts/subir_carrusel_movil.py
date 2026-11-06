@@ -1,8 +1,8 @@
 """Sube un carrusel de Mis tandas (fotos) a TikTok desde un móvil por ADB y se para antes de Publicar.
 
 Probado el 26/10/2026 en el OPPO de Néstor (1440x3168, TikTok ES). Los puntos de cada móvil están en
-PERFILES y se eligen por `wm size` (MOVIL_PERFIL=oppo|mi8 manda); los del Mi 8 son provisionales hasta
-calibrarlos con capturas. Fases:
+PERFILES y se eligen por `wm size` (MOVIL_PERFIL=oppo|mi8 manda); en el Mi 8 falta calibrar enlace, producto y
+swipes. Fases:
 
     python scripts/subir_carrusel_movil.py preparar <id>   # baja ZIP, copia fotos, guarda el sonido en Favoritos
     python scripts/subir_carrusel_movil.py editor <id>     # fotos → sonido → caption → producto por ID
@@ -64,13 +64,13 @@ PERFILES = {
         "historial": (340, 759), "zona_comerciales": (450, 1500), "buscar_comercial": (1296, 402),
         "check_comercial": (1278, 640),
     },
-    "mi8": {   # 1080x2248, densidad 440: PROVISIONAL, sin calibrar con capturas
+    "mi8": {   # 1080x2248, densidad 440: hasta «atras» medido el 6/11; enlace, producto y swipes PROVISIONALES
         "tamano": (1080, 2248),
         "swipe_ficha": (540, 1845, 540, 852), "swipe_sonido": (540, 640, 540, 1990),
-        "mas": (540, 2050), "galeria": (106, 2020), "album": (516, 154), "y_max_album": 278,
-        "rejilla": (313, 358, 397, 362),
-        "pildora_sonido": (495, 256), "fila_favorito": (450, 1413), "cerrar_panel_sonido": (540, 553),
-        "y_max_sonido": 357, "caption": (525, 733), "atras": (72, 150),
+        "mas": (540, 2040), "galeria": (106, 2020), "album": (540, 153), "y_max_album": 278,
+        "rejilla": (306, 399, 360, 360),
+        "pildora_sonido": (480, 190), "fila_favorito": (450, 1365), "cerrar_panel_sonido": (540, 450),
+        "y_max_sonido": 300, "caption": (540, 800), "atras": (78, 150),
         "enlace_x": 540, "enlace_y_defecto": 1625, "cerrar_enlace": (1006, 1712), "x_pildora_x": 680,
         "anadir_x": 891, "anadir_ys": (626, 786), "confirmar_producto": (540, 1298),
         "anadir_abajo": (540, 2000), "sugerencia": (542, 418), "vaciar": (891, 303),
