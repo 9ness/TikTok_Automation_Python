@@ -464,10 +464,8 @@ def _guardar_fijas(usuario: str, fijas: list[dict]) -> None:
     r = _redis()
     if not r.is_available():
         return
-    # Las completadas viejas sobran: se recuerdan las últimas, las abiertas todas.
-    cerradas = [i for i, t in enumerate(fijas) if t.get("completada_at")]
-    quitar = set(cerradas[:-config.FIJAS_GUARDAR]) if len(cerradas) > config.FIJAS_GUARDAR else set()
-    fijas = [t for i, t in enumerate(fijas) if i not in quitar]
+    # Las cerradas no se recortan nunca: una tanda olvidada devuelve a las
+    # abiertas lo que se dejó sin subir al cerrarla.
     r.set_json(config.FIJAS_KEY.format(usuario=usuario), {"tandas": fijas, "updated_at": time.time()})
 
 
@@ -647,13 +645,23 @@ def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos:
     if hueco["usados"] >= por_dia:
         hueco["fecha"] += dt.timedelta(days=1)
     abiertas_fijas = sum(1 for _, _, c in grupos if not c)
-    historicas: list[tuple[list[dict], dt.date | None, bool]] = []
+    # Lo ya subido se reparte aparte: mezclado con lo pendiente, abría tandas
+    # de vídeos antiguos con uno o dos nuevos. Solo cuenta para la separación.
+    subidos = [f for f in publicables if f["uploaded"]]
+    pendientes = [f for f in publicables if not f["uploaded"]]
+    sep_dias = config.separacion(usuario)
+    historicas: list[tuple[list[dict], dt.date | None, bool]] = [
+        (grupo, None, True)
+        for grupo, _ in _repartir(subidos, hueco["fecha"], por_dia, None, n_tanda, grupo_de, sep_dias)
+    ]
+    previos_subidos = dict(previos)
+    for f in subidos:
+        if f["uploaded_at"]:
+            d = dt.datetime.fromtimestamp(f["uploaded_at"], _TZ).date()
+            c = _clave_producto(f)
+            previos_subidos[c] = max(previos_subidos.get(c, d), d)
     nuevas: list[tuple[list[dict], dt.date | None, bool]] = []
-    for grupo, fecha in _repartir(publicables, hueco["fecha"], por_dia, previos, n_tanda, grupo_de,
-                                  config.separacion(usuario)):
-        if all(f["uploaded"] for f in grupo):
-            historicas.append((grupo, None, True))
-            continue
+    for grupo, fecha in _repartir(pendientes, hueco["fecha"], por_dia, previos_subidos, n_tanda, grupo_de, sep_dias):
         if abiertas_fijas < config.FIJAR_ABIERTAS or len(grupo) >= n_tanda:
             fijas.append({"ids": [f["id"] for f in grupo], "creada": time.time(),
                           "listo": {f["id"]: f["video_listo_at"] for f in grupo}})

@@ -87,7 +87,6 @@ POR_TANDA_USUARIO: dict[str, int] = {"ana": 6}
 def por_tanda(usuario: str) -> int:
     return POR_TANDA_USUARIO.get(usuario or "ness", POR_TANDA)
 FIJAR_ABIERTAS = 2   # tandas abiertas que se fijan (la de hoy y la siguiente)
-FIJAS_GUARDAR = 60   # completadas que se recuerdan
 
 
 def cache_dir() -> str:

@@ -285,3 +285,25 @@ def test_abierta_a_medias_se_sigue_llenando(redis, monkeypatch):
     lista += [fila(f"pov|s|c|{i}", orden_at=i) for i in range(3, 8)]
     d = servicio.tandas("ness")
     assert [t["total"] for t in d["tandas"]] == [8]
+
+
+def test_cerradas_viejas_no_vuelven_a_abiertas(redis, monkeypatch):
+    """6/11: al pasar de 60 cerradas se olvidaban las viejas y lo que se dejó
+    sin subir en ellas reaparecía en tandas abiertas."""
+    fijas = [{"ids": [f"v{i}"], "creada": 1.0, "completada_at": 1.0 + i, "listo": {f"v{i}": 0.0}}
+             for i in range(70)]
+    lista = [fila(f"v{i}") for i in range(70)] + [fila("rv|nuevo")]
+    _sin_precalentar(monkeypatch, lista)
+    servicio._guardar_fijas("ness", fijas)
+    servicio.completar("ness", ["rv|nuevo"])
+    assert len(servicio._fijas("ness")) == 71
+    assert servicio.tandas("ness")["tandas"] == []
+
+
+def test_lo_subido_suelto_no_rellena_una_tanda_abierta(redis, monkeypatch):
+    lista = [fila(f"s{i}", uploaded=True, uploaded_at=1000.0 + i) for i in range(8)] + [fila("nuevo")]
+    _sin_precalentar(monkeypatch, lista)
+    d = servicio.tandas("ness", todas=True)
+    abiertas = [t for t in d["tandas"] if t["abierta"]]
+    assert [[v["id"] for v in t["items"]] for t in abiertas] == [["nuevo"]]
+    assert d["cerradas"] == 1
