@@ -1416,3 +1416,6 @@
 - 2026-11-06 · pedidos.py solo cogía importes en € y perdía los de Polonia (zł), y no marcaba «Anuncios de la tienda» → lee cualquier moneda y marca anuncio; pedidos_sumar.py pasa a € y suma por ID sin duplicar
 - 2026-11-06 · `crontab <fichero>` con ruta de más de ~100 caracteres la corta, da «No such file» y no cambia nada → instalar con `crontab - < fichero` y comprobar con `crontab -l`.
 - 2026-11-06 · vídeos con bandas negras dentro de un MP4 1080x1920 (Flow dejado en 3:4 por carruseles, sin confirmar en origen) → regla general vídeo 9:16 / carrusel 3:4 y cropdetect antes del semáforo
+- 2026-11-06 · Clips de Veo (GenAI Pro) funden la imagen desde el fotograma ~184 (t≈7,67 s), medido por nitidez → usar la fuente hasta 7,62 s (`-t` ANTES de `-i`: como opción de salida corta tras estirar) y estirar con setpts ≤4,4 % hasta la duración de la voz.
+- 2026-11-06 · Flow: el ajuste 3:4→9:16 vuelve solo a 3:4 al recargar y `fimg` no vacía la caja; `browser.json` puede apuntar a una pestaña muerta → comprobar formato y pestaña antes de cada tanda.
+- 2026-11-06 · Clips de Veo traen 3 px negros por lateral en 720 de ancho (cropdetect daba 1072:1920 aunque el MP4 fuese 1080x1920) → recortar `crop=iw-8:ih-14` antes de escalar en el montaje.
