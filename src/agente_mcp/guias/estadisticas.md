@@ -60,6 +60,8 @@ No lo hagas a mano: está todo resuelto y un mes tarda ~3 min.
 - `conv.py` junta los `m_*.json` en `doc.json` con números y `tipo`.
 - **Cada día** (Néstor, 6/11/2026): Casca Chollos, Ama Shop y la cuenta árabe leen los pedidos de ayer en su rutina y los suman en Factory.
   `MOVIL_ADB=<móvil>` elige el móvil. Se llevan los id ya sumados en un fichero para no duplicar, y `origen`/`contenidos` se mandan enteros (lo guardado + lo nuevo).
+- `pedidos_sumar.py` (Viva Shop, `~/rutinas/vivashop-estadisticas-diaria.md`): suma los ID nuevos a `origen`, `productos` (con `pais`, España = ES, y `origen` por producto) y `contenidos`. `PEDIDOS_HASTA_ID` hace que `pedidos.py` pare en el último ID sumado, sin leer 90 días.
+- Entrada real a la lista en el Oppo: TikTok Studio › TikTok Shop para creadores › Ver detalles › Kit de herramientas › Ganancias › Pedidos de afiliados.
 - `pedidos.py salida.json` → un registro por pedido de **Perfil › Ganancias ›
   Pedidos de afiliados** (pestaña **Todo**, rango máx. 90 días; Néstor empezó
   en agosto, no hace falta antes). Lleva estado, tipo (Vídeo / Carousel /

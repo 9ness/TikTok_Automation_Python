@@ -14,6 +14,7 @@ def dump():
         time.sleep(1)
     return []
 TIPOS = {"Vídeo", "Carousel", "Carrusel", "LIVE", "Escaparate", "Tarjeta de producto", "Anuncio", "Imagen", "Foto"}
+HASTA = int(os.environ.get("PEDIDOS_HASTA_ID") or 0)   # lectura diaria: la lista va del más nuevo al más viejo; para al llegar a este ID
 pedidos, quietos, ultimo = {}, 0, None
 if os.path.exists(sys.argv[1]):   # retomar: la lista del móvil sigue cargada, solo se sigue bajando
     pedidos = {p["id"]: p for p in json.load(open(sys.argv[1]))}
@@ -27,8 +28,9 @@ while quietos < 3:
         for j, s in enumerate(bloque):
             if "~tplv" in s and j + 1 < len(bloque): p["producto"] = bloque[j + 1]
             elif s in TIPOS: p["tipo"] = s
+            elif s == "Anuncios de la tienda": p["anuncio"] = True
             elif re.fullmatch(r"[A-Z]{2}", s): p["pais"] = s
-            elif re.search(r"€.*x \d+|x \d+$", s) and "€" in s: p["importe"] = s
+            elif re.search(r"x \d+$", s): p["importe"] = s   # cualquier moneda: los de Polonia van en zł
             elif s.startswith("Porcentaje de comisión") and j + 2 < len(bloque): p["pct"] = bloque[j + 1]; p["comision"] = bloque[j + 2]
             elif s.startswith("#") or (len(s) > 25 and "#" in s and "producto" in p and "caption" not in p and s != p.get("producto")): p["caption"] = s
         viejo = pedidos.get(pid)
@@ -37,6 +39,7 @@ while quietos < 3:
     quietos = quietos + 1 if not nuevos else 0
     json.dump(list(pedidos.values()), open(sys.argv[1], "w"), ensure_ascii=False, indent=1)   # guarda en cada vuelta: un corte no pierde lo leído
     print(len(pedidos), flush=True)
+    if HASTA and any(int(i) <= HASTA for i in pedidos): break
     # la vista guarda TODOS los cargados y solo pide más al llegar al fondo: flings rápidos, no un swipe lento
     for _ in range(15): adb("shell", "input", "swipe", str(W // 2), str(H * 85 // 100), str(W // 2), str(H * 13 // 100), "80")
     time.sleep(2)
