@@ -66,7 +66,7 @@ PERFILES = {
         "check_comercial": (1278, 640),
     },
     "mi8": {   # 1080x2248, densidad 440: hasta «atras» medido el 6/11; enlace, producto y swipes PROVISIONALES
-        "tamano": (1080, 2248),
+        "tamano": (1080, 2248), "sin_combos": True, "lista_en_dump": True, "ficha_en_caliente": True,   # Android 10: no hay `input keycombination`
         "swipe_ficha": (540, 1845, 540, 852), "swipe_sonido": (540, 640, 540, 1990),
         "mas": (540, 2040), "galeria": (106, 2020), "album": (540, 153), "y_max_album": 278,
         "rejilla": (306, 399, 360, 360),
@@ -174,6 +174,41 @@ def tecla(*codigos: int) -> None:
     time.sleep(0.5)
 
 
+def sin_combos() -> bool:
+    return bool(perfil().get("sin_combos"))
+
+
+def vaciar_texto(n: int = 45) -> None:
+    """Vacía el campo con el foco; sin Ctrl+A, al final y borrando hacia atrás."""
+    if sin_combos():
+        adb("shell", "input", "keyevent", "123", *["67"] * n)
+        time.sleep(0.5)
+    else:
+        tecla(113, 29)
+        tecla(67)
+
+
+def pegar_caption() -> None:
+    tap(*pt("caption"), 2)
+    if sin_combos():
+        video_movil().pegar()             # chip del portapapeles de Gboard
+        tecla(62)                         # espacio: cierra la lista de hashtags sugeridos
+    else:
+        tecla(113, 50)                    # Ctrl+V
+    time.sleep(1)
+
+
+def al_principio() -> None:
+    tecla(122) if sin_combos() else tecla(113, 122)   # Inicio; Ctrl+Inicio en el OPPO
+
+
+def video_movil():
+    """El pegado por Keep + Gboard del Mi 8 ya está en subir_video_movil."""
+    import subir_video_movil as sv
+    sv.SERIAL, sv.TMP = SERIAL, TMP
+    return sv
+
+
 def escribir(texto: str) -> None:
     """Carácter a carácter: con Gboard, `input text` de golpe se come letras."""
     for c in texto:
@@ -254,12 +289,21 @@ def texto_zona(y0: int, y1: int) -> str:
                           capture_output=True, text=True).stdout
 
 
+def botones_anadir() -> list[dict]:
+    """«Añadir» de la lista de productos, si el volcado la ve (Mi 8 sí; OPPO no)."""
+    if not perfil().get("lista_en_dump"):
+        return []
+    return [n for n in nodos() if n["desc"] == "button_add_product"]
+
+
 def sin_resultados() -> bool:
     """«No se han encontrado productos» no sale en el volcado: se mira con OCR el centro de la pantalla."""
     from PIL import Image
 
     if buscar(r"No se han encontrado", intentos=1):
         return True
+    if perfil().get("lista_en_dump"):     # Mi 8: sin resultados la lista queda en BLANCO, sin ese texto
+        return not botones_anadir()
     png = screencap()
     im = Image.open(io.BytesIO(png)).convert("L")
     im.crop((0, int(im.height * .25), im.width, int(im.height * .5))).save(TMP / "sh" / "ocr.png")
@@ -270,7 +314,7 @@ def sin_resultados() -> bool:
 
 # ---------------------------------------------------------------- datos de la app
 def mcp(herramienta: str, argumentos: dict) -> dict:
-    url = re.search(rf"^- {USUARIO}: (\S+)", MCP_URLS.read_text(), re.M).group(1)
+    url = re.search(rf"^- {USUARIO}\b[^:\n]*: (\S+)", MCP_URLS.read_text(), re.M).group(1)   # admite «- ana (Moda Mujer…): url»
     cuerpo = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
               "params": {"name": herramienta, "arguments": argumentos}}
     req = urllib.request.Request(url, json.dumps(cuerpo).encode(), {
@@ -352,9 +396,12 @@ def al_escaparate(pid: str) -> bool:
     """Abre la ficha en TikTok y pulsa «Añadir al escaparate». True si lo añadió o ya estaba."""
     if SIN_STOCK.exists() and pid in SIN_STOCK.read_text().split():
         raise SystemExit(f"{pid}: ya visto sin existencias → sin stock, saltar")
+    if perfil().get("ficha_en_caliente"):  # Mi 8: con la app cerrada el enlace cae en el feed, no en la ficha
+        adb("shell", "monkey", "-p", PAQUETE, "-c", "android.intent.category.LAUNCHER", "1")
+        time.sleep(9)
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
         "-d", f"https://www.tiktok.com/view/product/{pid}", PAQUETE)
-    time.sleep(8)
+    time.sleep(12 if perfil().get("ficha_en_caliente") else 8)
     captura("6_ficha")
     if buscar(r"(se ha eliminado|Producto no disponible)", intentos=1):
         sin_stock(pid, "la ficha dice «eliminado/no disponible» (6_ficha)")
@@ -493,6 +540,9 @@ def preparar(cid: str) -> None:
 
 def copiar_caption(c: dict) -> None:
     texto = c["caption"] + " " + " ".join(c.get("hashtags", []))
+    if sin_combos():
+        video_movil().al_portapapeles(texto)
+        return
     (TMP / "sh" / "cap.txt").write_text(texto)
     adb("push", str(TMP / "sh" / "cap.txt"), "/data/local/tmp/cap.txt")
     adb("shell", 'am start -a android.intent.action.SEND -t text/plain -p com.google.android.keep '
@@ -547,9 +597,7 @@ def editor(cid: str) -> None:
     pulsar(r"^Siguiente$", 4)
 
     # Caption
-    tap(*pt("caption"), 2)
-    tecla(113, 50)                        # Ctrl+V
-    time.sleep(1)
+    pegar_caption()
     # A veces TikTok antepone un hashtag suyo (p. ej. del sonido): se borra lo que haya delante.
     inicio = c["caption"][:20]
     texto = next((html.unescape(n["text"]) for n in nodos()
@@ -557,7 +605,7 @@ def editor(cid: str) -> None:
     sobra = texto.find(inicio)
     if sobra > 0:
         print(f"AVISO: TikTok añadió «{texto[:sobra].strip()}» delante del caption → borrado")
-        tecla(113, 122)                   # Ctrl+Inicio
+        al_principio()
         for _ in range(sobra):
             tecla(112)                    # Supr
     pulsar(r"^Listo$", 2)
@@ -579,6 +627,8 @@ def rapido(cid: str) -> None:
     pid = pid_de(c)
     if SIN_STOCK.exists() and pid in SIN_STOCK.read_text().split():
         raise SystemExit(f"{pid}: ya visto sin existencias → sin stock, saltar")
+    if (TMP / f"escaparate_{pid}").exists() and not al_escaparate(pid):   # ya falló al buscarlo por ID
+        print("AVISO: no vi «Añadir al escaparate» ni que ya estuviera (mira 6_ficha); sigo")
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
     print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']} (vía rápida)")
     adb("shell", "am", "force-stop", PAQUETE)
@@ -617,9 +667,7 @@ def rapido(cid: str) -> None:
     captura("2_sonido")
     copiar_caption(c)                     # Keep y vuelta: el editor sigue igual
     pulsar(r"^Siguiente$", 4)
-    tap(*pt("caption"), 2)
-    tecla(113, 50)                        # Ctrl+V
-    time.sleep(1)
+    pegar_caption()
     inicio = c["caption"][:20]
     texto = next((html.unescape(n["text"]) for n in nodos()
                   if n["clase"].endswith("EditText") and inicio in html.unescape(n["text"])), "")
@@ -627,7 +675,7 @@ def rapido(cid: str) -> None:
         raise SystemExit("El caption no se pegó")
     sobra = texto.find(inicio)
     if sobra > 0:
-        tecla(113, 122)
+        al_principio()
         for _ in range(sobra):
             tecla(112)
     pulsar(r"^Listo$", 2)
@@ -657,6 +705,9 @@ def consulta_comercial(c: dict) -> str:
     return {"navidad": "christmas"}.get(estilo.split("_")[0], estilo.split("_")[0])
 
 
+AVISO_COMISION = r"^\W*Entendido\W*$"   # «Protección de comisión de 30 días»: tapa la lista, una vez por cuenta y puede salir tarde
+
+
 def producto(cid: str) -> None:
     """Desde la pantalla de publicar: producto por ID y, si el sonido no lo deja, uno comercial."""
     c = carrusel(cid)
@@ -677,6 +728,7 @@ def producto(cid: str) -> None:
     else:
         _comercial = False
     pulsar(r"^Producto$", 5)
+    pulsar(AVISO_COMISION, 2)
     pulsar(r"Buscar productos", 2)
     escribir(pid)
     tecla(66)
@@ -687,9 +739,9 @@ def producto(cid: str) -> None:
             break
         print(f"AVISO: «No se han encontrado productos», repito la búsqueda ({intento + 1})", flush=True)
         time.sleep(3 + 3 * intento)
+        pulsar(AVISO_COMISION, 2)
         pulsar(r"Buscar productos|^\d{10,}$", 1)
-        tecla(113, 29)
-        tecla(67)
+        vaciar_texto()
         escribir(pid)
         tecla(66)
         time.sleep(6)
@@ -700,8 +752,10 @@ def producto(cid: str) -> None:
         (TMP / f"escaparate_{pid}").write_text("1")   # el reintento de preparar abrirá la ficha y lo añadirá
         raise SystemExit(f"{pid} no sale al buscarlo: no está en el escaparate (mira 6_ficha de preparar)")
     campo = []
-    for y in pt("anadir_ys"):                 # «Añadir» del único resultado: su altura cambia (la lista no sale en el dump)
-        tap(pt("anadir_x"), y, 4)
+    # «Añadir» del único resultado: en el Mi 8 sale en el volcado; en el OPPO no, y su altura cambia
+    puntos = [(b["x"], b["y"]) for b in botones_anadir()[:1]] or [(pt("anadir_x"), y) for y in pt("anadir_ys")]
+    for x, y in puntos:
+        tap(x, y, 4)
         if buscar(r"Obtener una muestra", intentos=1):
             tecla(4)                      # se pulsó la tarjeta, no «Añadir»
             time.sleep(2)
@@ -719,15 +773,14 @@ def producto(cid: str) -> None:
         nombre = nombre_enlace(c)
         for _ in range(3):                # Gboard a veces cambia letras («Fruti»): se comprueba y se reescribe
             tap(campo[0]["x"], campo[0]["y"], 1)
-            tecla(113, 29)
-            tecla(67)
+            vaciar_texto()
             escribir(nombre)
             time.sleep(2)
             if any(n["desc"] == "edit_anchor_name_input" and n["text"] == nombre for n in nodos()):
                 break
             print("AVISO: el nombre del enlace no salió bien, lo reescribo")
-        tecla(111)                        # oculta el teclado
-    if not pulsar(r"^Añadir$", 4):
+        tecla(4 if perfil().get("lista_en_dump") else 111)   # oculta el teclado (en el Mi 8 ESC no lo cierra)
+    if not pulsar(r"^\W*Añadir\W*$", 4):
         tap(*pt("anadir_abajo"), 4)
     if _comercial:
         al_editor()
