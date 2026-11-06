@@ -1401,3 +1401,4 @@
 - 2026-11-06 · subir_comprobacion_movil: `ve()` quita el `^$` del patrón para el OCR, así que «^Añadir$» casaba con el «¿Añadir» del título y el diálogo no se cerraba («no sale Cambiar nombre») → buscar el botón con `m.ocr(r"^Añadir$")` anclado
 - 2026-11-06 · Comprobación previa: producto agotado = panel con «Añadido al escaparate» desactivado y sin «Crear ahora», y el script decía «no se abre el panel» → mira «artículo está agotado» antes de tocar nada y falla con ese motivo
 - 2026-11-06 · Comprobación previa: el volcado XML da «&amp;» en el EditText y «V&M» salía como nombre mal escrito estando bien → comparar con `html.unescape`
+- 2026-11-06 · Meta: un fallo del comentario con enlace de FB no marca la publicación como fallida y pasó semanas sin verse → `salud.comentarios_fb_fallidos` en las estadísticas; el token de página no trae `pages_manage_engagement` (`debug_token`).

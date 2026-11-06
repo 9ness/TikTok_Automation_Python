@@ -300,6 +300,13 @@ acceso Trial), `MULTIPLATAFORMA_DRY_RUN`, `MULTIPLATAFORMA_LIMITE_*`,
 Reutiliza `PUBLIC_BASE_URL` y `AUTH_COOKIE_KEY`. Sin cost tracking: las APIs
 de publicación son gratuitas.
 
+## Estadísticas semanales (6/11/2026)
+
+`scripts/multiplataforma_estadisticas.sh` copia `scripts/multiplataforma_estadisticas.py` al contenedor y guarda en
+`~/multiplataforma/estadisticas/<fecha>.json` los últimos 7 días de viva_shop, viva_salud y ama_shop: seguidores y totales
+por plataforma, cada publicación, media por `tipo`, `salud` (estados y comentarios de FB fallidos) y `en_cola`. Solo lectura,
+sin tokens en la salida; una métrica sin dato queda en `null`. La analiza la rutina `~/rutinas/meta-semanal.md` (lunes).
+
 ## Qué falta
 
 1. **App de Meta** (tipo Business) con `instagram_content_publish`,

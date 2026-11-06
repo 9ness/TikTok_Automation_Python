@@ -1,4 +1,5 @@
 ## Pendiente
+- [ ] **Meta · Facebook (6/11/2026):** reels a 0 reproducciones desde el 21/10 en las 3 páginas (¿app de Ana en desarrollo?: probar un reel en incógnito) y comentario con enlace fallando porque el token no lleva `pages_manage_engagement` (regenerarlo desde un dispositivo de Ana).
 - [ ] `mis_tandas(fotos=True)`: calcular `tareas` en `src/mis_tandas/fotos.py` como en los vídeos; hoy el filtro de la tarea GSBF no sale en carruseles y hay que casar por ID (6/11/2026)
 - [ ] (5/11/2026) Medir el corte del próximo despliegue con el arreglo de salida inmediata (esperado ~25-30 s); si sigue alto, mirar `docker events`.
 - [ ] (5/11/2026) A/B de Haiku (esfuerzo bajo) para escenas UGC (`nicho_general/escenas.py`) y guiones de ropa (`nicho_ropa/guionista.py`): hoy en `guion_pro` (Sonnet). Si sale igual, pasarlos a `guion`.
