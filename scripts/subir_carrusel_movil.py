@@ -293,7 +293,8 @@ def botones_anadir() -> list[dict]:
     """«Añadir» de la lista de productos, si el volcado la ve (Mi 8 sí; OPPO no)."""
     if not perfil().get("lista_en_dump"):
         return []
-    return [n for n in nodos() if n["desc"] == "button_add_product"]
+    # 6/11: a veces viene sin ese desc, como texto « Añadir», y la lista parecía vacía («no sale al buscarlo»)
+    return [n for n in nodos() if n["desc"] == "button_add_product" or re.fullmatch(r"\W*Añadir\W*", n["text"] or "")]
 
 
 def sin_resultados() -> bool:
