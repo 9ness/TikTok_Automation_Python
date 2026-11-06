@@ -187,7 +187,7 @@ def test_semaforo_de_carrusel(entorno):  # noqa: F811
     assert c["items"][0]["semaforo"]["color"] == "verde" and c["sin_revisar"] == 0
     assert fotos.zip_tanda("ness", 1)[0]
     # Resubir la foto deja el carrusel otra vez sin revisar.
-    _t.sleep(1.1)
+    _t.sleep(2.1)  # `version` va en segundos enteros y el semáforo tolera 1
     carrusel.subir_imagen("ness", i, 1, _jpeg())
     c = fotos.tandas("ness")["tandas"][0]
     assert c["items"][0]["semaforo"] is None and c["sin_revisar"] == 1

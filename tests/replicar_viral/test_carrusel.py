@@ -442,3 +442,254 @@ def test_disco_en_memoria_se_olvida_al_quemar(tmp_path, monkeypatch):
     assert carrusel._fotos_en_disco("ness", "abc123abc123")["base"] == {}  # en memoria
     carrusel.olvidar_disco("ness", "abc123abc123")
     assert "01.jpg" in carrusel._fotos_en_disco("ness", "abc123abc123")["base"]
+
+
+class _RedisDisco:
+    def __init__(self):
+        self.datos = {}
+
+    def is_available(self):
+        return True
+
+    def get_json(self, clave):
+        return self.datos.get(clave)
+
+    def set_json(self, clave, valor):
+        self.datos[clave] = json.loads(json.dumps(valor))
+        return True
+
+
+def _disco(tmp_path, monkeypatch):
+    from src.replicar_viral import carrusel, servicio
+
+    r = _RedisDisco()
+    monkeypatch.setattr(carrusel, "_raiz", lambda: tmp_path)
+    monkeypatch.setattr(servicio, "_redis", lambda: r)
+    carrusel._DISCO.clear()
+    carrusel._DISCO_CARGADOS.clear()
+    carrusel._DISCO_OLVIDOS.clear()
+    carrusel._DISCO_REINTENTO.clear()
+    base = tmp_path / "ness" / "abc123abc123" / "base"
+    base.mkdir(parents=True)
+    (base / "01.jpg").write_bytes(b"x")
+    r.datos[servicio.INDICE.format(usuario="ness")] = {"ids": ["abc123abc123"]}
+    return carrusel, r, base
+
+
+def test_disco_rapido_vale_aunque_este_caducado(tmp_path, monkeypatch):
+    carrusel, _, base = _disco(tmp_path, monkeypatch)
+    clave = ("ness", "abc123abc123")
+    carrusel._fotos_en_disco(*clave)
+    carrusel._DISCO[clave] = (1.0, carrusel._DISCO[clave][1])
+    (base / "02.jpg").write_bytes(b"x")
+    assert "02.jpg" not in carrusel._fotos_en_disco(*clave, rapido=True)["base"]
+    assert "02.jpg" in carrusel._fotos_en_disco(*clave)["base"]
+
+
+def test_disco_un_fallo_del_drive_no_vacia_lo_guardado(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    clave = ("ness", "abc123abc123")
+    carrusel._fotos_en_disco(*clave)
+    cuando = carrusel._DISCO[clave][0]
+
+    def falla(_):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(carrusel.os, "scandir", falla)
+    assert "01.jpg" in carrusel._fotos_en_disco(*clave, fresco=True)["base"]
+    assert carrusel._DISCO[clave][0] == cuando  # se reintenta en la siguiente vuelta
+
+
+def test_disco_lectura_pisada_por_un_olvido_no_se_guarda(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    clave = ("ness", "abc123abc123")
+    real = carrusel.os.scandir
+
+    def scandir(ruta):
+        carrusel.olvidar_disco(*clave)  # sube una foto mientras se lee
+        return real(ruta)
+
+    monkeypatch.setattr(carrusel.os, "scandir", scandir)
+    carrusel._fotos_en_disco(*clave)
+    assert clave not in carrusel._DISCO
+
+
+def test_disco_sobrevive_al_reinicio_sin_tocar_el_drive(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    assert carrusel.precalentar() == 1
+    carrusel._DISCO.clear()
+    carrusel._DISCO_CARGADOS.clear()
+
+    def falla(_):
+        raise AssertionError("no debe leer el Drive")
+
+    monkeypatch.setattr(carrusel.os, "scandir", falla)
+    assert carrusel.precalentar() == 0
+    assert "01.jpg" in carrusel._fotos_en_disco("ness", "abc123abc123", rapido=True)["base"]
+
+
+def test_precalentar_relee_lo_olvidado_y_lo_viejo(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    clave = ("ness", "abc123abc123")
+    assert carrusel.precalentar() == 1
+    assert carrusel.precalentar() == 0
+    carrusel.olvidar_disco(*clave)
+    assert carrusel.precalentar() == 1
+    carrusel._DISCO[clave] = (1.0, carrusel._DISCO[clave][1])
+    assert carrusel.precalentar() == 1
+
+
+def _redis_disco(carrusel, monkeypatch, valor=None, fallo=None):
+    """Redis de mentira que solo sabe de la copia del disco."""
+    class R:
+        escrito = {}
+        lecturas = 0
+
+        def is_available(self):
+            return True
+
+        def get_json(self, _clave):
+            R.lecturas += 1
+            if fallo:
+                raise fallo
+            return valor
+
+        def set_json(self, clave, datos):
+            R.escrito[clave] = datos
+
+    R.escrito = {}
+    monkeypatch.setattr(carrusel.servicio, "_redis", lambda: R())
+    return R
+
+
+def _limpiar_disco(carrusel):
+    carrusel._DISCO.clear()
+    carrusel._DISCO_CARGADOS.clear()
+    carrusel._DISCO_OLVIDOS.clear()
+    carrusel._DISCO_REINTENTO.clear()
+
+
+@pytest.mark.parametrize("valor", [
+    ["x"], "texto", 3,
+    {"a": None}, {"a": [1]}, {"a": ["ayer", {}]}, {"a": [1.0, None]},
+    {"a": [1.0, {"orig": {}, "base": {}}]},
+    {"a": [1.0, {"orig": {}, "base": {"01.jpg": "x"}, "txt": {}}]},
+    {"a": [float("inf"), {"orig": {}, "base": {}, "txt": {}}]},
+    {"a": [10 ** 400, {"orig": {}, "base": {}, "txt": {}}]},
+    {"a": [1.0, {"orig": {}, "base": {"01.jpg": float("nan")}, "txt": {}}]},
+    {"a": [1.0, {"orig": {}, "base": {"01.jpg": 10 ** 400}, "txt": {}}]},
+])
+def test_disco_copia_con_forma_rara_no_rompe_el_listado(tmp_path, monkeypatch, valor):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    _redis_disco(carrusel, monkeypatch, valor)
+    carrusel._cargar_disco("ness")
+    assert carrusel._DISCO == {}
+    assert "ness" in carrusel._DISCO_CARGADOS
+
+
+def test_disco_entrada_buena_entra_y_la_rara_se_descarta(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    buena = [5.0, {"orig": {}, "base": {"01.jpg": 1.5}, "txt": {}}]
+    _redis_disco(carrusel, monkeypatch, {"a": buena, "b": None})
+    carrusel._cargar_disco("ness")
+    assert list(carrusel._DISCO) == [("ness", "a")]
+
+
+def test_disco_lo_olvidado_no_vuelve_con_la_copia_de_redis(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    vieja = [5.0, {"orig": {}, "base": {}, "txt": {}}]
+    _redis_disco(carrusel, monkeypatch, {"a": vieja})
+    carrusel.olvidar_disco("ness", "a")
+    carrusel._cargar_disco("ness")
+    assert ("ness", "a") not in carrusel._DISCO
+
+
+def test_disco_si_redis_falla_se_reintenta_y_no_pisa_su_copia(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    R = _redis_disco(carrusel, monkeypatch, fallo=RuntimeError("redis"))
+    carrusel._cargar_disco("ness")
+    carrusel._cargar_disco("ness")
+    assert R.lecturas == 1  # hasta que pase la espera no se insiste
+    assert "ness" not in carrusel._DISCO_CARGADOS
+    carrusel._DISCO[("ness", "a")] = (1.0, {"orig": {}, "base": {}, "txt": {}})
+    carrusel._guardar_disco()
+    assert R.escrito == {}
+    carrusel._DISCO_REINTENTO["ness"] = 0
+    _redis_disco(carrusel, monkeypatch, {})
+    carrusel._cargar_disco("ness")
+    assert "ness" in carrusel._DISCO_CARGADOS
+
+
+def test_disco_usuario_sin_nada_vacia_su_copia(tmp_path, monkeypatch):
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    vieja = [5.0, {"orig": {}, "base": {}, "txt": {}}]
+    R = _redis_disco(carrusel, monkeypatch, {"a": vieja})
+    carrusel._cargar_disco("ness")
+    carrusel.olvidar_disco("ness", "a")
+    carrusel._guardar_disco()
+    assert list(R.escrito.values()) == [{}]
+
+
+def test_disco_quien_llega_durante_la_carga_espera(tmp_path, monkeypatch):
+    import threading
+
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    buena = [5.0, {"orig": {}, "base": {"01.jpg": 1.5}, "txt": {}}]
+    R = _redis_disco(carrusel, monkeypatch, {"a": buena})
+    dentro, sigue = threading.Event(), threading.Event()
+    leer = R.get_json
+
+    def lento(self, clave):
+        dentro.set()
+        sigue.wait(5)
+        return leer(self, clave)
+
+    monkeypatch.setattr(R, "get_json", lento)
+    uno = threading.Thread(target=carrusel._cargar_disco, args=("ness",))
+    uno.start()
+    assert dentro.wait(5)
+    vio = []
+    dos = threading.Thread(
+        target=lambda: (carrusel._cargar_disco("ness"), vio.append(dict(carrusel._DISCO))),
+    )
+    dos.start()
+    dos.join(0.2)
+    assert dos.is_alive()  # no se salta una carga a medias
+    sigue.set()
+    uno.join(5)
+    dos.join(5)
+    assert ("ness", "a") in vio[0]
+    assert R.lecturas == 1
+
+
+def test_disco_guardar_durante_una_carga_no_pisa_la_copia(tmp_path, monkeypatch):
+    import threading
+
+    carrusel, _, _ = _disco(tmp_path, monkeypatch)
+    _limpiar_disco(carrusel)
+    buena = [5.0, {"orig": {}, "base": {"01.jpg": 1.5}, "txt": {}}]
+    R = _redis_disco(carrusel, monkeypatch, {"a": buena})
+    dentro, sigue = threading.Event(), threading.Event()
+    leer = R.get_json
+
+    def lento(self, clave):
+        dentro.set()
+        sigue.wait(5)
+        return leer(self, clave)
+
+    monkeypatch.setattr(R, "get_json", lento)
+    carga = threading.Thread(target=carrusel._cargar_disco, args=("ness",))
+    carga.start()
+    assert dentro.wait(5)
+    carrusel._guardar_disco()  # a media carga: ese usuario aún no se escribe
+    assert R.escrito == {}
+    sigue.set()
+    carga.join(5)
+    carrusel._guardar_disco()
+    assert list(R.escrito.values()) == [{"a": buena}]

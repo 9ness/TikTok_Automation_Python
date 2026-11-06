@@ -92,7 +92,9 @@ def carruseles_pendientes() -> list[dict]:
             if slug not in activas or enlaces_repo.todos(slug).get(k):
                 continue
             base = carrusel.dir_replica(u, f["id"]) / "base"
-            fotos = sorted(str(x).replace("/mnt/drive", "/home/nebulabsai/gdrive") for x in base.glob("*.jpg"))
+            hay = carrusel._fotos_en_disco(u, f["id"], rapido=True)["base"]
+            fotos = sorted(str(base / x).replace("/mnt/drive", "/home/nebulabsai/gdrive")
+                           for x in hay if x.endswith(".jpg"))
             out.append({"tipo": "carrusel", "carrusel_id": f["id"], "usuario": u, "cuenta": slug,
                         "tienda_afiliado": "shein" if slug == "ama_shop" else "amazon",
                         "producto_key": k, "titulo": titulo, "tienda": prod.get("tienda", ""),

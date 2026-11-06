@@ -41,9 +41,10 @@ def _carruseles(usuario: str) -> list[dict]:
     from concurrent.futures import ThreadPoolExecutor
 
     validos = [d for d in docs if isinstance(d, dict) and d.get("tipo") == "carrusel"]
-    # Cada uno lee sus carpetas del Drive montado: en paralelo, no uno tras otro.
+    # Lo normal sale de memoria o de Redis; los que no estén, del Drive montado:
+    # en paralelo, no uno tras otro.
     with ThreadPoolExecutor(max_workers=8) as pool:
-        estados = list(pool.map(carrusel.con_estado, validos))
+        estados = list(pool.map(lambda d: carrusel.con_estado(d, rapido=True), validos))
     salida = [e for e in estados if e["hechas"] > 0]
     salida.sort(key=lambda d: d.get("creado_at") or 0)
     return _con_url(salida)

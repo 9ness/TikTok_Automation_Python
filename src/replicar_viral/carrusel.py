@@ -27,7 +27,9 @@ import json
 import os
 import re
 import shutil
+import math
 import tempfile
+import threading
 import time
 import uuid
 import zipfile
@@ -414,38 +416,145 @@ def hashtags_tiktok(doc: dict) -> list[str]:
 # Lo que hay en disco de cada réplica, en memoria: en el Drive montado listar
 # en frío las ~90 carpetas de «Mis tandas › Fotos» eran 30 s. Lo que sube la
 # app pasa por `_quemar`, que lo olvida; el resto lo refresca `precalentar`.
+#
+# Noviembre 2026: con el Drive limitado (403 de cuota) listar en frío los 411
+# carruseles pasaba de 600 s, y `precalentar` releyéndolo todo cada 10 min eran
+# 7.400 listados por hora que gastaban esa misma cuota. Por eso: los listados
+# (`rapido`) dan lo que haya aunque sea viejo, lo leído se guarda en Redis para
+# que ni un reinicio ni un script empiecen en frío, y cada carpeta se relee
+# cada `_DISCO_REFRESCO_S`: lo que cambia por la app ya llega por `olvidar_disco`.
 _DISCO: dict[tuple[str, str], tuple[float, dict]] = {}
 _DISCO_TTL_S = 20 * 60
+_DISCO_REFRESCO_S = 6 * 3600
+_DISCO_CARGADOS: set[str] = set()
+_DISCO_OLVIDOS: dict[tuple[str, str], int] = {}
+# Si Redis falla al cargar, no se insiste en cada foto del listado.
+_DISCO_REINTENTO_S = 60
+_DISCO_REINTENTO: dict[str, float] = {}
+# `_DISCO_LOCK` hace atómico «mirar si se olvidó + guardar» frente a
+# `olvidar_disco`, sin cubrir nunca una lectura del Drive. `_DISCO_CARGA_LOCK`
+# hace esperar a quien llega mientras otro trae la copia de Redis.
+_DISCO_LOCK = threading.Lock()
+_DISCO_CARGA_LOCK = threading.Lock()
 
 
 def olvidar_disco(usuario: str, id_: str) -> None:
-    _DISCO.pop((usuario or "ness", id_), None)
+    clave = (usuario or "ness", id_)
+    with _DISCO_LOCK:
+        _DISCO_OLVIDOS[clave] = _DISCO_OLVIDOS.get(clave, 0) + 1
+        _DISCO.pop(clave, None)
 
 
-def _fotos_en_disco(usuario: str, id_: str, fresco: bool = False) -> dict[str, dict[str, float]]:
+def _numero_finito(valor) -> bool:
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+        return False
+    try:
+        return math.isfinite(valor)
+    except OverflowError:  # un entero que no cabe en un float
+        return False
+
+
+def _entrada_valida(par) -> bool:
+    """¿Es `[cuando, {tipo: {nombre: mtime}}]`? Lo demás se relee del Drive."""
+    if not isinstance(par, (list, tuple)) or len(par) != 2:
+        return False
+    cuando, fotos = par
+    if not _numero_finito(cuando) or not isinstance(fotos, dict):
+        return False
+    for tipo in TIPOS_FOTO:
+        mapa = fotos.get(tipo)
+        if not isinstance(mapa, dict):
+            return False
+        if not all(_numero_finito(m) for m in mapa.values()):
+            return False
+    return True
+
+
+def _cargar_disco(usuario: str) -> None:
+    """Trae de Redis lo último leído de ese usuario, una vez por proceso. Lo
+    que ya esté en memoria es más nuevo y no se pisa, y lo olvidado en este
+    proceso tampoco vuelve: la copia de Redis es anterior al olvido."""
+    if usuario in _DISCO_CARGADOS:
+        return
+    with _DISCO_CARGA_LOCK:
+        if usuario in _DISCO_CARGADOS or time.time() < _DISCO_REINTENTO.get(usuario, 0):
+            return
+        try:
+            r = servicio._redis()
+            if not r.is_available():
+                _DISCO_REINTENTO[usuario] = time.time() + _DISCO_REINTENTO_S
+                return
+            guardado = r.get_json(servicio.DISCO.format(usuario=usuario))
+        except Exception:  # noqa: BLE001 — sin copia se lee del Drive, como siempre
+            _DISCO_REINTENTO[usuario] = time.time() + _DISCO_REINTENTO_S
+            return
+        with _DISCO_LOCK:
+            if isinstance(guardado, dict):
+                for id_, par in guardado.items():
+                    clave = (usuario, id_)
+                    if _entrada_valida(par) and clave not in _DISCO_OLVIDOS:
+                        _DISCO.setdefault(clave, (par[0], par[1]))
+            _DISCO_CARGADOS.add(usuario)
+
+
+def _guardar_disco() -> None:
+    """Deja en Redis lo que hay en memoria, un documento por usuario. Solo de
+    quien ya se cargó: si no, se perdería su copia, y un usuario sin nada en
+    memoria tiene que vaciar la suya para que lo olvidado no vuelva. Entradas
+    y cargados se toman juntos: un usuario que acaba de cargarse no puede
+    escribirse con una foto de la memoria anterior a su carga."""
+    r = servicio._redis()
+    if not r.is_available():
+        return
+    por_usuario: dict[str, dict] = {}
+    with _DISCO_LOCK:
+        cargados = list(_DISCO_CARGADOS)
+        for (usuario, id_), (cuando, fotos) in _DISCO.items():
+            por_usuario.setdefault(usuario, {})[id_] = [cuando, fotos]
+    for usuario in cargados:
+        r.set_json(servicio.DISCO.format(usuario=usuario), por_usuario.get(usuario, {}))
+
+
+def _fotos_en_disco(usuario: str, id_: str, fresco: bool = False,
+                    rapido: bool = False) -> dict[str, dict[str, float]]:
     """{tipo: {«01.jpg»: mtime}} leyendo cada carpeta UNA vez. En el Drive
     montado, preguntar por un fichero que no existe cuesta cientos de ms;
-    listar la carpeta, uno solo."""
+    listar la carpeta, uno solo. `rapido` es para los listados: vale lo
+    guardado aunque tenga más de `_DISCO_TTL_S`."""
     clave = (usuario or "ness", id_)
+    _cargar_disco(clave[0])
     guardado = _DISCO.get(clave)
-    if guardado and not fresco and time.time() - guardado[0] < _DISCO_TTL_S:
+    if guardado and not fresco and (rapido or time.time() - guardado[0] < _DISCO_TTL_S):
         return guardado[1]
     raiz = dir_replica(usuario, id_)
+    previo = guardado[1] if guardado else {}
+    olvidos = _DISCO_OLVIDOS.get(clave, 0)
     salida: dict[str, dict[str, float]] = {}
+    fallo = False
     for tipo in TIPOS_FOTO:
         try:
             with os.scandir(raiz / tipo) as it:
                 salida[tipo] = {e.name: e.stat().st_mtime for e in it if e.is_file()}
-        except OSError:
+        except FileNotFoundError:
             salida[tipo] = {}
-    _DISCO[clave] = (time.time(), salida)
+        except OSError:
+            # El Drive ha fallado, no es que no haya fotos: vaciarlo sacaría el
+            # carrusel de Mis tandas y movería las tandas.
+            salida[tipo] = previo.get(tipo, {})
+            fallo = True
+    # Si se subió una foto mientras se leía, esta lectura ya es vieja y guardarla
+    # dejaría el semáforo puesto sobre la foto anterior hasta la próxima relectura.
+    if not fallo:
+        with _DISCO_LOCK:
+            if _DISCO_OLVIDOS.get(clave, 0) == olvidos:
+                _DISCO[clave] = (time.time(), salida)
     return salida
 
 
 def precalentar() -> int:
-    """Relee el disco de todas las réplicas de carrusel (de todos los
-    usuarios) para que la primera visita a «Mis tandas › Fotos» no espere al
-    Drive. Devuelve cuántas leyó."""
+    """Relee el disco de las réplicas de carrusel (de todos los usuarios) que
+    no se han leído o llevan más de `_DISCO_REFRESCO_S`, para que la primera
+    visita a «Mis tandas › Fotos» no espere al Drive. Devuelve cuántas leyó."""
     from concurrent.futures import ThreadPoolExecutor
 
     r = servicio._redis()
@@ -456,11 +565,15 @@ def precalentar() -> int:
     except OSError:
         return 0
     pares = []
+    limite = time.time() - _DISCO_REFRESCO_S
     for u in usuarios:
+        _cargar_disco(u)
         ids = (r.get_json(servicio.INDICE.format(usuario=u)) or {}).get("ids") or []
-        pares += [(u, i) for i in ids if _ID.fullmatch(i or "")]
+        pares += [(u, i) for i in ids if _ID.fullmatch(i or "")
+                  and _DISCO.get((u, i), (0,))[0] < limite]
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(lambda p: _fotos_en_disco(*p, fresco=True), pares))
+    _guardar_disco()
     return len(pares)
 
 
@@ -479,12 +592,18 @@ async def bucle_precalentado(stop) -> None:
             await asyncio.wait_for(stop.wait(), timeout=600)
         except asyncio.TimeoutError:
             pass
+    # Lo olvidado desde la última vuelta no debe volver con la copia de Redis.
+    try:
+        await asyncio.to_thread(_guardar_disco)
+    except Exception as e:  # noqa: BLE001
+        log.warning("no se pudo guardar el disco de replicar carrusel: %s", e)
 
 
-def con_estado(doc: dict) -> dict:
-    """El documento + qué fotos hay ya en disco de cada diapositiva."""
+def con_estado(doc: dict, rapido: bool = False) -> dict:
+    """El documento + qué fotos hay ya en disco de cada diapositiva. `rapido`:
+    ver `_fotos_en_disco`."""
     usuario, id_ = doc.get("usuario") or "ness", doc["id"]
-    hay = _fotos_en_disco(usuario, id_)
+    hay = _fotos_en_disco(usuario, id_, rapido=rapido)
     diapos = []
     for d in doc.get("diapositivas") or []:
         nombre = f"{int(d['n']):02d}.jpg"

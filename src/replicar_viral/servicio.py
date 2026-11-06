@@ -31,6 +31,7 @@ PROMPT = Path(__file__).parent / "prompts" / "replicar.md"
 MODELO = "gemini-2.5-flash"
 CLAVE = "replicar_viral:{id}"
 INDICE = "replicar_viral:indice:{usuario}"
+DISCO = "replicar_viral:disco:{usuario}"   # {id: [cuándo, {tipo: {foto: mtime}}]}, ver carrusel._cargar_disco
 MAX_INDICE = 5000   # con 200, cada réplica nueva sacaba de Mis tandas a una vieja aunque estuviera en verde (5/11)
 MAX_S = 60
 
@@ -294,13 +295,13 @@ def lista(usuario: str, tipo: str = "", limite: int = 50) -> list[dict]:
 
 
 def _fotos_subidas(doc: dict) -> int:
-    """Cuántas diapositivas de un carrusel tienen ya su foto de Flow (un
-    `iterdir` por carrusel: el estado vive en disco, no en el documento)."""
+    """Cuántas diapositivas de un carrusel tienen ya su foto de Flow (el
+    estado vive en disco, no en el documento)."""
     try:
         from src.replicar_viral import carrusel
 
-        base = carrusel.dir_replica(doc.get("usuario") or "ness", doc.get("id", "")) / "base"
-        return sum(1 for p in base.iterdir() if p.suffix == ".jpg") if base.is_dir() else 0
+        hay = carrusel._fotos_en_disco(doc.get("usuario") or "ness", doc.get("id", ""), rapido=True)
+        return sum(1 for nombre in hay["base"] if nombre.endswith(".jpg"))
     except Exception:  # noqa: BLE001
         return 0
 
