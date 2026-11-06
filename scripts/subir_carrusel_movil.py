@@ -638,7 +638,8 @@ def producto(cid: str) -> None:
         if campo:
             break
     if not campo:
-        raise SystemExit("No se abrió «Cambiar nombre»: ¿producto sin stock («No disponible», mira 3_producto), sin ese ID o el sonido lo impide?")
+        captura("3_sin_campo")            # 6/11: este texto NO puede decir «sin stock»: subir_prebf lo tomaba por agotado y saltaba sin probar la ruta normal
+        raise SystemExit("No se abrió «Cambiar nombre»: ¿«No disponible» (mira 3_sin_campo), sin ese ID o el sonido lo impide?")
     if campo:
         nombre = nombre_enlace(c)
         for _ in range(3):                # Gboard a veces cambia letras («Fruti»): se comprueba y se reescribe
