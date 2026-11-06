@@ -1,6 +1,8 @@
 """Sube un carrusel de Mis tandas (fotos) a TikTok desde un móvil por ADB y se para antes de Publicar.
 
-Probado el 26/10/2026 en el OPPO de Néstor (1440x3168, TikTok ES). Fases:
+Probado el 26/10/2026 en el OPPO de Néstor (1440x3168, TikTok ES). Los puntos de cada móvil están en
+PERFILES y se eligen por `wm size` (MOVIL_PERFIL=oppo|mi8 manda); los del Mi 8 son provisionales hasta
+calibrarlos con capturas. Fases:
 
     python scripts/subir_carrusel_movil.py preparar <id>   # baja ZIP, copia fotos, guarda el sonido en Favoritos
     python scripts/subir_carrusel_movil.py editor <id>     # fotos → sonido → caption → producto por ID
@@ -47,6 +49,37 @@ CARPETA_MOVIL = "/sdcard/Pictures/carr_tmp"
 MCP_URLS = Path(__file__).resolve().parent.parent / "MCP_URLS.local.md"
 USUARIO = os.environ.get("MCP_USUARIO", "ness")
 
+# Puntos de la UI de TikTok por móvil. Un perfil por pantalla: escalar no basta (densidades distintas).
+PERFILES = {
+    "oppo": {   # 1440x3168, densidad 560: probado
+        "tamano": (1440, 3168),
+        "swipe_ficha": (720, 2600, 720, 1200), "swipe_sonido": (720, 900, 720, 2800),
+        "mas": (720, 3024), "galeria": (141, 2991), "album": (688, 243), "y_max_album": 400,
+        "rejilla": (417, 552, 477, 483),   # x, y, paso x, paso y
+        "pildora_sonido": (660, 372), "fila_favorito": (600, 1845), "cerrar_panel_sonido": (720, 750),
+        "y_max_sonido": 500, "caption": (700, 980), "atras": (96, 237),
+        "enlace_x": 720, "enlace_y_defecto": 2116, "cerrar_enlace": (1341, 2226), "x_pildora_x": 906,
+        "anadir_x": 1188, "anadir_ys": (840, 1044), "confirmar_producto": (720, 1698),
+        "anadir_abajo": (720, 2970), "sugerencia": (723, 578), "vaciar": (1188, 405),
+        "historial": (340, 759), "zona_comerciales": (450, 1500), "buscar_comercial": (1296, 402),
+        "check_comercial": (1278, 640),
+    },
+    "mi8": {   # 1080x2248, densidad 440: PROVISIONAL, sin calibrar con capturas
+        "tamano": (1080, 2248),
+        "swipe_ficha": (540, 1845, 540, 852), "swipe_sonido": (540, 640, 540, 1990),
+        "mas": (540, 2050), "galeria": (106, 2020), "album": (516, 154), "y_max_album": 278,
+        "rejilla": (313, 358, 397, 362),
+        "pildora_sonido": (495, 256), "fila_favorito": (450, 1413), "cerrar_panel_sonido": (540, 553),
+        "y_max_sonido": 357, "caption": (525, 733), "atras": (72, 150),
+        "enlace_x": 540, "enlace_y_defecto": 1625, "cerrar_enlace": (1006, 1712), "x_pildora_x": 680,
+        "anadir_x": 891, "anadir_ys": (626, 786), "confirmar_producto": (540, 1298),
+        "anadir_abajo": (540, 2000), "sugerencia": (542, 418), "vaciar": (891, 303),
+        "historial": (255, 560), "zona_comerciales": (331, 1183), "buscar_comercial": (972, 301),
+        "check_comercial": (958, 466),
+    },
+}
+_perfil: dict | None = None
+
 
 # ---------------------------------------------------------------- adb básico
 def reconectar() -> bool:
@@ -91,6 +124,40 @@ def screencap() -> bytes:
             return png
         reconectar()
     return png
+
+
+def perfil() -> dict:
+    """Perfil del móvil conectado, una sola consulta. Tamaño desconocido → para: tocar a ciegas podría publicar mal."""
+    global _perfil
+    if _perfil is None:
+        nombre = os.environ.get("MOVIL_PERFIL")
+        if nombre:
+            if nombre not in PERFILES:
+                raise SystemExit(f"MOVIL_PERFIL desconocido: {nombre}")
+            _perfil = PERFILES[nombre]
+        else:
+            salida = adb("shell", "wm", "size")
+            m = re.search(r"Physical size: (\d+)x(\d+)", salida) or re.search(r"(\d+)x(\d+)", salida)
+            tamano = tuple(map(int, m.groups())) if m else None
+            _perfil = next((p for p in PERFILES.values() if p["tamano"] == tamano), None)
+            if _perfil is None:
+                raise SystemExit(f"Pantalla sin perfil: {salida.strip()!r} (añádelo a PERFILES o usa MOVIL_PERFIL)")
+    return _perfil
+
+
+def pt(nombre: str):
+    return perfil()[nombre]
+
+
+def deslizar(nombre: str, ms: int) -> None:
+    adb("shell", "input", "swipe", *map(str, pt(nombre)), str(ms))
+
+
+def toque_foto(i: int) -> None:
+    """Foto i de la rejilla de 3 columnas; lo más nuevo arriba."""
+    x, y, paso_x, paso_y = pt("rejilla")
+    fila, col = divmod(i, 3)
+    tap(x + paso_x * col, y + paso_y * fila, 1)
 
 
 def tap(x: int, y: int, espera: float = 1.5) -> None:
@@ -180,7 +247,8 @@ def texto_zona(y0: int, y1: int) -> str:
     from PIL import Image
 
     png = screencap()
-    Image.open(io.BytesIO(png)).convert("L").crop((0, y0, 1440, y1)).save(TMP / "sh" / "ocr.png")
+    im = Image.open(io.BytesIO(png)).convert("L")
+    im.crop((0, y0, im.width, y1)).save(TMP / "sh" / "ocr.png")
     return subprocess.run(["tesseract", str(TMP / "sh" / "ocr.png"), "-", "-l", "spa", "--psm", "6"],
                           capture_output=True, text=True).stdout
 
@@ -283,7 +351,7 @@ def al_escaparate(pid: str) -> bool:
         sin_stock(pid, "la ficha dice «eliminado/no disponible» (6_ficha)")
     # el stock sale en el panel «Información de la promoción», que sube al 2.º deslizamiento
     for _ in range(2):
-        adb("shell", "input", "swipe", "720", "2600", "720", "1200", "600")
+        deslizar("swipe_ficha", 600)
         time.sleep(2)
         if buscar(r"Sin existen", intentos=1):
             captura("6_panel")
@@ -296,7 +364,7 @@ def al_escaparate(pid: str) -> bool:
     if not pulsar(r"Añadir al escaparate", 4):
         # Al deslizar sube el panel «Información de la promoción»: ahí sale el stock y el botón
         for _ in range(3):
-            adb("shell", "input", "swipe", "720", "2600", "720", "1200", "600")
+            deslizar("swipe_ficha", 600)
             time.sleep(2)
             if buscar(r"Sin existen", intentos=1):
                 captura("6_panel")
@@ -396,7 +464,7 @@ def preparar(cid: str) -> None:
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
         "-d", c["musica"]["tiktok"]["enlace"], PAQUETE)
     time.sleep(6)
-    adb("shell", "input", "swipe", "720", "900", "720", "2800", "300")  # a veces abre a media página
+    deslizar("swipe_sonido", 300)  # a veces abre a media página
     time.sleep(2)
     # Guardado de antes → quitar y volver a guardar: así queda el PRIMERO de Favoritos
     if pulsar(r"^Guardado$"):
@@ -443,35 +511,34 @@ def editor(cid: str) -> None:
     adb("shell", "am", "force-stop", PAQUETE)
     adb("shell", "monkey", "-p", PAQUETE, "-c", "android.intent.category.LAUNCHER", "1")
     time.sleep(7)
-    tap(720, 3024, 4)                     # «+»
-    tap(141, 2991, 3)                     # galería
+    tap(*pt("mas"), 4)                     # «+»
+    tap(*pt("galeria"), 3)                     # galería
     # Solo el álbum carr_tmp: en «Recientes» se cuelan capturas y vídeos más nuevos
-    if not any(n["text"] == "carr_tmp" and n["y"] < 400 for n in nodos()):
-        tap(688, 243, 2)                  # desplegable de álbumes
+    if not any(n["text"] == "carr_tmp" and n["y"] < pt("y_max_album") for n in nodos()):
+        tap(*pt("album"), 2)                  # desplegable de álbumes
         if not pulsar(r"^carr_tmp$", 3):
             raise SystemExit("No encuentro el álbum carr_tmp")
     if not buscar(r"Siguiente", intentos=1):
         pulsar(r"Selección múltiple")     # activa los círculos
-    for i in range(n_fotos):              # rejilla 3 columnas; lo más nuevo arriba
-        fila, col = divmod(i, 3)
-        tap(417 + 477 * col, 552 + 483 * fila, 1)
+    for i in range(n_fotos):
+        toque_foto(i)
     captura("1_seleccion")
     if not pulsar(rf"Siguiente \({n_fotos}\)", 5):
         raise SystemExit("No veo «Siguiente (N)»: revisa la selección")
 
     # Sonido desde Favoritos
     for _ in range(2):                    # a veces la fila no ha cargado y queda «Añadir sonido»
-        tap(660, 372, 3)                  # píldora del sonido recomendado
+        tap(*pt("pildora_sonido"), 3)                  # píldora del sonido recomendado
         pulsar(r"^Favoritos$", 4)
-        tap(600, 1845, 3)                 # primera fila = el último guardado (el dump no ve la lista)
-        tap(720, 750, 2)                  # cierra el panel
-        if not any(n["text"] == "Añadir sonido" and n["y"] < 500 for n in nodos()):
+        tap(*pt("fila_favorito"), 3)                 # primera fila = el último guardado (el dump no ve la lista)
+        tap(*pt("cerrar_panel_sonido"), 2)                  # cierra el panel
+        if not any(n["text"] == "Añadir sonido" and n["y"] < pt("y_max_sonido") for n in nodos()):
             break
     captura("2_sonido")
     pulsar(r"^Siguiente$", 4)
 
     # Caption
-    tap(700, 980, 2)
+    tap(*pt("caption"), 2)
     tecla(113, 50)                        # Ctrl+V
     time.sleep(1)
     # A veces TikTok antepone un hashtag suyo (p. ej. del sonido): se borra lo que haya delante.
@@ -524,16 +591,15 @@ def rapido(cid: str) -> None:
         captura("r_sonido")
         raise SystemExit("No veo «Usar sonido» (mira r_sonido)")
     time.sleep(3)
-    tap(141, 2991, 3)                     # galería (miniatura abajo a la izquierda)
-    if not any(n["text"] == "carr_tmp" and n["y"] < 400 for n in nodos()):
-        tap(688, 243, 2)
+    tap(*pt("galeria"), 3)                     # galería (miniatura abajo a la izquierda)
+    if not any(n["text"] == "carr_tmp" and n["y"] < pt("y_max_album") for n in nodos()):
+        tap(*pt("album"), 2)
         if not pulsar(r"^carr_tmp$", 3):
             raise SystemExit("No encuentro el álbum carr_tmp")
     if not buscar(r"Siguiente", intentos=1):
         pulsar(r"Selección múltiple")
     for i in range(len(locales)):
-        fila, col = divmod(i, 3)
-        tap(417 + 477 * col, 552 + 483 * fila, 1)
+        toque_foto(i)
     captura("1_seleccion")
     if not pulsar(rf"Siguiente \({len(locales)}\)", 5):
         raise SystemExit("No veo «Siguiente (N)»: revisa la selección")
@@ -542,7 +608,7 @@ def rapido(cid: str) -> None:
     captura("2_sonido")
     copiar_caption(c)                     # Keep y vuelta: el editor sigue igual
     pulsar(r"^Siguiente$", 4)
-    tap(700, 980, 2)
+    tap(*pt("caption"), 2)
     tecla(113, 50)                        # Ctrl+V
     time.sleep(1)
     inicio = c["caption"][:20]
@@ -561,7 +627,7 @@ def rapido(cid: str) -> None:
 
 def al_editor() -> None:
     """Atrás desde publicar: a veces pasa por «Vista previa» (con «Editar fotos»)."""
-    tap(96, 237, 3)
+    tap(*pt("atras"), 3)
     if pulsar(r"^Editar fotos$", 3):
         return
 
@@ -569,7 +635,7 @@ def al_editor() -> None:
 def abrir_enlace() -> None:
     """Fila «Añadir enlace»: el nodo con desc es un icono estrecho; se toca la fila entera."""
     n = next((n for n in nodos() if n["text"] == "Añadir enlace"), None)
-    tap(720, n["y"] if n else 2116, 3)
+    tap(pt("enlace_x"), n["y"] if n else pt("enlace_y_defecto"), 3)
 
 
 def consulta_comercial(c: dict) -> str:
@@ -592,10 +658,10 @@ def producto(cid: str) -> None:
         # El sonido del viral no deja producto: se quita, se pone el producto y se
         # buscan comerciales con su título. NO se elige a ciegas: lo decide Néstor.
         if not pulsar(r"^Cerrar$"):       # cierra «Añadir enlace» (su altura cambia)
-            tap(1341, 2226, 2)
+            tap(*pt("cerrar_enlace"), 2)
         al_editor()
-        x = next((n for n in nodos() if n["desc"] == "Cerrar" and n["y"] < 500), None)
-        tap(x["x"] if x else 906, 372, 2) # «x» de la píldora del sonido
+        x = next((n for n in nodos() if n["desc"] == "Cerrar" and n["y"] < pt("y_max_sonido")), None)
+        tap(x["x"] if x else pt("x_pildora_x"), pt("pildora_sonido")[1], 2) # «x» de la píldora del sonido
         pulsar(r"^Siguiente$", 4)
         abrir_enlace()
         _comercial = True
@@ -625,15 +691,15 @@ def producto(cid: str) -> None:
         (TMP / f"escaparate_{pid}").write_text("1")   # el reintento de preparar abrirá la ficha y lo añadirá
         raise SystemExit(f"{pid} no sale al buscarlo: no está en el escaparate (mira 6_ficha de preparar)")
     campo = []
-    for y in (840, 1044):                 # «Añadir» del único resultado: su altura cambia (la lista no sale en el dump)
-        tap(1188, y, 4)
+    for y in pt("anadir_ys"):                 # «Añadir» del único resultado: su altura cambia (la lista no sale en el dump)
+        tap(pt("anadir_x"), y, 4)
         if buscar(r"Obtener una muestra", intentos=1):
             tecla(4)                      # se pulsó la tarjeta, no «Añadir»
             time.sleep(2)
             continue
         campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
         if not campo:                     # a veces «¿Añadir producto al vídeo?» (el dump no lo ve)
-            tap(720, 1698, 4)
+            tap(*pt("confirmar_producto"), 4)
             campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
         if campo:
             break
@@ -653,32 +719,32 @@ def producto(cid: str) -> None:
             print("AVISO: el nombre del enlace no salió bien, lo reescribo")
         tecla(111)                        # oculta el teclado
     if not pulsar(r"^Añadir$", 4):
-        tap(720, 2970, 4)
+        tap(*pt("anadir_abajo"), 4)
     if _comercial:
         al_editor()
-        tap(660, 372, 4)                  # con producto solo salen «Sonidos comerciales»
+        tap(*pt("pildora_sonido"), 4)                  # con producto solo salen «Sonidos comerciales»
         escribir(consulta_comercial(c))
         time.sleep(3)
-        tap(723, 578, 8)                  # primera sugerencia: con Enter a veces no hay resultados
+        tap(*pt("sugerencia"), 8)                  # primera sugerencia: con Enter a veces no hay resultados
         for _ in range(2):                # a veces sale «No se encontraron resultados»: repetir desde el historial
             if not buscar(r"No se encontraron", intentos=1):
                 break
-            tap(1188, 405, 2)             # vaciar
+            tap(*pt("vaciar"), 2)             # vaciar
             tecla(4)                      # oculta teclado → se ve el historial
             time.sleep(2)
-            tap(340, 759, 8)              # primera búsqueda del historial (la misma)
+            tap(*pt("historial"), 8)              # primera búsqueda del historial (la misma)
         # lista vacía sin aviso (no sale en el volcado): «Buscar» y, si nada, otras consultas del estilo
-        hay = lambda: re.search(r"[A-Za-z]{3,}", texto_zona(450, 1500))  # noqa: E731
+        hay = lambda: re.search(r"[A-Za-z]{3,}", texto_zona(*pt("zona_comerciales")))  # noqa: E731
         for q in [None, "slowed", "trending", "pop"]:
             if hay():
                 break
             print(f"AVISO: sin sonidos comerciales; pruebo {q or '«Buscar»'}", flush=True)
             if q:
-                tap(1188, 405, 2)         # vaciar
+                tap(*pt("vaciar"), 2)         # vaciar
                 escribir(q)
-            tap(1296, 402, 8)             # «Buscar» (la lista queda por encima del teclado)
+            tap(*pt("buscar_comercial"), 8)             # «Buscar» (la lista queda por encima del teclado)
         captura("5_comerciales")
-        tap(1278, 640, 4)                 # check del primero: el más parecido
+        tap(*pt("check_comercial"), 4)                 # check del primero: el más parecido
         captura("5_comercial")
         pulsar(r"^Siguiente$", 4)
     captura("4_final")

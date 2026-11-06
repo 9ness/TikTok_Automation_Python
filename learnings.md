@@ -1414,3 +1414,4 @@
 - 2026-11-06 · Social1 «You must be subscribed to filter videos»: la cuenta del 30/10 pasó a Free Plan/Canceled en una semana → mirar /account antes de buscar; sin suscripción solo queda ana.json (datos viejos)
 - 2026-11-06 · pedidos.py llevaba el swipe del Oppo (y=2700, fuera de pantalla en el Mi 8) → coordenadas según wm size
 - 2026-11-06 · pedidos.py solo cogía importes en € y perdía los de Polonia (zł), y no marcaba «Anuncios de la tienda» → lee cualquier moneda y marca anuncio; pedidos_sumar.py pasa a € y suma por ID sin duplicar
+- 2026-11-06 · `crontab <fichero>` con ruta de más de ~100 caracteres la corta, da «No such file» y no cambia nada → instalar con `crontab - < fichero` y comprobar con `crontab -l`.
