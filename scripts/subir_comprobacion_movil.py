@@ -7,7 +7,7 @@ Cupo diario: 6 (o 10) comprobaciones; el contador sale tras la primera.
 Uso: subir_comprobacion_movil.py <ronda> <n> [video]   («video» = reanudar con el vídeo ya elegido)
 Lee <ronda>/SUBIDA.json (numero, archivo, product_id, nombre_enlace, caption); apunta en SUBIDAS.log.
 Capturas de antes/después y de fallos en <ronda>/subida/. Ver docs/CUENTA_ARABE.md §5."""
-import sys, time, re, unicodedata, subprocess
+import sys, time, re, unicodedata, subprocess, html
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -40,6 +40,7 @@ if DESDE != 'video':
         m.adb("shell","am","force-stop",m.PAQUETE); time.sleep(2)
         m.adb("shell","am","start","-a","android.intent.action.VIEW","-d",f"https://www.tiktok.com/view/product/{it['product_id']}",m.PAQUETE)
         time.sleep(14); m.sin_guia_proximidad()
+        if ve(r'artículo está agotado', 1): falla('producto AGOTADO: no se sube')   # sin «Crear ahora», el botón queda en «Añadido al escaparate» (6/11)
         for _ in range(4):
             if m.buscar(r'^\s*(Crear ahora|Añadir al escaparate)$', 1): return
             if m.pulsar(r'Gana .*€', 4, 1): continue
@@ -55,10 +56,13 @@ if DESDE != 'video':
     time.sleep(3)
     if not any(x['clase'].endswith('EditText') for x in m.nodos()):
         m.tap(540, 1278, 4)                   # «Vídeos» de «¿Cómo quieres promocionar…?» (no sale en el volcado)
-    for _ in range(3):                        # diálogo nuevo (4/11): «¿Añadir producto al vídeo?» → «Añadir»;
+    for _ in range(6):                        # diálogo nuevo (4/11): «¿Añadir producto al vídeo?» → «Añadir»;
         if any(x['clase'].endswith('EditText') for x in m.nodos()): break   # a veces tarda en salir (5/11)
         if ve(r'Añadir producto al', 2):
-            debe(r'^\s*Añadir$', 4); break
+            p = m.ocr(r'^Añadir$')            # anclado: ve() quita el ^$ y casaba con el «¿Añadir» del título (6/11)
+            if not p: falla('no veo el botón «Añadir»')
+            m.tap(*p, 4); continue
+        time.sleep(2)
     campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
     if not campo: falla('no sale «Cambiar nombre del producto»')
     for intento in range(2):                  # con el móvil cargado se cuela un espacio o se pierde una letra
@@ -78,10 +82,10 @@ if DESDE != 'video':
             m.pegar()
         time.sleep(1)
         campo = next((x for x in m.nodos() if x['clase'].endswith('EditText')), None)
-        if campo and campo['text'].strip().lower() == nombre.lower(): break
+        if campo and html.unescape(campo['text']).strip().lower() == nombre.lower(): break   # el volcado da «&amp;»
         print(f'nombre mal escrito ({campo and campo["text"]!r}), reintento')
         if not campo: break
-    if not campo or campo['text'].strip().lower() != nombre.lower(): falla(f'nombre mal escrito: {campo and campo["text"]!r}')
+    if not campo or html.unescape(campo['text']).strip().lower() != nombre.lower(): falla(f'nombre mal escrito: {campo and campo["text"]!r}')
     m.tap(700, 371, 4)                        # letras rojas «Haz una comprobación previa de tu vídeo» (enlace dentro del texto)
     if not ve(r'Sube un', 5): falla('no sale la comprobación')
     m.tap(540, 908, 3)
