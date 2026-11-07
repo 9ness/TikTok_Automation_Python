@@ -197,7 +197,9 @@ fotogramas repartidos y compáralos lado a lado con la foto limpia del producto
 de poner un **verde**, revisión densa: un fotograma cada 0,5 s en rejilla
 (`ffmpeg -vf "fps=2,scale=-2:300,tile=8x3"`) buscando lo que dura medio
 segundo: manos deformes, objetos que aparecen/desaparecen, el producto que
-cambia en el corte entre clips, texto raro. El verde se sube sin mirar. En la duda entre dos colores, el
+cambia en el corte entre clips, texto raro; (3) **movimiento**: `python3 scripts/medir_movimiento.py <mp4>`, verde solo con
+media ≥ 2 y ningún clip < 1,5 (si no, TikTok lo sanciona como «contenido estático»; ver
+`comun/revision-calidad.md`). El verde se sube sin mirar. En la duda entre dos colores, el
 más prudente. Escribe siempre el motivo en una frase («taza lisa, igual en
 los dos clips» · «champú con texto en el bote» · «el clip 2 la pinta roja»).
 El color vale para ESE montaje: si se rehace, vuelve a «sin revisar».

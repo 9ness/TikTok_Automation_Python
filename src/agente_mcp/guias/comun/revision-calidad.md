@@ -168,9 +168,15 @@ no sirva.
   otro» y rechaza si sale duplicado; y rechaza **texto inventado** sobre el
   producto (rótulos en la mochila o en la bolsa) que no esté en la foto.
 
-- **Vídeo demasiado estático** (hipótesis, no confirmada; el detector es
-  inconsistente): TikTok sancionó (-4) «contenido estático / slideshow» un
-  vídeo con el clip casi como una foto (cámara fija, producto quieto, solo
-  un dedo que se mueve). Rechaza el clip sin movimiento de cámara ni de mano
-  y pide en la pista «la cámara se mueve suavemente / se acerca despacio, la
-  mano se mueve con naturalidad». Ver `APELACIONES.md`.
+- **Vídeo demasiado estático (OBLIGATORIO, confirmado 3 veces):** TikTok sanciona
+  (-4, quita el producto del vídeo) «contenido estático / slideshow» los vídeos
+  que parecen una foto: botas 29/9 (movimiento 1,63, un clip 1,15) y tapa de
+  microondas 7/11 (0,85, un clip 0,35). En el prompt de vídeo, PROHIBIDO pedir
+  «todo quieto / cámara fija / la mano casi no se mueve» para evitar cosas
+  flotando: pide **la cámara se acerca despacio o se desplaza un poco, como un
+  móvil en la mano** y **la mano hace algo real con el producto** (lo coge por el
+  asa, lo pone en su sitio, abre la puerta), más un movimiento con sentido
+  (vapor, plato que gira). Lo que no se puede mover es el producto por sí solo.
+  **Mide antes del semáforo:** `python3 scripts/medir_movimiento.py <vídeo.mp4>`
+  → media y por mitad (≈ clip). Verde solo si la media ≥ 2 y ningún clip < 1,5;
+  entre 1,5 y 2, ámbar con el motivo; por debajo, rehacer el clip. Ver `APELACIONES.md`.

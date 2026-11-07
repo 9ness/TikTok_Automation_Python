@@ -1444,3 +1444,5 @@
 - 2026-11-07 · Omni con producto de empuje (escoba): mueve el cabezal aunque pidas quietud; si la suciedad está entre el cabezal y la mano, pasa por encima y aparecen dientes → la imagen debe dejar la suciedad MÁS ALLÁ del cabezal, nunca debajo de su recorrido.
 - 2026-11-07 · Para el segundo plano de un producto, usar de referencia una imagen buena ya generada y cambiar solo el entorno da mejor consistencia que volver a la foto de ficha; ojo, ficha.png de mi8_gmv no siempre es la ficha.
 - 2026-11-07 · Carruseles Ama Shop en el Mi 8: 24 seguidos a ~4,5 min con 1 min de espera tras publicar y sin puzle; un fallo suelto de Keep («no veo Cortar») se arregla con force-stop de Keep y TikTok y repitiendo ese carrusel.
+- 2026-11-07 · sanción -4 «estático» en la tapa de microondas (mov. 0,85, clip 1 0,35) por prompts Omni de «todo quieto» → pedir paseo/acercamiento de cámara y mano en movimiento; medir con tblend+signalstats (ffmpeg -nostdin en bucles) y no publicar < 1,5
+- 2026-11-07 · scripts/medir_movimiento.py + regla en revision-calidad.md y mis-tandas.md: verde solo con movimiento ≥2 y ningún clip <1,5; prompts sin «todo quieto»
