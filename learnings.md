@@ -1433,3 +1433,4 @@
 - 2026-11-07 · Omni dijo «desde la talla 44» en las dos versiones del clip aunque el prompt no lo pedía → transcribir siempre lo hablado (Deepgram + Whisper small) y, si sobra una frase al inicio, cortar el clip gratis antes de regenerar
 - 2026-11-07 · dias_mi8.py: `a_datos()` exige OCR de «Personalizado»/«Ayer», que falla en chips grises con aviso arriba → force-stop y «no encuentro Ver detalles» (fallback 228,843 no da en TikTok Studio, real ≈205,882). A mano: Perfil › TikTok Studio › Ver detalles › «>» › chip Ayer y `leer()`; Ganancias entra por «Más» (946,1640). Conviene detectar «Datos clave».
 - 2026-11-07 · `carrusel.ver` no es solo lectura: en réplicas sin `musica` llama a tikwm y guarda → para leer en masa usar `servicio.ver`.
+- 2026-11-07 · `amashop_preparar_subida.py` no saca el ID de enlaces cortos vm.tiktok.com (su curl no sigue al `shop.tiktok.com/es/pdp/<id>` del 301) → pendiente de arreglo; `pedidos.py` sí vale en el Mi 8 (70 s, 25 pedidos).
