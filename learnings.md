@@ -1431,3 +1431,4 @@
 - 2026-11-07 · subida_diaria.py en el Mi 8 con reiniciar=False: sin force-stop de TikTok, para no perder la cuenta activa ni provocar otra vez el puzle.
 - 2026-11-07 · mis_tandas: las fotos no traen campo `tareas` y usan `subido`; los vídeos traen `uploaded` y `tareas` → casar carruseles con una tarea por ID de `product_url`.
 - 2026-11-07 · Omni dijo «desde la talla 44» en las dos versiones del clip aunque el prompt no lo pedía → transcribir siempre lo hablado (Deepgram + Whisper small) y, si sobra una frase al inicio, cortar el clip gratis antes de regenerar
+- 2026-11-07 · dias_mi8.py: `a_datos()` exige OCR de «Personalizado»/«Ayer», que falla en chips grises con aviso arriba → force-stop y «no encuentro Ver detalles» (fallback 228,843 no da en TikTok Studio, real ≈205,882). A mano: Perfil › TikTok Studio › Ver detalles › «>» › chip Ayer y `leer()`; Ganancias entra por «Más» (946,1640). Conviene detectar «Datos clave».
