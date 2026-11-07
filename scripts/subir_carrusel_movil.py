@@ -36,8 +36,10 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import unicodedata
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -336,6 +338,7 @@ def mcp(herramienta: str, argumentos: dict) -> dict:
 
 
 CACHE = TMP / "tandas.json"
+_CERROJO_ENLACES = threading.Lock()
 
 
 def carrusel(cid: str) -> dict:
@@ -344,6 +347,14 @@ def carrusel(cid: str) -> dict:
         c["musica"]["tiktok"] = {"titulo": f"fijo {SONIDO_ID}",
                                  "enlace": f"https://www.tiktok.com/music/sonido-{SONIDO_ID}"}
     return c
+
+
+def _guardar_cache(datos: dict) -> None:
+    """Con rename: el lote baja en hilos y nadie debe leer el JSON a medias."""
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = CACHE.with_name(f"{CACHE.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(datos, ensure_ascii=False))
+    tmp.replace(CACHE)
 
 
 def _carrusel(cid: str) -> dict:
@@ -361,8 +372,7 @@ def _carrusel(cid: str) -> dict:
             return c
     # Caché vieja o inexistente (4/11: «No encuentro» → force-stop y reintento): se pide fresca y se guarda
     datos = mcp("mis_tandas", {"fotos": True})
-    CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE.write_text(json.dumps(datos, ensure_ascii=False))
+    _guardar_cache(datos)
     c = buscar(datos)
     if c:
         return c
@@ -451,9 +461,27 @@ def nombre_enlace(c: dict) -> str:
     return out
 
 
+def _enlace_fresco(c: dict) -> str:
+    """El enlace firmado dura 24 h y cae al cambiar MCP_TOKEN_SALT; la caché puede ser más vieja.
+
+    Bajo cerrojo y mirando antes la caché: si caducan todos, Mis tandas se pide una sola vez.
+    """
+    with _CERROJO_ENLACES:
+        nuevo = _carrusel(c["id"])["zip"]
+        if nuevo != c["zip"]:
+            return nuevo
+        CACHE.unlink(missing_ok=True)
+        return _carrusel(c["id"])["zip"]
+
+
 def bajar_fotos(c: dict, d: Path) -> None:
     """El ZIP lo arma la app al vuelo: ~2 min. Por eso el lote los baja todos a la vez."""
-    zipdata = urllib.request.urlopen(c["zip"], timeout=400).read()
+    try:
+        zipdata = urllib.request.urlopen(c["zip"], timeout=400).read()
+    except urllib.error.HTTPError as e:
+        if e.code not in (403, 410):
+            raise
+        zipdata = urllib.request.urlopen(_enlace_fresco(c), timeout=400).read()
     with zipfile.ZipFile(io.BytesIO(zipdata)) as z:
         fotos = sorted(n for n in z.namelist() if n.lower().endswith((".jpg", ".jpeg", ".png")))
         for i, n in enumerate(fotos, 1):
@@ -465,7 +493,7 @@ def lote() -> None:
     """Una llamada a Mis tandas + todos los ZIP pendientes en paralelo, antes de tocar el móvil."""
     from concurrent.futures import ThreadPoolExecutor
     datos = mcp("mis_tandas", {"fotos": True})
-    CACHE.write_text(json.dumps(datos, ensure_ascii=False))
+    _guardar_cache(datos)
     pend = [c for t in datos["tandas"] for c in t.get("items", t.get("carruseles", []))
             if not c.get("subido") and not c.get("sin_stock")]
 

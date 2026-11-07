@@ -1530,13 +1530,8 @@ def _usuario_token(token: str) -> str:
     return u
 
 
-@router.get("/api/mcp/{token}/archivo")
-async def archivo(token: str, r: Annotated[str, Query()] = "",
-                  b: Annotated[str, Query()] = "") -> Response:
-    """Descarga para el agente: `r` = GET interno de la API, `b` = fichero de la bandeja."""
-    u = config.usuario_de_token(token)
-    if not u:
-        return Response("Token no válido", status_code=401)
+async def _servir_archivo(u: str, r: str, b: str) -> Response:
+    """`r` = GET interno de la API, `b` = fichero de la bandeja."""
     try:
         if b:
             p = archivos.ruta_en_bandeja(u, b)
@@ -1552,9 +1547,38 @@ async def archivo(token: str, r: Annotated[str, Query()] = "",
     import mimetypes
 
     tipo = tipo or mimetypes.guess_type(nombre)[0] or "application/octet-stream"
+    from urllib.parse import quote
+
+    nombre = nombre or "archivo"
+    # Las cabeceras van en latin-1: un título en árabe daba 500 en la descarga.
+    plano = re.sub(r'[^\x20-\x7e]|["\\]', "_", nombre)
     return Response(datos, media_type=tipo, headers={
-        "Content-Disposition": f'attachment; filename="{nombre or "archivo"}"',
+        "Content-Disposition": f"attachment; filename=\"{plano}\"; filename*=UTF-8''{quote(nombre, safe='')}",
         "Cache-Control": "no-store"})
+
+
+@router.get("/api/mcp/{token}/archivo")
+async def archivo(token: str, r: Annotated[str, Query()] = "",
+                  b: Annotated[str, Query()] = "") -> Response:
+    """Descarga con el token: ya no la dan las herramientas, queda por los
+    enlaces que un agente tenga guardados de antes."""
+    u = config.usuario_de_token(token)
+    if not u:
+        return Response("Token no válido", status_code=401)
+    return await _servir_archivo(u, r, b)
+
+
+@router.get("/api/mcp-archivo")
+async def archivo_firmado(u: Annotated[str, Query()] = "", r: Annotated[str, Query()] = "",
+                          b: Annotated[str, Query()] = "", exp: Annotated[str, Query()] = "",
+                          s: Annotated[str, Query()] = "") -> Response:
+    """Descarga con enlace firmado: un fichero, 24 h, sin el token del MCP."""
+    estado = config.comprobar_enlace(u, r, b, exp, s)
+    if estado == "caducado":
+        return Response("Enlace caducado: vuelve a pedirlo a la herramienta", status_code=410)
+    if estado != "ok":
+        return Response("Enlace no válido", status_code=403)
+    return await _servir_archivo(u, r, b)
 
 
 @router.post("/api/mcp/{token}/subir")

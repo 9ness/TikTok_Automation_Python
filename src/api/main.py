@@ -549,6 +549,8 @@ _PREFIJOS_PRO = (
     # Néstor está bloqueado) y solo ella puede dar los permisos desde SU móvil.
     # Solo escribe tokens que Meta valida; nunca devuelve ninguno.
     "/api/v1/multiplataforma/meta/",
+    # Descargas firmadas del MCP: las abre también quien tiene sesión de `pro`.
+    "/api/mcp-archivo",
     "/api/v1/auth",
     "/api/v1/health",
     "/ws/queue",

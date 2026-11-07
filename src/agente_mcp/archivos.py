@@ -10,7 +10,6 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from urllib.parse import quote
 
 import httpx
 
@@ -181,11 +180,11 @@ def fotogramas(datos: bytes, n: int = 4, lado: int = 640) -> tuple[list[bytes], 
 # Enlaces de descarga para el agente (pasan por el proxy del MCP)
 # ---------------------------------------------------------------------------
 def enlace_interno(usuario: str, ruta_api: str) -> str:
-    """URL pública que sirve un GET interno de la API con el token del MCP."""
+    """URL pública firmada (24 h) que sirve un GET interno de la API."""
     if not ruta_api:
         return ""
-    return f"{config.url_mcp(usuario)}/archivo?r={quote(ruta_api, safe='')}"
+    return config.enlace_firmado(usuario, ruta=ruta_api)
 
 
 def enlace_bandeja(usuario: str, rel: str) -> str:
-    return f"{config.url_mcp(usuario)}/archivo?b={quote(rel, safe='')}"
+    return config.enlace_firmado(usuario, bandeja=rel)

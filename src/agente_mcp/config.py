@@ -17,8 +17,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
+import time
 from pathlib import Path
+from urllib.parse import quote, urlencode
+
 from src.rutas_drive import AI_PRO_REL
 
 GUIAS_DIR = Path(__file__).resolve().parent / "guias"
@@ -59,6 +63,46 @@ def usuario_de_token(token: str) -> str | None:
 
 def url_mcp(usuario: str) -> str:
     return f"{base_publica()}/api/mcp/{token_de(usuario)}"
+
+
+# ---------------------------------------------------------------------------
+# Enlaces de descarga firmados: valen para UN fichero y caducan. Los enlaces
+# acaban en logs, JSON de subida y chats; con el token dentro, cualquiera que
+# los viera tenía el MCP entero. Cambiar `MCP_TOKEN_SALT` también los anula.
+# ---------------------------------------------------------------------------
+CADUCIDAD_ENLACE_S = 24 * 3600
+
+
+def _firma_enlace(usuario: str, ruta: str, bandeja: str, exp: int) -> str:
+    clave = hmac.new(_clave(), b"enlace-descarga", hashlib.sha256).digest()
+    # JSON y no concatenar: ningún reparto de los campos da el mismo mensaje.
+    mensaje = json.dumps([usuario, ruta, bandeja, exp], ensure_ascii=False)
+    return hmac.new(clave, mensaje.encode(), hashlib.sha256).hexdigest()[:40]
+
+
+def enlace_firmado(usuario: str, *, ruta: str = "", bandeja: str = "") -> str:
+    """URL pública de descarga de un fichero, sin el token del MCP."""
+    exp = int(time.time()) + CADUCIDAD_ENLACE_S
+    consulta = urlencode({"u": usuario, "r": ruta, "b": bandeja, "exp": exp,
+                          "s": _firma_enlace(usuario, ruta, bandeja, exp)}, quote_via=quote)
+    return f"{base_publica()}/api/mcp-archivo?{consulta}"
+
+
+def comprobar_enlace(usuario: str, ruta: str, bandeja: str, exp: str, firma: str) -> str:
+    """"ok", "caducado" o "malo". La firma se mira antes que la fecha, para no
+    decirle a quien prueba enlaces inventados que su fecha es vieja."""
+    from src.api import users
+
+    try:
+        caduca = int(exp)
+    except (TypeError, ValueError):
+        return "malo"
+    if not usuario or not hmac.compare_digest(
+            _firma_enlace(usuario, ruta, bandeja, caduca).encode(), (firma or "").encode()):
+        return "malo"
+    if not users.existe(usuario):
+        return "malo"
+    return "ok" if time.time() < caduca else "caducado"
 
 
 # ---------------------------------------------------------------------------

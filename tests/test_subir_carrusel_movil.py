@@ -1,5 +1,9 @@
 """Los puntos del Oppo no pueden moverse: la subida nocturna depende de ellos."""
 import importlib.util
+import io
+import urllib.error
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -73,3 +77,49 @@ def test_toque_foto_en_oppo(m, monkeypatch):
     monkeypatch.setattr(m, "tap", lambda x, y, e: toques.append((x, y, e)))
     m.toque_foto(4)
     assert toques == [(417 + 477, 552 + 483, 1)]
+
+
+def _zip():
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("1.jpg", b"x")
+    return b.getvalue()
+
+
+def _caducado(url):
+    return urllib.error.HTTPError(url, 410, "caducado", None, None)
+
+
+def test_enlace_caducado_pide_mis_tandas_una_vez_para_todo_el_lote(m, tmp_path, monkeypatch):
+    monkeypatch.setattr(m, "CACHE", tmp_path / "c" / "tandas.json")
+    viejos = [{"id": str(i), "zip": f"viejo{i}"} for i in range(6)]
+    m._guardar_cache({"tandas": [{"items": viejos}]})
+    pedidas = []
+
+    def mcp(_nombre, _args):
+        pedidas.append(1)
+        return {"tandas": [{"items": [{"id": c["id"], "zip": "nuevo" + c["id"]} for c in viejos]}]}
+
+    def urlopen(url, timeout=0):
+        if url.startswith("viejo"):
+            raise _caducado(url)
+        return io.BytesIO(_zip())
+
+    monkeypatch.setattr(m, "mcp", mcp)
+    monkeypatch.setattr(m.urllib.request, "urlopen", urlopen)
+    for c in viejos:
+        (tmp_path / c["id"]).mkdir()
+    with ThreadPoolExecutor(6) as ex:
+        list(ex.map(lambda c: m.bajar_fotos(c, tmp_path / c["id"]), viejos))
+    assert len(pedidas) == 1
+    assert all(any((tmp_path / c["id"]).iterdir()) for c in viejos)
+
+
+def test_otro_error_de_descarga_no_reintenta(m, tmp_path, monkeypatch):
+    def urlopen(url, timeout=0):
+        raise urllib.error.HTTPError(url, 500, "mal", None, None)
+
+    monkeypatch.setattr(m.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(m, "mcp", lambda *_: pytest.fail("no debe pedir Mis tandas"))
+    with pytest.raises(urllib.error.HTTPError):
+        m.bajar_fotos({"id": "1", "zip": "x"}, tmp_path)

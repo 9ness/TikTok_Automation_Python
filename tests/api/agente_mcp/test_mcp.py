@@ -163,6 +163,99 @@ def test_token_malo_401(app_client, usuarios):
     assert app_client.get("/api/mcp/ness.malo/archivo", params={"b": "x"}).status_code == 401
 
 
+# ---------------------------------------------------------------------------
+# Enlaces firmados
+# ---------------------------------------------------------------------------
+def _consulta(url: str) -> dict:
+    from urllib.parse import parse_qs, urlsplit
+
+    return {k: v[0] for k, v in parse_qs(urlsplit(url).query, keep_blank_values=True).items()}
+
+
+@pytest.fixture
+def bandeja(usuarios, monkeypatch, tmp_path):
+    monkeypatch.setenv("AUTH_COOKIE_KEY", "clave")
+    monkeypatch.setenv("AGENTE_BANDEJA_DIR", str(tmp_path))
+    (tmp_path / "ness").mkdir()
+    (tmp_path / "ness" / "a ñ.txt").write_text("hola")
+    (tmp_path / "ness" / "otro.txt").write_text("secreto")
+    return tmp_path
+
+
+def test_enlace_sin_token_y_descarga(app_client, bandeja):
+    url = archivos.enlace_bandeja("ness", "a ñ.txt")
+    assert config.token_de("ness") not in url
+    assert config.token_de("ness").split(".")[1] not in url
+    assert "/api/mcp-archivo?" in url
+    r = app_client.get("/api/mcp-archivo", params=_consulta(url))
+    assert r.status_code == 200 and r.text == "hola"
+    assert r.headers["cache-control"] == "no-store"
+    assert "filename*=UTF-8''a%20%C3%B1.txt" in r.headers["content-disposition"]
+
+
+def test_enlace_interno_lleva_la_ruta_con_su_consulta(bandeja, monkeypatch):
+    url = archivos.enlace_interno("ness", "/api/v1/mis-tandas/fotos/zip?tanda=3&x=a b")
+    q = _consulta(url)
+    assert q["r"] == "/api/v1/mis-tandas/fotos/zip?tanda=3&x=a b" and q["b"] == ""
+    assert config.comprobar_enlace(q["u"], q["r"], q["b"], q["exp"], q["s"]) == "ok"
+    assert archivos.enlace_interno("ness", "") == ""
+
+
+def test_enlace_caduca_a_las_24_horas(app_client, bandeja, monkeypatch):
+    ahora = 1_800_000_000
+    monkeypatch.setattr(config.time, "time", lambda: ahora)
+    q = _consulta(archivos.enlace_bandeja("ness", "a ñ.txt"))
+    assert int(q["exp"]) == ahora + 24 * 3600
+    monkeypatch.setattr(config.time, "time", lambda: ahora + 24 * 3600 - 1)
+    assert app_client.get("/api/mcp-archivo", params=q).status_code == 200
+    monkeypatch.setattr(config.time, "time", lambda: ahora + 24 * 3600)
+    assert app_client.get("/api/mcp-archivo", params=q).status_code == 410
+
+
+@pytest.mark.parametrize("campo,valor", [
+    ("b", "otro.txt"),            # otro fichero
+    ("u", "ana"),                 # otro usuario
+    ("exp", "9999999999"),        # alargar la fecha
+    ("exp", "mañana"),
+    ("s", "0" * 40),
+    ("s", ""),
+    ("s", "ñ"),                   # no ASCII: no debe dar 500
+])
+def test_enlace_manipulado_403(app_client, bandeja, campo, valor):
+    q = _consulta(archivos.enlace_bandeja("ness", "a ñ.txt"))
+    assert app_client.get("/api/mcp-archivo", params={**q, campo: valor}).status_code == 403
+
+
+def test_enlace_no_cambia_de_ruta_a_bandeja(app_client, bandeja):
+    q = _consulta(archivos.enlace_interno("ness", "/api/v1/x"))
+    assert app_client.get("/api/mcp-archivo", params={**q, "r": "", "b": "/api/v1/x"}).status_code == 403
+
+
+def test_enlace_de_usuario_borrado_403(app_client, bandeja, monkeypatch):
+    from src.api import users
+
+    q = _consulta(archivos.enlace_bandeja("ness", "a ñ.txt"))
+    monkeypatch.setattr(users, "existe", lambda u: False)
+    assert app_client.get("/api/mcp-archivo", params=q).status_code == 403
+
+
+def test_enlace_ruta_fuera_de_la_api_400(app_client, bandeja):
+    q = _consulta(config.enlace_firmado("ness", ruta="/etc/passwd"))
+    assert app_client.get("/api/mcp-archivo", params=q).status_code == 400
+
+
+def test_cambiar_la_sal_anula_los_enlaces(app_client, bandeja, monkeypatch):
+    q = _consulta(archivos.enlace_bandeja("ness", "a ñ.txt"))
+    monkeypatch.setenv("MCP_TOKEN_SALT", "otra")
+    assert app_client.get("/api/mcp-archivo", params=q).status_code == 403
+
+
+def test_el_token_del_mcp_no_firma_enlaces(bandeja):
+    """Quien tenga un enlace no saca de él nada que valga para otro fichero."""
+    q = _consulta(archivos.enlace_bandeja("ness", "a ñ.txt"))
+    assert q["s"] != config.token_de("ness").split(".")[1]
+
+
 def test_guias_publicas_y_sin_salirse(app_client):
     r = app_client.get("/api/v1/agente/guias/comun/app.md")
     assert r.status_code == 200 and "text/markdown" in r.headers["content-type"]
@@ -233,3 +326,34 @@ def test_subir_clip_manda_explicitas_las_herramientas_de_montaje(menu, ruta_list
         assert datos[k] is True, k
     asyncio.run(menus.subir_clip(c, "3", 2, b"x", "clip_2.mp4", flecha=False))
     assert api.formularios[1][1]["con_flecha"] is False
+
+
+def test_ruta_vieja_con_token_sigue_descargando(app_client, bandeja):
+    r = app_client.get(f"/api/mcp/{config.token_de('ness')}/archivo", params={"b": "a ñ.txt"})
+    assert r.status_code == 200 and r.text == "hola"
+
+
+def test_enlace_nombre_con_salto_de_linea_no_entra_en_la_cabecera(app_client, bandeja):
+    (bandeja / "ness" / 'mal\r\nX-Otra: 1".txt').write_text("hola")
+    url = archivos.enlace_bandeja("ness", 'mal\r\nX-Otra: 1".txt')
+    r = app_client.get("/api/mcp-archivo", params=_consulta(url))
+    assert r.status_code == 200 and "x-otra" not in r.headers
+    assert 'filename="mal__X-Otra: 1_.txt"' in r.headers["content-disposition"]
+
+
+def test_enlace_firmado_no_sale_de_la_bandeja(app_client, bandeja):
+    (bandeja / "ana").mkdir()
+    (bandeja / "ana" / "suyo.txt").write_text("de ana")
+    (bandeja / "ness" / "atajo.txt").symlink_to(bandeja / "ana" / "suyo.txt")
+    for b in ("../ana/suyo.txt", "atajo.txt"):
+        r = app_client.get("/api/mcp-archivo", params=_consulta(config.enlace_firmado("ness", bandeja=b)))
+        assert r.status_code != 200 and "de ana" not in r.text
+
+
+def test_enlace_lo_abre_un_pro_con_sesion(app_client, bandeja, monkeypatch):
+    from src.api import main
+
+    monkeypatch.setattr(main, "usuario_de_request", lambda _r: "ana")
+    monkeypatch.setattr(main._users, "es_admin", lambda _u: False)
+    r = app_client.get("/api/mcp-archivo", params=_consulta(archivos.enlace_bandeja("ness", "a ñ.txt")))
+    assert r.status_code == 200 and r.text == "hola"
