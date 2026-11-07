@@ -1,745 +1,53 @@
 # CLAUDE.md — Contexto del proyecto
 
 > Este archivo se carga automáticamente al abrir el proyecto. Mantenlo conciso —
-> cada línea consume contexto en cada sesión.
+> cada línea consume contexto en cada sesión. El detalle de cada nicho/módulo vive en
+> `docs/contexto/*.md` (texto literal): **si tu tarea toca uno de esos temas, léelo ANTES de tocar código.**
 
 ## 🦴 Modo CAVEMAN (ACTIVO)
 Regla estricta: Respuestas de 1-2 líneas máximo. Cero explicaciones, cortesías o resúmenes. Solo tool calls y confirmación de archivos modificados.
 
 ## Resumen del proyecto
 
-`TikTok_Automation_Python` — fábrica Streamlit que genera vídeos virales 9:16
-para TikTok. **4 programas principales** seleccionables en la sidebar (Creator
-Reward / TikTok Shop / Editor Auto / Tiktok Shop AI Pro), cada uno con sus
-nichos.
+`TikTok_Automation_Python` — fábrica que genera vídeos virales 9:16 para TikTok
+(API FastAPI + frontend Next.js; `main.py` es la UI Streamlit legacy, ya no se sirve). **4 programas**
+aislados, cada uno con sus nichos. Tabla completa con todas las celdas largas:
+[`docs/contexto/resumen-nichos-completo.md`](docs/contexto/resumen-nichos-completo.md).
 
-### Programa 1 — Creator Reward (existente)
-
-| Nicho | Modo | Propósito |
+| Programa | Nicho / modo | Propósito |
 |---|---|---|
-| 🏛️ Presidentes Top 5 | `PRESIDENTS_TOP5` | Rankings de presidentes USA con guion IA + assets locales |
-| 📊 Pronósticos Diarios | `PRONOSTICOS_DIARIOS` | Vídeos de pronósticos deportivos desde Redis (bet-ai-master) |
-| 🛡️ Quitar Copy | `COPYRIGHT_CLEANER` | Re-subtitula vídeos para evadir copyright |
-| 🏗️ Construcción POV | `CONSTRUCCION_POV` | Vídeo input → guion Gemini 1ª persona → voz MiniMax EN + anti-copy + subs |
-| 🔧 Herramientas · Voces | (sin modo) | Hub global voces MiniMax: presets ES/EN + clonado reutilizable entre modos |
+| 1 Creator Reward | 🏛️ Presidentes Top 5 `PRESIDENTS_TOP5` | Rankings de presidentes USA, guion IA + assets locales |
+| | 📊 Pronósticos Diarios `PRONOSTICOS_DIARIOS` | Pronósticos deportivos desde Redis (bet-ai-master) |
+| | 🛡️ Quitar Copy `COPYRIGHT_CLEANER` | Re-subtitula vídeos para evadir copyright |
+| | 🏗️ Construcción POV `CONSTRUCCION_POV` | Vídeo input → guion Gemini 1ª persona → voz MiniMax EN + anti-copy + subs |
+| | 🔧 Herramientas · Voces | Hub global de voces MiniMax: presets ES/EN + clonado |
+| 2 TikTok Shop | 🛒 Generador Shop `TIKTOK_SHOP` | Vídeos affiliate AI con Seedance/Veo3, multi-cuenta, multi-producto |
+| 3 Editor Auto | ✂️ Editor Auto `EDITOR_AUTO` | Edita vídeo input con flujo configurable de herramientas (subs, cortador de silencios + IA...) |
+| 4 AI Pro | 📦 Mis tandas | Primero del menú: lo ya montado (POV BOF, Largo, Multimodo) de 10 en 10, con semáforo 🟢🟡🔴 antes de subir. Solo lee |
+| | 🔁 Replicar viral · 🎞️ Replicar virales · 🖼️ Replicar carrusel | Copiar la fórmula de un viral (vídeo o carrusel de fotos) con un producto nuestro |
+| | 🚀 Viralización 1K `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote por ponente, sin repetir recursos |
+| | 🎙️ POV BOF Largo `NICHO_POV_BOF_LARGO_VIDEO` | POV BOF con guion IA para ESE producto + voz Fish; 2 clips |
+| | 🧪 Cuenta Piloto `CUENTA_PILOTO_VIDEO` | Productos que sube el operador (2 fotos), varios vídeos por producto |
+| | 🎛️ Moda Mujer · Multimodo (`mm_*`) | Formatos mudos de 10 s/20 s y seis hablados de ropa, elegidos por producto por un agente |
+| | 🎯 Nicho POV BOF | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso por carpeta |
+| | 🎨 Creativos Pro · 🖼️ Carruseles · 💬 Plantillas mensajes · 🧢 Gorras | Módulos 13/14/11 y mensajes a vendedores; sin edición de vídeo |
+| | 🌐 Nicho General · UGC `NICHO_GENERAL_ESCENAS/VIDEO` | Módulo 9: anuncio de TRES clips pegados |
+| | 🎬 BOF Cinematográfico `NICHO_BOF_CINE_VIDEO` · 👗 Ropa Con Personas `NICHO_ROPA_PERSONAS_VIDEO` · 👕 Ropa Sin Personas `NICHO_ROPA_VIDEO` | Módulos 10, 7 y 8 |
 
-### Programa 2 — TikTok Shop (en construcción)
+Punto de entrada: API `uvicorn src.api.main:app`; legacy `streamlit run main.py`.
 
-| Función | Modo | Propósito |
+## Detalle por nicho/módulo (leer ANTES de tocarlo)
+
+| Tema | Lee | Gotchas que muerden |
 |---|---|---|
-| 🛒 Generador Shop | `TIKTOK_SHOP` | Vídeos affiliate AI con Seedance/Veo3, multi-cuenta, multi-producto |
-
-### Programa 3 — Editor Auto
-
-| Función | Modo | Propósito |
-|---|---|---|
-| ✂️ Editor Auto | `EDITOR_AUTO` | Edita vídeo input con flujo configurable de herramientas componibles por usuario (subs, cortador silencios + IA, ...) |
-
-### Programa 4 — Tiktok Shop AI Pro
-
-| Función | Modo | Propósito |
-|---|---|---|
-| 📦 Mis tandas | (sin modo — no edita vídeo) | PRIMERO del menú para los tres: lo ya montado en POV BOF, POV BOF Largo y Multimodo del usuario, de 10 en 10 con fecha y época. Solo lee; subido/sin stock/rehacer escriben en el nicho de cada vídeo (`src/mis_tandas/`, guía `mis-tandas.md`). Semáforo 🟢🟡🔴 de revisión antes de subir por vídeo y montaje (`mis_tandas:semaforo:<usuario>`, MCP `semaforo_tanda`; rojo marca rehacer). Época por vídeo (`mis_tandas:epoca:<usuario>`, MCP `epoca_video`) y cuentas `SOLO_HABLADOS` (Ana): tandas de 6 hablados y mudos aparte en «Solo Meta». Filtro 🎯 por tarea de Campañas de creadores (N vídeos de productos concretos antes de una fecha; casa por ID de producto; `mis_tandas:tareas:<usuario>`, `src/mis_tandas/tareas.py`, MCP `guardar_tarea`/`tareas_tiktok`) |
-| 🔁 Replicar viral | (sin modo — solo texto) | Enlace de TikTok (lo baja tikwm) + producto del catálogo POV → Gemini ve el vídeo y devuelve guion de voz en off + prompts de 2 clips mudos de 8 s (`src/replicar_viral/`, MCP `replicar_viral`, guía `replicar-viral.md`). Se monta con el estilo `viral` del Largo (carpeta «Réplicas virales») |
-| 🎞️ Replicar virales | (sin modo — no edita vídeo) | MP4 de un viral replicado y YA MONTADO por el agente, `con_ia` (Omni) o `sin_ia` (real), con título y enlace de TikTok Shop → sale solo en Mis tandas (`rv|<id>`) con semáforo (`src/replicar_viral/video.py`, mismo Redis `replicar_viral:` con `tipo="video"` e índice propio `replicar_viral:videos:<usuario>`, MP4 en `Nebulabs/TikTok/TikTok Shop/Replicar_Viral/<usuario>/`, MCP `registrar_replica_video`/`listar_replicas_video`, guía `replicar-virales.md`) |
-| 🖼️ Replicar carrusel | (sin modo — solo texto) | Enlace de un carrusel de FOTOS (tikwm `images`) + producto POV → Gemini devuelve por diapositiva rol, texto adaptado y prompt de Flow; las fotos se generan a mano, se suben y se les quema el texto con el motor de Carruseles → ZIP (`src/replicar_viral/carrusel.py`, mismo Redis `replicar_viral:` con `tipo="carrusel"`, fotos en `Nebulabs/TikTok/TikTok Shop/Replicar_Carrusel/`, MCP `replicar_carrusel`/`subir_imagen_carrusel`/`descargar_carrusel`, guía `replicar-carrusel.md`). `pais` (10 de TikTok Shop Europa, `carrusel.PAISES`): virales de otros países en su idioma, con bandera. Sale también en Mis tandas |
-| 🚀 Viralización 1K | `VIRALIZACION_BATCH` | Vídeos POV/reacción en lote (gancho + paisajes) por ponente, sin repetir recursos, para llegar a 1000 seguidores |
-| 🎙️ POV BOF Largo | `NICHO_POV_BOF_LARGO_VIDEO` | Como POV BOF pero la voz es un guion escrito por IA para ESE producto y locutado con Fish; el guion se escribe para ~16s (284 car), que es lo que dan DOS clips de 8s sin tener que rebobinar |
-| 🧪 Cuenta Piloto | `CUENTA_PILOTO_VIDEO` | Productos que crea el operador SUBIENDO las dos fotos (no de Drive), por usuario y con VARIOS vídeos por producto; vídeo orgánico + edición del POV BOF |
-| 🎛️ Moda Mujer · Multimodo | (modos `mm_*` de Ropa) | Formatos MUDOS de 10s (espejo solo música, camisetas, zapatillas, marca, Vintage botas/bolsos) + dos de zapatillas de 20s (`mm_zapatillas_pov20`/`_sentado20`: dos clips mudos + guion de dolor locutado con Fish y montado con el editor del POV BOF Largo, `lleva_fish`) + seis HABLADOS de ropa (`mm_habla_*`: espejo, selfie, situación real 1/2, calle dividido, tienda colores; la chica de la cuenta habla en el clip, Omni 1.1 de GenAI Pro, prioritarios para ropa) elegidos producto a producto por un agente; catálogos ropa + zapatos + accesorios (`mujer_zapatos_web`/`mujer_accesorios_web`); vista «multimodo» y tandas de 10 (`/multimodo/tandas`) |
-| 🎯 Nicho POV BOF | (sin modo — fase 1) | Navega el Drive COMPARTIDO "Productos España" y lleva el progreso de qué carpeta de producto ya está hecha |
-| 🎨 Creativos Pro | (sin modo — no edita vídeo) | Módulo 13: un creativo publicitario por producto. Mismo catálogo que POV BOF (fuentes, fotos, textos, hashtags, escaparate, vendidos); solo cambia el prompt y el formato 3:4 |
-| 🖼️ Carruseles | (sin modo — no edita vídeo) | Módulo 14: carrusel de DOS fotos (chica sorprendida + producto) con el texto quemado. Solo productos donde la chica pueda estar EN el sitio |
-| 💬 Plantillas mensajes | (sin modo — no edita vídeo) | Mensajes para el vendedor (muestra gratuita, colaboración) listos para copiar. Editables y guardados POR USUARIO (`src/plantillas/`, prefijo `plantillas:`) |
-| 🧢 Nicho Gorras | (sin modo — no edita vídeo) | Módulo 11: solo listar gorras + textos + prompts; el vídeo se publica tal cual |
-| 🌐 Nicho General · UGC | `NICHO_GENERAL_ESCENAS` · `NICHO_GENERAL_VIDEO` | Módulo 9, formato "UGC Desde 0" (sep 2026): anuncio de TRES clips de 8 o 10s generados por separado y pegados (más, hasta 8, si la tienda pide una duración mínima). Dos ganchos (dolor / general) y dos duraciones, y cada combinación es un anuncio distinto |
-| 🎬 Nicho BOF Cinematográfico | `NICHO_BOF_CINE_VIDEO` | Módulo 10: como POV BOF pero sin mano — DOS clips de 5s con paneo, pegados y cuadrados por velocidad |
-| 👗 Nicho Ropa Con Personas | `NICHO_ROPA_PERSONAS_VIDEO` | Módulo 7: SOLO ropa de mujer, puesta por una modelo creada con IA (ficha JSON por usuario) |
-| 👕 Nicho Ropa Sin Personas | `NICHO_ROPA_VIDEO` | Módulo 8 del curso: prendas de una carpeta de Drive compartida POR ENLACE → textos/caption → prompts (vídeo con y sin manos) → montaje 9:16 SIN texto quemado y MUDO |
-
-Punto de entrada: [`main.py`](main.py). Lanza con `streamlit run main.py`.
-
----
-
-## Nicho 1 — Presidentes Top 5
-
-**Flujo:** OpenAI genera guion JSON → MiniMax TTS por segmento → MoviePy monta
-con imágenes locales de la biblioteca (un Top N de presidentes con datos histó-
-ricos polémicos).
-
-**Assets requeridos** (en `TIKTOK_ROOT_PATH`):
-- `BIBLIOTECA_PRESIDENTES/<NombrePresidente>/` con fotos `.jpg/.png` y vídeos `.mp4/.mov`
-- `BIBLIOTECA_INTRO/Intro/` para el opening
-- `BIBLIOTECA_RECURSOS/` para comodines (siluetas, sonidos)
-
-**Módulos clave:** [`src/guionista.py`](src/guionista.py) (OpenAI),
-[`src/locutor.py`](src/locutor.py) (MiniMax TTS), [`src/logic.py`](src/logic.py)
-(motor v1/v2 de animación), [`src/subtitles.py`](src/subtitles.py) (karaoke),
-[`src/text_hook.py`](src/text_hook.py) (hook box).
-
----
-
-## Nicho 2 — Pronósticos Diarios (más complejo)
-
-**Datos:** Redis Upstash, key `betai:daily_bets_tiktok_video:YYYY-MM` field
-`YYYY-MM-DD`. Schema: payload con array `versions[]` (cron + manuales) y
-`selected_version_id`. Cada versión trae `mode` (`single_match` / `multi_match`)
-+ `script` ya formateado para TTS + lista de picks.
-
-**Flujo:** Redis → MiniMax TTS único → Whisper (word_timings) → detección
-de segmentos (intro / picks / CTA) → MoviePy con stock por equipo + overlays.
-
-**Briefing completo en [`PronosticosAuto.md`](PronosticosAuto.md)** — fuente
-de verdad del schema y comportamiento del proyecto bet-ai-master.
-
-**Módulos clave** (todos en [`src/pronosticos/`](src/pronosticos/)):
-- `data_loader.py` — Redis + manejo de `versions[]` con compat legacy
-- `script_builder_ai.py` (BORRADO en v2 — el guion ya viene de Redis)
-- `segment_locator.py` — detecta `Empezamos/Seguimos/Vamos/Por último`,
-  anchors de dinero (cifra del bote) y CTA midroll
-- `cta_locator.py` — detecta ventana del CTA (incluye fallback `mi perfil`)
-- `league_overlay.py` — mapping liga → archivo logo + render PIL
-- `carousel_renderer.py` — card del pick (deshabilitado por defecto)
-- `stock_search.py` — búsqueda jerárquica (equipo → liga → general) con
-  fuzzy match (`Atletico_madrid` ↔ `Atlético de Madrid`)
-- `pipeline.py` — orquestador
-
-**Assets en `BIBLIOTECA_PRONOSTICOS_CLIPS/`:**
-- Subcarpetas por equipo/liga con `.mp4` (stock)
-- `fotos/perfil.png` — captura del perfil para el CTA midroll
-- `fotos/liga_*.png` y `fotos/copa_*.png` — escudos de ligas/copas
-- `sfx/money.mp3`, `sfx/clink.mp3`, `sfx/camera.mp3` — efectos de sonido
-- `sfx/fondo.mp3` — música de fondo (recortada a la duración del vídeo,
-  fade-out 0.5s, default 20% volumen)
-
-**Voz MiniMax:** la inglesa (`MINIMAX_VOICE_ID`) sirve para Presidentes; para
-Pronósticos hay 3 voces favoritas pre-seleccionables en la UI:
-`Spanish_Strong-WilledBoy`, `Spanish_EnergeticBoy`, `Spanish_PassionateWarrior`
-(todas Standard Spanish del catálogo MiniMax — tono latino-aceptable).
-Override por `PRONOSTICOS_VOICE_ID` o por la UI.
-
-**Capa de audio (de fondo a frente):**
-1. Música fondo (20%)
-2. TTS voz (100%)
-3. SFX dinero (cifra del bote)
-4. SFX clink (1 por pick, en `más/ambos/victoria/doble/...`)
-5. SFX cámara (cuando aparece perfil.png + cuando aparecen logos de ligas)
-
-**Capa visual:**
-- Stock por pick (carpeta del equipo > away > liga > general; reparto dinámico
-  de N clips de ~12s cada uno)
-- Overlay perfil.png durante CTA
-- Overlay logos de ligas durante intro (al pronunciar `ligas/champions/europa`)
-- Saturación post-render con ffmpeg `eq=saturation=1.25` por defecto
-- Subtítulos karaoke palabra-a-palabra con preset `PRONOSTICOS_SUB_STYLE`
-  (Impact bold, lowercase, sin píldora, posición Y 78%)
-
----
-
-## Nicho 3 — Quitar Copy
-
-Sube un vídeo, detecta los subtítulos originales, los enmascara y añade
-nuevos con estilo viral. Usa [`src/video_remover.py`](src/video_remover.py).
-No depende de Redis ni de assets externos.
-
----
-
-## Nicho 4 — Construcción POV
-
-**Flujo:** vídeo input (sin voz) → Gemini 2.5 Pro analiza el vídeo y devuelve
-un guion narrado 1ª persona US English calibrado a la duración real → MiniMax
-TTS (voz preset EN o clonada) → ffmpeg mux audio nuevo sobre vídeo → Whisper
-alinea palabras → transformaciones visuales anti-copy (zoom, saturación,
-metadata strip, opcional 1080p Lanczos) → render karaoke subs sobre el
-resultado. Sin Redis, sin assets externos — todo en runtime.
-
-**Módulos clave** (todos en [`src/construccion_pov/`](src/construccion_pov/)):
-- `gemini_video.py` — cliente Gemini con upload de vídeo (Files API + polling
-  ACTIVE + delete) y fallback dual-key FREE→PAID
-- `script_generator.py` — calcula `target_chars` por duración (15.5 ch/s EN,
-  cola silenciosa 4s) y construye el prompt desde `prompts/pov_script.md`
-- `pipeline.py` — orquestador end-to-end con franjas de progreso
-
-**Voces:** preset MiniMax inglés (`English_*` definidas en
-[`tiktok_shop/config.py:DEFAULT_VOICE_PRESETS_EN`](src/tiktok_shop/config.py))
-o clones globales gestionados desde `/creator-reward/tools/voices` (UI hub).
-
-**Endpoints API:**
-- `POST /api/v1/creator-reward/construccion-pov/enqueue` — multipart con
-  vídeo + style subs + voice_id + anti-copy options
-- `POST /api/v1/voices/clone` — sube sample → MiniMax voice_clone → guarda
-  VoiceClone en Redis (índice `voice:index`)
-- `GET  /api/v1/voices/{id}/sample` — MP3 cacheado para audicionar voz (sin
-  auth, sirve `<audio src>`)
-- `DELETE /api/v1/voices/{id}` — borra clones (presets bloqueados)
-
-**Output:** `<output_folder>/CONSTRUCCION_POV/POV_<stem>_<ts>.mp4`.
-
----
-
-## Programa 2 — TikTok Shop (en construcción)
-
-**Briefing completo en [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md)** —
-fuente de verdad del módulo (arquitectura, esquemas Redis, fases, prompts,
-flujos por tier, Pilot Program, Drive layout).
-
-**Propósito:** afiliado TikTok Shop España. Vídeos AI multi-cuenta × producto
-con Seedance (3 tiers Atlas) o Veo3 / Nano Banana (prompt-only manual).
-Independiente del Programa 1 — selector en sidebar separa ambos.
-
-**Raíz Drive:** `TIKTOK_SHOP/` — HERMANA de `TIKTOK_CR/`, no anidada. Helper
-canónico: `src/tiktok_shop/config.py:resolve_shop_root()` (autodetect con
-override `TIKTOK_SHOP_ROOT_PATH` en .env). Estructura interna:
-`_users/@user/products/{slug}/videos/` + `_products/{slug}/photos_source/`
-+ `_products/{slug}/photos_generated/`.
-
-**Módulos** (todos en [`src/tiktok_shop/`](src/tiktok_shop/)):
-`api/{atlas_cloud,gemini,minimax_clone}.py`,
-`pipeline/{analyzer,strategist,seedance_director,seedance_renderer,veo3_director,nano_banana_prompt_generator,carousel_director,editor,drive_uploader}.py`,
-`prompts/*.md`, `repos/*_repo.py`, `services/{cost_calculator,pilot_tracker,tier_selector,discovery_service,ads_signal,creation_pack}.py`,
-`utils/{duration_splitter,image_url_provider,photo_quality}.py`,
-`ui/{shop_router,tab_*}.py`.
-
-**Redis** (prefijo `tiktok_shop:`): `user:`, `product:`, `generation:`, `voice:`, `discovery:`, `plan:`.
-
-**🔍 Radar de Productos** (tab `ui/tab_radar.py`): descubre productos ganadores
-con inyección de ADS + pocos creadores (estrategia GMV Max) vía EchoTik
-(`ECHOTIK_API_USER`/`ECHOTIK_API_PASSWORD`). `services/discovery_service.py`
-escanea ranklist/keywords → `services/ads_signal.py` puntúa (demanda, pocos
-creadores, ADS, momentum, comisión) → importa a `Product`. Genera también
-carruseles (`pipeline/carousel_director.py` + `prompts/carousel_director.md`).
-Kalodata NO tiene API barata (solo Enterprise) — el proxy de ADS se infiere de
-los vídeos: proxy EchoTik (views altas + engagement bajo + ventas) Y/O la
-ETIQUETA AD real de TikTok leída vía Apify (`apify_cloud.extract_ad_flag` +
-`search_product_ad_videos`) — `ads_signal.ads_injection_signal` combina ambas en
-`gmv_max_likelihood` (0-100) + `probable_boosted`. Selector de fuente en el scan.
-`services/creation_pack.py:build_pack/plan_week` deja el producto LISTO PARA
-CREAR: descarga fotos (image_search), análisis, research de vídeos ganadores,
-genera estilos de vídeo (preset_generator) + carruseles + prompt Nano Banana,
-y escribe `_products/<slug>/PLAN.md` + `prompt_templates/` (+ `_plans/week_*.md`
-repartiendo productos por día). Persiste un `WeekPlan` (`models/week_plan.py`,
-`repos/plan_repo.py`, key `plan:`) → sub-tab "📅 Calendario" muestra qué producto
-probar cada día con checkbox "probado". `Product.origin` ("manual"|"radar")
-distingue los importados por el Radar de los creados a mano (filtro + badge en
-pestaña Productos). UI Radar: sub-tabs "🔎 Descubrir / 🗓️ Plan 7 días /
-📅 Calendario / 🎠 Carruseles".
-Cola unificada con Creator Reward via `JobMode.TIKTOK_SHOP`.
-
-**Tiers** (5, ver [`config.py`](src/tiktok_shop/config.py)):
-🟢 `standard` ($0.018/s i2v) · 🟡 `advanced` ($0.047/s i2v) · 🔴 `pro`
-($0.072/s ref2v multi-shot) · 🟣 `veo3_prompt_only` · 🍌 `nano_banana_prompt_only`.
-Imágenes a Atlas como **base64 inline** (los 3 tiers). Pro acepta hasta 9 refs.
-
-**Críticas:** `ai_disclosure: true` siempre · presencia humana parcial · Pilot
-Program máx 5 shoppable/semana (tracker en `services/pilot_tracker.py`).
-
----
-
-## Programa 4 — Tiktok Shop AI Pro
-
-**Briefing completo en [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md)** —
-fuente de verdad del módulo (arquitectura, banco de candidatos, estilos,
-jitter, numeración, schema Redis).
-
-**Propósito:** vídeos POV/reacción en lote (ponente + b-roll de paisajes)
-para llegar a 1000 seguidores en TikTok Shop — técnica anti-copyright
-"voice-over + b-roll". Sin Redis de negocio como TikTok Shop, solo tracking
-de uso; sin APIs de pago (todo ffmpeg + Whisper local + rclone) → **sin cost
-tracking, a propósito** (ver VIRALIZACION_MODULE.md).
-
-**Módulos** (todos en [`src/viralizacion/`](src/viralizacion/)):
-`config.py` (paths locales + parámetros de render/jitter),
-`repos/{redis_base,usage_repo}.py` (tracking de candidatos ya usados, prefijo
-`viralizacion:`), `services/{allocator,drive_uploader}.py`,
-`pipeline/{resource_scanner,transcriber,styles,renderer,batch}.py`.
-
-**Ponentes:** Pablo Motos y Víctor Küppers (banco de gancho + audios propios,
-paisajes compartidos). Assets en carpeta LOCAL persistente
-(`VIRALIZACION_ASSETS_PATH`, NO Drive montado, NO `/tmp`) — vídeo de gancho
-por ponente + audios + vídeo de paisajes (~61min) + música de fondo.
-
-**3 estilos de subtítulo/filtro** rotando por ronda (A Clásico / B Reveal
-letra-a-letra con glow / C Cinemático karaoke por palabra + letterbox) +
-jitter anti-fingerprint (zoom, duración de paisaje, transición, EQ) por
-clip/vídeo para que la plantilla no deje huella reconocible.
-
-**Nunca repite** gancho ni tramo de paisaje por ponente (Redis SET de
-índices usados, asignación con `PoolExhaustedError` claro si se agota).
-
-Cola unificada con Creator Reward vía `JobMode.VIRALIZACION_BATCH`.
-
-### Nicho POV BOF (mismo programa, fase 1)
-
-Navegador del Drive **compartido conmigo** `Productos España` (2 fuentes:
-`1 Prod Aleatorios` / `2 Prod Aleatorios 2`) con progreso por carpeta de
-producto. **Todavía no genera vídeos.**
-
-Módulos en [`src/nicho_pov_bof/`](src/nicho_pov_bof/): `config.py`,
-`repos/{redis_base,progress_repo,product_repo}.py` (prefijo `nicho_pov_bof:`),
-`services/{drive_client,photo_pairing,text_extractor,audio_bank,backup_sync,product_url}.py`,
-`pipeline/{duration_match,video_editor}.py`, `prompts/*.md`.
-API: `/api/v1/nicho-pov-bof/*`.
-
-`services/product_url.py` averigua la ficha de TikTok Shop
-(`https://www.tiktok.com/view/product/<id>`) desde el título + la tienda. La
-ÚNICA fuente que da el ID es EchoTik (se descartaron URL canónica, Gemini con
-búsqueda web, Apify, DuckDuckGo, fastmoss, kalodata y la web/API de TikTok) y
-cada búsqueda GASTA UNA LLAMADA del plan — por eso va con botón manual por
-producto, cachea en Redis y descarta resultados con poco parecido. El plan
-gratis son 100 llamadas/MES, así que una cuenta seca vuelve a servir al mes:
-`tiktok_shop/repos/echotik_cuentas_repo.py` guarda el banco de cuentas con la
-fecha de su primera llamada (`echotik:cuentas`) y la UI deja volver a la que ya
-haya renovado.
-
-Dos cosas no obvias:
-- El Drive es *shared-with-me* → **no aparece en el mount FUSE**; se lee por
-  CLI con `--drive-shared-with-me`.
-- Dentro de una carpeta hay **nombres de fichero duplicados** (`2.PNG` dos
-  veces). El identificador canónico de una foto es su **file ID**, y se
-  descarga con `rclone backend copyid`.
-
-Tiene fuentes propias más, que NO son del Drive del curso y viven en el Drive
-montado: **«🌐 Productos Web»** (`productos_web`), que se llena importando los
-ZIP que publica la web del curso —carpetas de diez, y el ZIP trae la
-convención AL REVÉS: `N` es la ficha y `N.1` la limpia—, y los **dos catálogos
-del operador**: «Muestras productos» (`mis_productos`, solo ness/nestor2 como Tareas, el slug es el viejo para
-no migrar lo ya guardado; solo IA; una muestra puede ser REEMBOLSABLE —X ventas antes de una fecha, campo `reembolso` del producto, `services/reembolsables.py` con `FUENTES_REEMBOLSO` = Muestras + los dos Productos físicos, revisar cada `REVISAR_CADA_DIAS`, MCP `reembolsables`/`marcar_reembolsable` con `catalogo`, con `importe` € que ordena la prioridad—; además en cualquier catálogo del operador varias MARCAS por producto —`fisico`, `contenido` N vídeos que se descuentan al marcar subido en Mis tandas, `q4`, `clips_reales`— y la lista `prioridades` (contenido → reembolsables por dinero → resto), `services/marcas.py`, MCP `marcar_producto`/`prioridades`, guía `pov-bof.md` §7) y «Tareas Productos» (`tareas_productos`) — muestra
-gratuita o tarea pagada, que no se trabajan igual — más «📦 Productos físicos» (`productos_fisicos`, solo ness/nestor2) y «📦 Productos físicos» de Ana (`productos_fisicos_ana`, solo ella) — oct 2026, productos que tienen en casa para grabar con gancho IA (guía `replicar-virales.md`; `usuarios` en SOURCES filtra el selector; se suben desde el menú «Subir productos», `/tiktok-shop-ai-pro/subir-productos`), «🎄 Temporada Q4» (`temporada_q4`, oct 2026: lo más vendido del Q4 anterior según EchoTik, sin saturar; ficha generada con los datos de EchoTik porque la web de TikTok pide captcha) y «🖼️ Carruseles virales» (`carruseles_virales`, COMPARTIDO: alta desde «Replicar carrusel» con foto + ficha + URL, `src/replicar_viral/catalogo.py`). Los sube él (foto limpia +
-ficha), viven en su Drive (`Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/<slug>/`) en
-carpetas de 10, y un producto se puede mover de uno a otro con sus fotos y sus
-datos (`mis_productos.mover_producto`). Las fotos se guardan con el MISMO
-convenio de nombres del Drive compartido (`3.png` / `3(1).png`) para que
-emparejado, textos, ficha y montaje funcionen sin código especial
-(`services/mis_productos.py`, que lleva los dos catálogos con un `source`).
-
-**TODOS los vídeos son de DOS clips**, montados con el editor del POV BOF Largo
-(`montar`: cuadra cada clip con su parte de la voz y salta del uno al otro en
-una pausa del habla). Sale de medir el banco: los audios duran 9,7-13,9s
-(mediana 12) y un clip da 8s, o 9,6 estirado un 20%; con uno solo faltaba trozo
-en todos y el hueco lo rellenaba el rebobinado (`_build_pingpong`) — en un vídeo
-de 12s, un tercio era ese rebote.
-
-TODOS los vídeos los locuta el guion escrito para ESE producto
-(`prompts/guion_producto.md`, ~190 car → ~10s, Fish) — `JobMode.NICHO_POV_BOF_VIDEO`.
-Lo único que cambia es la CTA, que nombra el pago a plazos y/o el envío gratis
-según lo que el producto CUMPLA (`config.hay_plazos` y
-`nicho_pov_bof_largo.config.hay_envio_gratis`: los leen de la ficha y caen al
-precio —40 € y 10 €— si la captura no lo enseña). Los flags
-`guion_producto_plazos` / `guion_producto_envio` guardan con cuál se escribió;
-con las dos promesas el guion se va a ~269 car (~15s) porque en 10s no caben.
-Cambiar de cierre NO cuesta una llamada: la CTA es un literal fijo del curso,
-así que `config.ajustar_cta` sustituye el final y deja el cuerpo — a Gemini
-solo se va cuando el producto no tiene guion o se pide rehacer. Los cinco textos de Klarna (`prompts/guiones_plazos.md`,
-`JobMode.NICHO_POV_BOF_PLAZOS_VIDEO`) ya no se usan: son genéricos —no nombran
-el producto— y de 253-274 car, o sea vídeos de 13-20s donde se piden 10.
-
-`Productos España` es SOLO LECTURA. El progreso vive en Redis, no en Drive.
-Las salidas futuras irán a `Nebulabs/TikTok/TikTok Shop/Nicho_POV_BOF/`.
-
-### Nicho Ropa Sin Personas (mismo programa, módulo 8)
-
-Módulos en [`src/nicho_ropa/`](src/nicho_ropa/) (prefijo Redis `nicho_ropa:`).
-API: `/api/v1/nicho-ropa/*`. Diferencias con POV BOF:
-- La carpeta de fotos se comparte **por enlace**, no está en "Compartido
-  conmigo" → se lee con `--drive-root-folder-id`, no con `--drive-shared-with-me`.
-- Es UNA sola carpeta con todas las prendas dentro (`NICHO_ROPA_FOLDER_ID`).
-- El vídeo **no lleva ningún texto quemado** y sale **mudo** (la música la pone
-  el operador al publicar); se le puede añadir voz hombre/mujer si se pide.
-- El prompt de vídeo tiene versión CON y SIN manos: se guarda un solo texto y
-  la variante sin manos se deriva quitando `config.LINEA_MANOS`.
-- Además de las 4 carpetas del curso (planas), acepta las de la web por ZIP:
-  cada una es una carpeta MÁS del selector con slug `mujer_web__Carpeta 23`
-  (`services/prendas_web.py`), así el resto del nicho no se entera del nivel
-  nuevo. Reusa el importador del POV BOF para no duplicar la inversión de
-  nombres. Pero **son dos pantallas**, no una: en la web la prenda va PUESTA
-  frente al espejo, así que las carpetas del ZIP viven en "Ropa Mujer/Hombre"
-  (`/tiktok-shop-ai-pro/nicho-ropa-web`) con su prompt y conservando la voz
-  del clip, y "Sin humanos" se queda con las 4 del Drive. Mismo backend y
-  mismo Redis: las separa el flag `web` de `/carpetas`, y la pantalla es el
-  mismo componente con `variante`.
-
-- **Tienda Colores 15s** (`tienda_colores`, Moda Mujer aleatorios) NO es del
-  curso: es la receta de cinco virales de pantalones. Dos clips de 8s (frente
-  / espaldas) como calle dividido, y el gancho —la chica nombra 3-4 colores y
-  el pantalón cambia en cada uno— lo hace el PROPIO generador: el clip 1 se
-  pide en Omni con la imagen 1 en cada color como ingredientes y los cortes
-  atados a la voz (`prompts/*_video_omni.md`, medido de cinco virales). El
-  montaje solo pega, subtitula, pone la flecha y limpia metadatos. Recolorear
-  desde la app (`pipeline/colores.py` + `recolor_video.py`/`recolor.py`) se
-  deja apagado (`TIENDA_COLORES_RECOLOR_VIDEO=1` lo recupera). Los nombres de
-  las variantes los lee el guion de la **captura del selector de colores**
-  subida por prenda (`services/variantes.py`, en `API_TEMP_ROOT/variantes`);
-  el guion guarda `colores` (el puesto, el último) y `colores_hex`. La imagen
-  1 es la chica con mallas y el pantalón a medio poner, y solo se ofrecen las
-  prendas con al menos 3 colores (`minimo_variantes`, de las
-  `Producto_N_Color_K` del ZIP).
-- Los formatos cuyo guion se escribe FUERA (espejo, selfie, gafas) ya no piden
-  pasar por ChatGPT a mano: `services/guionista.py` manda a Gemini el MISMO
-  prompt del curso + los textos y fotos de la prenda, y el bloque para el
-  generador se **monta aquí** (`_montar_video`) con el movimiento literal —
-  pedirle a Gemini que lo copiara lo cortaba por RECITATION. Se guarda por
-  prenda **y por modo** (`product_repo.guardar_guion`).
-
-Reutiliza del POV BOF `photo_pairing`, la descarga de fotos por file ID y el
-motor de extracción (`text_extractor.extract_from_pairs`) — cambia el prompt.
-
-### Nicho Ropa Con Personas (mismo programa, módulo 7)
-
-Módulos en [`src/nicho_ropa_personas/`](src/nicho_ropa_personas/) (prefijo
-Redis `nicho_ropa_personas:`). API: `/api/v1/nicho-ropa-personas/*`. La prenda
-va PUESTA por una modelo generada con IA. Usa las MISMAS carpetas de prendas
-que el módulo 8 (se importan de `nicho_ropa.config`): la foto vale para los dos
-nichos, cambia el prompt.
-
-Paso propio que no tiene ningún otro nicho: **crear la chica**. El operador
-sube una foto de internet, Gemini la mete en la plantilla del curso
-(`prompts/plantilla_chica.json`) y sale una ficha JSON que se guarda con nombre
-y se copia en cada vídeo. Es **por usuario** — la cara es la identidad de la
-cuenta. La plantilla ya trae el bloque `clothing`, así que crear a la chica y
-vestirla con el producto es UN prompt, no dos.
-
-Audios locutados (5 voces de mujer, se sortea una):
-`Nebulabs/TikTok/TikTok Shop/Nicho_Ropa_Personas/audios/mujer/`.
-
-### Nicho POV BOF Largo (mismo programa)
-
-Módulos en [`src/nicho_pov_bof_largo/`](src/nicho_pov_bof_largo/) (prefijo
-Redis `nicho_pov_bof_largo:`). API: `/api/v1/nicho-pov-bof-largo/*`. Es el POV
-BOF con la voz cambiada: en vez de una frase genérica del banco, un **guion
-escrito para ESE producto** (prompt del curso, literal en `prompts/guion.md`)
-y locutado con **Fish Audio** (`FISH_API_KEY`, modelo gratuito
-`s2.1-pro-free`). El guion se escribe para ~16s (284 car), que es lo que dan
-**DOS clips de 8s** sin rebobinar; la duración la manda la voz y el vídeo se
-recorta a ella.
-
-Tres cosas del guion que no son del curso y hay que saber:
-- El **cierre es la pieza de ajuste**, no un texto fijo: hay una escalera de
-  CTA de 43 a 139 caracteres (`config.ctas_posibles`, solo con lo que el
-  producto CUMPLE) y al locutar se elige la que deja el vídeo en su ventana
-  (`ventana_video`, 15-16s), rematando con el acelerón (máx x1.10). Guion
-  largo → cierre corto y acelerar; guion corto → primero cierre largo y luego
-  voz a tono normal. El cuerpo del guion NO se toca: cambiarlo cuesta una
-  llamada y es lo que vende.
-- La duración se pide **en CLIPS, no en segundos sueltos** (`opciones_guion`):
-  con clips de 8s son 2/3/4/5 → 16/24/32/40s, y con los de 10s 2/3/4 →
-  20/30/40s. El tope son 40s (`SEGUNDOS_GUION_TOPE`); 60 se quitó porque la
-  ficha de un producto no da para tanto y el guion se llenaba de relleno.
-  Pedir "30s" con clips de 8 no era múltiplo de nada: salían 3 clips (24s de
-  material) y un vídeo de 26 acelerando la voz.
-- El banco de voces se cambió entero en sep 2026: fuera las de vendedor/locutor
-  (suenan a anuncio en la primera frase), dentro diez `conversational` elegidas
-  escuchándolas decir un guion nuestro. El car/s de cada una está MEDIDO con
-  nuestro texto: el que anuncia el catálogo de Fish se desvía hasta 3 car/s.
-
-**⚡ Modo «Épico»** (`estilo_guion="epico"`): el prompt de dolor + `prompts/guion_epico.md`.
-La IA marca `[[GOLPE: TEXTO | escena]]`, que se guardan en `golpes` y la voz no
-lee. `pipeline/insertos.py` mete tras el montaje un inserto de 1 s por golpe
-(clip de 5 s de Kling subido con `inserto=N`), con destello, texto y
-un sonido del banco `assets/sfx/epico/` (uno por vídeo; boom y letras rojas si el inserto es de fondo blanco), y recorta la pausa de antes y de después. **Desde el 8/10/2026 va SIN insertos** (solo el guion): no se piden ni bloquean el montaje salvo `EPICO_CON_INSERTOS=1`.
-
-**🔄 Venta inversa** (`estilo_guion="inversa"`): «No lo compres si no quieres…»,
-prompt nuestro por ingeniería inversa de la web del curso (`prompts/guion_inversa.md`,
-muestras en `docs/venta_inversa/`); cierre de disponibilidad (`CTAS_INVERSA`), sin precio, siempre 3 clips (`SEGUNDOS_INVERSA`).
-
-**⚡ Acción** (`estilo_guion="accion"`): el «UGC Desde 0 · Gancho Acción» del curso pasado a POV (`prompts/guion_accion.md`, original en `docs/ugc_accion/`): sin dolor, el producto ya en uso y «Mira cómo…», luego características y la CTA de precio de siempre.
-
-**🎁 Regalo** (`estilo_guion="regalo"`, 27/10/2026): prompt nuestro `prompts/guion_regalo.md` — el gancho dice a QUIÉN regalarlo (adulto, situación real), luego características, precio y CTA de siempre; sin promesas de campaña. Se elige por producto (lo que no pega como regalo, dolor o precio).
-
-**🔁 Réplica viral** (`estilo_guion="viral"`, carpeta especial «Réplicas virales», de todos los usuarios): el guion y los prompts de los clips salen de la réplica (`src/replicar_viral/`, campo `replica_id`), sin IA; `POST /replica/anadir` y MCP `anadir_replica`. Siempre 2 clips.
-
-**Calendario de subidas** (qué carpeta toca cada día): [`docs/CALENDARIO_POV_BOF_LARGO.md`](docs/CALENDARIO_POV_BOF_LARGO.md).
-Las carpetas especiales (`CARPETAS_ESPECIALES`: Épico Octubre, Venta Inversa, Q4) van en orden de publicación y con sus fechas en la etiqueta.
-
-**🎄 Productos Q4** (`nicho_pov_bof/services/productos_q4.py`): carpeta real
-«Productos Q4» dentro del Inventario General, primera de la lista y solo para
-`ness`, con COPIAS de productos (fotos + textos + `segundos_guion`) para grabar
-vídeos de Black Friday/Navidad sin pisar el original. Manifiesto
-`q4:manifiesto`; se llena con `POST /q4/anadir` o el MCP `anadir_a_q4`.
-
-Si el producto pasa de `PRECIO_MIN_PLAZOS`, al guion se le añade el bloque de
-`prompts/guion_plazos.md` (una frase de financiación, sin nombrar la pasarela):
-misma estructura del curso, un párrafo más en el prompt. `guion_plazos` guarda
-en qué modo se escribió y se reescribe si el precio lo cambia.
-
-Su pantalla es un CALCO de la del POV BOF (misma UI y flujo) — solo cambia que
-se sube el guion + DOS clips. Comparte catálogo/carpetas/textos/fotos con el POV
-BOF (reusa sus endpoints), pero el **progreso es individual**: carpeta hecha
-(`progress_repo` propio + `/complete`), subido y guion/clips/vídeo viven en
-`nicho_pov_bof_largo:` (`/producto/estado`). Dos progresos son GLOBALES a
-propósito (ver "Escaparate y vendidos" abajo).
-
-### Agentes de IA (MCP) — transversal al Programa 4
-
-[`src/agente_mcp/`](src/agente_mcp/) deja que Claude / ChatGPT / Codex hagan
-el trabajo de un menú: servidor MCP (paquete `mcp` 2.x, `MCPServer`) montado
-en la propia API en `POST /api/mcp/<token>` (Streamable HTTP sin estado,
-JSON). Las herramientas **no reimplementan nada**: llaman a los endpoints de
-cada nicho en proceso (`interno.py`, `httpx.ASGITransport`) con la cookie
-firmada del usuario del token, así que permisos, cola, coste y progreso por
-usuario son los de la web. Adaptador por menú en `menus.py` (POV BOF, Largo,
-Moda Mujer ×2, Ropa Hombre, UGC, Creativos; Carruseles solo guía).
-
-- **Token** = `<usuario>.<HMAC(AUTH_COOKIE_KEY, MCP_TOKEN_SALT)>`: no se guarda
-  en ningún sitio; cambiar `MCP_TOKEN_SALT` revoca todos. La URL de cada uno
-  sale en Settings › «Conectar una IA (MCP)» (`/api/v1/agente/mi-conexion`).
-- **Bandeja**: `Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/` en el Drive — el MCP deja
-  fotos + `PLAN.md` por producto, el agente guarda al lado lo que genera y el
-  MCP lo sube a la app. Es lo único que vale igual para un agente de
-  escritorio (Drive sincronizado) y uno del VPS (mount).
-- **Guías** (`src/agente_mcp/guias/*.md`): la misma fuente la lee el MCP
-  (`guia`), la API la sirve pública en `/api/v1/agente/guias/…` y cada
-  pantalla la enlaza con «Guía IA». **Si cambias el flujo de una pantalla,
-  cambia su guía.**
-
-### Multiplataforma — publicar fuera de TikTok (oct 2026)
-
-[`src/multiplataforma/`](src/multiplataforma/) (prefijo `multiplataforma:`, API `/api/v1/multiplataforma/*`) sube los vídeos ya montados a IG Reels (reel de prueba con `trial_params` para viralización), FB Page Reels (+ comentario con enlace), Threads y Pinterest v5 por API oficial, con enlace de afiliado Amazon/SHEIN. Sin token → `simulado`. Tick: `scripts/multiplataforma_tick.py`. Ingesta sola desde `Drive/Nebulabs/TikTok/TikTok Shop/Multiplataforma/<cuenta>/{viralizacion,producto}/` (ritmo y horas por cuenta; `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`); el tick corre DENTRO del contenedor api. Enlace por producto (`enlaces:<slug>`) y resubida de Mis tandas del dueño de la cuenta, SOLO por MCP (guía `multiplataforma.md`); página pública sin login `/links/<cuenta>` para la bio. Los vídeos MUDOS de Mis tandas salen con música Mixkit mezclada (banco `Multiplataforma/_musica/<estilo>/`, `services/musica.py`). Enlaces NUNCA en TikTok. Detalle en [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md).
-
-### Estadísticas — ventas de la cuenta de Néstor (oct 2026)
-
-[`src/estadisticas/`](src/estadisticas/) (prefijo `estadisticas:`, clave `ventas:<usuario>`, API `/api/v1/estadisticas`, `ness` y `nes_bugallo`, cada uno la suya) guarda lo que se lee en la app de TikTok (Datos por mes + productos con venta + tendencias por día) y la pantalla `/estadisticas` lo enseña: GMV/ventas/clics por mes, correlación clics→ventas y previsión, por día, por tipo y por país; `ness` tiene selector de cuenta (Ama Shop, Casca Chollos, cuenta árabe) y «⚖️ Comparar» (`components/estadisticas/CompararCuentas.tsx`). No hay API de TikTok: lo lee un agente en el OPPO por ADB (MCP `estadisticas_ventas`/`guardar_estadisticas`, guía `estadisticas.md`).
-
-[`src/subidas/`](src/subidas/) (prefijo `subidas:` o `SUBIDAS_REDIS_PREFIX`, clave `<usuario>:<YYYY-MM>` → `{dias: {fecha: {videos, carruseles, nota, actualizado}}}`, API `/api/v1/subidas`, `nes_bugallo` y `ness`; ness puede pasar `usuario=`) cuenta los vídeos y carruseles publicados cada día con total y media del mes frente al objetivo 45 + 10; pantalla `/subidas` de solo lectura. Lo apuntan los agentes al terminar cada tanda (MCP `registrar_subidas`/`ver_subidas`, guía `subidas.md`). El usuario `nes_bugallo` (`pro`, cuenta árabe del Mi 8, `docs/CUENTA_ARABE.md`) solo ve Subidas y Estadísticas: menú propio (`CUENTAS_SUBIDAS` en `Sidebar.tsx`) y rutas extra en `_PREFIJOS_POR_USUARIO` de `src/api/main.py`.
-
-### Mi menú — la sidebar, por usuario
-
-Cada persona esconde y reordena su menú lateral desde `/settings` ("Mi menú",
-`components/settings/MenuPersonalizado.tsx`). Va en Redis
-(`ui:menu:<usuario>`, router transversal `src/api/routers/ui_menu.py`) y no en
-`localStorage`: la misma cuenta entra desde móvil, PC y APK. Se guardan solo
-CLAVES (el `href` de un item, el `basePath` de un grupo), nunca el menú entero
-— la lista la manda `Sidebar.tsx` y una copia guardada se quedaría vieja al
-añadir un nicho. Es COSMÉTICO: se aplica encima del menú que da el rol, que
-es lo que de verdad corta (y el backend lo comprueba aparte).
-
-### Nicho General · UGC (mismo programa, módulo 9)
-
-Módulos en [`src/nicho_general/`](src/nicho_general/) (prefijo Redis
-`nicho_general:`). API: `/api/v1/nicho-general/*`. El formato que publicó el
-curso para el Q4, y el primero que NO es un vídeo de una sola pieza: el anuncio
-son **tres clips** (dolor o gancho → producto y beneficios → urgencia y CTA)
-que se generan uno a uno en Flow/Omni y se pegan aquí.
-
-Lo que no tiene ningún otro nicho:
-
-- **Dos ejes, no uno.** El gancho (`GANCHOS`: dolor / general) es como los
-  estilos del POV BOF Largo, pero además está la **duración**: 10s en Omni u 8s
-  en GenAI Pro (Veo). No es un ajuste de vídeo — en 8 segundos no cabe lo mismo,
-  así que el guion se escribe entero para esa duración y el vídeo es otro. Las
-  dos cosas van en la clave del documento.
-- **Un personaje fijo**, creado aparte desde una foto de Pinterest
-  (`prompts/personaje.md`) y reutilizado en todas las escenas: es lo que da la
-  continuidad, junto con el escenario y con que la identidad vocal vaya copiada
-  palabra por palabra en los tres prompts. El curso PROHÍBE decir "continúa" o
-  "misma persona" entre clips.
-- **Los clips se suben sin orden.** El operador los adjunta todos de golpe y
-  `pipeline/video_editor.py` los ordena transcribiéndolos y casándolos con el
-  guion de cada escena; solo se recorta el silencio de ENTRADA de cada uno.
-
-Comparte con el POV BOF catálogo, carpetas, fotos, textos, escaparate y
-vendidos. Lo suyo (escenas, clips, vídeo, subido) es por usuario.
-
-### Escaparate y vendidos — transversales a TODOS los nichos
-
-Dos cosas NO son de ningún nicho: se hacen una sola vez por producto porque la
-cuenta de TikTok es la misma. Las dos viven en
-[`src/nicho_pov_bof/repos/product_repo.py`](src/nicho_pov_bof/repos/product_repo.py)
-y los demás nichos las reusan (no dupliques índices por nicho):
-
-- **Escaparate** — `escaparate:index[:usuario]`, clave `norm(tienda)|norm(titulo)`
-  (`clave_escaparate` / `escaparate_index` / `set_escaparate`). El mismo producto
-  sale repetido en varias carpetas del Drive y se graba con varios nichos:
-  marcado en uno, aparece marcado en todos. Sin textos extraídos la clave es
-  vacía y no deduplica.
-- **Vendidos** — `vendidos:index[:usuario]` + `vendido:[u:<usuario>:]<ref>`,
-  un ranking por persona; **no** se clasifica por nicho (`NICHOS_VENTA` queda
-  solo por compatibilidad del dato antiguo). La carpeta "Top vendidos" del
-  Drive sí es común: es un catálogo, no un progreso.
-
-Ambos son **por usuario**: Ana y Mauro son otras personas con su propia cuenta,
-y una venta o un escaparate es el resultado de SU cuenta. El histórico va en la
-clave sin sufijo, que es la de `ness` (mismo criterio que el progreso de
-carpetas).
-
-Cosas que ya costaron una vez:
-- El documento del curso pide 260 caracteres "para 15 segundos", pero su propio
-  ejemplo tiene 357 y a 18,2 car/s eso son 20s. **No se recorta**: forzarlo con
-  reintentos deja el guion telegráfico. Solo se avisa.
-- Los textos del producto (título, tienda, caption) se **leen** del Nicho POV
-  BOF, no se re-extraen: costarían las llamadas de Gemini dos veces.
-- La cadena de nivelado del POV BOF (`TP=-1.5`) NO vale para Fish: daba +0,20
-  dBTP. Aquí es `TP=-2.0` con limitador 0.89.
-
-### Nicho Carruseles (mismo programa, módulo 14)
-
-Módulos en [`src/nicho_carruseles/`](src/nicho_carruseles/) (prefijo Redis
-`nicho_carruseles:`). API: `/api/v1/nicho-carruseles/*`. **No edita vídeo**:
-publica un carrusel de DOS fotos con el texto quemado encima (PIL, sin cola —
-es un PNG sobre un JPEG).
-
-Lo que no tiene ningún otro nicho:
-- **Filtro de categoría.** No todo producto funciona en este formato: hay un
-  paso de clasificación con Gemini (texto suelto sobre los títulos YA
-  extraídos, sin imágenes) + interruptor manual por producto. Al filtrar, una
-  carpeta de diez se queda en dos o tres: el listado de carpetas enseña cuántos
-  aptos tiene cada una para no abrirlas en balde.
-- **La chica de la casa**: se sube la foto de una chica y Gemini saca su ficha
-  JSON (`services/chica_ficha.py`, idea del Nicho Ropa Con Personas). Con ella,
-  el prompt para crear la referencia de cada escenario lleva a ESA chica dentro
-  — un párrafo no clava a una persona y la referencia es lo que manda en
-  imagen-a-imagen.
-- **La foto 1 NO depende del producto, solo del SITIO.** Es una chica
-  sorprendida generada en Google Flow, y lo único que tiene que encajar es
-  dónde está: `generico`, `cama`, `sofa`, `exterior`, `cocina`, `bano`,
-  `coche` y `escritorio` — un prompt por escenario
-  (`prompts/foto_chica_<escenario>.md`), y la categoría decide cuál le toca.
-  Las tandas se suben POR ESCENARIO y para TODOS los catálogos a la vez, y se
-  reparten por orden entre los productos que no tienen. La foto 2 —el
-  producto— sí es de cada uno y se sube en su tarjeta.
-- Las fotos viven en el Drive montado
-  (`Nebulabs/TikTok/TikTok Shop/Nicho_Carruseles/<usuario>/`), y el original y la
-  versión con texto van en carpetas distintas: quemar sobre lo quemado deja el
-  texto doble. El vínculo foto↔producto es el NOMBRE del fichero
-  (`<fuente>__<carpeta>__<producto>.jpg`), no un índice en Redis.
-
-Comparte con el POV BOF catálogo, textos, hashtags, escaparate y vendidos
-(igual que Creativos Pro). Progreso y "subido" son propios.
-
-### Cuenta Piloto (mismo programa, no es un módulo del curso)
-
-Módulos en [`src/cuenta_piloto/`](src/cuenta_piloto/) (prefijo Redis
-`cuenta_piloto:`). API: `/api/v1/cuenta-piloto/*`. Vídeo ORGÁNICO (la imagen no
-la genera IA; la voz sí) con la MISMA edición del POV BOF — se reutiliza
-`build_video` tal cual.
-
-Tres cosas que no hace ningún otro nicho:
-- **El producto nace de una SUBIDA.** Las dos fotos (limpia + ficha) las sube el
-  operador; no hay Drive que recorrer ni emparejado que adivinar. Las fotos NO
-  pueden ir a `api_uploads/` (se purga a las 24h): van al Drive montado en
-  `Nebulabs/TikTok/TikTok Shop/Cuenta_Piloto/<usuario>/`.
-- **Es por usuario**: un documento Redis por operador, sin doc compartido.
-- **VARIOS vídeos por producto** — `videos` es una LISTA y se añade con
-  `product_repo.add_video()` bajo cerrojo. En el resto de nichos hay un solo
-  `video_path` y el segundo montaje pisa al primero.
-
----
-
-## Variables de entorno (`.env`)
-
-```env
-# === Programa 1 — Creator Reward ===
-# Path raíz de assets CR (Drive sincronizado). Auto-detect si no se define
-# (escanea "Mi unidad/Nebulabs/TikTok/Creator Reward/TIKTOK_ASSETS").
-# TIKTOK_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/Creator Reward/TIKTOK_ASSETS"
-
-# === Programa 2 — TikTok Shop ===
-# Path raíz TikTok Shop. HERMANO de TIKTOK_CR (no anidado). Auto-detect si
-# no se define (escanea "Mi unidad/Nebulabs/TikTok/TIKTOK_SHOP").
-# TIKTOK_SHOP_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_SHOP"
-
-# Atlas Cloud (Seedance — los 3 tiers Standard/Advanced/Pro). URL default oficial.
-ATLASCLOUD_API_KEY=...
-# ATLASCLOUD_BASE_URL=https://api.atlascloud.ai/api/v1   # opcional override
-# ATLAS_POLL_TIMEOUT_S=7200                              # default 2h. Sube si Standard
-                                                         #            tier suele tardar más.
-
-# fal.ai — fallback automático de Atlas Cloud. Mismo modelo Seedance pero
-# en otro hosting con queue independiente. Se activa solo si Atlas falla.
-# Si no está configurado, jobs fallidos en Atlas propagan el error.
-# FAL_API_KEY=...
-# FAL_POLL_TIMEOUT_S=1800                                # default 30 min
-
-# === Compartido entre programas ===
-OPENAI_API_KEY=...                   # Presidentes — guion JSON
-MINIMAX_API_KEY=...                  # TTS — los 3 nichos CR + TikTok Shop
-MINIMAX_GROUP_ID=...
-MINIMAX_VOICE_ID=...                 # voz default (inglesa, Presidents)
-PRONOSTICOS_VOICE_ID=Spanish_*       # opcional — override Pronósticos
-
-# Gemini — TikTok Shop dual-key con fallback (FREE → PAID si 429); legacy
-# `GOOGLE_GEMINI_KEY` lo usa Creator Reward y solo se reusa si no hay FREE/PAID.
-GOOGLE_GEMINI_KEY_FREE=AIza...       # proyecto sin billing (free tier)
-GOOGLE_GEMINI_KEY_PAID=AIza...       # proyecto con billing (~5€/mes)
-GOOGLE_GEMINI_KEY=...                # legacy compartido con CR
-
-# Upstash Redis (Pronósticos prefijo `betai:`, TikTok Shop prefijo `tiktok_shop:`)
-UPSTASH_REDIS_REST_URL=https://xxxxx.upstash.io
-UPSTASH_REDIS_REST_TOKEN=AX...
-# Redis LOCAL de la fábrica (VPS, oct 2026): servicios `redis` + `redis-rest`
-# (API REST de Upstash, deploy/redis-rest/). Interruptor: con FABRICA_REDIS_REST_URL
-# la fábrica usa el local; Editor Auto (↔ nebulabs-media) y Pronósticos (← Master
-# Picks) siguen SIEMPRE en Upstash vía UPSTASH_SHARED_* (los pone docker-compose).
-# FABRICA_REDIS_REST_URL=http://redis-rest:8080
-# FABRICA_REDIS_REST_TOKEN=...
-# REDIS_DATA_PATH=/mnt/HC_Volume_106974679/redis-data
-REDIS_PREFIX=betai:                  # default — solo afecta a Pronósticos
-
-# APIs stock Pronósticos (opcionales)
-PEXELS_API_KEY=...
-PIXABAY_API_KEY=...
-
-# Opcional TikTok Shop
-# TIKTOK_SHOP_MONTHLY_BUDGET_USD=50   # alerta dashboard al 80%
-
-# === Programa 3 — Editor Auto ===
-# Path raíz TikTok Editor. HERMANO de TIKTOK_CR/TIKTOK_SHOP. Auto-detect si
-# no se define (escanea "Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR").
-# TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR"
-# EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
-# ANTHROPIC_API_KEY_EDITOR_AUTO — silence_cutter usa Claude Haiku (OpenAI de respaldo)
-# EDITOR_ASR_PROVIDER=deepgram + DEEPGRAM_API_KEY — transcripción de todo el editor (src/editor_auto/asr.py; Whisper de respaldo)
-
-# === Programa 4 — Tiktok Shop AI Pro (Viralización) ===
-# Path raíz LOCAL (no Drive) de assets: gancho/audios/paisajes/música.
-# Auto-detect si no se define (prueba "~/viralizacion_assets").
-# VIRALIZACION_ASSETS_PATH="/home/nebulabsai/viralizacion_assets"
-# VIRALIZACION_REDIS_PREFIX=viralizacion:   # default
-# CUENTA_PILOTO_REDIS_PREFIX=cuenta_piloto:  # default
-# FISH_API_KEY=sk-fish-...                   # TTS del POV BOF Largo
-# ANTHROPIC_API_KEY_AI_PRO=sk-ant-...       # textos/guiones de AI Pro (src/tiktok_shop/api/claude.py:
-#                                          #   Haiku texto, Sonnet bajo fotos, Haiku bajo guiones POV+carrusel, Sonnet medio UGC/ropa; Gemini de respaldo)
-# AI_PRO_LLM=gemini                         # vuelve todo AI Pro a Gemini sin tocar código
-# ANTHROPIC_API_KEY_EDITOR_AUTO=sk-ant-...  # IA del cortador (src/editor_auto/api/claude_client.py, Haiku;
-#                                          #   OpenAI de respaldo; EDITOR_AUTO_LLM=openai vuelve a OpenAI)
-# NICHO_POV_BOF_LARGO_REDIS_PREFIX=nicho_pov_bof_largo:  # default
-# ZOOM_MARCA_AGUA=1.05                       # ampliación que se come la marca
-# ESQUINA_MARCA_AGUA=abajo-derecha           #   de agua del generador de vídeo
-# PUBLIC_BASE_URL=https://factory.nebulabsmedia.com  # URL pública del MCP y sus enlaces
-# MCP_TOKEN_SALT=1                           # cambiarlo revoca todos los tokens del MCP
-# AGENTE_BANDEJA_DIR=                        # solo dev/tests: bandeja fuera del Drive
-# === Drive (docs/DRIVE.md, src/rutas_drive.py) — Redis guarda `drive:<ruta relativa>` ===
-# NEBULABS_DRIVE_DIR=Nebulabs/TikTok              # antes NEBULABS_AUTOMATED_TIKTOK
-# AI_PRO_DRIVE_DIR=Nebulabs/TikTok/TikTok Shop    # Programa 4 (antes …/TIKTOK_SHOP_AI_PRO)
-# CR_DRIVE_DIR=Nebulabs/TikTok/Creator Reward     # antes TIKTOK_CR (TIKTOK_ROOT_PATH sale de aquí)
-# CURSO_DRIVE_DIR=Nebulabs/TikTok/TikTok Shop/_curso   # copias/paquetes de Productos España, Skool
-# DRIVE_ALIAS_JSON='{"viejo": "nuevo"}'      # alias extra de rutas viejas (al mover carpetas)
-```
-
----
-
-## Configuración de la sidebar
-
-La sidebar muestra solo los bloques relevantes al programa+nicho activo:
-
-### Programa 1 — Creator Reward
-
-Sidebar tiene: 🎯 Estrategia & Nicho, 🎥 Resolución (siempre); + 🎥 Motor
-Animación, 📝 Subtítulos karaoke, 🎣 Hook box (solo Presidentes). Pronósticos
-tiene controles dedicados en área principal (voz, SFX, overlays, saturación,
-carrusel, intro, selector de versión + cola).
-
-### Programa 2 — TikTok Shop
-
-Sin sidebar — todo en tabs del área principal: Productos / Usuarios /
-Generar Vídeo / Voces / Histórico (ver [`src/tiktok_shop/ui/`](src/tiktok_shop/ui/)).
-
-### Programa 4 — Tiktok Shop AI Pro
-
-Grupo de sidebar propio (frontend Next.js) separado de "TikTok Shop" —
-`basePath: /tiktok-shop-ai-pro`. Un único item hoy: "Viralización 1K"
-(`/tiktok-shop-ai-pro/viralizacion`), formulario simple (ponentes + cantidad
-+ nombre de cuenta + rondas con música). Pensado para acumular más
-herramientas del mismo grupo en el futuro.
+| Presidentes, Pronósticos, Quitar Copy, Construcción POV (Programa 1) | [`creator-reward.md`](docs/contexto/creator-reward.md) + [`PronosticosAuto.md`](PronosticosAuto.md) | Pronósticos lee Redis `betai:` escrito por bet-ai-master; capas de audio/visual; voces MiniMax |
+| Programa 2 TikTok Shop, Radar de productos, tiers Seedance/Veo3 | [`tiktok-shop-programa2.md`](docs/contexto/tiktok-shop-programa2.md) + [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | `ai_disclosure: true`, Pilot Program máx 5/semana, EchoTik gasta llamadas |
+| Viralización 1K y Nicho POV BOF (Drive "Productos España", catálogos del operador, reembolsables, marcas, guion y CTA) | [`ai-pro-viralizacion-pov-bof.md`](docs/contexto/ai-pro-viralizacion-pov-bof.md) + [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Drive compartido NO está en el mount FUSE (rclone `--drive-shared-with-me`); nombres de fichero duplicados → file ID; `Productos España` es solo lectura; todos los vídeos son de DOS clips |
+| Ropa Sin Personas / Con Personas, Tienda Colores, guionista Gemini | [`ai-pro-ropa.md`](docs/contexto/ai-pro-ropa.md) | Carpeta por enlace (`--drive-root-folder-id`); sin texto quemado y mudo; dos pantallas (web vs Drive) |
+| POV BOF Largo (estilos de guion épico/inversa/acción/regalo/viral, Fish, CTA, Q4) | [`ai-pro-pov-bof-largo.md`](docs/contexto/ai-pro-pov-bof-largo.md) + [`docs/CALENDARIO_POV_BOF_LARGO.md`](docs/CALENDARIO_POV_BOF_LARGO.md) | El cierre/CTA es la pieza de ajuste; duración en CLIPS; banco de voces medido |
+| Nicho General UGC, Carruseles, Cuenta Piloto | [`ai-pro-general-carruseles-piloto.md`](docs/contexto/ai-pro-general-carruseles-piloto.md) | UGC: no recortar guion, prohibido "continúa" entre clips; Carruseles: original y quemado en carpetas distintas; Piloto: fotos al Drive, no a `api_uploads/` |
+| MCP de agentes, Multiplataforma, Estadísticas/Subidas, Mi menú, Escaparate y vendidos | [`ai-pro-transversales.md`](docs/contexto/ai-pro-transversales.md) + [`MULTIPLATAFORMA_MODULE.md`](MULTIPLATAFORMA_MODULE.md) | Token MCP = HMAC (`MCP_TOKEN_SALT`); escaparate y vendidos son transversales y por usuario; enlaces de afiliado NUNCA en TikTok; si cambias una pantalla, cambia su guía |
+| Variables de entorno `.env`, rutas Drive (`*_DRIVE_DIR`), Redis local vs Upstash, claves de IA por programa | [`env-vars.md`](docs/contexto/env-vars.md) + [`docs/DRIVE.md`](docs/DRIVE.md) | Editor Auto y Pronósticos siguen SIEMPRE en Upstash (`UPSTASH_SHARED_*`) |
 
 ---
 
@@ -758,30 +66,55 @@ herramientas del mismo grupo en el futuro.
   Helper: `src/pronosticos/stock_search.py:_slug()`.
 - **Versiones de vídeo**: nombres de output incluyen sufijo `_v1`/`_v2`/`_v3`
   cuando hay varias versiones del mismo día.
-- **Aislamiento entre programas**: NUNCA mezclar lógica de Creator Reward y
-  TikTok Shop. Reusar solo módulos transversales (MiniMax, FFmpeg, Whisper,
-  Redis, logging). Cualquier cambio en un programa no debe romper el otro.
-- **System prompts en archivos `.md`**: todos los prompts de TikTok Shop viven
-  en `src/tiktok_shop/prompts/*.md`, NUNCA hardcoded en el código.
+- **System prompts en archivos `.md`** (`src/<programa>/prompts/*.md`), NUNCA hardcoded en el código.
+- **Aislamiento entre programas**: NUNCA mezclar lógica de Creator Reward,
+  TikTok Shop y Editor Auto. Reusar solo módulos transversales (MiniMax, FFmpeg, Whisper,
+  Redis, logging, `locutor.py`, `fonts_registry.py`, `src/queue/*`, `subtitles*`).
+  Cualquier cambio en un programa no debe romper el otro.
 - **Frontend mobile-first**: toda UI nueva/modificada debe diseñarse y
   validarse para móvil además de desktop. Grids `grid-cols-2 sm:grid-cols-N`,
   diálogos con `w-[calc(100vw-2rem)] max-h-[90vh] overflow-y-auto`, texto
   `text-xs sm:text-sm`, valores largos con `truncate`/`break-words`. La app
   se usa también desde móvil.
-- **Un vídeo no está terminado hasta que se comprueba** (18/10/2026): semáforo en
-  Mis tandas de cada vídeo antes de darlo por hecho; la web bloquea bajar para
-  publicar lo que no lo tiene (ver `src/agente_mcp/guias/mis-tandas.md`).
+- **Todas las pantallas de nicho se parecen (OBLIGATORIO).** Son once y las
+  usan tres personas: quien aprende una tiene que saber usar las demás. El
+  estándar entero —anatomía de pantalla y de tarjeta, colores con significado,
+  tamaños y qué componentes reutilizar— está en
+  [`UI_NICHOS.md`](UI_NICHOS.md); **léelo antes de tocar una pantalla de
+  nicho**. En corto: cabecera de TEXTO (nunca la portada del curso), `Caja`
+  "Dónde trabajas" con `Sub` + barra + carpetas como CHIPS con `hechas/total`,
+  `Paso` numerados con sus colores fijos (violeta preparar · fucsia generar ·
+  esmeralda prompt · azul descargar), tarjetas en `sm:grid-cols-2` y la fila
+  Escaparate/Subido/Vendió siempre la última. Lo que no encaje se añade a
+  `components/tiktok-shop-ai-pro/` y se usa desde todos — no se inventa un
+  diseño por pantalla.
+- **MCP y guías al día (OBLIGATORIO).** Los vídeos los hacen sobre todo agentes: toda función
+  nueva de un menú de AI Pro entra también en el MCP (`src/agente_mcp/`) y en su guía
+  (`src/agente_mcp/guias/*.md`) en el mismo cambio (README › «Mantener el MCP al día»).
+- **Un vídeo NO está terminado hasta que se comprueba (OBLIGATORIO, 18/10/2026).**
+  Todo vídeo montado (de cualquier nicho, réplicas incluidas) se revisa y lleva
+  semáforo en Mis tandas antes de darlo por hecho; una tanda con `sin_revisar` > 0
+  no está terminada. La web bloquea la descarga para publicar de lo que no tiene
+  semáforo o está en rojo (`servicio.sin_revisar`). Ver `src/agente_mcp/guias/mis-tandas.md`.
+- **Refuerzo anti-sanción en TODO vídeo que se monte (OBLIGATORIO).** TikTok
+  Shop sanciona por "promoción de productos incoherente" cuando no le queda
+  claro que el vídeo enseña el producto enlazado, y lo decide una máquina. Así
+  que cualquier formato nuevo, de cualquier nicho, sale con: **subtítulos** de
+  lo que dice la voz (el TEXTO del guion locutado, los TIEMPOS de Whisper —
+  ver `build_video(con_subtitulos, texto_voz)`), el **nombre del producto**
+  quemado en pantalla, y los **metadatos limpios** (`limpiar_metadatos`). Lo
+  que NO sirve: meter la foto del producto "con opacidad 0" o fuera del
+  encuadre — en un MP4 renderizado no hay capas y el archivo sale idéntico.
 - **Cost tracking obligatorio**: TODA llamada a API externa con coste (OpenAI,
-  MiniMax, Atlas Cloud, …) debe pasar por un `record_*` de
-  [`src/cost_tracking.py`](src/cost_tracking.py). El runner ya envuelve cada
-  job con `start_job`/`finalize_and_persist` vía `dispatch_job`. Al añadir
-  un MODO o API nueva: (1) si la API no existe aún, añade tarifa + helper
-  `record_<api>` con la tarifa vigente; (2) llama al helper justo tras el
-  response real (con tokens/chars/segundos reales del provider). El panel
-  `/costs` mostrará el desglose automáticamente — no hace falta tocar UI.
-  Excepción explícita: Programa 4 (Viralización) no usa ninguna API de pago
-  (ffmpeg/Whisper local/rclone) → sin `record_*`, a propósito (ver
-  VIRALIZACION_MODULE.md).
+  MiniMax, Gemini, Atlas Cloud, EchoTik…) debe pasar por un `record_*` de
+  [`src/cost_tracking.py`](src/cost_tracking.py), con tokens/chars/segundos
+  REALES del response. El runner ya envuelve cada job con
+  `start_job`/`finalize_and_persist` vía `dispatch_job`. Al añadir un MODO o API
+  nueva: (1) si la API no existe aún, añade tarifa + helper `record_<api>` con la
+  tarifa vigente; (2) llama al helper justo tras el response real. El panel
+  `/costs` muestra el desglose solo. Excepción explícita: Programa 4
+  (Viralización) no usa ninguna API de pago (ffmpeg/Whisper local/rclone) → sin
+  `record_*`, a propósito (ver VIRALIZACION_MODULE.md).
 
 ---
 
@@ -797,13 +130,13 @@ herramientas del mismo grupo en el futuro.
 | [`APELACIONES.md`](APELACIONES.md) | Cómo apelar sanciones de TikTok Shop («promoción incoherente»): pruebas, forma del texto, qué no decir, casos aprobados |
 | [`UI_NICHOS.md`](UI_NICHOS.md) | **Estándar visual de las pantallas de nicho** (Programa 4) — anatomía de pantalla y de tarjeta, colores con significado, piezas que se reutilizan. Obligatorio antes de crear o retocar una |
 | [`VIRALIZACION_MODULE.md`](VIRALIZACION_MODULE.md) | Programa 4 — banco de candidatos sin repetir, 3 estilos de subtítulo, jitter anti-fingerprint, numeración de rondas |
-| [`src/agente_mcp/guias/`](src/agente_mcp/guias/README.md) | **Guías para agentes de IA** (una por menú del Programa 4): las lee el MCP con `guia`, se sirven en `/api/v1/agente/guias/…` y cada pantalla las enlaza con «Guía IA». Si cambias el flujo de una pantalla, actualiza su guía. Skill: `.claude/skills/operar-tiktok-ai-pro` |
+| [`src/agente_mcp/guias/`](src/agente_mcp/guias/README.md) | **Si te piden HACER el trabajo de un menú de Tiktok Shop AI Pro** (bajar fotos, generar en Flow, subir clips…) y **guías para agentes de IA** (una por menú del Programa 4): las lee el MCP con `guia`, se sirven en `/api/v1/agente/guias/…` y cada pantalla las enlaza con «Guía IA». Si cambias el flujo de una pantalla, actualiza su guía. Skill: `.claude/skills/operar-tiktok-ai-pro` |
 | [`WEB_CURSO.md`](WEB_CURSO.md) | **Web del curso (`ttshopaiproapp.com`)** — mapa de menús y hashes, inventarios, cómo entran ZIP/enlaces en nuestra app, prompts publicados, precios de Compras, peticiones de mejora pendientes |
 | [`EDITOR_DEBUGGING.md`](EDITOR_DEBUGGING.md) | **Playbook de depuración del cortador de vídeo** — LEER antes de tocar `silence_cutter.py`: jerarquía de señales (silero>energía>Whisper), pipeline, casuística de bugs reales (proteína…), cómo diagnosticar una queja, gotchas de cola/deploy, auto-corrección |
 | [`PronosticosAuto.md`](PronosticosAuto.md) | Nicho Pronósticos — schema Redis bet-ai-master, segmentos, overlays |
 | [`APK.md`](APK.md) | **APK Android (TWA)** — por qué TWA y no Capacitor (descargas), cómo se genera, cuándo hay que rehacerla, gotchas de Bubblewrap |
 | [`DEV_SETUP.md`](DEV_SETUP.md) | Arranque local (uvicorn + npm run dev), troubleshooting WS/cache |
-| [`deploy/README.md`](deploy/README.md) | Despliegue VPS Hetzner + Docker stack + Tailscale Funnel + webhook |
+| [`deploy/README.md`](deploy/README.md) | Histórico: instalación original en Hetzner (migrado a Contabo el 4-nov-2026) + Docker stack + Tailscale Funnel + webhook |
 | [`deploy/SERVER_ACCESS.md`](deploy/SERVER_ACCESS.md) | Runbook SSH al server (IP, paths, comandos comunes) |
 | [`deploy/CLAUDE_REMOTE.md`](deploy/CLAUDE_REMOTE.md) | Claude Code en el VPS (Remote Control + chat web): qué ocupa, cómo quitarlo y cómo reinstalarlo |
 | [`deploy/CODEX_REMOTE.md`](deploy/CODEX_REMOTE.md) | Codex en el VPS (remote-control con cuenta ChatGPT): qué ocupa, limpiar versiones viejas, quitarlo y reinstalarlo |
@@ -811,7 +144,15 @@ herramientas del mismo grupo en el futuro.
 | [`docs/DRIVE.md`](docs/DRIVE.md) | **Dónde va cada cosa en el Google Drive** (árbol `Nebulabs/`, qué está compartido, rutas viejas → nuevas, reglas para agentes) |
 | [`learnings.md`](learnings.md) | Historial técnico (1 línea por aprendizaje/fix) — **escribir al resolver bug o patrón nuevo** |
 | [`tasks.md`](tasks.md) | TODO pendientes — mover a `## ✅ Done` al cerrar |
+| [`docs/contexto/`](docs/contexto/) | Detalle literal por nicho/módulo y `.env` movido de este archivo (tabla «Detalle por nicho/módulo» arriba) |
+| [`src/agente_mcp/guias/genjutsu-higgsfield.md`](src/agente_mcp/guias/genjutsu-higgsfield.md) | **Cuenta nueva de Néstor / vídeos virales de mayor calidad y menor volumen**: receta completa de producto, personaje en Flow, Genjutsu web/MCP, voz y revisión. Tutorial y prompts en `docs/clases/2026-10-13_tutorial_genjutsu_higgsfield.md`; MCP de la app `guia("genjutsu")`. Higgsfield registrado en Claude Code del VPS, pendiente de autenticación |
+| [`docs/clases/2026-10-23_instagram_shop/README.md`](docs/clases/2026-10-23_instagram_shop/README.md) | **Cuentas de Meta (viva_shop, viva_salud, ama_shop) y vídeos para Instagram/Facebook**: curso Skool «Instagram Shop · Fase 1». Incluye restricción de países, 10 reels sin enlaces para crecer, calentamiento de 72 h, bandera de España al fondo y la CTA «Comenta SÍ + Sígueme». También el formato avatar «remedios» y la marca Buumi (+20 % sobre Amazon). Los prompts y guiones del curso solo están en el VPS, sin subir a git |
+| [`docs/clases/2026-10-24_seedance_capcut/README.md`](docs/clases/2026-10-24_seedance_capcut/README.md) | **Seedance 2.0 / formato «Revelación 15 s»** (curso Skool «Crea con Seedance»): un personaje destapa maniquíes y grita cada color, en una toma de 15 s. Incluye los prompts literales de la web, los costes de CapCut (Ultra, unos 75 créditos por vídeo), la alternativa con el Seedance de Higgsfield y el encaje con Ana y Casca Chollos |
+| `MCP_URLS.local.md` (NO está en git) | **URLs del MCP de la app con su token** (p. ej. la de Ana, para subir los vídeos del multimodo). Solo existe en el PC del operador y en el VPS; nunca las copies a memoria, commits ni chats. Si no lo encuentras, pídele la URL al operador |
+| [`docs/CUENTA_ARABE.md`](docs/CUENTA_ARABE.md) | **Cuenta árabe del Mi 8 y usuario web `nes_bugallo` («Ness/Bugallo»)** (29/10/2026): público árabe/magrebí, 45 carruseles + 10 vídeos POV/día, **se copia el estilo y los textos de SUS tiendas, no los nuestros**, precio sí. Carruseles con `replicar_carrusel(pais="AR")`; texto mixto español+árabe+números con `src/texto_arabe.py` (Tajawal + bidi); pantallas Subidas y Estadísticas de nes_bugallo; subida automática del Mi 8 pendiente |
+| [`SESSION_STATE.md`](SESSION_STATE.md) | Handoff del refactor TikTok Shop (mayo 2026) |
 | [`README.md`](README.md) | Onboarding general del repo |
+
 
 ## Estructura por programa
 
@@ -831,8 +172,9 @@ Frontend: `frontend/app/<programa>/` + `frontend/lib/queries/<programa>.ts`.
 Actualiza CLAUDE.md cuando: módulo nuevo/eliminado en `src/`, env vars que
 cambian, schema Redis, assets esperados, nicho o programa nuevo.
 NO por: bugfixes, refactors, ajustes de parámetros, lo derivable del código.
-Cap 250 líneas — mover detalles a `.md` específico si crece (p. ej.
-`ADDING_PROGRAM.md` recoge la guía completa de "añadir programa").
+Cap 250 líneas — mover detalles a `.md` específico si crece: el de cada nicho va
+literal en `docs/contexto/` (y su fila en «Detalle por nicho/módulo»); `ADDING_PROGRAM.md`
+recoge la guía completa de "añadir programa". No copies aquí lo que ya está en AGENTS.md.
 
 ### Memoria y Tareas
 - **Lectura**: Lee `tasks.md` para pendientes y `learnings.md` para historial técnico.
