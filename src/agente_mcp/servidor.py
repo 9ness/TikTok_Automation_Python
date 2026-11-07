@@ -1125,6 +1125,33 @@ async def _foto_de(u: str, valor: str, que: str) -> tuple[bytes, str]:
 
 
 @_herramienta(structured_output=False)
+async def alta_mi_producto(ctx: Context, foto_limpia: str, foto_ficha: str = "",
+                           product_url: str = "", catalogo: str = "mis_productos",
+                           carpeta: str = "") -> str:
+    """Da de alta un producto PROPIO en un catálogo del operador
+    (`mis_productos` por defecto), igual que el botón de la web: sirve para
+    productos de tareas (Black Friday) o vendidos que no están en ningún
+    catálogo. `foto_limpia` (el producto) y `foto_ficha` (captura de la ficha con
+    título y precio): url http(s), `archivo_id` de /subir o ruta de tu bandeja.
+    `product_url`: enlace de TikTok Shop. `carpeta` vacía = la que toque (se
+    llenan de diez en diez). Busca antes que no exista. Después,
+    `preparar_carpeta(productos="N")` lee los textos y escribe el guion."""
+    u = _usuario(ctx)
+    limpia, n_limpia = await _foto_de(u, foto_limpia, "`foto_limpia`")
+    files = {"foto_limpia": (n_limpia or "limpia.jpg", limpia, "image/jpeg")}
+    if foto_ficha:
+        ficha, n_ficha = await _foto_de(u, foto_ficha, "`foto_ficha`")
+        files["foto_ficha"] = (n_ficha or "ficha.jpg", ficha, "image/jpeg")
+    for nombre, contenido, _tipo in files.values():
+        if archivos.es_video(nombre, contenido):
+            raise ErrorApp("Eso es un vídeo: aquí van FOTOS.")
+    r = await Interno(u)._pedir(
+        "POST", "/api/v1/nicho-pov-bof/mis-productos", params={"source": catalogo},
+        data={"product_url": product_url, "carpeta": carpeta}, files=files)
+    return _json(r.json())
+
+
+@_herramienta(structured_output=False)
 async def producto_carrusel(ctx: Context, product_url: str = "", foto_limpia: str = "",
                             foto_ficha: str = "", carrusel_url: str = "",
                             releer_carpeta: str = "", releer_producto: str = "") -> str:

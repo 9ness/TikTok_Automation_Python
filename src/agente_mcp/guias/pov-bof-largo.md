@@ -318,6 +318,9 @@ Carpeta de temporada dentro de **📦 Inventario General**, la primera de la lis
 el original no se toca y en la copia el guion, los clips, el vídeo y las marcas
 son nuevos, así que se puede repetir un producto ya publicado.
 
+- Producto que no está en ningún catálogo (tareas de Black Friday, vendidos): MCP
+  `alta_mi_producto(foto_limpia, foto_ficha, product_url)` lo crea en «Mis Productos»; luego
+  `preparar_carpeta(catalogo="mis_productos", carpeta=…, productos="N")`.
 - Añadir: MCP `anadir_a_q4(productos=["inventario_general|Carpeta_22|3", …], clips=3)`
   (API: `POST /api/v1/nicho-pov-bof-largo/q4/anadir`). Idempotente.
 - `clips=3` deja el guion en 24 s (tres clips de 8 s): una imagen por clip, tres
