@@ -83,7 +83,8 @@ def volcado():
 def a_datos():
     """Llega a la página Datos: Perfil › TikTok Studio › «Ver detalles» de TikTok Shop para creadores › «>»."""
     pal = palabras()
-    if hay("Personalizado", pal) and hay("Ayer", pal):
+    # el OCR no siempre lee los chips grises («Ayer»): «Datos clave» también confirma la página (8/11)
+    if hay("Personalizado", pal) and (hay("Ayer", pal) or hay("clave", pal)):
         return
     adb("shell", "am", "force-stop", PKG); time.sleep(1)
     adb("shell", "monkey", "-p", PKG, "1"); time.sleep(9)

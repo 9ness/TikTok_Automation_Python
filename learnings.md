@@ -1447,3 +1447,4 @@
 - 2026-11-07 · sanción -4 «estático» en la tapa de microondas (mov. 0,85, clip 1 0,35) por prompts Omni de «todo quieto» → pedir paseo/acercamiento de cámara y mano en movimiento; medir con tblend+signalstats (ffmpeg -nostdin en bucles) y no publicar < 1,5
 - 2026-11-07 · scripts/medir_movimiento.py + regla en revision-calidad.md y mis-tandas.md: verde solo con movimiento ≥2 y ningún clip <1,5; prompts sin «todo quieto»
 - 2026-11-08 · asegurar_cuenta (movil.py) no cambia de cuenta desde @vistoyfichado: el perfil nuevo ya no tiene el @ arriba y el toque en (200, y_arroba−70) abre «Tu Story» → el selector «Cambiar de cuenta» se abre tocando la insignia roja «9+» junto al nombre (≈662,318 en el Mi 8). Quien use el Mi 8 de noche lo deja en @pisadaviva.
+- 2026-11-08 · dias_mi8.py a_datos(): el OCR psm 11 parte «Datos clave» en dos palabras y no lee los chips grises → comprobar «clave» suelto
