@@ -1448,3 +1448,4 @@
 - 2026-11-07 · scripts/medir_movimiento.py + regla en revision-calidad.md y mis-tandas.md: verde solo con movimiento ≥2 y ningún clip <1,5; prompts sin «todo quieto»
 - 2026-11-08 · asegurar_cuenta (movil.py) no cambia de cuenta desde @vistoyfichado: el perfil nuevo ya no tiene el @ arriba y el toque en (200, y_arroba−70) abre «Tu Story» → el selector «Cambiar de cuenta» se abre tocando la insignia roja «9+» junto al nombre (≈662,318 en el Mi 8). Quien use el Mi 8 de noche lo deja en @pisadaviva.
 - 2026-11-08 · dias_mi8.py a_datos(): el OCR psm 11 parte «Datos clave» en dos palabras y no lee los chips grises → comprobar «clave» suelto
+- 2026-11-08 · dias_mi8 «no encuentro Ver detalles» en el Mi 8 con Ama Shop: la pantalla pasaba a AOD (screencap en blanco, mCurrentFocus=AOD) → `svc power stayon true` al empezar; además el centro de creadores saca el popup «Gana recompensas… Ahora no» y TikTok Studio está en ~200,752 (no en el 228,843 por defecto).
