@@ -130,3 +130,34 @@ def test_sin_cola_no_borra_nada(entorno, monkeypatch):
     monkeypatch.setattr(rs, "open_job_ids", lambda queue=None: None)
     monkeypatch.setattr(rs.UserRepo, "list_all", lambda self: [_user()])
     assert rs.sweep(dry_run=False) == []
+
+
+def test_lo_que_el_montaje_no_deja_lo_borra_la_cuenta_de_subidas(entorno, monkeypatch):
+    """Originales subidos por la web: no son de la cuenta del montaje (EIO)."""
+    _, base = entorno
+    viejo = _dia(base, "entrada", HOY - timedelta(days=20))
+    llamadas = []
+    from src.editor_auto.services import drive_uploads
+
+    def _rm_falla(p):
+        raise OSError(5, "Input/output error")
+
+    def _api(user, rel):
+        llamadas.append((user, rel))
+        import shutil
+        shutil.rmtree(viejo, ignore_errors=True)
+        return True
+
+    monkeypatch.setattr(rs.shutil, "rmtree", lambda p, ignore_errors=False: (
+        None if ignore_errors else _rm_falla(p)))
+    monkeypatch.setattr(drive_uploads, "is_configured", lambda: True)
+    monkeypatch.setattr(drive_uploads, "delete_user_path", _api)
+    hechos = rs.sweep_user(_user(), dry_run=False, open_ids=set())
+    assert llamadas == [("cli", ["entrada", viejo.name])]
+    assert not hechos[0].get("error")
+
+    # Si la API tampoco puede, queda el error y no se da por borrado.
+    viejo2 = _dia(base, "entrada", HOY - timedelta(days=21))
+    monkeypatch.setattr(drive_uploads, "delete_user_path", lambda u, r: False)
+    hechos = rs.sweep_user(_user(), dry_run=False, open_ids=set())
+    assert hechos[0].get("error") and viejo2.exists()
