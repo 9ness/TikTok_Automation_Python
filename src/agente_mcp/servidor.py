@@ -125,7 +125,9 @@ def _usuario(ctx: Context) -> str:
 
 
 def _json(datos: Any) -> str:
-    return json.dumps(datos, ensure_ascii=False, indent=1, default=str)
+    # Compacto: el agente lee JSON igual de bien sin sangría, y cada respuesta
+    # entra entera en su contexto (Mis tandas de ness: 74 KB → 60 KB).
+    return json.dumps(datos, ensure_ascii=False, separators=(",", ":"), default=str)
 
 
 async def _ctx(ctx: Context, menu: str, catalogo: str, carpeta: str, modo: str = "",
