@@ -1,0 +1,17 @@
+[Unit]
+Description=Bot de WhatsApp del Editor (FastAPI en 100.83.196.101:8093)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=nebulabsai
+WorkingDirectory=/home/nebulabsai/whatsapp-bot
+EnvironmentFile=/home/nebulabsai/whatsapp-bot/.env
+ExecStart=/home/nebulabsai/whatsapp-bot/venv/bin/uvicorn --factory whatsapp_bot.app:crear_app --host 100.83.196.101 --port 8093 --no-access-log
+Restart=always
+RestartSec=5
+MemoryMax=300M
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+{
+  "name": "videos_caducan",
+  "language": "es",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}, tus vídeos del {{2}} se borran el {{3}}. Descárgalos antes desde tu panel de nebulabsmedia.com.",
+      "example": {
+        "body_text": [
+          [
+            "Laura",
+            "10/11",
+            "17/11"
+          ]
+        ]
+      }
+    }
+  ]
+}

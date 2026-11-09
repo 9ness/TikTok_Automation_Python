@@ -1,0 +1,11 @@
+- Qué hacemos: editamos tus vídeos grabados. Quitamos silencios, repeticiones y tomas malas, ponemos subtítulos con tu estilo y una flecha que apunta a tu llamada a la acción. Desde el plan Pro también fotos de apoyo (B-roll).
+- Cómo funciona: entras en tu panel de la web ({web}), subes los vídeos del día y los mandas a editar. Cuando están, los descargas del panel. También puedes pedirlos por este chat escribiendo «vídeos».
+- Plazo: entrega en 24 h. Los planes superiores pasan antes en la cola.
+- Cuántos vídeos: cada plan tiene un número de vídeos al día.
+- Prueba gratis: los 3 primeros vídeos al registrarte no se pagan.
+- Cómo se contrata: eliges plan en la web y nos escribes por aquí; Néstor te pasa la forma de pago y activa el plan.
+- Pago anual: pagas 10 meses y usas 12.
+- VIP a medida: edición con tu estilo fijo y cada vídeo revisado a mano; plazas limitadas, se contrata hablando con Néstor.
+- Los vídeos editados se guardan unos días en el panel y luego se borran: descárgalos a tiempo.
+- Para vincular este WhatsApp con tu cuenta, escribe «vídeos» y sigue los pasos (te llega un código al email de tu cuenta).
+- Horario de atención de Néstor: {horario}. Fuera de ese horario el bot sigue contestando lo automático.

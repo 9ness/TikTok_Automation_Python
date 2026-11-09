@@ -1,0 +1,19 @@
+{
+  "name": "recordatorio_videos_pendientes",
+  "language": "es",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}, tienes {{2}} vídeos subidos sin enviar a editar. Entra en tu panel de nebulabsmedia.com y pulsa «Enviar a editar» para que empecemos con ellos.",
+      "example": {
+        "body_text": [
+          [
+            "Laura",
+            "3"
+          ]
+        ]
+      }
+    }
+  ]
+}

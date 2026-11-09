@@ -69,3 +69,8 @@ tsconfig.tsbuildinfo
 
 # URLs del MCP con token (acceso como un usuario): SOLO en local y en el VPS
 *.local.md
+
+# Bot de WhatsApp: conversaciones (SQLite) y claves locales
+whatsapp_bot/datos/
+whatsapp_bot/.env
+whatsapp_bot/.env.local

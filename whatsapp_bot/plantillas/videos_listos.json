@@ -1,0 +1,21 @@
+{
+  "name": "videos_listos",
+  "language": "es",
+  "category": "UTILITY",
+  "components": [
+    {
+      "type": "BODY",
+      "text": "Hola {{1}}, tus {{2}} vídeos del {{3}} ya están editados. Descárgalos antes del {{4}} en tu panel de nebulabsmedia.com o escríbenos «vídeos» y te los mandamos por aquí.",
+      "example": {
+        "body_text": [
+          [
+            "Laura",
+            "5",
+            "10/11",
+            "17/11"
+          ]
+        ]
+      }
+    }
+  ]
+}
