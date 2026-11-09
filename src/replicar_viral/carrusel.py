@@ -791,7 +791,31 @@ def con_fecha(datos: bytes, epoca: float) -> bytes:
     return b"\xff\xd8" + bytes(resto) + app1 + datos[i:]
 
 
-def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str, epoca: float | None = None) -> int:
+def leer_fotos_zip(docs: list[dict]) -> dict[str, list[tuple[int, bytes]]]:
+    """{id: [(n, bytes)…]} de las diapositivas listas de cada carrusel (la de
+    texto, o la de Flow si no lleva), en orden. Se leen EN PARALELO: vienen del
+    Drive montado (FUSE) y una a una la tanda de 10 carruseles tardaba 20 s en
+    caliente y más de 2 min en frío, casi todo esperando a la red."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def una(trabajo):
+        usuario, id_, n = trabajo
+        p = ruta_foto(usuario, id_, n, "txt") or ruta_foto(usuario, id_, n, "base")
+        return p.read_bytes() if p else None
+
+    trabajos = [(doc.get("usuario") or "ness", doc["id"], int(d["n"]))
+                for doc in docs for d in doc.get("diapositivas") or []]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        datos = list(pool.map(una, trabajos))
+    salida: dict[str, list[tuple[int, bytes]]] = {doc["id"]: [] for doc in docs}
+    for (_, id_, n), b in zip(trabajos, datos):
+        if b is not None:
+            salida[id_].append((n, b))
+    return salida
+
+
+def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str, epoca: float | None = None,
+                 leidas: dict[str, list[tuple[int, bytes]]] | None = None) -> int:
     """Mete en `z`, bajo `carpeta/`, las diapositivas listas (con su texto, o
     la de Flow tal cual si no lleva) en orden + `caption.txt`. Devuelve
     cuántas fotos entraron. Lo usa también «Mis tandas › Fotos».
@@ -799,24 +823,23 @@ def meter_en_zip(z: zipfile.ZipFile, doc: dict, carpeta: str, epoca: float | Non
     Con `epoca`, la 01 lleva esa fecha (EXIF y la del fichero en el ZIP) y
     cada siguiente 2 s menos: al descomprimir en el móvil, la galería (lo más
     nuevo arriba) las deja en orden. Sin ella iban con la fecha de disco y
-    salían revueltas. Pasos de 2 s porque el ZIP no guarda segundos impares."""
+    salían revueltas. Pasos de 2 s porque el ZIP no guarda segundos impares.
+
+    `leidas`: las fotos ya leídas con `leer_fotos_zip` (la tanda entera de una
+    vez, en paralelo); sin ella se leen aquí."""
     import datetime as dt
     import zoneinfo
 
-    usuario, id_ = doc.get("usuario") or "ness", doc["id"]
     metidas = 0
-    for d in doc.get("diapositivas") or []:
-        p = ruta_foto(usuario, id_, d["n"], "txt") or ruta_foto(usuario, id_, d["n"], "base")
-        if not p:
-            continue
-        nombre = f"{carpeta}/{d['n']:02d}.jpg"
+    for n, datos in (leidas if leidas is not None else leer_fotos_zip([doc]))[doc["id"]]:
+        nombre = f"{carpeta}/{n:02d}.jpg"
         if epoca is None:
-            z.write(p, nombre)
+            z.writestr(nombre, datos)
         else:
             cuando = epoca - 2 * metidas
             hora = dt.datetime.fromtimestamp(cuando, zoneinfo.ZoneInfo("Europe/Madrid"))
             info = zipfile.ZipInfo(nombre, date_time=hora.timetuple()[:6])
-            z.writestr(info, con_fecha(p.read_bytes(), cuando))
+            z.writestr(info, con_fecha(datos, cuando))
         metidas += 1
     if metidas:
         pie = (doc.get("caption") or "").strip()

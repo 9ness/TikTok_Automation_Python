@@ -318,16 +318,21 @@ def zip_tanda(usuario: str, numero: int, pendientes: bool = False) -> tuple[byte
     # Fecha de captura DEcreciente (01 del primer carrusel = la más nueva): la
     # galería pone lo más nuevo arriba y así sale en el orden de la tanda.
     epoca = time.time()
+    elegidos: list[tuple[int, dict]] = []
+    for i, doc in enumerate(grupos[int(numero) - 1], start=1):
+        if pendientes and doc.get("subido"):
+            continue
+        if _clave(doc) in agotados and not doc.get("subido"):
+            continue  # sin stock no se publica (como en los vídeos)
+        if not doc.get("subido") and servicio.sin_revisar({"semaforo": _semaforo(doc, sem)}):
+            saltados += 1
+            continue  # sin semáforo o en rojo no se baja para publicar
+        elegidos.append((i, doc))
+    # Todas las fotos de la tanda a la vez (del Drive, en paralelo).
+    leidas = carrusel.leer_fotos_zip([d for _, d in elegidos])
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
-        for i, doc in enumerate(grupos[int(numero) - 1], start=1):
-            if pendientes and doc.get("subido"):
-                continue
-            if _clave(doc) in agotados and not doc.get("subido"):
-                continue  # sin stock no se publica (como en los vídeos)
-            if not doc.get("subido") and servicio.sin_revisar({"semaforo": _semaforo(doc, sem)}):
-                saltados += 1
-                continue  # sin semáforo o en rojo no se baja para publicar
-            n = carrusel.meter_en_zip(z, doc, f"{i:02d}_{carrusel.nombre_carrusel(doc)}", epoca)
+        for i, doc in elegidos:
+            n = carrusel.meter_en_zip(z, doc, f"{i:02d}_{carrusel.nombre_carrusel(doc)}", epoca, leidas)
             if n:
                 metidos += 1
                 epoca -= 2 * n
