@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import shutil
 import threading
@@ -470,6 +471,21 @@ def _guardar_fijas(usuario: str, fijas: list[dict]) -> None:
 
 
 def tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos: bool = False) -> dict:
+    """Ver `_tandas`. Aquí solo se piden de una vez (un MGET) los documentos
+    del usuario que la pantalla lee: eran 5 viajes seguidos a Redis por
+    petición y ahora es uno."""
+    from src.mis_tandas import tareas as tareas_mod
+
+    u = usuario or "ness"
+    claves = [k.format(usuario=u) for k in (
+        config.OCULTOS_KEY, config.FIJAS_KEY, config.SEMAFORO_KEY, config.EPOCA_KEY, tareas_mod.TAREAS_KEY,
+    )]
+    pre = getattr(_redis(), "prelectura", None)
+    with (pre(claves) if pre else contextlib.nullcontext()):
+        return _tandas(usuario, todas=todas, fresco=fresco, ver_ocultos=ver_ocultos)
+
+
+def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos: bool = False) -> dict:
     """Las tandas ABIERTAS con sus vídeos y, de las cerradas, solo cuántas hay
     (con `todas`, también sus vídeos).
 

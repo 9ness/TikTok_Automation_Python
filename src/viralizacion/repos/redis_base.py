@@ -6,9 +6,12 @@ programas, ver CLAUDE.md)."""
 
 from __future__ import annotations
 
+import contextlib
+import copy
 import json
+import threading
 import urllib.parse
-from typing import Any
+from typing import Any, Iterator
 
 import requests
 
@@ -77,8 +80,52 @@ class ViralizacionRedis:
             print(f"[ViralizacionRedis] POST {path} error: {e}")
             return None
 
+    # ---- prelectura ----
+    # Una pantalla que lee 5 documentos sueltos hace 5 viajes seguidos a
+    # Redis REST. Con `prelectura` se piden de golpe en un MGET y, mientras
+    # dure el bloque y SOLO en este hilo, `get_json` de esas claves sale de
+    # memoria. Lo que se escribe o borra dentro del bloque se olvida, así que
+    # una lectura posterior vuelve a Redis y nunca devuelve algo viejo.
+    _local = threading.local()
+
+    @contextlib.contextmanager
+    def prelectura(self, keys: list[str]) -> Iterator[None]:
+        previa = getattr(self._local, "docs", None)
+        docs: dict[str, Any] = dict(previa or {})
+        if self.is_available():
+            faltan = [k for k in dict.fromkeys(keys) if self._full_key(k) not in docs]
+            if faltan:
+                encoded = "/".join(self._enc(self._full_key(k)) for k in faltan)
+                raw_list = self._get(f"mget/{encoded}")
+                # Si el MGET falla no se guarda nada: cada get_json va a Redis
+                # como siempre.
+                if isinstance(raw_list, list) and len(raw_list) == len(faltan):
+                    for k, raw in zip(faltan, raw_list):
+                        docs[self._full_key(k)] = raw
+        self._local.docs = docs
+        try:
+            yield
+        finally:
+            self._local.docs = previa
+
+    def _olvidar(self, key: str) -> None:
+        docs = getattr(self._local, "docs", None)
+        if docs:
+            docs.pop(self._full_key(key), None)
+
+    def _decodificar(self, raw: Any) -> dict | None:
+        if raw is None:
+            return None
+        try:
+            return absolutizar(json.loads(raw) if isinstance(raw, str) else copy.deepcopy(raw))
+        except json.JSONDecodeError:
+            return None
+
     # ---- comandos ----
     def get_json(self, key: str) -> dict | None:
+        docs = getattr(self._local, "docs", None)
+        if docs and self._full_key(key) in docs:
+            return self._decodificar(docs[self._full_key(key)])
         raw = self._get(f"get/{self._enc(self._full_key(key))}")
         if raw is None:
             return None
@@ -88,11 +135,13 @@ class ViralizacionRedis:
             return None
 
     def set_json(self, key: str, value: dict | list) -> bool:
+        self._olvidar(key)
         body = json.dumps(relativizar(value), ensure_ascii=False).encode("utf-8")
         result = self._post(f"set/{self._enc(self._full_key(key))}", body=body)
         return result == "OK"
 
     def delete(self, key: str) -> bool:
+        self._olvidar(key)
         result = self._post(f"del/{self._enc(self._full_key(key))}")
         return result is not None
 
