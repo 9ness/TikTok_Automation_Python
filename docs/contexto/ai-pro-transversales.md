@@ -54,6 +54,13 @@ escondido en «Mi menú» sale dentro de «Más» › «Ocultos en Mi menú». L
 «Más» va con `prefetch={false}`. Usuario sin entrada en `PRINCIPAL` = menú de
 siempre. «Panel de mando ↗» enlaza a panel.nebulabsmedia.com (controles del VPS).
 
+**Salud de la app (9/11/2026).** `GET /api/health/completo` (`src/api/routers/salud.py`,
+con sesión) mira lo que el panel de mando no ve: los dos Redis, el Drive montado,
+el disco de trabajo y la cola (workers vivos y trabajos ATASCADOS: corriendo
+> `SALUD_CORRIENDO_MAX_MIN`=60 o pendientes > `SALUD_PENDIENTE_MAX_MIN`=10 sin nada
+corriendo; lo programado a futuro no cuenta). Cada sonda en su hilo con tope de 4 s.
+Se ve en Diagnóstico › Resumen. `GET /api/health` sigue siendo el latido de Docker.
+
 ### Escaparate y vendidos — transversales a TODOS los nichos
 
 Dos cosas NO son de ningún nicho: se hacen una sola vez por producto porque la
