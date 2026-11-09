@@ -52,6 +52,32 @@ MCP_URLS = Path(__file__).resolve().parent.parent / "MCP_URLS.local.md"
 USUARIO = os.environ.get("MCP_USUARIO", "ness")
 SONIDO_ID = os.environ.get("SONIDO_ID", "")   # sonido comercial fijo (Ama Shop), por enlace y con `rapido`: sin lista ni lupa
 
+# Cronómetro por fase (9/11): solo mide, no cambia nada. Cada orden (rapido/producto/publicar) guarda
+# sus fases en TMP/fases_<id>.json; publicar añade el total a TMP/fases.jsonl.
+_FASES: dict = {}
+_T_FASE = [time.time()]
+_FASE_CID = [""]
+
+
+def fase(nombre: str) -> None:
+    ahora = time.time()
+    s = round(ahora - _T_FASE[0], 1)
+    _T_FASE[0] = ahora
+    _FASES[nombre] = round(_FASES.get(nombre, 0) + s, 1)
+    print(f"⏱ {nombre} {s}s", flush=True)
+
+
+def _guardar_fases(orden: str) -> None:
+    if not _FASE_CID[0] or not _FASES:
+        return
+    try:
+        f = TMP / f"fases_{_FASE_CID[0]}.json"
+        prev = json.loads(f.read_text()) if f.exists() else {}
+        prev[orden] = _FASES
+        f.write_text(json.dumps(prev, ensure_ascii=False))
+    except Exception as e:  # noqa: BLE001 — medir nunca rompe la subida
+        print(f"AVISO: no guardé las fases ({e})")
+
 # Puntos de la UI de TikTok por móvil. Un perfil por pantalla: escalar no basta (densidades distintas).
 PERFILES = {
     "oppo": {   # 1440x3168, densidad 560: probado
@@ -647,6 +673,7 @@ def rapido(cid: str) -> None:
     Sin ficha del escaparate ni Favoritos (~7 min frente a ~11). Si algo no cuadra, sale con error y el
     wrapper repite por la ruta normal (preparar + editor)."""
     (TMP / f"inicio_{cid}").write_text(str(time.time()))
+    _FASE_CID[0] = cid
     c = carrusel(cid)
     d = TMP / cid
     d.mkdir(parents=True, exist_ok=True)
@@ -660,17 +687,21 @@ def rapido(cid: str) -> None:
         print("AVISO: no vi «Añadir al escaparate» ni que ya estuviera (mira 6_ficha); sigo")
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
     print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']} (vía rápida)")
+    fase("datos_fotos")
     adb("shell", "am", "force-stop", PAQUETE)
     limpiar()
+    fase("limpiar")
     adb("shell", "mkdir", "-p", CARPETA_MOVIL)
     for p in locales:
         destino = f"{CARPETA_MOVIL}/{cid}_{p.name}"
         adb("push", str(p), destino)
         adb("shell", "am", "broadcast", "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
             "-d", f"file://{destino}")
+    fase("push_fotos")
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
         "-d", c["musica"]["tiktok"]["enlace"], PAQUETE)
     time.sleep(7)
+    fase("abrir_sonido")
     for _ in range(3):                    # «Hubo un problema» al abrir en frío: «Volver a intentar»
         if pulsar(r"^Usar sonido$", 4):
             break
@@ -679,6 +710,7 @@ def rapido(cid: str) -> None:
         captura("r_sonido")
         raise SystemExit("No veo «Usar sonido» (mira r_sonido)")
     time.sleep(3)
+    fase("usar_sonido")
     tap(*pt("galeria"), 3)                     # galería (miniatura abajo a la izquierda)
     if not any(n["text"] == "carr_tmp" and n["y"] < pt("y_max_album") for n in nodos()):
         tap(*pt("album"), 2)
@@ -689,11 +721,13 @@ def rapido(cid: str) -> None:
     for i in range(len(locales)):
         toque_foto(i)
     captura("1_seleccion")
+    fase("elegir_fotos")
     if not pulsar(rf"Siguiente \({len(locales)}\)", 5):
         raise SystemExit("No veo «Siguiente (N)»: revisa la selección")
     if not any("Sonido original" in n["text"] or n["desc"] == "Música" for n in nodos()):
         print("AVISO: no veo el sonido puesto en el editor")
     captura("2_sonido")
+    fase("siguiente")
     copiar_caption(c)                     # Keep y vuelta: el editor sigue igual
     pulsar(r"^Siguiente$", 4)
     pegar_caption()
@@ -707,7 +741,9 @@ def rapido(cid: str) -> None:
         al_principio()
         for _ in range(sobra):
             tecla(112)
+    fase("caption")
     pulsar(r"^Listo$", 2)
+    fase("listo")
     producto(cid)
 
 
@@ -739,6 +775,7 @@ AVISO_COMISION = r"^\W*Entendido\W*$"   # «Protección de comisión de 30 días
 
 def producto(cid: str) -> None:
     """Desde la pantalla de publicar: producto por ID y, si el sonido no lo deja, uno comercial."""
+    _FASE_CID[0] = _FASE_CID[0] or cid
     c = carrusel(cid)
     pid = pid_de(c)
     abrir_enlace()
@@ -754,6 +791,7 @@ def producto(cid: str) -> None:
         pulsar(r"^Siguiente$", 4)
         abrir_enlace()
         _comercial = True
+        fase("quitar_sonido_viral")
     else:
         _comercial = False
     pulsar(r"^Producto$", 5)
@@ -780,6 +818,7 @@ def producto(cid: str) -> None:
     if sin_resultados():
         (TMP / f"escaparate_{pid}").write_text("1")   # el reintento de preparar abrirá la ficha y lo añadirá
         raise SystemExit(f"{pid} no sale al buscarlo: no está en el escaparate (mira 6_ficha de preparar)")
+    fase("producto_buscar")
     campo = []
     # «Añadir» del único resultado: en el Mi 8 sale en el volcado; en el OPPO no, y su altura cambia
     puntos = [(b["x"], b["y"]) for b in botones_anadir()[:1]] or [(pt("anadir_x"), y) for y in pt("anadir_ys")]
@@ -795,6 +834,7 @@ def producto(cid: str) -> None:
             campo = [n for n in nodos() if n["desc"] == "edit_anchor_name_input"]
         if campo:
             break
+    fase("producto_anadir")
     if not campo:
         captura("3_sin_campo")            # 6/11: este texto NO puede decir «sin stock»: subir_prebf lo tomaba por agotado y saltaba sin probar la ruta normal
         raise SystemExit("No se abrió «Cambiar nombre»: ¿«No disponible» (mira 3_sin_campo), sin ese ID o el sonido lo impide?")
@@ -811,6 +851,7 @@ def producto(cid: str) -> None:
         tecla(4 if perfil().get("lista_en_dump") else 111)   # oculta el teclado (en el Mi 8 ESC no lo cierra)
     if not pulsar(r"^\W*Añadir\W*$", 4):
         tap(*pt("anadir_abajo"), 4)
+    fase("producto_nombre")
     if _comercial:
         al_editor()
         tap(*pt("pildora_sonido"), 4)                  # con producto solo salen «Sonidos comerciales»
@@ -838,12 +879,14 @@ def producto(cid: str) -> None:
         tap(*pt("check_comercial"), 4)                 # check del primero: el más parecido
         captura("5_comercial")
         pulsar(r"^Siguiente$", 4)
+        fase("cambio_sonido_comercial")
     captura("4_final")
     print("Listo para revisar antes de Publicar")
 
 
 def publicar(cid: str) -> None:
     # Publicar se pulsa UNA sola vez (repetir = duplicado). Si no se ve (ADB caído a mitad), reconecta y mira otra vez.
+    _FASE_CID[0] = cid
     n = buscar(r"^Publicar$")
     if not n:
         reconectar(); time.sleep(3)
@@ -855,15 +898,30 @@ def publicar(cid: str) -> None:
         subprocess.run(["adb", "-s", SERIAL, "shell", "input", "tap", str(n["x"]), str(n["y"])], capture_output=True, timeout=25)
     except subprocess.TimeoutExpired:
         print("AVISO: el toque de Publicar se colgó; NO se repite (mira la cuenta)")
+    fase("publicar")
     time.sleep(10)
+    fase("espera_tras_publicar")
     r = mcp("marcar_tanda", {"id": cid, "subido": True, "fotos": True})
     print("subido en la app:", r.get("subido"))
+    fase("marcar_subido")
     ini = TMP / f"inicio_{cid}"
     if ini.exists():
         mins = (time.time() - float(ini.read_text())) / 60
         print(f"tiempo total: {mins:.1f} min")
         with open(TMP / "tiempos.txt", "a") as f:
             f.write(f"{cid} {mins:.1f}\n")
+        try:   # una línea por carrusel con todas las fases (rapido + producto + publicar)
+            _guardar_fases("publicar")
+            ff = TMP / f"fases_{cid}.json"
+            todas = json.loads(ff.read_text()) if ff.exists() else {}
+            with open(TMP / "fases.jsonl", "a") as f:
+                f.write(json.dumps({"fecha": time.strftime("%F %T"), "id": cid, "usuario": USUARIO,
+                                    "movil": SERIAL, "total_s": round(mins * 60), "fases": todas},
+                                   ensure_ascii=False) + "\n")
+            ff.unlink(missing_ok=True)
+            _FASES.clear()
+        except Exception as e:  # noqa: BLE001
+            print(f"AVISO: no guardé fases.jsonl ({e})")
     captura()
 
 
@@ -877,5 +935,10 @@ def limpiar() -> None:
 
 if __name__ == "__main__":
     (TMP / "sh").mkdir(parents=True, exist_ok=True)
-    fase, *resto = sys.argv[1:]
-    {"lote": lote, "rapido": rapido, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[fase](*resto)
+    orden, *resto = sys.argv[1:]
+    try:
+        {"lote": lote, "rapido": rapido, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[orden](*resto)
+    finally:
+        if _FASES:
+            fase("fin")   # lo que quede hasta salir (o hasta el fallo)
+        _guardar_fases(orden)
