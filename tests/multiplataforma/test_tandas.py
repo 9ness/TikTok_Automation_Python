@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import zoneinfo
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -491,3 +493,73 @@ def test_replanificar_sin_separacion_deja_el_orden(filas, drive, cuenta, monkeyp
     ayer = _cola_repetida(cuenta, REFS)
     inf = tandas.replanificar("ama_shop", ahora=AHORA)
     assert "espaciadas" not in inf and _orden(ayer) == REFS
+
+
+# ── capacidad por época: ¿cabe lo de temporada antes de que acabe? ──────────
+
+def _t(dia: dt.date) -> float:
+    return dt.datetime.combine(dia, dt.time(20, 30), TZ).timestamp()
+
+
+def test_capacidad_cuenta_lo_que_sale_tarde_y_el_ritmo_que_haria_falta():
+    hoy = dt.date(2026, 11, 9)
+    ahora = dt.datetime.combine(hoy, dt.time(10), TZ).timestamp()
+    cola = [("black_friday", _t(hoy + dt.timedelta(days=i))) for i in range(1, 31)]  # 30: acaba el 1/12 (22 días)
+    cola += [("navidad", _t(dt.date(2026, 12, 20))), ("navidad", _t(dt.date(2027, 2, 3)))]
+    cola += [("halloween", _t(dt.date(2026, 11, 20))), ("neutro", _t(dt.date(2027, 3, 1))), ("", _t(hoy))]
+    cap = tandas.capacidad(cola, 1, ahora)
+    bf, nav = cap["epocas"]
+    assert bf == {"epoca": "black_friday", "pendientes": 30, "fin": "2026-12-01", "dias": 22, "a_tiempo": 22, "tarde": 8}
+    assert (nav["fin"], nav["a_tiempo"], nav["tarde"]) == ("2027-01-06", 1, 1)  # la ventana cruza el año
+    assert cap["tarde"] == 9 and cap["fuera_de_epoca"] == 1  # halloween ya pasó: espera, no cuenta como tarde
+    assert cap["ritmo"] == 1 and cap["ritmo_necesario"] == 2  # 30 en 22 días
+
+
+def test_capacidad_sin_temporada_no_pide_nada():
+    cap = tandas.capacidad([("neutro", AHORA + 86400)], 2, AHORA)
+    assert cap == {"ritmo": 2, "ritmo_necesario": 0, "tarde": 0, "fuera_de_epoca": 0, "epocas": []}
+
+
+def test_capacidad_epocas_lee_la_cola_de_producto(filas, drive, cuenta, monkeypatch):
+    from src.mis_tandas import servicio
+
+    filas += [_fila(drive, "largo|inv|C1|1|", "Manta neutra"),
+              _fila(drive, "largo|inv|C1|2|", "Disfraz bruja"),
+              _fila(drive, "largo|inv|C1|3|", "Calabaza led")]
+    monkeypatch.setattr(servicio, "epocas", lambda u: {"largo|inv|C1|2|": "halloween", "largo|inv|C1|3|": "halloween"})
+    cuando = [AHORA + 86400, AHORA + 5 * 86400, AHORA + 40 * 86400]  # la calabaza saldría el 17/11
+    for f, t in zip(filas, cuando):
+        publicaciones_repo.encolar(Publicacion(cuenta="ama_shop", video_path=f["video_path"], tipo="producto",
+                                               producto_ref=f["titulo"], plataformas=["instagram"],
+                                               programada_en=t, origen="tandas"))
+    publicaciones_repo.encolar(Publicacion(cuenta="ama_shop", video_path=filas[2]["video_path"], tipo="carrusel",
+                                           plataformas=["instagram"], programada_en=AHORA + 50 * 86400))
+    cap = tandas.capacidad_epocas("ama_shop", ahora=AHORA)
+    assert cap["cuenta"] == "ama_shop" and cap["priorizar_epocas"] is False
+    assert cap["epocas"] == [{"epoca": "halloween", "pendientes": 2, "fin": "2026-10-31", "dias": 23,
+                              "a_tiempo": 1, "tarde": 1}]
+    assert cap["tarde"] == 1 and cap["ritmo_necesario"] == 1
+
+
+def test_original_de_la_copia_con_musica_sigue_a_la_carpeta_mudada(filas, drive, cuenta, monkeypatch, tmp_path):
+    """El .json de la copia guarda la ruta de cuando se hizo. Si la carpeta del
+    Drive se mudó después, hay que llevarla a donde está hoy o el vídeo pierde
+    su época (pasó el 5/11/2026 con 159 vídeos de ama_shop)."""
+    from src import rutas_drive
+    from src.mis_tandas import servicio
+
+    f = _fila(drive, "largo|inv|C1|2|", "Botas de otoño")
+    filas.append(f)
+    monkeypatch.setattr(servicio, "epocas", lambda u: {"largo|inv|C1|2|": "otono"})
+    rel = Path(f["video_path"]).relative_to(tmp_path)
+    monkeypatch.setitem(rutas_drive.ALIAS, "CARPETA_VIEJA", rel.parts[0])
+    copia = tmp_path / "musica" / "copia.mp4"
+    copia.parent.mkdir()
+    copia.write_bytes(b"v")
+    vieja = tmp_path / "CARPETA_VIEJA" / Path(*rel.parts[1:])
+    copia.with_suffix(".json").write_text(json.dumps({"original": str(vieja)}), encoding="utf-8")
+    assert tandas._original(str(copia)) == f["video_path"]
+    publicaciones_repo.encolar(Publicacion(cuenta="ama_shop", video_path=str(copia), tipo="producto",
+                                           producto_ref="botas", plataformas=["instagram"],
+                                           programada_en=AHORA + 86400, origen="tandas"))
+    assert [e["epoca"] for e in tandas.capacidad_epocas("ama_shop", ahora=AHORA)["epocas"]] == ["otono"]

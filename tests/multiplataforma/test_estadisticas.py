@@ -194,3 +194,15 @@ def test_generar_sin_datos():
 @pytest.mark.parametrize("v,txt", [(None, "—"), (25226, "25.226"), (4279.75, "4.279,8"), (120.0, "120")])
 def test_formato_numeros(v, txt):
     assert informe._n(v) == txt
+
+
+def test_seccion_epocas_del_informe():
+    cap = {"ritmo": 1, "ritmo_necesario": 3, "tarde": 32, "fuera_de_epoca": 4, "epocas": [
+        {"epoca": "navidad", "pendientes": 90, "fin": "2027-01-06", "dias": 58, "a_tiempo": 58, "tarde": 32}]}
+    md = "\n".join(informe.seccion_epocas({"cuentas": {"viva_shop": {"epocas": cap}, "ama_shop": {"epocas": None}}}))
+    assert "| viva_shop | navidad | 06/01 | 90 | 58 | 32 |" in md
+    assert "**3 vídeos de producto al día** (hoy 1)" in md and "4 de una época que ya pasó" in md
+    assert "ama_shop" not in md
+    # sin temporada en cola (o lectura vieja): la sección no sale
+    vacia = {"ritmo": 1, "ritmo_necesario": 0, "tarde": 0, "fuera_de_epoca": 0, "epocas": []}
+    assert informe.seccion_epocas({"cuentas": {"viva_shop": {"epocas": vacia}, "x": {}}}) == []

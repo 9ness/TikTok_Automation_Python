@@ -19,6 +19,7 @@ import httpx
 
 from src.multiplataforma import config
 from src.multiplataforma.repos import cuentas_repo, publicaciones_repo, redis_base
+from src.multiplataforma.services import tandas
 
 VENTANA_S = 7 * 86400
 _TOKEN_RE = re.compile(r"(access_token|input_token)=[^&\s\"']+")
@@ -77,6 +78,18 @@ def reels_fb(c, pubs: list, ahora: float) -> list[dict]:
     return out
 
 
+def epocas(slug: str, ahora: float) -> dict | None:
+    """¿Cabe lo de temporada antes de que acabe su época? None si la app
+    desplegada aún no lo calcula o falla: el vigía no se cae por esto."""
+    calcular = getattr(tandas, "capacidad_epocas", None)
+    if calcular is None:
+        return None
+    try:
+        return calcular(slug, ahora=ahora)
+    except Exception as e:  # noqa: BLE001
+        return {"error": type(e).__name__}
+
+
 def main() -> int:
     ahora = time.time()
     todas = publicaciones_repo.todas(20000)
@@ -92,6 +105,7 @@ def main() -> int:
             "tokens": tokens,
             "threads_renovado": renovado.get(c.slug),
             "fb_reels": reels_fb(c, propias, ahora) if "facebook" in tokens else [],
+            "epocas": epocas(c.slug, ahora),
         }
     pubs = [{"id": p.id, "cuenta": p.cuenta, "titulo": (p.titulo or "")[:60], "programada_en": p.programada_en,
              "plataformas": list(p.plataformas or []), "estado": dict(p.estado or {}),

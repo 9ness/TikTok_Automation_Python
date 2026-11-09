@@ -151,6 +151,17 @@ def salud(pubs: list) -> dict:
     return {"estados": dict(sorted(estados.items())), "comentarios_fb_fallidos": comentarios_fallidos}
 
 
+def epocas(slug: str, errores: list[str]) -> dict | None:
+    """None si la app desplegada aún no lo calcula; un fallo no tumba la lectura."""
+    try:
+        from src.multiplataforma.services import tandas
+        calcular = getattr(tandas, "capacidad_epocas", None)
+        return calcular(slug) if calcular else None
+    except Exception as e:  # noqa: BLE001
+        errores.append(f"epocas: {type(e).__name__}")
+        return None
+
+
 def cuenta(slug: str, todas: list, desde: int, hasta: int) -> dict:
     c = cuentas_repo.get(slug)
     if c is None:
@@ -169,6 +180,8 @@ def cuenta(slug: str, todas: list, desde: int, hasta: int) -> dict:
         "en_cola": len(cola),
         # Página de la bio: visitas y clics por producto (solo contadores).
         "embudo": embudo.resumen(slug, desde, hasta) if embudo else None,
+        # ¿Cabe lo de temporada antes de que acabe su época?
+        "epocas": epocas(slug, errores),
         "errores": errores,
     }
 

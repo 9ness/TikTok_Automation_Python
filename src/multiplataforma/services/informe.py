@@ -263,6 +263,34 @@ def recomendaciones(pubs: list[dict]) -> list[str]:
     return out
 
 
+def seccion_epocas(ultimo: dict) -> list[str]:
+    """¿Cabe lo de temporada antes de que acabe su época? Solo sale si hay
+    vídeos de temporada en cola."""
+    filas, notas = [], []
+    for c, d in sorted((ultimo.get("cuentas") or {}).items()):
+        cap = d.get("epocas")
+        if not isinstance(cap, dict):
+            continue
+        for e in cap.get("epocas") or []:
+            filas.append([c, e["epoca"], f"{e['fin'][8:]}/{e['fin'][5:7]}", _n(e["pendientes"]),
+                          _n(e["a_tiempo"]), _n(e["tarde"])])
+        if cap.get("tarde"):
+            falta = (cap.get("ritmo_necesario") or 0) > (cap.get("ritmo") or 0)
+            notas.append(f"- **{c}**: {cap['tarde']} saldrían tarde. " +
+                         (f"Para que quepan harían falta **{cap['ritmo_necesario']} vídeos de producto al día** "
+                          f"(hoy {cap.get('ritmo')}): subir el ritmo o elegir cuáles se quedan fuera."
+                          if falta else "Caben con el ritmo de hoy: basta ordenar la cola por época (replanificar)."))
+        if cap.get("fuera_de_epoca"):
+            notas.append(f"- **{c}**: {cap['fuera_de_epoca']} de una época que ya pasó esperan a la siguiente.")
+    if not filas and not notas:
+        return []
+    l = ["## 🎄 Temporada: ¿cabe en la cola?", "",
+         "Vídeos de producto pendientes de cada época y cuántos saldrían cuando ya ha pasado, con el reparto de hoy.", ""]
+    if filas:
+        l += _tabla(["cuenta", "época", "acaba", "en cola", "a tiempo", "tarde"], filas) + [""]
+    return l + notas + ([""] if notas else [])
+
+
 def generar(fotos: list[tuple[str, dict]], ahora: float | None = None, dias: int = 7) -> str:
     """El Markdown del informe. `dias` = ventana de «esta semana» para top y tablas."""
     if not fotos:
@@ -336,6 +364,7 @@ def generar(fotos: list[tuple[str, dict]], ahora: float | None = None, dias: int
 
     l += seccion_clics(semana)
     l += seccion_embudo(ultimo)
+    l += seccion_epocas(ultimo)
 
     flo = [m for m in flojas(todas, ahora) if (_ts(m) or 0) >= ahora - dias * 86400][:10]
     l += ["## No despegan (semana, ≥48 h y < 1/4 de la mediana de su cuenta y formato)", ""]

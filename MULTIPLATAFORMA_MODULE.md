@@ -254,6 +254,8 @@ pensado para el agente diario que busca los enlaces.
 
 **El mismo producto no sale días seguidos** (`tandas.espaciar`, 9/11/2026): una tanda trae varios vídeos del mismo producto y salían uno detrás de otro (viva_salud publicó la misma proteína 7 días seguidos). Al encolar y al replanificar, un `producto_ref` no vuelve a salir hasta pasados `MULTIPLATAFORMA_SEPARACION_PRODUCTO_DIAS` (3; 0 = apagado), contando lo publicado esos días. Reordena lo mínimo dentro de la prioridad y nunca deja nada sin salir: si solo quedan vídeos de ese producto, salen. Solo cambia el orden, no lo que se publica.
 
+**¿Cabe lo de temporada? (`tandas.capacidad_epocas`, 9/11/2026):** por cada época con la ventana abierta, cuántos vídeos de producto hay en cola, cuántos salen a tiempo y cuántos saldrían cuando ya ha pasado, y el `ritmo_necesario` (vídeos de producto al día para que todo lo de temporada quepa, sacando antes la época que antes acaba). Solo lee. Lo recogen el vigía (`cuentas.<slug>.epocas` → incidencia `cola:<slug>:epocas`, nivel aviso) y las estadísticas (`epocas` por cuenta → sección «Temporada: ¿cabe en la cola?» del informe). La época de una copia con música sale del `.json` de al lado (`original`), y esa ruta se lleva a donde está hoy la carpeta (`rutas_drive.a_absoluta`): tras la mudanza del Drive del 5/11 guardaba la ruta vieja y 137 vídeos de ama_shop (39 de otoño) contaban como «neutro» al ordenar por época.
+
 - `GET /cuentas/{slug}/productos?sin_enlace=1` — productos agrupados por
   `producto_key` (vídeos, subidos a TikTok, en cola, estado del enlace).
 - `GET /cuentas/{slug}/productos/{producto_key}/foto` (con auth).

@@ -30,6 +30,7 @@ import unicodedata
 import zoneinfo
 from pathlib import Path
 
+from src import rutas_drive
 from src.multiplataforma import config
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo, redis_base
@@ -371,11 +372,14 @@ def prioridad(f: dict, hoy: dt.date) -> tuple[int, int]:
 
 
 def _original(path: str) -> str:
-    """La copia con música guarda al lado un .json con el vídeo original."""
+    """La copia con música guarda al lado un .json con el vídeo original. La
+    ruta se lleva a donde está HOY esa carpeta del Drive: el .json se escribió
+    al hacer la copia y, si después se mudó la carpeta (5/11/2026), la ruta
+    vieja ya no casa con ninguna fila y el vídeo perdía su época."""
     try:
         meta = Path(path).with_suffix(".json")
         if meta.is_file():
-            return str(json.loads(meta.read_text("utf-8")).get("original") or "")
+            return str(rutas_drive.a_absoluta(str(json.loads(meta.read_text("utf-8")).get("original") or "")))
     except Exception:  # noqa: BLE001
         pass
     return ""
@@ -489,6 +493,63 @@ def replanificar_todas(*, ahora: float | None = None, cada_s: int = 3600, log=la
             log(f"[replanificar] {c.slug}: {inf.get('movidas', 0)} movidas {inf.get('error', '')}")
         out.append(inf)
     return out
+
+
+def fin_ventana(epoca: str, hoy: dt.date) -> dt.date | None:
+    """El último día de la ventana en curso de la época (None si no tiene o no toca hoy)."""
+    v = config.VENTANA_EPOCA.get(epoca)
+    if not v or not en_ventana(epoca, hoy):
+        return None
+    d2, m2 = v[1]
+    return dt.date(hoy.year if (m2, d2) >= (hoy.month, hoy.day) else hoy.year + 1, m2, d2)
+
+
+def capacidad(cola: list[tuple[str, float]], ritmo: int, ahora: float) -> dict:
+    """¿Cabe lo de temporada antes de que acabe su época? `cola` = (época, hora
+    programada) de cada vídeo de producto pendiente. Por época con ventana abierta:
+    cuántos hay, cuántos salen a tiempo y cuántos tarde con el reparto actual.
+    `ritmo_necesario` = vídeos de producto al día para que TODO lo de temporada
+    salga dentro de su época, sacando antes la que antes se acaba."""
+    zona = _zona()
+    hoy = dt.datetime.fromtimestamp(ahora, zona).date()
+    por_epoca: dict[str, list[float]] = {}
+    for epoca, t in cola:
+        por_epoca.setdefault(epoca or "neutro", []).append(t)
+    epocas, fuera = [], 0
+    for epoca, horas in por_epoca.items():
+        if epoca not in config.VENTANA_EPOCA:
+            continue
+        fin = fin_ventana(epoca, hoy)
+        if fin is None:
+            fuera += len(horas)  # su época ya pasó o no ha llegado: esperan a la siguiente
+            continue
+        tarde = sum(1 for t in horas if dt.datetime.fromtimestamp(t, zona).date() > fin)
+        epocas.append({"epoca": epoca, "pendientes": len(horas), "fin": fin.isoformat(),
+                       "dias": max((fin - hoy).days, 1), "a_tiempo": len(horas) - tarde, "tarde": tarde})
+    epocas.sort(key=lambda e: (e["fin"], e["epoca"]))
+    necesario, acumulado = 0, 0
+    for e in epocas:
+        acumulado += e["pendientes"]
+        necesario = max(necesario, -(-acumulado // e["dias"]))
+    return {"ritmo": ritmo, "ritmo_necesario": necesario, "tarde": sum(e["tarde"] for e in epocas),
+            "fuera_de_epoca": fuera, "epocas": epocas}
+
+
+def capacidad_epocas(slug: str, *, ahora: float | None = None) -> dict:
+    """`capacidad` de la cola de producto de la cuenta. Solo lee."""
+    c = cuenta_o_error(slug)
+    ahora = time.time() if ahora is None else ahora
+    info: dict[str, dict] = {}
+    if c.dueno:
+        info = {f["video_path"]: f for f in filas_cuenta(c)}
+    cola = []
+    for p in publicaciones_repo.de_cuenta(slug):
+        if p.tipo != TIPO or p.terminada:
+            continue
+        f = info.get(p.video_path) or info.get(_original(p.video_path)) or {}
+        cola.append(("" if f.get("nicho") == "rv" else f.get("epoca") or "neutro", p.programada_en))
+    ritmo = int((c.ritmo or {}).get(TIPO, config.RITMO_DEFAULT.get(TIPO, 1))) or 1
+    return {"cuenta": slug, "priorizar_epocas": bool(c.priorizar_epocas), **capacidad(cola, ritmo, ahora)}
 
 
 def garantia_diaria(slug: str, *, ahora: float | None = None) -> dict:

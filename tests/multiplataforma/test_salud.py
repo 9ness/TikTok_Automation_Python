@@ -145,6 +145,24 @@ def test_analizar_junta_todo():
                       "token:viva_shop:threads:invalido"]
 
 
+def test_epocas_avisa_de_lo_que_saldria_fuera_de_su_epoca():
+    cap = {"ritmo": 1, "ritmo_necesario": 3, "tarde": 40, "fuera_de_epoca": 2, "epocas": [
+        {"epoca": "black_friday", "pendientes": 30, "fin": "2026-12-01", "dias": 22, "a_tiempo": 22, "tarde": 8},
+        {"epoca": "navidad", "pendientes": 90, "fin": "2027-01-06", "dias": 58, "a_tiempo": 58, "tarde": 32}]}
+    (inc,) = salud.de_epocas("viva_shop", cap)
+    assert inc["clave"] == "cola:viva_shop:epocas" and inc["nivel"] == "aviso" and not inc["notificar"]
+    assert "8 de black_friday (acaba el 01/12)" in inc["texto"] and "32 de navidad (acaba el 06/01)" in inc["texto"]
+    assert "3 vídeos de producto al día (hoy 1)" in inc["texto"]
+    # cabe con el ritmo de hoy: lo que falta es ordenar
+    (inc,) = salud.de_epocas("viva_shop", {**cap, "ritmo": 3})
+    assert "replanificar" in inc["texto"]
+    # nada tarde, lectura vieja sin el dato o con error: sin incidencia
+    assert salud.de_epocas("viva_shop", {**cap, "tarde": 0}) == []
+    assert salud.de_epocas("viva_shop", None) == [] and salud.de_epocas("viva_shop", {"error": "X"}) == []
+    datos = {"cuentas": {"viva_shop": {"tokens": {}, "epocas": cap}}, "pubs": []}
+    assert _claves(salud.analizar(datos, None, AHORA)) == ["cola:viva_shop:epocas"]
+
+
 # ── script del host ────────────────────────────────────────────────────────
 
 def _script():

@@ -109,6 +109,21 @@ def de_cola(pubs: list[dict], ahora: float) -> list[dict]:
     return out
 
 
+def de_epocas(cuenta: str, cap: dict | None) -> list[dict]:
+    """Lo de temporada que, con el reparto de hoy, saldría cuando su época ya
+    ha pasado (un vídeo de Navidad en febrero). Avisa una vez; el recordatorio
+    semanal y el «resuelto» los pone `filtrar_nuevas`."""
+    if not isinstance(cap, dict) or not cap.get("tarde"):
+        return []
+    partes = [f"{e['tarde']} de {e['epoca']} (acaba el {e['fin'][8:]}/{e['fin'][5:7]})"
+              for e in cap.get("epocas") or [] if e.get("tarde")]
+    que_hacer = (f"harían falta {cap.get('ritmo_necesario')} vídeos de producto al día (hoy {cap.get('ritmo')})"
+                 if (cap.get("ritmo_necesario") or 0) > (cap.get("ritmo") or 0)
+                 else "caben con el ritmo de hoy si se ordena la cola por época (replanificar)")
+    return [_inc(f"cola:{cuenta}:epocas", "aviso",
+                 f"{cuenta} · saldrían fuera de su época: {', '.join(partes)}; {que_hacer}")]
+
+
 def _primer_error(ps: list[dict], pl: str) -> str:
     errs = collections.Counter(normalizar((p.get("errores") or {}).get(pl)) for p in ps)
     errs.pop("", None)
@@ -173,6 +188,7 @@ def analizar(datos: dict, log_texto: str | None, ahora: float) -> list[dict]:
         out += de_tokens(cuenta, tokens, ahora)
         out += de_threads(cuenta, tokens, c.get("threads_renovado"), ahora)
         out += de_fb_cero(cuenta, c.get("fb_reels") or [], ahora)
+        out += de_epocas(cuenta, c.get("epocas"))
     out += de_cola(datos.get("pubs") or [], ahora)
     if log_texto is not None:
         out += de_log(log_texto, ahora)
