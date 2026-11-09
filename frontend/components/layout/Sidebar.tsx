@@ -165,6 +165,7 @@ const NAV: NavGroup[] = [
       { href: "/editor-auto/generate", label: "Generador", icon: Sparkles },
       { href: "/editor-auto/plans", label: "Planes", icon: CreditCard },
       { href: "/editor-auto/marketing", label: "Marketing", icon: LineChart },
+      { href: "/editor-auto/estadisticas", label: "Estadísticas", icon: BarChart3 },
     ],
   },
   {

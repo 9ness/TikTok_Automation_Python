@@ -67,6 +67,7 @@ PIXABAY_API_KEY=...
 # EDITOR_RETENTION_DAYS=30 / EDITOR_RETENTION_SOURCE_DAYS=10 — caducidad editados/originales de clientes web (Redis settings:retention_* manda; retention_enabled=0 la apaga)
 # ANTHROPIC_API_KEY_EDITOR_AUTO — silence_cutter usa Claude Haiku (OpenAI de respaldo)
 # EDITOR_ASR_PROVIDER=deepgram + DEEPGRAM_API_KEY — transcripción de todo el editor (src/editor_auto/asr.py; Whisper de respaldo)
+# EDITOR_STATS_DB=/app/temp_work/estadisticas/editor.sqlite (default) + EDITOR_STATS_SALT (default API_KEY) — estadísticas LOCALES del editor y de nebulabsmedia (embudo sin cookies, prueba→pago, coste/tiempo por vídeo); src/editor_auto/services/estadisticas.py, página /editor-auto/estadisticas
 
 # === Programa 4 — Tiktok Shop AI Pro (Viralización) ===
 # Path raíz LOCAL (no Drive) de assets: gancho/audios/paisajes/música.

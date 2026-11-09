@@ -5493,13 +5493,21 @@ def dispatch_job(job: Job) -> None:
     except Exception as e:
         print(f"[dispatch] cost_tracking.start_job failed: {e}")
 
+    _ok = False
     try:
         result_path = runner(job, _on_log, _on_progress)
         job.result_path = result_path
+        _ok = True
     finally:
         try:
             from src import cost_tracking
-            cost_tracking.finalize_and_persist()
+            _coste = cost_tracking.finalize_and_persist()
+            # Estadísticas locales del Editor Auto (SQLite, nunca lanza).
+            if _coste is not None and job.mode == JobMode.EDITOR_AUTO:
+                from src.editor_auto.services import estadisticas
+                _d = _coste.to_dict()
+                _d.setdefault("meta", {})["estado"] = "hecho" if _ok else "fallido"
+                estadisticas.registrar_trabajo(_d)
         except Exception as e:
             print(f"[dispatch] cost_tracking.finalize failed: {e}")
 

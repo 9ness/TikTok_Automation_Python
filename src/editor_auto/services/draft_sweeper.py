@@ -320,6 +320,12 @@ async def sweeper_loop(stop_event: asyncio.Event) -> None:
         except Exception as e:
             logger.warning("[draft_sweeper] caducidad falló: %s", e)
         try:
+            # Foto de las cuentas web para las estadísticas locales (cada 2 h).
+            from src.editor_auto.services import estadisticas
+            await asyncio.to_thread(estadisticas.maybe_actualizar_cuentas, logger.info)
+        except Exception as e:
+            logger.warning("[draft_sweeper] estadísticas falló: %s", e)
+        try:
             await asyncio.wait_for(stop_event.wait(), timeout=INTERVAL_S)
         except asyncio.TimeoutError:
             pass

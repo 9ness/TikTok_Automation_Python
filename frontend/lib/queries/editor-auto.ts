@@ -815,3 +815,73 @@ export function useManualRender(userId: string) {
     },
   });
 }
+
+// ─────────────── Estadísticas locales (embudo web, prueba→pago, coste) ───────────────
+
+export interface PasoEmbudo {
+  paso: string;
+  n: number;
+  desde_anterior: number | null;
+}
+
+export interface ClienteStats {
+  cuenta: string;
+  usuario: string | null;
+  alta: string | null;
+  plan: string | null;
+  rol: string | null;
+  prueba_restante: number | null;
+  prueba_empezada: string | null;
+  primer_pago: string | null;
+  videos: number;
+  coste_usd: number;
+  coste_por_video: number | null;
+  seg_medio: number | null;
+  ultimo_video: string | null;
+}
+
+export interface EstadisticasEditor {
+  rango: { desde: string; hasta: string };
+  embudo: PasoEmbudo[];
+  conversion: {
+    desde: string;
+    hasta: string;
+    altas: number;
+    prueba: number;
+    pago: number;
+    pct_prueba: number | null;
+    pct_pago: number | null;
+  };
+  coste: {
+    videos: number;
+    fallidos: number;
+    coste_usd: number;
+    coste_medio_usd: number | null;
+    seg_medio: number | null;
+    seg_max: number | null;
+    por_herramientas: {
+      herramientas: string;
+      videos: number;
+      coste_medio_usd: number;
+      seg_medio: number | null;
+    }[];
+  };
+  por_dia: ({ dia: string; videos: number; coste_usd: number; seg_medio: number | null } & Record<
+    string,
+    number | string | null
+  >)[];
+  clientes: ClienteStats[];
+}
+
+/** Estadísticas del Editor Auto guardadas en local (SQLite del VPS). */
+export function useEstadisticasEditor(desde?: string, hasta?: string) {
+  const qs = new URLSearchParams();
+  if (desde) qs.set("desde", desde);
+  if (hasta) qs.set("hasta", hasta);
+  const q = qs.toString();
+  return useQuery<EstadisticasEditor>({
+    queryKey: [...editorAutoKeys.all, "estadisticas", desde ?? "", hasta ?? ""] as const,
+    queryFn: () => api.get<EstadisticasEditor>(`${WEB_ADMIN_ROOT}/estadisticas${q ? `?${q}` : ""}`),
+    refetchInterval: 60_000,
+  });
+}

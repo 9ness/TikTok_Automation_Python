@@ -711,8 +711,20 @@ def web_send_to_edit(
                 repo.set_trial_videos(user.account_email, max(0, cur - len(enqueued)))
             except Exception:
                 pass
+        _apuntar_envio(user, len(enqueued), prueba=trial_left is not None)
 
     return {"day": day, "enqueued": enqueued, "errors": errors, "locked": bool(enqueued)}
+
+
+def _apuntar_envio(user: EditorUser, n: int, *, prueba: bool) -> None:
+    """Estadísticas locales: vídeos enviados y, si es prueba, la primera vez."""
+    from src.editor_auto.services import estadisticas as est
+    cid = est.cuenta_id(user.account_email)
+    if not cid:
+        return
+    if prueba:
+        est.registrar_evento("prueba_empezada", cuenta=cid, unico=True)
+    est.registrar_evento("video_enviado", cuenta=cid, extra=str(n))
 
 
 # ─────────────────────────── Salida (vídeos editados) ───────────────────────────
@@ -911,7 +923,61 @@ def web_download(
     # Nombre de descarga limpio: quita el prefijo timestamp del upload
     # (1780695599_IMG_9750_editado.mp4 → IMG_9750_editado.mp4).
     nice = re.sub(r"^\d{8,}_", "", safe) or safe
+    if not source:
+        from src.editor_auto.services import estadisticas as est
+        est.registrar_evento("descarga", cuenta=est.cuenta_id(user.account_email), extra=day)
     return FileResponse(path, media_type="video/mp4", filename=nice)
+
+
+# ═══════════════════ ESTADÍSTICAS LOCALES (embudo, coste, clientes) ═══════════════════
+
+_BEACON_VENTANA: dict[str, list[float]] = {}
+_BEACON_MAX_MIN = 30  # eventos por IP y minuto
+
+
+@router.post("/evento", status_code=204)
+async def web_evento(request: Request) -> None:
+    """Beacon público de nebulabsmedia.com (sin login ni cookies): visita,
+    precios, registro_visto. Cuerpo JSON (también como text/plain, que es lo
+    que manda `navigator.sendBeacon` sin preflight). Nunca da error al
+    navegador: lo que no vale se ignora."""
+    from src.editor_auto.services import estadisticas as est
+    try:
+        datos = json.loads((await request.body())[:2000] or b"{}")
+        if not isinstance(datos, dict):
+            return None
+    except Exception:
+        return None
+    ip = est.ip_cliente({k.lower(): v for k, v in request.headers.items()},
+                        request.client.host if request.client else None)
+    ahora = time.time()
+    ventana = [t for t in _BEACON_VENTANA.get(ip or "", []) if ahora - t < 60]
+    if len(ventana) >= _BEACON_MAX_MIN:
+        return None
+    ventana.append(ahora)
+    _BEACON_VENTANA[ip or ""] = ventana
+    if len(_BEACON_VENTANA) > 5000:  # que no crezca sin fin
+        _BEACON_VENTANA.clear()
+    est.registrar_beacon(
+        tipo=str(datos.get("tipo") or "")[:20], ruta=str(datos.get("ruta") or "")[:80],
+        ref=str(datos.get("ref") or "")[:300], utm=(str(datos["utm"])[:40] if datos.get("utm") else None),
+        ip=ip, agente=request.headers.get("user-agent"),
+    )
+    return None
+
+
+@router.get("/admin/estadisticas")
+def web_admin_estadisticas(
+    _: Annotated[str, Depends(get_current_user)],
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> dict:
+    """Embudo de la web, prueba→pago, vídeos y coste por cliente (SQLite local)."""
+    from src.editor_auto.services import estadisticas as est
+    for d in (desde, hasta):
+        if d is not None and not is_valid_day(d):
+            raise ValidationError("Día inválido (YYYY-MM-DD).", details={"dia": d})
+    return est.resumen(desde, hasta)
 
 
 # ═══════════════════════ ADMIN — aprobación manual (API key) ═══════════════════════
