@@ -57,6 +57,7 @@ from src.api.routers import (
     copyright_router,
     dashboard_router,
     diagnostics_router,
+    salud_router,
     editor_auto_enqueue_router,
     editor_auto_folders_router,
     editor_auto_plans_router,
@@ -484,6 +485,7 @@ def create_app() -> FastAPI:
     app.include_router(claves_router)
     app.include_router(claude_vps_router)
     app.include_router(diagnostics_router)
+    app.include_router(salud_router)
     app.include_router(queue_ws_router)
     app.include_router(multiplataforma_router)
     app.include_router(multiplataforma_publico_router)

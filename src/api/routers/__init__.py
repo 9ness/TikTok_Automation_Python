@@ -72,6 +72,7 @@ from .claves import router as claves_router
 from .claude_vps import router as claude_vps_router
 from .cuotas import cuotas_router
 from .diagnostics import router as diagnostics_router
+from .salud import router as salud_router
 from .fonts import file_router as fonts_file_router, router as fonts_router
 
 __all__ = [
@@ -106,6 +107,7 @@ __all__ = [
     "claude_vps_router",
     "cuotas_router",
     "diagnostics_router",
+    "salud_router",
     "editor_auto_enqueue_router",
     "editor_auto_folders_router",
     "editor_auto_sharing_router",

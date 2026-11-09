@@ -16,6 +16,8 @@ import {
   useAppLogs,
   useDeployDetail,
   useDiagnosticsSummary,
+  useSaludCompleta,
+  type Sonda,
 } from "@/lib/queries/diagnostics";
 import { cn } from "@/lib/utils";
 
@@ -92,6 +94,7 @@ function TabBar({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
 
 function ResumenTab() {
   const q = useDiagnosticsSummary();
+  const salud = useSaludCompleta();
 
   return (
     <div className="space-y-2 text-[11px]">
@@ -99,10 +102,13 @@ function ResumenTab() {
         size="sm"
         variant="outline"
         className="h-6 w-full gap-1 text-[10px]"
-        onClick={() => q.refetch()}
-        disabled={q.isFetching}
+        onClick={() => {
+          q.refetch();
+          salud.refetch();
+        }}
+        disabled={q.isFetching || salud.isFetching}
       >
-        {q.isFetching ? (
+        {q.isFetching || salud.isFetching ? (
           <Loader2 className="h-3 w-3 animate-spin" />
         ) : (
           <RefreshCw className="h-3 w-3" />
@@ -114,6 +120,40 @@ function ResumenTab() {
           {q.isLoading ? "Cargando…" : "Sin datos."}
         </p>
       )}
+      <Section title="Salud de la app">
+        {!salud.data ? (
+          <p className="text-muted-foreground">
+            {salud.isLoading ? "Comprobando…" : "No se pudo comprobar."}
+          </p>
+        ) : (
+          <>
+            <SondaRow nombre="Redis fábrica" sonda={salud.data.redis_fabrica} />
+            <SondaRow nombre="Redis compartido" sonda={salud.data.redis_compartido} />
+            <SondaRow nombre="Drive" sonda={salud.data.drive} />
+            <SondaRow nombre="Disco trabajo" sonda={salud.data.disco_trabajo} />
+            <SondaRow
+              nombre="Cola"
+              sonda={{
+                ok: salud.data.cola.ok,
+                error:
+                  salud.data.cola.workers_vivos === 0
+                    ? "sin workers"
+                    : `${salud.data.cola.atascados.length} atascado(s)`,
+              }}
+              detalle={`${salud.data.cola.pendientes} en cola · ${salud.data.cola.corriendo} corriendo`}
+            />
+            {salud.data.cola.atascados.map((a) => (
+              <p
+                key={a.id}
+                className="break-words rounded bg-destructive/10 px-1 py-0.5 text-[10px] text-destructive"
+              >
+                <span className="font-mono">{a.id}</span> {a.titulo || a.modo} · {a.motivo}
+                {a.usuario ? ` · ${a.usuario}` : ""}
+              </p>
+            ))}
+          </>
+        )}
+      </Section>
       {q.data && (
         <>
           <Section title="Servicios">
@@ -230,6 +270,38 @@ function KV({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="flex items-center justify-between gap-2">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-mono text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function SondaRow({
+  nombre,
+  sonda,
+  detalle,
+}: {
+  nombre: string;
+  sonda: Sonda;
+  detalle?: string;
+}) {
+  const texto = sonda.ok
+    ? detalle ?? (sonda.ms != null ? `${sonda.ms} ms` : "ok")
+    : sonda.error ?? "falla";
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="flex min-w-0 items-center gap-1 text-muted-foreground">
+        {sonda.ok ? (
+          <Check className="h-3 w-3 shrink-0 text-emerald-500" />
+        ) : (
+          <AlertCircle className="h-3 w-3 shrink-0 text-destructive" />
+        )}
+        <span className="truncate">{nombre}</span>
+      </span>
+      <span
+        className={cn("truncate font-mono", sonda.ok ? "text-foreground" : "text-destructive")}
+        title={texto}
+      >
+        {texto}
+      </span>
     </div>
   );
 }

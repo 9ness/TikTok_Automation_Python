@@ -89,3 +89,49 @@ export function useAppLogs() {
     staleTime: 10_000,
   });
 }
+
+/** Una sonda de `/api/health/completo` (Redis, Drive, disco). */
+export interface Sonda {
+  ok: boolean;
+  ms?: number;
+  error?: string;
+  [extra: string]: unknown;
+}
+
+export interface TrabajoAtascado {
+  id: string;
+  modo: string;
+  titulo: string;
+  estado: "corriendo" | "pendiente";
+  minutos: number;
+  progreso: number;
+  etiqueta: string;
+  usuario: string | null;
+  motivo: string;
+}
+
+export interface SaludCompleta {
+  ok: boolean;
+  fallos: string[];
+  redis_fabrica: Sonda;
+  redis_compartido: Sonda;
+  drive: Sonda;
+  disco_trabajo: Sonda;
+  cola: {
+    ok: boolean;
+    pendientes: number;
+    corriendo: number;
+    workers_vivos?: number;
+    atascados: TrabajoAtascado[];
+  };
+}
+
+/** Lo que el panel de mando no ve: Redis, Drive montado y cola atascada.
+ *  Sin polling: solo se pide al abrir Diagnóstico o al pulsar Refrescar. */
+export function useSaludCompleta() {
+  return useQuery<SaludCompleta>({
+    queryKey: ["diagnostics", "salud"],
+    queryFn: () => api.get<SaludCompleta>(`/api/health/completo`),
+    staleTime: 20_000,
+  });
+}
