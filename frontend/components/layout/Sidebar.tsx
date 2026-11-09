@@ -26,6 +26,7 @@ import {
   LineChart,
   Loader2,
   Menu,
+  MessageCircle,
   MessageSquareText,
   Mic,
   Package,
@@ -174,6 +175,7 @@ const NAV: NavGroup[] = [
       { href: "/editor-auto/plans", label: "Planes", icon: CreditCard },
       { href: "/editor-auto/marketing", label: "Marketing", icon: LineChart },
       { href: "/editor-auto/estadisticas", label: "Estadísticas", icon: BarChart3 },
+      { href: "/editor-auto/whatsapp", label: "WhatsApp", icon: MessageCircle },
     ],
   },
   {
