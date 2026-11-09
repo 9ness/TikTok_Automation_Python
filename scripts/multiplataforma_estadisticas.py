@@ -92,8 +92,10 @@ def threads(c, desde: int, hasta: int, errores: list[str]) -> dict:
 
 def medir_publicacion(p, c, errores: list[str]) -> dict:
     """Lo que lleva cada publicación en cada plataforma donde salió."""
-    out: dict = {"id": p.id[:8], "tipo": p.tipo, "titulo": (p.titulo or "")[:70],
-                 "fecha": dt.datetime.fromtimestamp(p.programada_en, ZONA).strftime("%Y-%m-%d")}
+    cuando = dt.datetime.fromtimestamp(p.programada_en, ZONA)
+    out: dict = {"id": p.id[:8], "pid": p.id, "tipo": p.tipo, "titulo": (p.titulo or "")[:70],
+                 "fecha": cuando.strftime("%Y-%m-%d"), "hora": cuando.strftime("%H:%M"),
+                 "ts": int(p.programada_en), "origen": p.origen or "", "producto_ref": p.producto_ref or ""}
     res = p.resultados or {}
     ig = (res.get("instagram") or {}).get("media_id")
     if ig and p.estado.get("instagram") == config.ESTADO_PUBLICADO:

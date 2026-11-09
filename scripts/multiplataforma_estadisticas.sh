@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Guarda las estadísticas de Meta de la semana en ~/multiplataforma/estadisticas/<fecha>.json.
+# Guarda las estadísticas de Meta de la semana en ~/multiplataforma/estadisticas/<fecha>.json
+# y el informe semanal_<fecha>.md (scripts/multiplataforma_informe.py).
 # Se copia al contenedor como el tick, para no depender de un despliegue.
 set -euo pipefail
 
@@ -13,3 +14,5 @@ docker exec -w /app -e PYTHONPATH=/app tiktok-api python /tmp/multiplataforma_es
 mv "$salida.tmp" "$salida"
 chmod 600 "$salida"
 echo "$salida"
+# Informe en Markdown (host, sin API): semanal_<fecha>.md junto al JSON.
+python3 "$aqui/multiplataforma_informe.py" --carpeta "$destino"

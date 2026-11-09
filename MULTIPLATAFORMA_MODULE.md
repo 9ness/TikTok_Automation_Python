@@ -307,6 +307,13 @@ de publicación son gratuitas.
 por plataforma, cada publicación, media por `tipo`, `salud` (estados y comentarios de FB fallidos) y `en_cola`. Solo lectura,
 sin tokens en la salida; una métrica sin dato queda en `null`. La analiza la rutina `~/rutinas/meta-semanal.md` (lunes).
 
+Desde el 9/11 cada publicación lleva también `pid`, `hora`, `ts`, `origen` y `producto_ref`, y el `.sh` genera además
+`semanal_<fecha>.md` con `scripts/multiplataforma_informe.py` (host, solo stdlib; lógica en `services/informe.py`, tests en
+`tests/multiplataforma/test_estadisticas.py`). Junta todas las lecturas (manda la más reciente) y ordena por MEDIANA de vistas
+de IG: por cuenta·formato (`viral_pablo_motos` y `remedios` salen del título), plataforma, franja horaria y día, top 10,
+«despegaron» (≥10× la mediana de su cuenta), «no despegan» (≥48 h y <¼ de su mediana), FB a cero y seguidores frente a hace
+una semana. No se vuelca a `video_stats` del panel: ese esquema es de TikTok (programa, hora de México, recompensas).
+
 ## Qué falta
 
 1. **App de Meta** (tipo Business) con `instagram_content_publish`,
