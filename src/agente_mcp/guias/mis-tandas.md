@@ -239,6 +239,8 @@ TikTok › perfil › Campañas de creadores da cupones/dinero por subir N víde
 ciertos productos antes de una fecha. Solo se apuntan las REALISTAS (N vídeos de
 productos concretos); las de GMV de 1.000 €, directos o similares, no.
 
+- Ver las apuntadas: `tareas_tiktok()` (nombre, recompensa, fecha de fin,
+  productos). El progreso de cada una sale en `mis_tandas` › `tareas_activas`.
 - Alta: `guardar_tarea(nombre, recompensa, fin, videos_requeridos, productos)` —
   `productos` son IDs de TikTok o enlaces a la ficha (casa con CUALQUIER vídeo de
   ese producto, de cualquier nicho); `refs` = `source|carpeta|producto` si aún no

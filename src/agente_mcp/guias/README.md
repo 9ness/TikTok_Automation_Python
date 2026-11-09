@@ -236,6 +236,9 @@ vídeos).
    descarga para las fotos.
 7. Generas en Flow / GenAI Pro / Magnific y guardas **en esa misma carpeta**
    con el nombre que dice el plan (`imagen_1.png`, `clip_1.mp4`, …).
+   `listar_bandeja(ruta)` te dice qué hay ya en la bandeja (o en una
+   subcarpeta), con el tamaño y un enlace de descarga de cada fichero: míralo
+   antes de generar para no repetir lo que ya está hecho.
 8. `ver(ruta_bandeja=…)` → te enseña la imagen o fotogramas del clip para
    revisarlo contra `ver_producto(…)` (foto limpia y ficha). Checklist en
    [`comun/revision-calidad.md`](comun/revision-calidad.md).
