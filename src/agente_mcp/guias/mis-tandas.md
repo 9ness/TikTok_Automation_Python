@@ -204,6 +204,16 @@ más prudente. Escribe siempre el motivo en una frase («taza lisa, igual en
 los dos clips» · «champú con texto en el bote» · «el clip 2 la pinta roja»).
 El color vale para ESE montaje: si se rehace, vuelve a «sin revisar».
 
+**De qué se aprende: `motivos_semaforo(dias=30)`.** Agrupa los motivos de
+todos los rojos y ámbar (el producto no es el de la ficha, cambia entre clips,
+física imposible, electrónica encendida, producto complejo, texto, mano que
+toca…), con cuántos vídeos, ejemplos, qué hacer y el % de rojo de cada nicho.
+Míralo **antes de generar una tanda**: lo que más se repite es lo que hay que
+pedir bien en el prompt y lo primero que hay que comprobar al revisar. Por eso
+el motivo va SIEMPRE escrito y con el fallo concreto: «marcado a mano» o
+«rehacer» no enseñan nada. Un rojo ya rehecho y aprobado deja de contar (el
+semáforo guarda solo el último color de cada vídeo).
+
 **Que la mano roce o toque el producto NO es motivo de ámbar** (Néstor,
 7/10/2026): solo cuenta si el producto se deforma, cambia o hace algo
 físicamente raro. Lo que sí es ámbar sin dudar: **electrónica que se enciende

@@ -87,6 +87,21 @@ class SemaforoRequest(BaseModel):
     por: str = ""
 
 
+@router.get("/motivos")
+def get_motivos(
+    dias: Annotated[int, Query(ge=0, le=730)] = 0,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Por qué se van a rojo y a ámbar los vídeos: los motivos del semáforo
+    agrupados por categoría, con ejemplos y el reparto por nicho. Solo lee."""
+    from src.mis_tandas import motivos
+
+    try:
+        return motivos.resumen(servicio.semaforos(usuario), dias)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
 @router.post("/semaforo")
 def set_semaforo(
     body: SemaforoRequest,

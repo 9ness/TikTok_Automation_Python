@@ -827,6 +827,20 @@ async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") ->
 
 
 @_herramienta(structured_output=False)
+async def motivos_semaforo(ctx: Context, dias: int = 0) -> str:
+    """Por qué se van a ROJO y a ÁMBAR los vídeos de «Mis tandas»: los motivos
+    que se escribieron al poner el semáforo, agrupados (el producto no es el de
+    la ficha, cambia entre clips, física imposible, electrónica encendida,
+    producto complejo, texto…), con cuántos vídeos, ejemplos, qué hacer y el
+    reparto por nicho (`rv` réplicas, `largo`, `mm` multimodo, `car` carruseles).
+    Llámalo ANTES de generar una tanda: lo que más se repite es lo que hay que
+    pedir bien en el prompt y mirar primero al revisar. `dias` > 0 = solo lo
+    revisado en ese plazo. Solo lee. Guía `mis-tandas.md` › Semáforo."""
+    dias = max(0, min(int(dias or 0), 730))
+    return _json(await Interno(_usuario(ctx)).get(f"/api/v1/mis-tandas/motivos?dias={dias}"))
+
+
+@_herramienta(structured_output=False)
 async def epoca_video(ctx: Context, id: str, epoca: str) -> str:
     """Época de un vídeo de «Mis tandas» (`id` sale de `mis_tandas`): cuándo
     publicarlo en TikTok y en Meta. `neutro` (vale todo el año), `otono`,
