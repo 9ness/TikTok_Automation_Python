@@ -236,12 +236,15 @@ def renovar_tokens_threads(log=lambda _: None) -> dict:
         try:
             d = _get("https://graph.threads.net/refresh_access_token",
                      {"grant_type": "th_refresh_token", "access_token": token})
-        except TokenInvalido as e:
-            informe[c.slug] = f"error: {e}"
-            log(f"[threads] {c.slug}: no se pudo renovar ({e})")
+        except (TokenInvalido, httpx.HTTPError) as e:  # una cuenta caída no corta el lote
+            informe[c.slug] = f"error: {type(e).__name__ if isinstance(e, httpx.HTTPError) else e}"
+            log(f"[threads] {c.slug}: no se pudo renovar ({informe[c.slug]})")
             continue
-        if d.get("access_token"):
-            cuentas_repo.set_tokens(c.slug, {"threads": d["access_token"]})
+        if not d.get("access_token"):  # sin token nuevo no hay renovación: se reintenta en el siguiente tick
+            informe[c.slug] = "error: Meta no devolvió access_token"
+            log(f"[threads] {c.slug}: respuesta sin access_token")
+            continue
+        cuentas_repo.set_tokens(c.slug, {"threads": d["access_token"]})
         _marcar_renovado(c.slug)
         informe[c.slug] = "renovado"
         log(f"[threads] {c.slug}: token renovado")

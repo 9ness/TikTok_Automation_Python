@@ -8,6 +8,7 @@ token).
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -35,6 +36,23 @@ class ErrorPublicacion(Exception):
 
 def _ocultar(d: dict | None) -> dict:
     return {k: ("***" if "token" in k.lower() else v) for k, v in (d or {}).items()}
+
+
+_TOKEN_EN_URL = re.compile(r"((?:access|input)_token=)[^&\s\"']+")
+# Límites de llamadas de Meta: llegan con HTTP 400, pero pasan solos → reintentable.
+CODIGOS_LIMITE = frozenset({4, 17, 32, 613})
+
+
+def _sin_token(texto: str) -> str:
+    return _TOKEN_EN_URL.sub(r"\1***", str(texto))
+
+
+def _codigo_graph(r: httpx.Response) -> int | None:
+    try:
+        err = r.json().get("error")
+        return int(err.get("code")) if isinstance(err, dict) else None
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 class ClienteBase:
@@ -103,11 +121,12 @@ class ClienteBase:
         except httpx.TimeoutException as e:
             raise ErrorPublicacion(f"{self.plataforma}: timeout en {metodo} {url}") from e
         except httpx.HTTPError as e:
-            raise ErrorPublicacion(f"{self.plataforma}: error de red en {metodo} {url}: {e}") from e
+            raise ErrorPublicacion(f"{self.plataforma}: error de red en {metodo} {url}: {_sin_token(e)}") from e
         if r.status_code >= 400:
             raise ErrorPublicacion(
                 f"{self.plataforma}: HTTP {r.status_code} en {metodo} {url}: {self._mensaje_error(r)}",
-                reintentable=r.status_code >= 500 or r.status_code == 429,
+                reintentable=(r.status_code >= 500 or r.status_code == 429
+                              or _codigo_graph(r) in CODIGOS_LIMITE),
             )
         if not esperar_json:
             return r
