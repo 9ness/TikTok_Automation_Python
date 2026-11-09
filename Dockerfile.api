@@ -107,6 +107,12 @@ RUN set -eux; \
     rm -rf /tmp/rclone.zip /var/lib/apt/lists/*; \
     rclone version
 
+# Cliente ssh para mandar renders del editor al PC de casa por Tailscale SSH
+# (sin claves; ver src/editor_auto/services/render_remoto.py). Capa propia
+# DESPUÉS del pip install para no reconstruir torch/whisper.
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
 # Código fuente. Solo lo que el módulo API necesita en runtime —
 # Streamlit (`main.py`) NO se copia (no se sirve desde Docker).
 COPY src ./src

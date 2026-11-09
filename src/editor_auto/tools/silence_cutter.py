@@ -8034,6 +8034,7 @@ def _apply_cuts_ffmpeg(
         cmd,
         total_ms=total_output_ms,
         on_progress=on_progress,
+        log=log,
     )
 
 
@@ -8072,7 +8073,7 @@ def _passthrough_with_format(
     ]
     encoder_label = "h264_nvenc (GPU)" if _has_nvenc() else "libx264 veryfast (CPU)"
     log(f"[silence_cutter] Passthrough con normalización · vf={vf} · enc={encoder_label}")
-    _run_ffmpeg_with_progress(cmd, on_progress=lambda f: None)
+    _run_ffmpeg_with_progress(cmd, on_progress=lambda f: None, log=log)
 
 
 def _run_ffmpeg_with_progress(
@@ -8080,6 +8081,8 @@ def _run_ffmpeg_with_progress(
     *,
     on_progress,
     total_ms: int | None = None,
+    log=None,
+    _remoto_ok: bool = True,
 ) -> None:
     """Ejecuta ffmpeg con `-progress pipe:1` para emitir progreso periódico.
 
@@ -8097,6 +8100,22 @@ def _run_ffmpeg_with_progress(
     """
     import collections
     import threading
+
+    # Render en el PC de casa (NVENC) si EDITOR_RENDER_REMOTO=1 y responde;
+    # ante cualquier fallo devuelve False y se hace aquí como siempre.
+    if _remoto_ok:
+        try:
+            from src.editor_auto.services import render_remoto
+            if render_remoto.intentar(
+                cmd,
+                ejecutar=lambda c: _run_ffmpeg_with_progress(
+                    c, on_progress=on_progress, total_ms=total_ms, _remoto_ok=False),
+                duracion_s=(total_ms / 1000.0) if total_ms else None,
+                log=log or (lambda _m: None),
+            ):
+                return
+        except Exception:  # noqa: BLE001 — el remoto nunca rompe el render local
+            pass
 
     proc = subprocess.Popen(
         cmd + ["-progress", "pipe:1", "-nostats"],
