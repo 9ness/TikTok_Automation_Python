@@ -79,11 +79,28 @@ def _size(path: str) -> int:
     return total
 
 
-def _remove(path: str) -> None:
-    if os.path.isdir(path):
-        shutil.rmtree(path)
-    else:
-        os.remove(path)
+def _remove(path: str, username: str) -> None:
+    """Borra por el montaje; lo que no deja (los originales que sube la web
+    son de la cuenta OAuth de `drive_uploads`, no de la del montaje → EIO) lo
+    borra esa cuenta por la API de Drive."""
+    try:
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+        return
+    except OSError as e:
+        err = e
+    if os.path.isdir(path):  # quita por el montaje todo lo que sí pueda
+        shutil.rmtree(path, ignore_errors=True)
+    try:
+        from src.editor_auto.services import drive_uploads
+        rel = os.path.relpath(path, user_folder(username)).split(os.sep)
+        if drive_uploads.is_configured() and drive_uploads.delete_user_path(username, rel):
+            return
+    except Exception as e2:  # noqa: BLE001
+        raise OSError(f"{err} · Drive API: {e2}") from e2
+    raise err
 
 
 def _day_has_open_jobs(user_id: str, day: str, open_ids: set[str]) -> bool:
@@ -127,7 +144,7 @@ def sweep_user(user, *, dry_run: bool, open_ids: set[str], log=logger.info) -> l
         if dry_run:
             return
         try:
-            _remove(path)
+            _remove(path, user.name)
             log(f"[caducidad] 🗑️ {tipo} {user.name}: {os.path.basename(path)} ({b / 1e6:.0f} MB)")
         except OSError as e:
             out[-1]["error"] = str(e)

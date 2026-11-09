@@ -287,3 +287,71 @@ def delete_day_file(username: str, day: str, filename: str) -> bool:
             r.raise_for_status()
             return True
     return False
+
+
+def _find_any_child(parent_id: str, name: str) -> tuple[str, str] | None:
+    """(id, mimeType) de un hijo por nombre EXACTO (fichero o carpeta)."""
+    r = _session().get(
+        _DRIVE_API, headers=_auth_headers(),
+        params={
+            "q": f"name = '{_esc(name)}' and '{parent_id}' in parents and trashed = false",
+            "fields": "files(id,name,mimeType)", "pageSize": 20,
+            "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
+        },
+    )
+    r.raise_for_status()
+    for f in r.json().get("files", []):
+        if f.get("name") == name:
+            return f["id"], f.get("mimeType", "")
+    return None
+
+
+def _delete_tree(file_id: str, mime: str) -> int:
+    """Borra un fichero o una carpeta con su contenido. Devuelve nº de errores
+    (lo que no es de esta cuenta da 403)."""
+    errores = 0
+    if mime == "application/vnd.google-apps.folder":
+        token = None
+        while True:
+            params = {
+                "q": f"'{file_id}' in parents and trashed = false",
+                "fields": "nextPageToken,files(id,mimeType)", "pageSize": 200,
+                "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
+            }
+            if token:
+                params["pageToken"] = token
+            r = _session().get(_DRIVE_API, headers=_auth_headers(), params=params)
+            r.raise_for_status()
+            data = r.json()
+            for f in data.get("files", []):
+                errores += _delete_tree(f["id"], f.get("mimeType", ""))
+            token = data.get("nextPageToken")
+            if not token:
+                break
+    r = _session().delete(
+        f"{_DRIVE_API}/{file_id}", headers=_auth_headers(),
+        params={"supportsAllDrives": "true"},
+    )
+    if r.status_code not in (200, 204, 404):
+        errores += 1
+    return errores
+
+
+def delete_user_path(username: str, rel_parts: list[str]) -> bool:
+    """Borra `Usuarios/<username>/<rel_parts…>` con ESTA cuenta (la de las
+    subidas web). Lo que sube el cliente es suyo, así que la cuenta del montaje
+    rclone no puede borrarlo (403 → EIO). True si no queda nada."""
+    root = _find_child(None, DRIVE_ROOT_NAME)
+    users = _find_child(root, DRIVE_USERS_FOLDER) if root else None
+    parent = _find_child(users, username) if users else None
+    if not parent:
+        return False
+    for name in rel_parts[:-1]:
+        hit = _find_any_child(parent, name)
+        if not hit:
+            return True
+        parent = hit[0]
+    hit = _find_any_child(parent, rel_parts[-1])
+    if not hit:
+        return True
+    return _delete_tree(*hit) == 0
