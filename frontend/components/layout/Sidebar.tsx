@@ -8,6 +8,9 @@ import {
   CalendarDays,
   Captions,
   Clapperboard,
+  EyeOff,
+  Gauge,
+  MoreHorizontal,
   GalleryHorizontalEnd,
   ChevronDown,
   ChevronRight,
@@ -62,6 +65,8 @@ export type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Enlace a otra web (se abre en pestaña nueva, sin `Link` de Next). */
+  externo?: boolean;
 };
 
 export type NavGroup =
@@ -76,6 +81,9 @@ function isUnder(pathname: string | null | undefined, base: string): boolean {
   if (!pathname) return false;
   return pathname === base || pathname.startsWith(`${base}/`);
 }
+
+/** Panel de mando de Néstor (servidores, webs, dispositivos, cron). */
+export const PANEL_URL = "https://panel.nebulabsmedia.com";
 
 const NAV: NavGroup[] = [
   {
@@ -193,6 +201,12 @@ const NAV: NavGroup[] = [
   {
     kind: "single",
     item: { href: "/settings", label: "Settings", icon: Settings },
+  },
+  {
+    // Los controles del VPS (CPU, RAM, disco, contenedores, webs, móviles,
+    // cron) ya viven en el panel de mando: aquí solo el enlace, sin copiarlos.
+    kind: "single",
+    item: { href: PANEL_URL, label: "Panel de mando", icon: Gauge, externo: true },
   },
 ];
 
@@ -328,7 +342,10 @@ export function primeraPantalla(
   prefs: MenuPrefs,
   usuario?: string | null,
 ): string {
-  for (const n of aplicarPrefs(navPara(rol, usuario), prefs)) {
+  const arriba = PRINCIPAL[usuario ?? ""];
+  const visibles = aplicarPrefs(navPara(rol, usuario), prefs);
+  const orden = arriba ? partirMenu(visibles, visibles, arriba).principal : visibles;
+  for (const n of orden) {
     const primero = n.kind === "group" ? n.items[0] : undefined;
     if (primero) return primero.href;
     if (n.kind === "single" && n.item.href !== "/") return n.item.href;
@@ -343,7 +360,93 @@ const CON_SUBIDAS = ["ness", "nes_bugallo"];
 const SOLO_ALGUNOS: Record<string, string[]> = {
   "/estadisticas": CON_ESTADISTICAS,
   "/subidas": CON_SUBIDAS,
+  [PANEL_URL]: ["ness"],
 };
+
+/** Lo que cada uno ve A PRIMERA VISTA; todo lo demás se pliega en «Más»
+ *  (sigue vivo: el MCP y los agentes usan esas pantallas y su API).
+ *
+ *  Néstor (9/11/2026): «ya solo uso los agentes y el MCP; de AI Pro, Mis
+ *  tandas». Las claves son las de siempre (`href` de un enlace, `basePath` de
+ *  un grupo) y valen también para un item DENTRO de un grupo: sale suelto
+ *  arriba y el grupo se queda en «Más» con el resto. El orden es este.
+ *  Quien no está aquí ve su menú como siempre, sin «Más». */
+export const PRINCIPAL: Record<string, string[]> = {
+  ness: [
+    `/tiktok-shop-ai-pro/mis-tandas`,
+    "/subidas",
+    "/estadisticas",
+    "/costs",
+    "/claude",
+    "/accesos",
+    "/editor-auto",
+  ],
+};
+
+export type MenuPartido = {
+  principal: NavGroup[];
+  mas: NavGroup[];
+  /** Lo escondido en «Mi menú» que no está arriba: se enseña plegado dentro
+   *  de «Más», para que nada quede a más de un clic. */
+  ocultos: NavGroup[];
+};
+
+function quitarItem(nav: NavGroup[], href: string): { item?: NavItem; resto: NavGroup[] } {
+  let item: NavItem | undefined;
+  const resto = nav.flatMap((n): NavGroup[] => {
+    if (n.kind === "single") {
+      if (n.item.href === href) {
+        item = n.item;
+        return [];
+      }
+      return [n];
+    }
+    const encontrado = n.items.find((i) => i.href === href);
+    if (!encontrado) return [n];
+    item = encontrado;
+    const items = n.items.filter((i) => i.href !== href);
+    return items.length ? [{ ...n, items }] : [];
+  });
+  return { item, resto };
+}
+
+/** Separa el menú (ya con las preferencias aplicadas) en lo de arriba y
+ *  «Más». Sin lista `principal`, todo va arriba como siempre. */
+export function partirMenu(
+  visibles: NavGroup[],
+  todos: NavGroup[],
+  principal: string[] | undefined,
+): MenuPartido {
+  if (!principal?.length) return { principal: visibles, mas: [], ocultos: [] };
+  let mas = visibles;
+  const arriba: NavGroup[] = [];
+  for (const clave of principal) {
+    const grupo = mas.find((n) => n.kind === "group" && n.basePath === clave);
+    if (grupo) {
+      arriba.push(grupo);
+      mas = mas.filter((n) => n !== grupo);
+      continue;
+    }
+    const { item, resto } = quitarItem(mas, clave);
+    if (item) {
+      arriba.push({ kind: "single", item });
+      mas = resto;
+    }
+  }
+  // Ocultos = lo que hay en el menú completo y no en el visible, quitando lo
+  // que ya está arriba (si alguien esconde algo de arriba, se respeta).
+  const enVista = new Set<string>();
+  for (const n of visibles) {
+    if (n.kind === "single") enVista.add(n.item.href);
+    else n.items.forEach((i) => enVista.add(i.href));
+  }
+  const ocultos = todos.flatMap((n): NavGroup[] => {
+    if (n.kind === "single") return enVista.has(n.item.href) ? [] : [n];
+    const items = n.items.filter((i) => !enVista.has(i.href));
+    return items.length ? [{ ...n, items }] : [];
+  });
+  return { principal: arriba, mas, ocultos };
+}
 
 /** Cuentas que SOLO llevan el contador de subidas y sus ventas (la cuenta
  *  árabe de Bugallo, docs/CUENTA_ARABE.md §6): su menú son esas dos pantallas
@@ -406,7 +509,14 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const prefs = useMenuPrefs();
   // Mientras carga, el menú de siempre: es un parpadeo menos molesto que una
   // sidebar vacía, y lo que se esconde no es secreto.
-  const nav = aplicarPrefs(navPara(me.data?.rol, me.data?.username), prefs.data ?? MENU_PREFS_VACIAS);
+  const prefsUso = prefs.data ?? MENU_PREFS_VACIAS;
+  const base = navPara(me.data?.rol, me.data?.username);
+  const menu = partirMenu(
+    aplicarPrefs(base, prefsUso),
+    aplicarPrefs(base, { ...prefsUso, ocultos: [] }),
+    PRINCIPAL[me.data?.username ?? ""],
+  );
+  const nav = menu.principal;
   const puedeCambiar = Boolean(me.data?.puede_cambiar_usuario);
   const suplantando = Boolean(me.data?.admin_real);
   // Estado de cada grupo expandido — auto-abrir si la ruta actual cae dentro.
@@ -425,6 +535,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       for (const node of NAV) {
         if (node.kind === "group" && isUnder(pathname, node.basePath)) {
           next[node.title] = true;
+          next[`oculto:${node.title}`] = true;
         }
       }
       return next;
@@ -469,55 +580,22 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-1">
-          {nav.map((node) =>
-            node.kind === "single" ? (
-              <SidebarLink
-                key={node.item.href}
-                item={node.item}
-                pathname={pathname}
-                onNavigate={onNavigate}
-              />
-            ) : (
-              <li key={node.title}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setExpanded((prev) => ({ ...prev, [node.title]: !prev[node.title] }))
-                  }
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors",
-                    "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
-                  )}
-                  aria-expanded={expanded[node.title] ?? false}
-                >
-                  <node.icon className="h-4 w-4" strokeWidth={1.75} />
-                  {node.title}
-                  {node.basePath === "/editor-auto" && (
-                    <EditorAutoEntradaBadge />
-                  )}
-                  {expanded[node.title] ? (
-                    <ChevronDown className="ml-auto h-3 w-3" strokeWidth={2} />
-                  ) : (
-                    <ChevronRight className="ml-auto h-3 w-3" strokeWidth={2} />
-                  )}
-                </button>
-                {expanded[node.title] && (
-                  <ul className="ml-3 mt-1 space-y-0.5 border-l pl-3">
-                    {node.items.map((item) => (
-                      <SidebarLink
-                        key={item.href}
-                        item={item}
-                        pathname={pathname}
-                        onNavigate={onNavigate}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ),
-          )}
-        </ul>
+        <ListaNav
+          nav={nav}
+          pathname={pathname}
+          onNavigate={onNavigate}
+          expanded={expanded}
+          setExpanded={setExpanded}
+        />
+        {(menu.mas.length > 0 || menu.ocultos.length > 0) && (
+          <SeccionMas
+            menu={menu}
+            pathname={pathname}
+            onNavigate={onNavigate}
+            expanded={expanded}
+            setExpanded={setExpanded}
+          />
+        )}
       </nav>
 
       <div className="shrink-0 space-y-2 border-t px-3 py-3">
@@ -529,6 +607,199 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
     </>
+  );
+}
+
+type Expandidos = Record<string, boolean>;
+
+function navContiene(nav: NavGroup[], pathname: string | null): boolean {
+  return nav.some((n) =>
+    n.kind === "single"
+      ? n.item.href !== "/" && !n.item.externo && isUnder(pathname, n.item.href)
+      : isUnder(pathname, n.basePath),
+  );
+}
+
+const CLAVE_MAS = "sidebar:mas-abierto";
+
+/** «Más»: lo que no se usa a diario, plegado. Cerrado no se pinta, así que
+ *  Next tampoco precarga el código de esas pantallas. Se abre solo si estás
+ *  en una de ellas; si no, recuerda cómo lo dejaste (en este navegador). */
+function SeccionMas({
+  menu,
+  pathname,
+  onNavigate,
+  expanded,
+  setExpanded,
+}: {
+  menu: MenuPartido;
+  pathname: string | null;
+  onNavigate?: () => void;
+  expanded: Expandidos;
+  setExpanded: React.Dispatch<React.SetStateAction<Expandidos>>;
+}) {
+  const dentro = navContiene(menu.mas, pathname) || navContiene(menu.ocultos, pathname);
+  const [abierto, setAbierto] = useState(false);
+  const [verOcultos, setVerOcultos] = useState(false);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(CLAVE_MAS) === "1") setAbierto(true);
+    } catch {
+      /* sin almacenamiento: empieza cerrado */
+    }
+  }, []);
+  useEffect(() => {
+    if (dentro) setAbierto(true);
+    if (navContiene(menu.ocultos, pathname)) setVerOcultos(true);
+  }, [dentro, menu.ocultos, pathname]);
+  const cambiar = () => {
+    setAbierto((v) => {
+      try {
+        window.localStorage.setItem(CLAVE_MAS, v ? "0" : "1");
+      } catch {
+        /* da igual: solo es comodidad */
+      }
+      return !v;
+    });
+  };
+  const nOcultos = menu.ocultos.reduce(
+    (t, n) => t + (n.kind === "single" ? 1 : n.items.length),
+    0,
+  );
+  return (
+    <div className="mt-3 border-t pt-3">
+      <button
+        type="button"
+        onClick={cambiar}
+        aria-expanded={abierto}
+        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+      >
+        <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} />
+        Más
+        {abierto ? (
+          <ChevronDown className="ml-auto h-3 w-3" strokeWidth={2} />
+        ) : (
+          <ChevronRight className="ml-auto h-3 w-3" strokeWidth={2} />
+        )}
+      </button>
+      {abierto && (
+        <div className="mt-1 space-y-1">
+          <ListaNav
+            nav={menu.mas}
+            pathname={pathname}
+            onNavigate={onNavigate}
+            expanded={expanded}
+            setExpanded={setExpanded}
+            sinPrecarga
+          />
+          {nOcultos > 0 && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setVerOcultos((v) => !v)}
+                aria-expanded={verOcultos}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                title="Lo que escondiste en Settings › Mi menú"
+              >
+                <EyeOff className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Ocultos en Mi menú ({nOcultos})
+                {verOcultos ? (
+                  <ChevronDown className="ml-auto h-3 w-3" strokeWidth={2} />
+                ) : (
+                  <ChevronRight className="ml-auto h-3 w-3" strokeWidth={2} />
+                )}
+              </button>
+              {verOcultos && (
+                <div className="opacity-80">
+                  <ListaNav
+                    nav={menu.ocultos}
+                    pathname={pathname}
+                    onNavigate={onNavigate}
+                    expanded={expanded}
+                    setExpanded={setExpanded}
+                    sinPrecarga
+                    prefijo="oculto:"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ListaNav({
+  nav,
+  pathname,
+  onNavigate,
+  expanded,
+  setExpanded,
+  sinPrecarga = false,
+  prefijo = "",
+}: {
+  nav: NavGroup[];
+  pathname: string | null;
+  onNavigate?: () => void;
+  expanded: Expandidos;
+  setExpanded: React.Dispatch<React.SetStateAction<Expandidos>>;
+  sinPrecarga?: boolean;
+  /** Para que un grupo en «Más» y su parte oculta no se abran a la vez. */
+  prefijo?: string;
+}) {
+  return (
+        <ul className="space-y-1">
+          {nav.map((node) =>
+            node.kind === "single" ? (
+              <SidebarLink
+                key={node.item.href}
+                item={node.item}
+                pathname={pathname}
+                onNavigate={onNavigate}
+                sinPrecarga={sinPrecarga}
+              />
+            ) : (
+              <li key={node.title}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpanded((prev) => ({ ...prev, [prefijo + node.title]: !prev[prefijo + node.title] }))
+                  }
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider transition-colors",
+                    "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+                  )}
+                  aria-expanded={expanded[prefijo + node.title] ?? false}
+                >
+                  <node.icon className="h-4 w-4" strokeWidth={1.75} />
+                  {node.title}
+                  {node.basePath === "/editor-auto" && (
+                    <EditorAutoEntradaBadge />
+                  )}
+                  {expanded[prefijo + node.title] ? (
+                    <ChevronDown className="ml-auto h-3 w-3" strokeWidth={2} />
+                  ) : (
+                    <ChevronRight className="ml-auto h-3 w-3" strokeWidth={2} />
+                  )}
+                </button>
+                {expanded[prefijo + node.title] && (
+                  <ul className="ml-3 mt-1 space-y-0.5 border-l pl-3">
+                    {node.items.map((item) => (
+                      <SidebarLink
+                        key={item.href}
+                        item={item}
+                        pathname={pathname}
+                        onNavigate={onNavigate}
+                        sinPrecarga={sinPrecarga}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ),
+          )}
+        </ul>
   );
 }
 
@@ -607,19 +878,44 @@ function SidebarLink({
   item,
   pathname,
   onNavigate,
+  sinPrecarga = false,
 }: {
   item: NavItem;
   pathname: string | null;
   onNavigate?: () => void;
+  /** Lo de «Más» no se precarga: casi nunca se abre y cada precarga baja
+   *  el código de una pantalla entera. */
+  sinPrecarga?: boolean;
 }) {
-  const active =
-    item.href === "/" ? pathname === "/" : isUnder(pathname, item.href);
+  const active = item.externo
+    ? false
+    : item.href === "/"
+      ? pathname === "/"
+      : isUnder(pathname, item.href);
   const Icon = item.icon;
+  if (item.externo) {
+    return (
+      <li>
+        <a
+          href={item.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onNavigate}
+          className="relative flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:bg-accent/60 hover:text-foreground"
+        >
+          <Icon className="h-4 w-4" strokeWidth={1.75} />
+          <span className="truncate">{item.label}</span>
+          <span aria-hidden className="ml-auto text-[10px]">↗</span>
+        </a>
+      </li>
+    );
+  }
   return (
     <li>
       <Link
         href={item.href as never}
         onClick={onNavigate}
+        prefetch={sinPrecarga ? false : undefined}
         className={cn(
           "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-200",
           active

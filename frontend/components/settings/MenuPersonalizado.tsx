@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   NAV_FIJOS,
+  PRINCIPAL,
   aplicarPrefs,
   claveNav,
   navPara,
@@ -148,6 +149,13 @@ export function MenuPersonalizado() {
             mantén pulsado un momento). Es solo tu menú: no borra nada y las pantallas siguen
             estando si escribes la URL. Se guarda en tu cuenta, así que vale también en el
             móvil.
+            {PRINCIPAL[me.data?.username ?? ""] ? (
+              <>
+                {" "}Arriba del menú solo va lo de cada día; lo demás está plegado en{" "}
+                <b>«Más»</b>, al final, y lo que escondas aquí sale dentro de «Más» en{" "}
+                «Ocultos en Mi menú».
+              </>
+            ) : null}
           </p>
 
           <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={soltarGrupo}>

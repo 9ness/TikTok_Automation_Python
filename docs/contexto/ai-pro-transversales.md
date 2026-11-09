@@ -46,6 +46,14 @@ CLAVES (el `href` de un item, el `basePath` de un grupo), nunca el menú entero
 añadir un nicho. Es COSMÉTICO: se aplica encima del menú que da el rol, que
 es lo que de verdad corta (y el backend lo comprueba aparte).
 
+**«Más» (9/11/2026).** `PRINCIPAL` en `Sidebar.tsx` fija lo que un usuario ve a
+primera vista (hoy solo `ness`: Mis tandas suelta, Subidas, Estadísticas,
+Costes, Claude, Accesos y Editor Auto). Lo demás se pliega en «Más» al final
+del menú (sin borrar nada: el MCP y los agentes usan esas pantallas), y lo
+escondido en «Mi menú» sale dentro de «Más» › «Ocultos en Mi menú». Lo de
+«Más» va con `prefetch={false}`. Usuario sin entrada en `PRINCIPAL` = menú de
+siempre. «Panel de mando ↗» enlaza a panel.nebulabsmedia.com (controles del VPS).
+
 ### Escaparate y vendidos — transversales a TODOS los nichos
 
 Dos cosas NO son de ningún nicho: se hacen una sola vez por producto porque la
