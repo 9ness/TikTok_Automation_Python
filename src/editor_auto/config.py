@@ -264,6 +264,58 @@ def set_send_cutoff_hour(hour: int) -> int:
     return h
 
 
+SETTINGS_RETENTION_KEY = "settings:retention_days"
+SETTINGS_RETENTION_SOURCE_KEY = "settings:retention_source_days"
+
+
+def _setting_int(key: str, env: str, default: int) -> int:
+    try:
+        from src.editor_auto.repos.redis_base import get_editor_redis
+        v = get_editor_redis().get_str(key)
+        if v is not None and str(v).strip() != "":
+            return max(0, int(v))
+    except Exception:
+        pass
+    try:
+        return max(0, int(os.getenv(env, str(default))))
+    except ValueError:
+        return default
+
+
+def retention_days() -> int:
+    """Días que se guardan los vídeos EDITADOS de clientes web (`salida/<día>/`),
+    contados desde su día de publicación. 0 = no borrar nunca.
+    Redis `settings:retention_days` → env EDITOR_RETENTION_DAYS → 30."""
+    return _setting_int(SETTINGS_RETENTION_KEY, "EDITOR_RETENTION_DAYS", 30)
+
+
+def retention_source_days() -> int:
+    """Días que se guardan los ORIGINALES (`entrada/<día>/` y `recuperacion/`).
+    0 = no borrar nunca. Redis `settings:retention_source_days` →
+    env EDITOR_RETENTION_SOURCE_DAYS → 10 (cubre los 7 días de
+    «avísanos y lo corregimos» de la FAQ, contados desde la entrega)."""
+    return _setting_int(SETTINGS_RETENTION_SOURCE_KEY, "EDITOR_RETENTION_SOURCE_DAYS", 10)
+
+
+def user_retention_days(user) -> int:
+    """Caducidad efectiva de los editados de un usuario: su override
+    (`retention_days_override`: 0 = nunca) o la general."""
+    ov = getattr(user, "retention_days_override", None)
+    if ov is not None and int(ov) >= 0:
+        return int(ov)
+    return retention_days()
+
+
+def day_expires_at(user, day: str) -> str | None:
+    """Último día (YYYY-MM-DD) en que el cliente puede descargar los editados
+    de `day`. None = sin caducidad."""
+    n = user_retention_days(user)
+    if n <= 0 or not is_valid_day(day):
+        return None
+    from datetime import date, timedelta
+    return (date.fromisoformat(day) + timedelta(days=n)).isoformat()
+
+
 def day_send_open(day: str) -> bool:
     """¿Sigue ABIERTO el envío a edición para `day`? Cierre a `send_cutoff_hour`
     (Europe/Madrid). Hoy tras el cierre → cerrado; futuros → abiertos; pasados

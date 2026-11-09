@@ -126,6 +126,7 @@ def _to_response(u: EditorUser) -> EditorUserResponse:
         auto_enqueue=u.auto_enqueue,
         auto_enqueue_delay_minutes=u.auto_enqueue_delay_minutes,
         daily_video_limit_override=u.daily_video_limit_override,
+        retention_days_override=getattr(u, "retention_days_override", None),
         window_start_hour_override=u.window_start_hour_override,
         window_end_hour_override=u.window_end_hour_override,
         output_released_on=u.output_released_on,
@@ -353,6 +354,10 @@ def update_user(
         # -1 = limpiar override (usar el del plan).
         v = int(payload.daily_video_limit_override)
         u.daily_video_limit_override = None if v < 0 else v
+    if payload.retention_days_override is not None:
+        # -1 = volver a la caducidad general; 0 = no borrar nunca.
+        v = int(payload.retention_days_override)
+        u.retention_days_override = None if v < 0 else v
     if payload.window_start_hour_override is not None:
         v = int(payload.window_start_hour_override)
         u.window_start_hour_override = None if v < 0 else max(0, min(23, v))

@@ -165,7 +165,7 @@ def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
     (todos los vídeos resueltos: aprobados o caídos, ninguno pendiente), envía
     el email 'tus vídeos están listos' una sola vez. Nunca lanza."""
     try:
-        from src.editor_auto.config import manual_approval_enabled
+        from src.editor_auto.config import day_expires_at, manual_approval_enabled
         from src.editor_auto.repos.web_account_repo import get_web_account_repo
         from src.editor_auto.services import email_notify
 
@@ -205,6 +205,7 @@ def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
         res = email_notify.send_videos_ready(
             to=[email], client_name=name, count=ready,
             folder_link=os.getenv("EDITOR_WEB_PANEL_URL", "https://nebulabsmedia.com/panel"),
+            expires_at=day_expires_at(user, day) or "",
         )
         if res.get("ok"):
             r.set_str(notified_key, "1")
@@ -823,6 +824,8 @@ def web_output(
     # cuando el día queda completo. Idempotente (flag webday_notified).
     if all_done and ready > 0:
         _maybe_notify_ready(user, day, queue)
+    from src.editor_auto.config import day_expires_at
+    from src.editor_auto.services.retention_sweeper import expired_days
     return {
         "day": day,
         "total": len(jobs_meta),
@@ -830,6 +833,8 @@ def web_output(
         "review": review,
         "all_done": all_done,
         "videos": videos,
+        "expires_at": day_expires_at(user, day),
+        "expired": day in expired_days(user.id),
     }
 
 
@@ -840,7 +845,8 @@ def web_days_summary(
 ) -> dict:
     """Resumen de estado por día (para colorear el calendario del cliente):
     cada día enviado → {total, ready, review, in_progress, all_done}."""
-    from src.editor_auto.config import manual_approval_enabled
+    from src.editor_auto.config import day_expires_at, manual_approval_enabled
+    from src.editor_auto.services.retention_sweeper import expired_days
 
     user = _resolve_user(claims)
     gate = manual_approval_enabled()
@@ -870,7 +876,12 @@ def web_days_summary(
         days[day] = {
             "total": total, "ready": ready, "review": review,
             "in_progress": total - done, "all_done": all_done,
+            "expires_at": day_expires_at(user, day), "expired": False,
         }
+    for day in expired_days(user.id):
+        if is_valid_day(day) and day not in days:
+            days[day] = {"total": 0, "ready": 0, "review": 0, "in_progress": 0,
+                         "all_done": True, "expires_at": None, "expired": True}
     return {"days": days}
 
 
@@ -892,6 +903,10 @@ def web_download(
     safe = _safe_name(file)
     path = os.path.join(folder, safe)
     if not os.path.exists(path):
+        from src.editor_auto.services.retention_sweeper import expired_days
+        if not source and day in expired_days(user.id):
+            raise APIError("Estos vídeos ya se borraron: los guardamos un tiempo limitado.",
+                           status_code=status.HTTP_410_GONE, code="expired")
         raise UserNotFoundError("Vídeo no encontrado.", details={"file": file})
     # Nombre de descarga limpio: quita el prefijo timestamp del upload
     # (1780695599_IMG_9750_editado.mp4 → IMG_9750_editado.mp4).
@@ -1030,6 +1045,28 @@ def web_admin_user_pipeline(
         "n_in_process": len(in_process),
         "n_ready": len(ready),
         "gate": gate,
+    }
+
+
+@router.post("/admin/retention")
+def web_admin_retention(
+    _: Annotated[str, Depends(get_current_user)],
+    queue: Annotated[JobQueue, Depends(get_queue)],
+    dry_run: bool = True,
+) -> dict:
+    """Caducidad de vídeos de clientes: con `dry_run` (por defecto) solo lista
+    lo que se borraría; con `dry_run=false` lo borra. Ver retention_sweeper."""
+    from src.editor_auto.config import retention_days, retention_source_days
+    from src.editor_auto.services import retention_sweeper
+
+    ids = retention_sweeper.open_job_ids(queue)
+    items = retention_sweeper.sweep(dry_run=dry_run, open_ids=ids or set())
+    return {
+        "dry_run": dry_run,
+        "retention_days": retention_days(),
+        "retention_source_days": retention_source_days(),
+        "items": items,
+        "total_bytes": sum(i["bytes"] for i in items if not i.get("error")),
     }
 
 

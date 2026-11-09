@@ -183,6 +183,18 @@ Para añadir una herramienta nueva:
   (transcriben su salida, así que el gancho copiado no los descuadra).
   Si algo falla, copia la entrada y el flujo sigue.
 
+## Caducidad de vídeos de clientes web (9/11/2026)
+
+`src/editor_auto/services/retention_sweeper.py`, desde el loop del `draft_sweeper` (cada 6 h):
+- Editados `salida/<día>/`: se borran a los `retention_days` (30) del día; el cliente ve
+  «Descárgalos antes del …» en el panel y en el email de listos. Al caducar, claves `webday_*`
+  fuera y el día pasa a `webdays_expired:{uid}` (la web lo pinta «vídeos borrados»; `/download` → 410).
+- Originales `entrada/<día>/` y `recuperacion/`: a los `retention_source_days` (10). Nunca con trabajos abiertos.
+- Por cliente `retention_days_override` (Usuarios › «Guardar editados»): vacío = general, 0 = nunca, N días.
+- Solo cuentas web (`account_email`). Redis: `settings:retention_days`, `settings:retention_source_days`,
+  `settings:retention_enabled` (0 = apagado). Env: `EDITOR_RETENTION_DAYS`, `EDITOR_RETENTION_SOURCE_DAYS`.
+- A mano: `scripts/caducidad_clientes.sh simular|ejecutar` (POST `/web/admin/retention?dry_run=`).
+
 ## Variables de entorno
 
 ```env

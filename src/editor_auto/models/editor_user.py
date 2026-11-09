@@ -92,6 +92,10 @@ class EditorUser(BaseModel):
     # `salida/` solo los aprobados → el cliente nunca ve un vídeo sin tu visto
     # bueno. Default False = comportamiento de siempre (directo a salida).
     manual_review: bool = False
+    # Caducidad de sus vídeos editados (días desde el día de publicación).
+    # None = la general (`config.retention_days()`, 30). 0 = no borrar nunca
+    # (permiso especial). Los originales siguen la general de originales.
+    retention_days_override: int | None = None
     # Billing — opcional. `subscription=None` significa "user de prueba"
     # (sin cuotas ni ventana horaria). Útil para QA, betas internos, demos.
     subscription: Subscription | None = None

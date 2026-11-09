@@ -76,9 +76,10 @@ def _send(to: list[str], subject: str, html: str, text: str) -> dict:
 
 def send_videos_ready(
     *, to: list[str], client_name: str, count: int | None = None,
-    folder_link: str | None = None,
+    folder_link: str | None = None, expires_at: str | None = None,
 ) -> dict:
-    """Email 'tus vídeos del día están listos'."""
+    """Email 'tus vídeos del día están listos'. Con `expires_at` (YYYY-MM-DD,
+    clientes de la web) dice «en tu panel» y hasta cuándo se pueden descargar."""
     nice = client_name or "Hola"
     if count == 1:
         n_txt, verbo, adj = "Tu vídeo", "está", "editado y listo"
@@ -92,6 +93,19 @@ def send_videos_ready(
               "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
     _hoy = datetime.now()
     fecha = f"{_hoy.day} de {_MESES[_hoy.month - 1]}"
+    donde = "en tu panel" if expires_at is not None else "en tu carpeta de Drive"
+    caduca_html = caduca_txt = ""
+    if expires_at:
+        try:
+            _y, _m, _d = (int(x) for x in expires_at.split("-"))
+            _cad = f"{_d} de {_MESES[_m - 1]}"
+            caduca_html = (
+                '<p style="margin:10px 0 0;font-size:14px;color:#92400e;line-height:1.5">'
+                f'Descárgalos antes del <strong>{_cad}</strong>: después se borran '
+                'para siempre.</p>')
+            caduca_txt = f"\nDescárgalos antes del {_cad}: después se borran para siempre.\n"
+        except (ValueError, IndexError):
+            pass
 
     # Botón con gradiente de marca (cyan → violeta del logo). Fallback de color
     # sólido para clientes que no renderizan gradientes.
@@ -126,7 +140,8 @@ def send_videos_ready(
         f'¡Hola {nice}! 👋</h1>'
         f'<p style="margin:0 0 6px;font-size:15px;color:#374151;line-height:1.5">'
         f'<strong>{n_txt}</strong> del día de hoy ya {verbo} '
-        f'<strong>{adj}</strong> en tu carpeta de Drive.</p>'
+        f'<strong>{adj}</strong> {donde}.</p>'
+        f'{caduca_html}'
         f'{button}'
         '<p style="margin:18px 0 0;font-size:13px;color:#6b7280;line-height:1.5">'
         '¿Tienes alguna duda? Escríbenos respondiendo a este correo o por '
@@ -141,7 +156,7 @@ def send_videos_ready(
     )
     text = (
         f"¡Hola {nice}!\n\n{n_txt} del día de hoy ya {verbo} {adj} "
-        f"en tu carpeta de Drive.{link_txt}\n"
+        f"{donde}.{caduca_txt}{link_txt}\n"
         f"¿Alguna duda? Escríbenos respondiendo a este correo o por WhatsApp: "
         f"https://wa.me/34631543618\n\n¡Gracias por confiar en nosotros!\n\nNebulabs Media"
     )

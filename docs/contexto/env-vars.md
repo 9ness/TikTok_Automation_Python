@@ -64,6 +64,7 @@ PIXABAY_API_KEY=...
 # no se define (escanea "Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR").
 # TIKTOK_EDITOR_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_EDITOR"
 # EDITOR_AUTO_REDIS_PREFIX=editor_auto:   # default
+# EDITOR_RETENTION_DAYS=30 / EDITOR_RETENTION_SOURCE_DAYS=10 — caducidad editados/originales de clientes web (Redis settings:retention_* manda; retention_enabled=0 la apaga)
 # ANTHROPIC_API_KEY_EDITOR_AUTO — silence_cutter usa Claude Haiku (OpenAI de respaldo)
 # EDITOR_ASR_PROVIDER=deepgram + DEEPGRAM_API_KEY — transcripción de todo el editor (src/editor_auto/asr.py; Whisper de respaldo)
 

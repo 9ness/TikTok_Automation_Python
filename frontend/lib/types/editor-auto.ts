@@ -170,6 +170,7 @@ export interface EditorUser {
   /** Máx vídeos/día para este usuario (cuenta atrás). null = sin límite
    *  propio (usa el del plan, o ilimitado si no tiene plan). */
   daily_video_limit_override: number | null;
+  retention_days_override?: number | null;
   window_start_hour_override: number | null;
   window_end_hour_override: number | null;
   /** Fecha UTC (YYYY-MM-DD) en que se compartió la carpeta salida. Al
@@ -229,6 +230,7 @@ export interface EditorUserUpdateInput {
   auto_enqueue_delay_minutes?: number;
   /** -1 = limpiar override (sin límite propio). */
   daily_video_limit_override?: number;
+  retention_days_override?: number;
   window_start_hour_override?: number;
   window_end_hour_override?: number;
   /** Email de la cuenta web a vincular. "" = desvincular. */

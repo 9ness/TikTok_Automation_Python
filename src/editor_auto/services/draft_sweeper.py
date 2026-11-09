@@ -314,6 +314,12 @@ async def sweeper_loop(stop_event: asyncio.Event) -> None:
         except Exception as e:
             logger.warning("[draft_sweeper] pasada falló: %s", e)
         try:
+            # Caducidad de vídeos de clientes (cada 6 h; ver retention_sweeper).
+            from src.editor_auto.services import retention_sweeper
+            await asyncio.to_thread(retention_sweeper.maybe_sweep, None, logger.info)
+        except Exception as e:
+            logger.warning("[draft_sweeper] caducidad falló: %s", e)
+        try:
             await asyncio.wait_for(stop_event.wait(), timeout=INTERVAL_S)
         except asyncio.TimeoutError:
             pass

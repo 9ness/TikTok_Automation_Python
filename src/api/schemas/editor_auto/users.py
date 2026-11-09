@@ -37,6 +37,9 @@ class EditorUserUpdateRequest(BaseModel):
     # "usar el del plan" se manda -1 en los int-nullable (lo traduce el handler).
     auto_enqueue_delay_minutes: int | None = None
     daily_video_limit_override: int | None = None
+    # Caducidad de sus editados en días: None = no tocar/la general; en el
+    # update -1 = volver a la general, 0 = nunca borrar.
+    retention_days_override: int | None = None
     window_start_hour_override: int | None = None
     window_end_hour_override: int | None = None
     # Email de la cuenta web (nebulabs-media) a vincular. "" = desvincular.
@@ -92,6 +95,9 @@ class EditorUserResponse(BaseModel):
     auto_enqueue: bool = False
     auto_enqueue_delay_minutes: int = 0
     daily_video_limit_override: int | None = None
+    # Caducidad de sus editados en días: None = no tocar/la general; en el
+    # update -1 = volver a la general, 0 = nunca borrar.
+    retention_days_override: int | None = None
     window_start_hour_override: int | None = None
     window_end_hour_override: int | None = None
     output_released_on: str | None = None

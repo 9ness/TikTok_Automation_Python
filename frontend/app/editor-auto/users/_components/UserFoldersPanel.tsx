@@ -128,6 +128,8 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
   // Config por usuario (delay + máx/día). Sync desde el server al cargar.
   const [delayMin, setDelayMin] = useState("");
   const [maxDay, setMaxDay] = useState("");
+  // Caducidad de sus editados en días: vacío = la general (30), 0 = nunca.
+  const [keepDays, setKeepDays] = useState("");
   useEffect(() => {
     if (user.data) {
       setDelayMin(String(user.data.auto_enqueue_delay_minutes ?? 0));
@@ -136,8 +138,16 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           ? ""
           : String(user.data.daily_video_limit_override),
       );
+      setKeepDays(
+        user.data.retention_days_override == null ? "" : String(user.data.retention_days_override),
+      );
     }
-  }, [user.data?.id, user.data?.auto_enqueue_delay_minutes, user.data?.daily_video_limit_override]);
+  }, [
+    user.data?.id,
+    user.data?.auto_enqueue_delay_minutes,
+    user.data?.daily_video_limit_override,
+    user.data?.retention_days_override,
+  ]);
 
   const counts = folders.data?.counts ?? {
     entrada: 0,
@@ -152,8 +162,9 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
   function saveConfig() {
     const d = Math.max(0, parseInt(delayMin || "0", 10) || 0);
     const m = maxDay.trim() === "" ? -1 : Math.max(0, parseInt(maxDay, 10) || 0);
+    const k = keepDays.trim() === "" ? -1 : Math.max(0, parseInt(keepDays, 10) || 0);
     update.mutate(
-      { auto_enqueue_delay_minutes: d, daily_video_limit_override: m },
+      { auto_enqueue_delay_minutes: d, daily_video_limit_override: m, retention_days_override: k },
       {
         onSuccess: () => toast.success("Ajustes guardados"),
         onError: (e) => toast.error(e.message),
@@ -234,7 +245,7 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           <p className="text-xs font-semibold text-cyan-700 dark:text-cyan-300">
             ⚙️ Ajustes de encolado (máx/día vacío = usa el límite del plan)
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div className="space-y-1">
               <label className="text-[11px] text-muted-foreground">
                 ⏱ Delay auto-encolado (min)
@@ -261,6 +272,19 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
                 className="h-8 text-sm"
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">
+                🗑️ Guardar editados (días)
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={keepDays}
+                onChange={(e) => setKeepDays(e.target.value)}
+                placeholder="30 (general)"
+                className="h-8 text-sm"
+              />
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={saveConfig} disabled={update.isPending} className="h-7">
@@ -274,7 +298,9 @@ export function UserFoldersPanel({ userId }: { userId: string }) {
           <p className="text-[10px] text-muted-foreground">
             El delay es la cuenta atrás antes de auto-encolar un vídeo nuevo
             (puedes encolar a mano antes desde la pestaña entrada). El máx/día
-            se resetea a medianoche.
+            se resetea a medianoche. Guardar editados: vacío = la caducidad
+            general (30 días), 0 = no borrarlos nunca. Los originales se borran
+            a los 10 días.
           </p>
         </div>
 
