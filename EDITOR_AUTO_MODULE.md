@@ -211,6 +211,27 @@ OPENAI_API_KEY=sk-...
 
 Reusa `UPSTASH_REDIS_REST_URL/_TOKEN` ya compartidas entre programas.
 
+## WhatsApp (bot)
+
+Bot externo (otro servidor, `whatsapp_bot/`) que atiende a clientes del Editor Auto. El box solo expone
+lo que necesita; todo con `X-API-Key` (`get_current_user`), prefijo `/api/v1/editor-auto/whatsapp`:
+
+| Endpoint | Para qué |
+|---|---|
+| `GET /cliente?telefono=` | `resumen_cliente`: cuenta, plan, cuota de hoy y últimos 3 días con vídeos (enlaces de descarga con ticket de 6 h) |
+| `POST /vincular/pedir` `{telefono,email}` | manda un código de 6 dígitos al email de la cuenta (máx 3/hora; siempre `ok:true`, no revela cuentas) |
+| `POST /vincular/confirmar` `{telefono,codigo}` | confirma (máx 5 intentos, caduca a 15 min) y guarda el vínculo |
+| `POST /desvincular` `{telefono}` | borra el vínculo |
+| `POST /coste` `{modelo,input_tokens,output_tokens,cache_*}` | apunta gasto de Claude (`record_claude`, detail `editor_auto.whatsapp_bot`; fuera de un job queda como coste suelto) |
+| `GET/POST /bot/{diagnostico,conversaciones,conversacion,plantillas,suscribir,prueba,pausa,reanudar}` | proxy con lista blanca a `{BOT_URL}/admin/<nombre>` (sin env → `configurado:false`; bot caído → `alcanzable:false`) |
+
+Avisos del box al bot: `services/whatsapp_notify.py` → `POST {BOT_URL}/interno/aviso` (evento `videos_listos`),
+enganchado en `_maybe_notify_ready` (una vez por usuario/día, flag `webday_wa_notified:`). Apagado salvo `EDITOR_WHATSAPP_AVISOS=1`.
+
+Claves Redis nuevas (prefijo `editor_auto:`): `wa:by_phone:{tel}` → email, `wa:by_email:{email}` → tel,
+`wa:codigo:{tel}` (JSON, TTL 15 min), `wa:pedidos:{tel}` (contador, TTL 1 h). Teléfono = solo dígitos con prefijo país (`34…`).
+Envs: `EDITOR_BOX_PUBLIC_URL`, `EDITOR_WHATSAPP_BOT_URL`, `EDITOR_WHATSAPP_BOT_TOKEN`, `EDITOR_WHATSAPP_AVISOS` (ver `docs/contexto/env-vars.md`).
+
 ## Cost tracking
 
 - Todas las llamadas de IA de `silence_cutter` pasan por

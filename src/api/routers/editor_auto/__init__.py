@@ -8,6 +8,7 @@ from .subscriptions import router as subscriptions_router
 from .tools import router as tools_router
 from .users import router as users_router
 from .web_upload import router as web_upload_router
+from .whatsapp import router as whatsapp_router
 
 __all__ = [
     "enqueue_router",
@@ -20,4 +21,5 @@ __all__ = [
     "subscriptions_router",
     "referrals_router",
     "web_upload_router",
+    "whatsapp_router",
 ]
