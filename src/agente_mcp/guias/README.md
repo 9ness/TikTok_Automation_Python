@@ -209,6 +209,15 @@ Conectar una IA (MCP)**. Todo lo que hagas va a SU nombre (su progreso, sus
 vídeos).
 
 1. `guia()` y `guia(menu)` → estas instrucciones.
+   **Para no releerlas enteras:** `aprendizajes(tema)` (1-3 palabras: «omni
+   marca», «puzle», «carrusel música», «bandas negras», «Mi 8») devuelve las
+   líneas del cuaderno de fallos y arreglos (`learnings.md`, lo más reciente
+   primero) y las SECCIONES de guía donde sale el tema, con un extracto.
+   `guia_seccion(guia, seccion)` trae esa sección entera (2-3 KB en vez de
+   20-30) y, sin `seccion`, el índice de la guía. Úsalo antes de empezar algo
+   que ya se ha hecho otras veces y **siempre que algo falle**: lo más
+   probable es que ya esté resuelto. No sustituye a leer la guía del menú la
+   primera vez que lo haces.
 2. `menus_disponibles()` → menús, modos y opciones válidas.
 3. En los catálogos del operador (Muestras, Tareas, Productos físicos…), si
    no te dicen qué producto: `prioridades()` → qué toca primero (necesita

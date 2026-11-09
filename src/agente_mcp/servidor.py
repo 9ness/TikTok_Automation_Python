@@ -40,6 +40,10 @@ operador (hasta dónde llegar, dónde generar el vídeo, 8 s o 10 s…) y cómo
 revisar fotos y clips para no cometer una infracción de «producto
 incoherente».
 
+Si algo falla o es algo que ya se ha hecho otras veces, `aprendizajes(tema)`
+(«omni marca», «puzle», «bandas negras») te da lo ya aprendido y las secciones
+de guía donde sale; `guia_seccion(guia, seccion)` trae solo esa sección.
+
 Flujo típico: `carpetas` → `productos` → `preparar_carpeta` (y `estado` hasta
 que acabe) → `preparar_bandeja` (deja fotos y PLAN.md en el Drive) → generas
 imágenes y clips en Google Flow / GenAI Pro / Magnific con el navegador →
@@ -187,6 +191,54 @@ def menus_disponibles() -> str:
          "opciones": m.opciones, "solo_guia": m.tipo == "solo_guia"}
         for m in menus.MENUS.values()
     ])
+
+
+@_herramienta(structured_output=False)
+def aprendizajes(ctx: Context, tema: str, maximo: int = 8) -> str:
+    """Lo ya aprendido sobre un tema, sin leer guías enteras: las líneas del
+    cuaderno de fallos y arreglos (`learnings.md`, lo más reciente primero) y
+    las SECCIONES de las guías donde sale. `tema` = 1-3 palabras («omni marca»,
+    «puzle», «carrusel música», «bandas negras», «Mi 8»). Llámalo ANTES de
+    empezar algo que ya se ha hecho otras veces y cuando algo falle: lo más
+    probable es que ya esté resuelto. Cada sección trae un extracto; la sección
+    entera se pide con `guia_seccion(guia, seccion)` (2-3 KB en vez de 20-30)."""
+    from src.agente_mcp import buscador
+
+    if not buscador.palabras(tema):
+        raise ErrorApp("Di un tema con alguna palabra concreta: «omni», «puzle», «carrusel música»…")
+    maximo = max(1, min(int(maximo or 8), 20))
+    out: dict[str, Any] = {"tema": tema}
+    if buscador.ve_aprendizajes(_usuario(ctx)):
+        entradas = buscador.leer_aprendizajes()
+        out["aprendizajes"] = buscador.buscar_aprendizajes(tema, entradas, maximo)
+        if not entradas:
+            out["aviso"] = "El cuaderno de aprendizajes no está en este servidor; solo se buscan las guías."
+    out["guias"] = buscador.buscar_guias(tema, buscador.secciones(), max(3, maximo // 2 + 2))
+    if not out.get("aprendizajes") and not out["guias"]:
+        out["aviso"] = "Nada con esas palabras. Prueba con una sola o con un sinónimo."
+    return _json(out)
+
+
+@_herramienta(structured_output=False)
+def guia_seccion(guia: str, seccion: str = "") -> str:
+    """UNA sección de una guía, entera (para no leer la guía completa). `guia`
+    = el nombre que da `aprendizajes` («mis-tandas.md», «comun/plataformas.md»;
+    vale sin `.md`) y `seccion` = su título o un trozo («semáforo»). Sin
+    `seccion`: el índice de esa guía con el tamaño de cada sección."""
+    from src.agente_mcp import buscador
+
+    secs = buscador.secciones()
+    if not seccion.strip():
+        ind = buscador.indice(guia, secs)
+        if not ind:
+            raise ErrorApp(f"No hay guía {guia!r}. Mira los nombres en `aprendizajes(tema)` o en `guia()`.")
+        return _json({"guia": guia, "secciones": ind})
+    s = buscador.leer_seccion(guia, seccion, secs)
+    if not s:
+        titulos = [x["seccion"] for x in buscador.indice(guia, secs)]
+        raise ErrorApp(f"No hay sección {seccion!r} en {guia!r}." + (
+            f" Secciones: {' · '.join(titulos)}" if titulos else " Esa guía no existe."))
+    return f"<!-- {s.guia} › {s.titulo} -->\n{s.texto}"
 
 
 @_herramienta(structured_output=False)
