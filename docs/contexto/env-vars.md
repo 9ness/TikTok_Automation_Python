@@ -99,3 +99,11 @@ PIXABAY_API_KEY=...
 # PANEL_URL=https://panel.nebulabsmedia.com  # Mis tandas pone el progreso de la tarea «Subir vídeos»
 # PANEL_TOKEN=                               #   del panel (src/mis_tandas/progreso_panel.py); los de /etc/panel-mcp.env
 ```
+
+# --- Editor Auto · bot de WhatsApp (ver EDITOR_AUTO_MODULE.md › «WhatsApp (bot)») ---
+# EDITOR_BOX_PUBLIC_URL=https://factory.nebulabsmedia.com  # base de los enlaces de descarga que ve el cliente
+# EDITOR_WHATSAPP_BOT_URL=                                  # URL del bot (otro servidor); proxy /bot/* y avisos
+# EDITOR_WHATSAPP_BOT_TOKEN=                                # Bearer hacia el bot (admin e /interno/aviso)
+# EDITOR_WHATSAPP_AVISOS=0                                  # 1 = avisar por WhatsApp cuando los vídeos están listos
+# Las variables del propio bot (WHATSAPP_*, D360_API_KEY, EDITOR_API_URL/KEY, PANEL_*) NO van en este .env:
+# viven en ~/proyectos/whatsapp-bot/.env.local (comando `clave whatsapp-bot <VARIABLE>`); lista en whatsapp_bot/.env.example

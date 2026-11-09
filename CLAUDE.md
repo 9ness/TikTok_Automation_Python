@@ -126,6 +126,7 @@ Punto de entrada: API `uvicorn src.api.main:app`; legacy `streamlit run main.py`
 | [`ADDING_PROGRAM.md`](ADDING_PROGRAM.md) | **Checklist para añadir un programa nuevo** (touchpoints API + runner + Redis + frontend + cost + deploy + tests + docs) |
 | [`TIKTOK_SHOP_MODULE.md`](TIKTOK_SHOP_MODULE.md) | Programa 2 — arquitectura completa, esquemas Redis, prompts, Pilot Program |
 | [`EDITOR_AUTO_MODULE.md`](EDITOR_AUTO_MODULE.md) | Programa 3 — flujo modular, tools registry, Silero VAD + Claude Haiku (OpenAI de respaldo) |
+| [`whatsapp_bot/README.md`](whatsapp_bot/README.md) | **Bot de WhatsApp del Editor Auto** — servicio aparte para vps-webs (no importa `src/`): webhook de Meta o 360dialog, menús, vinculación por código, Haiku, avisos; vías de conexión, variables y `deploy/desplegar.sh`. La API solo le da `/api/v1/editor-auto/whatsapp/*` y la página «Conectar WhatsApp» |
 | [`TTSHOP_AI_PRO_WEB.md`](TTSHOP_AI_PRO_WEB.md) | **La web del curso** — cómo funciona `ttshopaiproapp.com`, de donde salen prompts, ZIP y fichas. Está tras login del operador: ningún agente puede mirarla, así que lo que se sepa se escribe ahí |
 | [`APELACIONES.md`](APELACIONES.md) | Cómo apelar sanciones de TikTok Shop («promoción incoherente»): pruebas, forma del texto, qué no decir, casos aprobados |
 | [`UI_NICHOS.md`](UI_NICHOS.md) | **Estándar visual de las pantallas de nicho** (Programa 4) — anatomía de pantalla y de tarjeta, colores con significado, piezas que se reutilizan. Obligatorio antes de crear o retocar una |

@@ -1,0 +1,5 @@
+# Bot de WhatsApp del Editor (servicio aparte, en vps-webs). No usa el resto del repo.
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+anthropic>=2.0

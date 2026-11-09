@@ -160,7 +160,7 @@ def _unapprove_output(user_id: str, day: str, out_name: str) -> None:
     get_editor_redis().srem(f"{_APPROVED_KEY}{user_id}:{day}", out_name)
 
 
-def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
+def _maybe_notify_ready_email(user: EditorUser, day: str, queue: JobQueue) -> None:
     """Si el cliente activó el aviso por email y el día YA está completo para él
     (todos los vídeos resueltos: aprobados o caídos, ninguno pendiente), envía
     el email 'tus vídeos están listos' una sola vez. Nunca lanza."""
@@ -209,6 +209,63 @@ def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
         )
         if res.get("ok"):
             r.set_str(notified_key, "1")
+    except Exception:
+        pass
+
+
+def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
+    """Avisa de 'videos listos': email (logica original) y, aparte, WhatsApp.
+    Nunca lanza."""
+    _maybe_notify_ready_email(user, day, queue)
+    try:
+        _avisar_whatsapp_listos(user, day, queue)
+    except Exception:
+        pass
+
+
+def _avisar_whatsapp_listos(user: EditorUser, day: str, queue: JobQueue) -> None:
+    """Aviso por WhatsApp (bot externo) de 'videos listos', una sola vez por
+    usuario/dia. Independiente del email. Nunca lanza."""
+    try:
+        if os.getenv("EDITOR_WHATSAPP_AVISOS") != "1":
+            return
+        from src.editor_auto.config import day_expires_at, manual_approval_enabled
+        from src.editor_auto.repos.web_account_repo import get_web_account_repo
+        from src.editor_auto.services import whatsapp_notify
+
+        r = get_editor_redis()
+        key = f"webday_wa_notified:{user.id}:{day}"
+        if r.get_str(key):
+            return
+        gate = manual_approval_enabled()
+        approved = _approved_set(user.id, day)
+        by_id = {j.id: j for j in queue.get_all()}
+        terminal = {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+        ready = 0
+        for m in _get_day_jobs(user.id, day):
+            job = by_id.get(m.get("job_id"))
+            if not (job and job.status in terminal):
+                return
+            out_name = os.path.basename(job.result_path) if job.result_path else None
+            score = _job_score(job) if job.status == JobStatus.COMPLETED else None
+            passed = bool(job.status == JobStatus.COMPLETED and out_name and _job_deliverable(job, score))
+            is_approved = (not gate) or (out_name in approved if out_name else False)
+            if passed and not is_approved:
+                return
+            if passed:
+                ready += 1
+        if ready <= 0:
+            return
+        acc = get_web_account_repo().get(user.account_email) or {}
+        email = (acc.get("email") or user.account_email or "").strip()
+        if not email:
+            return
+        nombre = acc.get("username") or acc.get("name") or user.name
+        if whatsapp_notify.avisar_videos_listos(
+            email=email, nombre=nombre, dia=day, listos=ready,
+            caduca=day_expires_at(user, day),
+        ):
+            r.set_str(key, "1")
     except Exception:
         pass
 
