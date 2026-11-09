@@ -49,7 +49,8 @@ mismo proyecto: se satura y se congela.
    gasta el doble y no hace falta). **Compruébalo SIEMPRE antes de generar**:
    Flow recuerda el último formato y otro agente puede haberlo dejado en 3:4
    (vídeos con bandas negras, 6/11/2026). Antes del semáforo, `cropdetect` de
-   ffmpeg debe dar 1080:1920: el tamaño del MP4 no lo delata. Al reiniciar
+   ffmpeg debe dar 1080:1920: el tamaño del MP4 no lo delata (lo mira
+   `python3 -m src.comprobador_video <vídeo>`). Al reiniciar
    el navegador, Flow vuelve a 4:3 horizontal y las imágenes salen
    apaisadas (1200×896); un clip hecho desde una imagen apaisada sale con
    bandas negras y hay que tirarlo (oct 2026, 4 créditos de GenAI Pro).

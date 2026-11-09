@@ -180,3 +180,11 @@ no sirva.
   **Mide antes del semáforo:** `python3 scripts/medir_movimiento.py <vídeo.mp4>`
   → media y por mitad (≈ clip). Verde solo si la media ≥ 2 y ningún clip < 1,5;
   entre 1,5 y 2, ámbar con el motivo; por debajo, rehacer el clip. Ver `APELACIONES.md`.
+- **Lo técnico, de una pasada (antes de mirar nada a ojo):**
+  `python3 -m src.comprobador_video v1.mp4 v2.mp4 … [--clips 2] [--con-voz]`
+  (solo ffmpeg, ~4 s por vídeo) dice de cada uno `pasa`, `dudas` o `falla` y por
+  qué: formato 1080x1920, **bandas negras dentro del 9:16** (`cropdetect`),
+  **movimiento por clip** (lo mismo que `medir_movimiento.py`), audio (sin pista
+  o en silencio; con `--con-voz` es fallo) y metadatos sin limpiar. `falla` = no
+  merece la pena revisarlo: se rehace. **`pasa` NO es un verde:** queda mirar el
+  producto contra la ficha, que es lo que da la sanción.
