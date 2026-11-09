@@ -314,7 +314,8 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
         dias = config.SEPARACION_PRODUCTO_DIAS
         cola = sorted((p for p in de_la_cuenta if p.tipo == TIPO), key=lambda p: p.programada_en)
         candidatas = espaciar(candidatas, lambda t: t[1], dias * ritmo,
-                              [p.producto_ref for p in cola[-dias * ritmo:]])
+                              [p.producto_ref for p in cola[-dias * ritmo:]],
+                              grupo=lambda t: prioridad(t[0], hoy)[0])
 
     reloj = ingesta.huecos(ritmo, horas, max(ahora, ingesta._ultima_programada(slug, TIPO)), semilla=slug)
     for f, k, e in candidatas:
@@ -391,12 +392,14 @@ def _empezada(p: Publicacion) -> bool:
                for pl in p.plataformas)
 
 
-def espaciar(items: list, clave, ventana: int, recientes: list[str] | None = None) -> list:
+def espaciar(items: list, clave, ventana: int, recientes: list[str] | None = None, grupo=None) -> list:
     """Reordena lo MÍNIMO para que la misma `clave(item)` (el producto) no se
     repita dentro de `ventana` huecos. Respeta el orden de entrada (la
     prioridad): en cada hueco sale el primero que no choca; si todos chocan, el
     que lleva más huecos sin salir. `recientes` = claves de lo último ya
-    publicado o fijo, de más viejo a más nuevo. Sin clave no hay restricción."""
+    publicado o fijo, de más viejo a más nuevo. Sin clave no hay restricción.
+    `grupo(item)` (la prioridad): nunca adelanta a uno de otro grupo, para que
+    lo de temporada no se retrase detrás de lo neutro."""
     if ventana <= 0 or len(items) < 2:
         return list(items)
     ultimo: dict[str, int] = {}
@@ -408,7 +411,10 @@ def espaciar(items: list, clave, ventana: int, recientes: list[str] | None = Non
     resto, out = list(items), []
     while resto:
         elegido, mas_viejo = None, None
+        g0 = grupo(resto[0]) if grupo else None
         for i, it in enumerate(resto):
+            if grupo and grupo(it) != g0:
+                break
             k = clave(it)
             if not k or k not in ultimo or pos - ultimo[k] > ventana:
                 elegido = i
@@ -450,9 +456,11 @@ def replanificar(slug: str, *, ahora: float | None = None, margen_s: int = 2700)
             continue
         fijas = [p for p in pubs if p.programada_en <= ahora + margen_s]
         mover = [p for p in pubs if p.programada_en > ahora + margen_s]
+        prio: dict[str, tuple] = {}
         if tipo == TIPO:
-            mover.sort(key=lambda p: (prioridad(info.get(p.video_path) or info.get(_original(p.video_path)) or {}, hoy),
-                                      p.programada_en))
+            prio = {p.id: prioridad(info.get(p.video_path) or info.get(_original(p.video_path)) or {}, hoy)
+                    for p in mover}
+            mover.sort(key=lambda p: (prio[p.id], p.programada_en))
         else:
             mover.sort(key=lambda p: p.programada_en)
         ritmo = int((c.ritmo or {}).get(tipo, config.RITMO_DEFAULT.get(tipo, 1))) or 1
@@ -460,7 +468,8 @@ def replanificar(slug: str, *, ahora: float | None = None, margen_s: int = 2700)
         if tipo == TIPO and dias > 0:
             antes = [p.id for p in mover]
             mover = espaciar(mover, lambda p: p.producto_ref, dias * ritmo,
-                             _recientes(de_la_cuenta, tipo, ahora, dias, excluir=set(antes)))
+                             _recientes(de_la_cuenta, tipo, ahora, dias, excluir=set(antes)),
+                             grupo=lambda p: prio[p.id][0])
             out["espaciadas"] = sum(1 for a, p in zip(antes, mover) if a != p.id)
         horas = (c.horas or {}).get(tipo) or config.HORAS_DEFAULT.get(tipo, ["12:00"])
         reloj = ingesta.huecos(ritmo, horas, max([ahora] + [p.programada_en for p in fijas]), semilla=slug)

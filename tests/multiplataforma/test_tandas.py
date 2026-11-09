@@ -563,3 +563,12 @@ def test_original_de_la_copia_con_musica_sigue_a_la_carpeta_mudada(filas, drive,
                                            producto_ref="botas", plataformas=["instagram"],
                                            programada_en=AHORA + 86400, origen="tandas"))
     assert [e["epoca"] for e in tandas.capacidad_epocas("ama_shop", ahora=AHORA)["epocas"]] == ["otono"]
+
+
+def test_espaciar_no_adelanta_otra_prioridad():
+    # Navidad (grupo 0) repetida: no se cuela lo neutro (grupo 1) por delante.
+    items = [("nav", 0), ("nav", 0), ("neu", 1), ("otro", 1)]
+    out = tandas.espaciar(items, lambda t: t[0], 2, grupo=lambda t: t[1])
+    assert [t[1] for t in out] == [0, 0, 1, 1]
+    sin = tandas.espaciar(items, lambda t: t[0], 2)
+    assert sin[1][0] == "neu"

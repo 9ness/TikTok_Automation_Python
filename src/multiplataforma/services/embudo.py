@@ -39,11 +39,26 @@ def _clave(slug: str, dia: dt.date) -> str:
     return f"embudo:{slug}:{dia:%Y-%m}"
 
 
+_TOPE_LOCAL: dict = {}
+
+
 def registrar(slug: str, tipo: str, producto: str = "", *, user_agent: str = "", ahora: float | None = None) -> bool:
     """Suma una visita o un clic. Devuelve si contó; nunca lanza."""
     if tipo not in (VISITA, CLIC) or not cuentas_repo.slug_valido(slug) or enlace_corto.es_bot(user_agent):
         return False
     ahora = time.time() if ahora is None else ahora
+    # Tope en memoria ANTES de tocar Redis (Upstash es de pago y compartido):
+    # un bucle de POSTs a un slug cualquiera no gasta llamadas.
+    minuto = int(ahora // 60)
+    if _TOPE_LOCAL.get("m") != minuto:
+        _TOPE_LOCAL.clear()
+        _TOPE_LOCAL["m"] = minuto
+    n = _TOPE_LOCAL.get(slug, 0) + 1
+    if len(_TOPE_LOCAL) > 200 and slug not in _TOPE_LOCAL:
+        return False
+    _TOPE_LOCAL[slug] = n
+    if n > config.EMBUDO_TOPE_MINUTO:
+        return False
     try:
         pagina = tandas.links_publicos(slug)  # cacheada: la página la acaba de pedir
         if tipo == CLIC and producto not in {p["id"] for p in pagina["productos"]}:

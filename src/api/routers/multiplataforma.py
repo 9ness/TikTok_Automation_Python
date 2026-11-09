@@ -346,6 +346,8 @@ async def links_evento(slug: str, request: Request) -> Response:
     """PÚBLICO: la página /links/<cuenta> avisa de una visita o de un clic en un
     producto (`{"tipo": "visita"|"clic", "producto": id}`, con `sendBeacon`).
     Solo suma contadores (`services/embudo.py`). Siempre 204: no dice si contó."""
+    if int(request.headers.get("content-length") or 0) > 1024:
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
     try:
         cuerpo = json.loads((await request.body())[:400] or b"{}")
     except ValueError:

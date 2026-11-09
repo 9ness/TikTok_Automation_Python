@@ -18,6 +18,13 @@ PERSONA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Instagram 350.
 DIA = dt.datetime(2026, 11, 9, 12, 0).timestamp()
 
 
+@pytest.fixture(autouse=True)
+def _tope_local_limpio():
+    embudo._TOPE_LOCAL.clear()
+    yield
+    embudo._TOPE_LOCAL.clear()
+
+
 @pytest.fixture()
 def pagina(monkeypatch):
     """La página pública de `ama_shop` con dos productos; otra cuenta no existe."""
@@ -105,3 +112,12 @@ def test_informe_saca_la_pagina_de_la_bio():
     assert "viva_salud" not in texto
     assert "| ama_shop | 7 | Bolso rojo |" in texto
     assert informe.seccion_embudo({"cuentas": {"ama_shop": {}}}) == []
+
+
+def test_tope_en_memoria_no_toca_redis(monkeypatch, pagina):
+    monkeypatch.setattr(config, "EMBUDO_TOPE_MINUTO", 2)
+    llamadas = []
+    monkeypatch.setattr(tandas, "links_publicos", lambda slug: llamadas.append(slug) or {"productos": []})
+    for _ in range(5):
+        embudo.registrar("no_existe", "visita", user_agent=PERSONA, ahora=DIA)
+    assert len(llamadas) == 2
