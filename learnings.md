@@ -1479,3 +1479,4 @@
 - 2026-11-09 · `sed -i` falla en el Drive montado (FUSE: no puede renombrar el temporal) → editar esos ficheros con Python (leer, cambiar, escribir encima).
 - 2026-11-09 · `gpt-imagen` dentro de un `while read` se come el resto del fichero (lee stdin) y solo sale la 1.ª imagen → llamarlo con `</dev/null`.
 - 2026-11-09 · que_vende (Ama Shop): ventas por producto vienen con títulos traducidos (IT/FR/DE) que casaban con otro bolso → mapa TRADUCE + 2.ª pasada contra el título español; ventas por contenido se cortan en `ventas.actualizado` para no dar pedidos a vídeos posteriores. Ojo: dos agentes escribieron el mismo `que_vende.py` → nombres de script por agente.
+- 2026-11-09 · subir_carrusel_movil: `orden` (orden_subida) evita dos carruseles seguidos del mismo viral (`url`) o producto; en `__main__` la variable `orden` tapaba la función → se llama `ordenar`. test_perfiles se quedó viejo con las banderas solo-Mi 8 (sin_combos, lista_en_dump, ficha_en_caliente).

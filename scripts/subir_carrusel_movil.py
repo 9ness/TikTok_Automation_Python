@@ -515,6 +515,51 @@ def bajar_fotos(c: dict, d: Path) -> None:
 
 
 # ---------------------------------------------------------------- fases
+def _plantilla(c: dict) -> str:
+    """El viral copiado: dos réplicas del mismo viral llevan el mismo estilo (sanción por contenido repetido)."""
+    return (c.get("url") or c.get("folder") or c.get("id") or "").split("?")[0].rstrip("/")
+
+
+def _prod(c: dict) -> str:
+    m = re.search(r"/(?:product|pdp)/(\d+)", c.get("product_url") or "")
+    return m.group(1) if m else (c.get("product_url") or c.get("id") or "")
+
+
+def orden_subida(pend: list[dict]) -> list[dict]:
+    """Orden de subida sin dos seguidos con la misma plantilla ni el mismo producto.
+
+    En cada paso elige, entre los que no chocan con el anterior, el de la plantilla con más
+    pendientes (así no se atasca al final) y, a igualdad, el más antiguo (creado_at). Si todos
+    chocan, el que menos (antes repetir producto que plantilla).
+    """
+    from collections import Counter
+    quedan = sorted(pend, key=lambda c: float(c.get("creado_at") or 0))
+    out: list[dict] = []
+    while quedan:
+        prev = out[-1] if out else None
+
+        def choque(c: dict) -> tuple[int, int]:
+            if prev is None:
+                return (0, 0)
+            return (int(_plantilla(c) == _plantilla(prev)), int(_prod(c) == _prod(prev)))
+
+        cuenta = Counter(_plantilla(c) for c in quedan)
+        mejor = min(range(len(quedan)), key=lambda i: (choque(quedan[i]), -cuenta[_plantilla(quedan[i])], i))
+        out.append(quedan.pop(mejor))
+    return out
+
+
+def ordenar() -> None:
+    """Imprime los ids pendientes (verdes, sin subir, con stock) en el orden en que hay que subirlos."""
+    datos = mcp("mis_tandas", {"fotos": True})
+    _guardar_cache(datos)
+    pend = [c for t in datos["tandas"] for c in t.get("items", t.get("carruseles", []))
+            if not c.get("subido") and not c.get("sin_stock")
+            and ((c.get("semaforo") or {}).get("color") == "verde")]
+    for c in orden_subida(pend):
+        print(f"{c['id']} · {' '.join((c.get('titulo') or '').split())[:50]}")
+
+
 def lote() -> None:
     """Una llamada a Mis tandas + todos los ZIP pendientes en paralelo, antes de tocar el móvil."""
     from concurrent.futures import ThreadPoolExecutor
@@ -937,7 +982,7 @@ if __name__ == "__main__":
     (TMP / "sh").mkdir(parents=True, exist_ok=True)
     orden, *resto = sys.argv[1:]
     try:
-        {"lote": lote, "rapido": rapido, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[orden](*resto)
+        {"lote": lote, "orden": ordenar, "rapido": rapido, "preparar": preparar, "editor": editor, "producto": producto, "publicar": publicar, "limpiar": limpiar}[orden](*resto)
     finally:
         if _FASES:
             fase("fin")   # lo que quede hasta salir (o hasta el fallo)

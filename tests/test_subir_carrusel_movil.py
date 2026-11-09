@@ -21,7 +21,9 @@ def m(monkeypatch):
 
 
 def test_perfiles_con_las_mismas_claves(m):
-    assert set(m.PERFILES["oppo"]) == set(m.PERFILES["mi8"])
+    # Banderas solo del Mi 8 (Android 10); el código las lee con .get() y faltan = False en el OPPO
+    solo_mi8 = {"sin_combos", "lista_en_dump", "ficha_en_caliente"}
+    assert set(m.PERFILES["oppo"]) == set(m.PERFILES["mi8"]) - solo_mi8
 
 
 def test_oppo_conserva_los_puntos_probados(m):
@@ -123,3 +125,61 @@ def test_otro_error_de_descarga_no_reintenta(m, tmp_path, monkeypatch):
     monkeypatch.setattr(m, "mcp", lambda *_: pytest.fail("no debe pedir Mis tandas"))
     with pytest.raises(urllib.error.HTTPError):
         m.bajar_fotos({"id": "1", "zip": "x"}, tmp_path)
+
+
+# ── Orden de subida (Ama Shop sancionada por contenido repetido) ──
+def _c(i, viral, prod, t=0.0):
+    return {"id": i, "url": f"https://www.tiktok.com/@x/video/{viral}?lang=es",
+            "product_url": f"https://www.tiktok.com/view/product/{prod}", "creado_at": t}
+
+
+def _seguidos(m, lista, f):
+    return [(a["id"], b["id"]) for a, b in zip(lista, lista[1:]) if f(a) == f(b)]
+
+
+def test_orden_no_repite_plantilla_seguida(m):
+    pend = [_c("a1", 1, 10, 1), _c("a2", 1, 11, 2), _c("a3", 1, 12, 3), _c("b1", 2, 20, 4), _c("b2", 2, 21, 5)]
+    r = m.orden_subida(pend)
+    assert sorted(c["id"] for c in r) == sorted(c["id"] for c in pend)
+    assert _seguidos(m, r, m._plantilla) == []
+    assert [c["id"] for c in r] == ["a1", "b1", "a2", "b2", "a3"]
+
+
+def test_orden_no_repite_producto_seguido(m):
+    pend = [_c("a", 1, 10, 1), _c("b", 2, 10, 2), _c("c", 3, 20, 3)]
+    r = m.orden_subida(pend)
+    assert _seguidos(m, r, m._prod) == []
+    assert [c["id"] for c in r] == ["a", "c", "b"]
+
+
+def test_orden_respeta_antiguedad_si_no_hay_choque(m):
+    pend = [_c("z", 3, 30, 9), _c("x", 1, 10, 1), _c("y", 2, 20, 5)]
+    assert [c["id"] for c in m.orden_subida(pend)] == ["x", "y", "z"]
+
+
+def test_orden_sin_salida_pone_todos_igual(m):
+    pend = [_c("a", 1, 10, 1), _c("b", 1, 11, 2)]
+    assert [c["id"] for c in m.orden_subida(pend)] == ["a", "b"]
+    assert m.orden_subida([]) == []
+
+
+def test_plantilla_ignora_parametros_de_la_url(m):
+    assert m._plantilla({"url": "https://t.com/@a/video/5?lang=es"}) == m._plantilla({"url": "https://t.com/@a/video/5/"})
+    assert m._plantilla({"folder": "Carruseles Virales 23"}) == "Carruseles Virales 23"
+
+
+def test_orden_no_toca_el_movil(m, monkeypatch):
+    monkeypatch.setattr(m, "adb", lambda *a, **k: (_ for _ in ()).throw(AssertionError("adb")))
+    monkeypatch.setattr(m, "mcp", lambda h, a: {"tandas": [{"items": [
+        _c("v1", 1, 10, 1) | {"semaforo": {"color": "verde"}},
+        _c("r1", 2, 20, 2) | {"semaforo": {"color": "rojo"}},
+        _c("s1", 3, 30, 3) | {"semaforo": {"color": "verde"}, "subido": True},
+        _c("v2", 1, 11, 4) | {"semaforo": {"color": "verde"}},
+        _c("v3", 4, 40, 5) | {"semaforo": {"color": "verde"}},
+    ]}]})
+    monkeypatch.setattr(m, "_guardar_cache", lambda d: None)
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        m.ordenar()
+    assert [l.split(" ·")[0] for l in buf.getvalue().splitlines()] == ["v1", "v3", "v2"]
