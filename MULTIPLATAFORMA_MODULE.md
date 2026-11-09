@@ -314,6 +314,19 @@ de IG: por cuenta·formato (`viral_pablo_motos` y `remedios` salen del título),
 «despegaron» (≥10× la mediana de su cuenta), «no despegan» (≥48 h y <¼ de su mediana), FB a cero y seguidores frente a hace
 una semana. No se vuelca a `video_stats` del panel: ese esquema es de TikTok (programa, hora de México, recompensas).
 
+## Vigía de salud (9/11/2026)
+
+`scripts/multiplataforma_salud.sh [--dry-run]`: el recolector `scripts/multiplataforma_salud.py` corre en el
+contenedor (solo lectura, nunca saca tokens: de cada uno, si vale, cuándo caduca y sus permisos; cola de 7 días;
+reproducciones de los reels de FB) → `~/multiplataforma/salud_datos.json`; el host lo analiza con
+`src/multiplataforma/services/salud.py` (stdlib) junto con la cola de `tick.log` y avisa a `/api/avisos` del panel.
+Incidencias: token inválido o que caduca en <3 días (grave, notifica), Threads sin renovar >14/50 días, publicaciones
+pendiente/error >1 h tras su hora, fallidas en 48 h (error normalizado), FB a cero (≥3 reels >48 h, todos ≤2), tick
+parado >45 min (grave, notifica) o con Traceback en los últimos 4, y recolector caído. Deduplica con
+`~/multiplataforma/salud_estado.json`: una vez por incidencia, recordatorio a los 7 días, aviso si sube de nivel y
+«✅ Resuelto» al desaparecer; si el POST falla, se reintenta en el siguiente pase. No reintenta, no publica, no borra.
+Cron propuesto (pendiente de Néstor): `7 * * * * ~/proyectos/TikTok_Automation_Python/scripts/multiplataforma_salud.sh >> ~/multiplataforma/salud.log 2>&1`.
+
 ## Qué falta
 
 1. **App de Meta** (tipo Business) con `instagram_content_publish`,
