@@ -10,13 +10,15 @@ firmado, que lo descargan Meta/Threads sin cabeceras).
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_current_user, get_web_user
@@ -24,7 +26,9 @@ from src.api.exceptions import APIError
 from src.multiplataforma import config, publicador
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo
-from src.multiplataforma.services import carruseles, conectar_meta, enlace_corto, enlaces, ingesta, tandas, textos, video_url
+from src.multiplataforma.services import (
+    carruseles, conectar_meta, embudo, enlace_corto, enlaces, ingesta, tandas, textos, video_url,
+)
 
 router = APIRouter(
     prefix="/api/v1/multiplataforma",
@@ -335,6 +339,22 @@ def links_publicos(slug: str) -> JSONResponse:
     except tandas.ErrorTandas as e:
         raise _err_tandas(e) from e
     return JSONResponse(datos, headers={"Cache-Control": "public, max-age=120"})
+
+
+@router_publico.post("/links/{slug}/evento", status_code=204)
+async def links_evento(slug: str, request: Request) -> Response:
+    """PÚBLICO: la página /links/<cuenta> avisa de una visita o de un clic en un
+    producto (`{"tipo": "visita"|"clic", "producto": id}`, con `sendBeacon`).
+    Solo suma contadores (`services/embudo.py`). Siempre 204: no dice si contó."""
+    try:
+        cuerpo = json.loads((await request.body())[:400] or b"{}")
+    except ValueError:
+        cuerpo = {}
+    if isinstance(cuerpo, dict):
+        await run_in_threadpool(embudo.registrar, slug, str(cuerpo.get("tipo") or ""),
+                                str(cuerpo.get("producto") or ""),
+                                user_agent=request.headers.get("user-agent", ""))
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
 
 
 @router_publico.api_route("/links/r/{codigo}", methods=["GET", "HEAD"])

@@ -492,6 +492,10 @@ BOTS_USER_AGENT = re.compile(
     r"curl/|python-|httpx|wget", re.I)
 
 
+# Embudo de la página de la bio (`services/embudo.py`): como mucho estos avisos
+# (visitas + clics) por cuenta y minuto; lo que pase de ahí no se cuenta.
+EMBUDO_TOPE_MINUTO = int(os.getenv("MULTIPLATAFORMA_EMBUDO_TOPE_MINUTO", "300"))
+
 # ── «Comenta SÍ» → enlace por mensaje privado (#297) ──────────────────────
 # Lee los comentarios de los reels de IG con enlace, detecta «sí» y responde
 # con un mensaje privado (Private Replies: un mensaje por comentario, en 7

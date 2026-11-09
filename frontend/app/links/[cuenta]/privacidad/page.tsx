@@ -42,6 +42,11 @@ function secciones(c: Cuenta): { titulo: string; texto: string }[] {
         "Los tokens se guardan en nuestro servidor privado, con acceso restringido, y solo los usa el publicador. Se pueden revocar en cualquier momento desde la configuración de cada plataforma.",
     },
     {
+      titulo: "Página de enlaces",
+      texto:
+        "Nuestra página de enlaces solo cuenta, de forma anónima y agregada, cuántas visitas recibe y qué enlaces se abren, para saber qué productos interesan. Ese recuento no usa cookies ni guarda ningún dato que identifique a quien entra.",
+    },
+    {
       titulo: "Enlaces de afiliado",
       texto: `Si compras a través de un enlace, ${c.tienda} puede pagarnos una comisión sin coste extra para ti. ${c.tienda} aplica su propia política de privacidad y de cookies.`,
     },
@@ -58,7 +63,7 @@ export default function PrivacidadPage({ params }: { params: { cuenta: string } 
     <main className="min-h-screen bg-white">
       <div className="mx-auto max-w-2xl px-4 py-8 text-sm text-neutral-800 sm:py-12">
         <h1 className="mb-1 text-xl font-semibold sm:text-2xl">Política de privacidad · {c.nombre}</h1>
-        <p className="mb-6 text-xs text-neutral-500">Última actualización: 9 de octubre de 2026</p>
+        <p className="mb-6 text-xs text-neutral-500">Última actualización: 9 de noviembre de 2026</p>
         {secciones(c).map((s) => (
           <section key={s.titulo} className="mb-5">
             <h2 className="mb-1 font-semibold">{s.titulo}</h2>

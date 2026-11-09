@@ -27,6 +27,10 @@ try:  # el script se copia al contenedor: puede ir por delante del despliegue
     from src.multiplataforma.services import enlace_corto
 except ImportError:  # pragma: no cover
     enlace_corto = None
+try:
+    from src.multiplataforma.services import embudo
+except ImportError:  # pragma: no cover
+    embudo = None
 
 ZONA = ZoneInfo(config.ZONA_HORARIA)
 CUENTAS = ("viva_shop", "viva_salud", "ama_shop")
@@ -163,6 +167,8 @@ def cuenta(slug: str, todas: list, desde: int, hasta: int) -> dict:
         "publicaciones": medidas,
         "salud": salud(pubs),
         "en_cola": len(cola),
+        # Página de la bio: visitas y clics por producto (solo contadores).
+        "embudo": embudo.resumen(slug, desde, hasta) if embudo else None,
         "errores": errores,
     }
 

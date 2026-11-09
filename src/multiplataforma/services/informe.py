@@ -219,6 +219,30 @@ def seccion_clics(pubs: list[dict]) -> list[str]:
     return l + [""]
 
 
+def seccion_embudo(ultimo: dict) -> list[str]:
+    """Página de la bio (`/links/<cuenta>`): visitas, clics y qué se abre.
+    Sale en cuanto la lectura trae el dato, aunque sea cero: «nadie entra en
+    la bio» también es una respuesta."""
+    cuentas = {c: d["embudo"] for c, d in (ultimo.get("cuentas") or {}).items()
+               if isinstance(d.get("embudo"), dict)}
+    if not cuentas:
+        return []
+    l = ["## 🧭 Página de la bio (semana)", "",
+         "Visitas a `/links/<cuenta>` y clics en un producto (personas, sin rastreadores; solo contadores).", ""]
+    filas = []
+    for c, e in sorted(cuentas.items()):
+        v, k = int(e.get("visitas") or 0), int(e.get("clics") or 0)
+        filas.append([c, _n(v), _n(k), f"{_n(round(100 * k / v, 1))} %" if v else "—"])
+    l += _tabla(["cuenta", "visitas", "clics", "clics por visita"], filas)
+    top = sorted(((c, p) for c, e in cuentas.items() for p in e.get("productos") or []),
+                 key=lambda cp: -int(cp[1].get("clics") or 0))[:10]
+    if top:
+        l += ["", "Lo que más se abre:", ""]
+        l += _tabla(["cuenta", "clics", "producto"],
+                    [[c, _n(p.get("clics")), (p.get("titulo") or p.get("id") or "")[:60]] for c, p in top])
+    return l + [""]
+
+
 def recomendaciones(pubs: list[dict]) -> list[str]:
     """Una línea por cuenta: el formato que más rinde frente al siguiente (por mediana de IG)."""
     out = []
@@ -311,6 +335,7 @@ def generar(fotos: list[tuple[str, dict]], ahora: float | None = None, dias: int
                   _n(vistas(m, "threads")), _n(vistas(m, "facebook")), (m.get("titulo") or "")[:45]] for m in top]) + [""]
 
     l += seccion_clics(semana)
+    l += seccion_embudo(ultimo)
 
     flo = [m for m in flojas(todas, ahora) if (_ts(m) or 0) >= ahora - dias * 86400][:10]
     l += ["## No despegan (semana, ≥48 h y < 1/4 de la mediana de su cuenta y formato)", ""]

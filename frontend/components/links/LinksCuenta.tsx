@@ -124,6 +124,24 @@ function iniciales(nombre: string): string {
  *  colores) para que quien llega desde la bio la reconozca, una franja de
  *  urgencia y los productos en LISTA (foto + texto + botón), que es lo que
  *  mejor cabe en un móvil. */
+/** Cuenta la visita y los clics en un producto (solo contadores en el servidor:
+ *  sin cookies ni datos de quien entra). El enlace sigue yendo directo a la
+ *  tienda; `sendBeacon` no retrasa la salida y, si falla, no pasa nada. */
+function contar(cuenta: string, tipo: "visita" | "clic", producto = ""): void {
+  try {
+    const url = `${api.baseUrl}/api/v1/multiplataforma/links/${encodeURIComponent(cuenta)}/evento`;
+    const cuerpo = JSON.stringify({ tipo, producto });
+    if (typeof navigator.sendBeacon === "function") {
+      // text/plain: no dispara preflight de CORS cuando la API está en otro host (dev).
+      navigator.sendBeacon(url, new Blob([cuerpo], { type: "text/plain" }));
+    } else {
+      void fetch(url, { method: "POST", body: cuerpo, keepalive: true, credentials: "omit" }).catch(() => {});
+    }
+  } catch {
+    // medir nunca rompe la página
+  }
+}
+
 export function LinksCuenta({ cuenta }: { cuenta: string }) {
   const [datos, setDatos] = useState<DatosLinks | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +164,10 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
           if (r.status === 404) throw new Error("Esta página no existe.");
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const d = (await r.json()) as DatosLinks;
-          if (vivo) setDatos(d);
+          if (vivo) {
+            setDatos(d);
+            contar(cuenta, "visita");
+          }
           return;
         } catch (e) {
           if ((e as Error).message === "Esta página no existe.") {
@@ -302,6 +323,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
             href={ultimo.enlace}
             target="_blank"
             rel="nofollow sponsored noopener"
+            onClick={() => contar(cuenta, "clic", ultimo.id)}
             className={`group mb-5 block overflow-hidden rounded-2xl border transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--acento)] ${tarjeta}`}
           >
             <div className="relative aspect-[4/3] w-full">
@@ -397,6 +419,7 @@ export function LinksCuenta({ cuenta }: { cuenta: string }) {
                   href={p.enlace}
                   target="_blank"
                   rel="nofollow sponsored noopener"
+                  onClick={() => contar(cuenta, "clic", p.id)}
                   className={`group flex items-center gap-3 rounded-2xl border p-2.5 transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--acento)] ${tarjeta}`}
                 >
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl sm:h-24 sm:w-24">

@@ -218,6 +218,8 @@ Viva Shop/Salud con `duenos_extra=[nestor2, mauro]`.
 | `garantia:<slug>` | JSON | `{dia, pub}` último día en que la garantía diaria adelantó un vídeo |
 | `corto:<código>` | JSON | enlace corto (#296): `{url, cuenta, pid, plataforma, producto_ref, creado_en}` |
 | `clics:<pid>` | HASH | `{red: clics}` del enlace corto de esa publicación |
+| `embudo:<slug>:<AAAA-MM>` | HASH | página de la bio: `v:<DD>` visitas del día, `c:<DD>:<producto_key>` clics en ese producto |
+| `embudo:tope:<slug>:<minuto>` | INT (EX 2 min) | tope de avisos por cuenta y minuto |
 | `comenta_si:hecho:<comment_id>` · `comenta_si:usuario:<media>:<usuario>` | STR (EX 30 d) | «Comenta SÍ» ya atendido |
 | `comenta_si:hora:<slug>:<AAAAMMDDHH>` | INT (EX 1 h) | tope por cuenta y hora |
 | `comenta_si:seco:<fecha>` | JSON lista | lo que se HABRÍA mandado en seco (máx. 500/día) |
@@ -304,6 +306,7 @@ acceso Trial), `MULTIPLATAFORMA_DRY_RUN`, `MULTIPLATAFORMA_LIMITE_*`,
 `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`, `MULTIPLATAFORMA_MUSICA_DIR`,
 `MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`, `MULTIPLATAFORMA_CARRUSEL_REEL`,
 `MULTIPLATAFORMA_ENLACE_CORTO` (0), `MULTIPLATAFORMA_ENLACE_CORTO_AMAZON` (0), `MULTIPLATAFORMA_ENLACE_CORTO_BASE`,
+`MULTIPLATAFORMA_SEPARACION_PRODUCTO_DIAS` (3; 0 = sin separar), `MULTIPLATAFORMA_EMBUDO_TOPE_MINUTO` (300),
 `MULTIPLATAFORMA_COMENTA_SI_ENVIAR` (0), `MULTIPLATAFORMA_COMENTA_SI_DIAS`, `MULTIPLATAFORMA_COMENTA_SI_TOPE_HORA`,
 `MULTIPLATAFORMA_RESCATE_S`, `MULTIPLATAFORMA_MAX_RESCATES`, `MULTIPLATAFORMA_GARANTIA_HORA`, `MULTIPLATAFORMA_IG_GRACIA_ERROR_S` (180: segundos que se sigue sondeando un contenedor de IG en ERROR antes de tirarlo).
 Reutiliza `PUBLIC_BASE_URL` y `AUTH_COOKIE_KEY`. Sin cost tracking: las APIs
@@ -354,6 +357,20 @@ Los dos están **apagados**; encenderlos cambia lo que sale publicado → «sí�
   usuario·reel, tope `COMENTA_SI_TOPE_HORA` (30) por cuenta; si el envío falla no se marca y se reintenta. En seco
   (por defecto) solo anota en `comenta_si:seco:<fecha>`; enviar = `MULTIPLATAFORMA_COMENTA_SI_ENVIAR=1`, con la app en
   Live y `instagram_manage_comments` + `instagram_manage_messages`. Sin cron todavía.
+
+## Embudo de la página de la bio (9/11/2026)
+
+En IG el pie de un reel no lleva enlace: quien quiere el producto pasa por `/links/<cuenta>`. `services/embudo.py`
+cuenta por día las **visitas** a la página y los **clics por producto**, para saber cuánta gente llega de la bio y
+qué abre. El enlace sigue yendo DIRECTO a la tienda (Amazon no admite acortadores): `LinksCuenta.tsx` avisa aparte con
+`navigator.sendBeacon` a `POST /api/v1/multiplataforma/links/{slug}/evento` (público, cuerpo
+`{"tipo": "visita"|"clic", "producto": key}` como text/plain, siempre 204). Solo contadores: sin cookies, IP ni
+identificador (lo dice la página de privacidad). No cuentan los rastreadores (`BOTS_USER_AGENT`), los productos que no
+están en la página ni lo que pase de `MULTIPLATAFORMA_EMBUDO_TOPE_MINUTO` (300) avisos por cuenta y minuto; si Redis
+falla, la página no se entera. `scripts/multiplataforma_estadisticas.py` vuelca `embudo` por cuenta (`visitas`,
+`clics`, `por_dia`, top de `productos` con título) y el informe semanal saca «🧭 Página de la bio» (clics por visita y
+lo que más se abre). No cambia nada de lo que se publica. Al desplegar: comprobar que el Caddy de vps-webs deja pasar
+el POST a `/api/v1/multiplataforma/links/*`. Tests: `tests/multiplataforma/test_embudo.py`.
 
 ## Qué falta
 
