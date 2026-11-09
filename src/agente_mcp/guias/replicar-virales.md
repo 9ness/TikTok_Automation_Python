@@ -81,6 +81,12 @@ cruza TikTok para sancionar por «producto incoherente».
      Cada pista va al banco con su URL y su licencia en un `LICENCIAS.md`
      (navideña: `_agente/ness/alisa_z/musica_navidad/`). Volumen bajo,
      ~-22 LUFS; con voz, por debajo de ella.
+   - **Réplica SIN sonido (9/11/2026): la app le mete la música sola.** Al
+     `registrar_replica_video`, si el MP4 no trae audio (o está en silencio), se
+     mezcla DENTRO una pista libre del banco `Multiplataforma/_musica/` (Mixkit,
+     licencia en su `LICENCIA.md`), rotando estilo y pista por usuario para que
+     no sea siempre la misma (`replicar_viral/video.py:musica_si_mudo`; queda en
+     `musica_fondo`). Las subidas por «Comprobación previa» ya no dejan añadirla.
    - **Voz bien alta**: `loudnorm=I=-14:TP=-2:LRA=11` sobre la voz; la clonada de
      Néstor sale floja de Fish, súbele antes `volume=4dB`. Escúchala al final.
    - **Cierre con sentido**, una frase entera y natural, nunca «En el carrito
@@ -198,7 +204,7 @@ Vídeo de 12-15 s, muy variado:
 3. **La chica probándosela frente al espejo, ~4 s en varias tomas** distintas
    (IA con la foto limpia como ingrediente: diseño, color, estampado, corte y
    largo idénticos a la foto).
-4. La música la pone Ana al publicar: Mis tandas enlaza el **sonido del viral
+4. Si el MP4 es mudo, la app ya le mete música libre al registrarlo (ver arriba). Si lleva sonido, la pone Ana al publicar: Mis tandas enlaza el **sonido del viral
    original** (chip 🎵 azul de la fila `rv|`, sale solo si la réplica se
    registró con `url_viral`; se lee de tikwm y queda en `musica.tiktok`) (en ropa no ha habido sanciones por
    producto incoherente, de momento sin «comprobar vídeo»). El semáforo en Mis

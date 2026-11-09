@@ -29,6 +29,7 @@ genjutsu = viral, sin_ia = físico; `nicho_pov_bof/services/marcas.py`).
 from __future__ import annotations
 
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -84,6 +85,55 @@ def _copiar(origen: Path, destino: Path) -> None:
     tmp = destino.with_suffix(".part")
     shutil.copyfile(origen, tmp)
     tmp.replace(destino)
+
+
+# Estilos del banco de música libre (Multiplataforma/_musica) que se rotan en
+# las réplicas MUDAS, para que no lleven siempre la misma canción (Néstor, 9/11).
+ESTILOS_MUDOS = ("pop_outfit", "lofi_otono", "jazz_cafe", "bossa_lounge", "dream_pop",
+                 "house_fashion", "folk_acustico", "rnb_suave", "retro_vintage", "soul_funk_70s")
+
+
+def musica_si_mudo(doc: dict, video: Path) -> dict | None:
+    """Si el MP4 montado no tiene sonido, le mete DENTRO una pista sin copyright
+    del banco (estilo y pista rotando por usuario: Redis `musica_ultima:rv_<u>`).
+    En TikTok, tras «Comprobación previa» ya no se puede añadir música.
+    Defensivo: cualquier fallo → None y el vídeo se queda como estaba."""
+    try:
+        from src.multiplataforma.services import musica
+        from src.multiplataforma.repos import redis_base
+
+        if not musica.es_mudo(video):
+            return None
+        cuenta = f"rv_{doc.get('usuario') or 'ness'}"
+        estilo = musica.elegir_estilo(doc.get("musica")) if doc.get("musica") else ""
+        if not estilo or estilo == "lofi_otono":
+            try:
+                r = redis_base.get_redis()
+                n = int(r.get_json(f"musica_estilo_n:{cuenta}") or 0)
+                r.set_json(f"musica_estilo_n:{cuenta}", n + 1)
+                if int(r.get_json(f"musica_estilo_n:{cuenta}") or 0) != n + 1:
+                    raise RuntimeError("Redis no guarda")
+            except Exception:  # noqa: BLE001 — sin Redis: al azar, para no repetir
+                n = random.randrange(len(ESTILOS_MUDOS))
+            estilo = ESTILOS_MUDOS[n % len(ESTILOS_MUDOS)]
+        pista = musica.elegir_pista(estilo, cuenta)
+        try:
+            guardada = (redis_base.get_redis().get_json(f"musica_ultima:{cuenta}") or {}).get(estilo)
+        except Exception:  # noqa: BLE001
+            guardada = None
+        if pista is not None and guardada != pista.name:
+            # Sin Redis la rotación daría siempre la 1ª: al azar dentro del estilo.
+            pista = random.choice(musica.pistas(estilo))
+        if pista is None:
+            return None
+        tmp = video.with_name(video.stem + ".musica.mp4")
+        musica.mezclar(video, pista, tmp)
+        tmp.replace(video)
+        fondo = {"estilo": estilo, "pista": pista.name, "at": time.time()}
+        doc["musica_fondo"] = fondo
+        return fondo
+    except Exception:  # noqa: BLE001 — sin música, la réplica vale igual
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +249,8 @@ def registrar(
             doc["catalogo_ref"] = ref
         destino = ruta_video(usuario, doc["id"])
         _copiar(origen, destino)
+        doc.pop("musica_fondo", None)
+        musica_si_mudo(doc, destino)
         doc.update({"video_path": str(destino), "video_listo_at": ahora, "rehacer": False,
                     "rehacer_nota": "", "rehecho": True, "actualizado_at": ahora})
         servicio.guardar(doc, indexar=False)
@@ -229,6 +281,7 @@ def registrar(
     if ref:
         doc["catalogo_ref"] = ref
     con_sonido(doc)
+    musica_si_mudo(doc, destino)
     servicio.guardar(doc, indexar=False)
     _indexar(usuario, id_)
     return doc

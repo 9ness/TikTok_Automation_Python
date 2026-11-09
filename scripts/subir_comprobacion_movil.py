@@ -33,7 +33,7 @@ def debe(patron, espera=3, intentos=5):
     m.tap(*p, espera)
 n = sys.argv[2]; it = m.item(str(R), n)
 DESDE = sys.argv[3] if len(sys.argv) > 3 else ''
-nombre = unicodedata.normalize('NFKD', it['nombre_enlace']).encode('ascii','ignore').decode()
+nombre = ' '.join(unicodedata.normalize('NFKD', it['nombre_enlace']).encode('ascii','ignore').decode().split())   # emojis → espacio sobrante (9/11)
 if DESDE != 'video':
     m.despertar(); m.preparar(str(R), n)
     def abrir_panel():

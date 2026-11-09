@@ -1461,3 +1461,8 @@
 - 2026-11-08 · Nano Banana da «rate limited»/«Generation failed» siempre con el mismo prompt mientras otros pasan → cambiar la referencia (foto_ficha en vez de limpia) o el escenario, no reintentar igual.
 - 2026-11-08 · El destello ✦ fijo abajo de los clips Omni no es problema en POV BOF Largo: el montaje de la app lo recorta (comprobado crudo vs montado).
 - 2026-11-08 · ing_rec2 casa el clip por los 70 primeros caracteres del prompt: si los 3 clips empiezan igual baja el mismo vídeo (x18_c1 era el clip 3) → poner en ing.json la clave «Mauro mNN clip N:» o empezar cada prompt distinto.
+- 2026-11-09 · preparar_carpeta del MCP falla con rango "23-32" («no tiene textos extraídos») → pasar los productos separados por comas "23,24,…"; preparar_bandeja/subir_clips_de_bandeja piden lista.
+- 2026-11-09 · Leer guiones del POV BOF Largo sin web → docker exec -w /app -e PYTHONPATH=/app tiktok-api python con Interno("<user>").get("/api/v1/nicho-pov-bof-largo/productos", source=…, folder=…) → items[].guion.
+- 2026-11-09 · Fichas de TikTok Shop ES desde un Redmi con cuenta MX + VPN no sirven (catálogo distinto) → capturas en el Mi 8; si la pantalla está bloqueada, `adb shell wm dismiss-keyguard`.
+- 2026-11-09 · subir_comprobacion_movil: emojis del nombre de enlace dejaban un espacio final («nombre mal escrito») → normalizar con ' '.join(...split()).
+- 2026-11-09 · Réplicas rv| mudas salían sin música y por «Comprobación previa» no se puede añadir → registrar() mezcla una pista libre del banco _musica (musica_si_mudo); en el host Redis no guarda sin dar error, por eso se comprueba leyendo y si no, pista al azar.
