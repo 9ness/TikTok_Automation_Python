@@ -258,7 +258,7 @@ async def remote_start(session_id: str = Form(...), project: str = Form(""),
     reconnect = "Reconectado desde la web. Responde solo 'ok' y espera mi siguiente mensaje; no edites ni ejecutes nada."
     _tmux("new-session", "-d", "-s", name, "-x", "200", "-y", "50", "-c", cwd,
           CLAUDE_BIN + " --resume " + session_id +
-          " --permission-mode acceptEdits " + shlex.quote(reconnect))
+          " --permission-mode acceptEdits --add-dir /mnt/HC_Volume_106974679 " + shlex.quote(reconnect))
     await asyncio.sleep(13)
     _tmux("send-keys", "-t", name, "/remote-control", "Enter")
     await asyncio.sleep(8)
@@ -348,7 +348,7 @@ async def remote_start_all(x_api_key: str | None = Header(None)):
             reconnect = "Reconectado desde la web. Responde solo 'ok' y espera mi siguiente mensaje; no edites ni ejecutes nada."
             _tmux("new-session", "-d", "-s", name, "-x", "200", "-y", "50", "-c", cwd,
                   CLAUDE_BIN + " --resume " + sid +
-                  " --permission-mode acceptEdits " + shlex.quote(reconnect))
+                  " --permission-mode acceptEdits --add-dir /mnt/HC_Volume_106974679 " + shlex.quote(reconnect))
             await asyncio.sleep(13)
             _tmux("send-keys", "-t", name, "/remote-control", "Enter")
             await asyncio.sleep(8)
@@ -385,6 +385,7 @@ async def _run(prompt, project, session_id) -> AsyncIterator[str]:
     real = _resolve_dir(project)
     cwd = str(PROY / real) if real else str(PROY)
     opts = ClaudeAgentOptions(cwd=cwd, permission_mode="acceptEdits",
+                              add_dirs=["/mnt/HC_Volume_106974679"],
                               allowed_tools=SAFE_TOOLS, resume=session_id or None)
     new_sid = None
     # El ~/.claude.json es compartido por ~10 servicios claude remote-control
