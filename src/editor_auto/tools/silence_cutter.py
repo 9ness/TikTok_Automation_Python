@@ -7728,12 +7728,15 @@ def _video_encoder_args() -> list[str]:
             "-b:v", "0",
             "-pix_fmt", "yuv420p",
         ]
-    # CPU fallback. crf 18 = calidad alta (casi sin pérdida visible) para no
-    # degradar el vídeo del cliente. `medium` da mejor compresión que veryfast
-    # a igual crf, manteniendo la calidad sin disparar demasiado el tiempo.
+    # CPU fallback. crf 18 = calidad alta (casi sin pérdida visible).
+    # Preset veryfast (9/11/2026, tarea 255): medido en 30 s de 1080x1920,
+    # medium 43,7 s · faster 19,9 s · veryfast 13,3 s con SSIM 0,9784/0,9784/
+    # 0,9778 y peso similar. Este render se repite hasta 5 veces por job
+    # (self-heal) y las herramientas siguientes re-codifican con veryfast,
+    # así que medium solo costaba tiempo. EDITOR_X264_PRESET lo cambia.
     return [
         "-c:v", "libx264",
-        "-preset", "medium",
+        "-preset", os.environ.get("EDITOR_X264_PRESET", "veryfast").strip() or "veryfast",
         "-crf", "18",
         "-pix_fmt", "yuv420p",
     ]
@@ -8026,7 +8029,7 @@ def _apply_cuts_ffmpeg(
         "-metadata:s:v:0", "rotate=0",
         output_path,
     ]
-    encoder_label = "h264_nvenc (GPU)" if _has_nvenc() else "libx264 veryfast (CPU)"
+    encoder_label = "h264_nvenc (GPU)" if _has_nvenc() else "libx264 (CPU)"
     log(f"[silence_cutter] FFmpeg concat de {n} segmentos · "
         f"rotation={rotation}° · aspect={output_aspect} · enc={encoder_label} · "
         f"target_ms={total_output_ms}")
@@ -8071,7 +8074,7 @@ def _passthrough_with_format(
         "-metadata:s:v:0", "rotate=0",
         output_path,
     ]
-    encoder_label = "h264_nvenc (GPU)" if _has_nvenc() else "libx264 veryfast (CPU)"
+    encoder_label = "h264_nvenc (GPU)" if _has_nvenc() else "libx264 (CPU)"
     log(f"[silence_cutter] Passthrough con normalización · vf={vf} · enc={encoder_label}")
     _run_ffmpeg_with_progress(cmd, on_progress=lambda f: None, log=log)
 
