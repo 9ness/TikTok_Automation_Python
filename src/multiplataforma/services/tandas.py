@@ -267,7 +267,8 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
     horas = (c.horas or {}).get(TIPO) or config.HORAS_DEFAULT.get(TIPO, ["12:00"])
     r = redis_base.get_redis()
     ya = set(r.smembers(_key_encoladas(slug)))
-    ya |= {p.video_path for p in publicaciones_repo.de_cuenta(slug)}
+    de_la_cuenta = publicaciones_repo.de_cuenta(slug)
+    ya |= {p.video_path for p in de_la_cuenta}
     guardados = enlaces_repo.todos(slug)
 
     informe: dict = {"cuenta": slug, "encoladas": [], "omitidas": {"sin_enlace": 0, "no_subidos": 0,
@@ -308,6 +309,11 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
                                    float(t[0].get("uploaded_at") or 0) or float(t[0].get("video_listo_at") or 0)))
     if limite > 0:
         candidatas = candidatas[:limite]
+    if config.SEPARACION_PRODUCTO_DIAS > 0:  # varios vídeos del mismo producto, repartidos
+        dias = config.SEPARACION_PRODUCTO_DIAS
+        cola = sorted((p for p in de_la_cuenta if p.tipo == TIPO), key=lambda p: p.programada_en)
+        candidatas = espaciar(candidatas, lambda t: t[1], dias * ritmo,
+                              [p.producto_ref for p in cola[-dias * ritmo:]])
 
     reloj = ingesta.huecos(ritmo, horas, max(ahora, ingesta._ultima_programada(slug, TIPO)), semilla=slug)
     for f, k, e in candidatas:
@@ -381,6 +387,45 @@ def _empezada(p: Publicacion) -> bool:
                for pl in p.plataformas)
 
 
+def espaciar(items: list, clave, ventana: int, recientes: list[str] | None = None) -> list:
+    """Reordena lo MÍNIMO para que la misma `clave(item)` (el producto) no se
+    repita dentro de `ventana` huecos. Respeta el orden de entrada (la
+    prioridad): en cada hueco sale el primero que no choca; si todos chocan, el
+    que lleva más huecos sin salir. `recientes` = claves de lo último ya
+    publicado o fijo, de más viejo a más nuevo. Sin clave no hay restricción."""
+    if ventana <= 0 or len(items) < 2:
+        return list(items)
+    ultimo: dict[str, int] = {}
+    pos = 0
+    for k in recientes or []:
+        if k:
+            ultimo[k] = pos
+        pos += 1
+    resto, out = list(items), []
+    while resto:
+        elegido, mas_viejo = None, None
+        for i, it in enumerate(resto):
+            k = clave(it)
+            if not k or k not in ultimo or pos - ultimo[k] > ventana:
+                elegido = i
+                break
+            if mas_viejo is None or ultimo[k] < ultimo[clave(resto[mas_viejo])]:
+                mas_viejo = i
+        it = resto.pop(mas_viejo if elegido is None else elegido)
+        if clave(it):
+            ultimo[clave(it)] = pos
+        pos += 1
+        out.append(it)
+    return out
+
+
+def _recientes(pubs: list[Publicacion], tipo: str, ahora: float, dias: int, excluir: set[str]) -> list[str]:
+    """`producto_ref` de lo que la cuenta sacó (o tiene fijo) en los últimos
+    `dias`, de más viejo a más nuevo: lo nuevo no repite lo de ayer."""
+    cerca = [p for p in pubs if p.tipo == tipo and p.id not in excluir and p.programada_en >= ahora - dias * 86400]
+    return [p.producto_ref for p in sorted(cerca, key=lambda p: p.programada_en)]
+
+
 def replanificar(slug: str, *, ahora: float | None = None, margen_s: int = 2700) -> dict:
     """Vuelve a repartir la cola de la cuenta desde ahora, sin huecos, con su
     ritmo y sus horas. En `producto`, por prioridad (`prioridad`); en el resto,
@@ -392,7 +437,8 @@ def replanificar(slug: str, *, ahora: float | None = None, margen_s: int = 2700)
     info: dict[str, dict] = {}
     if c.dueno:
         info = {f["video_path"]: f for f in filas_cuenta(c)}
-    pendientes = [p for p in publicaciones_repo.de_cuenta(slug) if not p.terminada and not _empezada(p)]
+    de_la_cuenta = publicaciones_repo.de_cuenta(slug)
+    pendientes = [p for p in de_la_cuenta if not p.terminada and not _empezada(p)]
     out: dict = {"cuenta": slug, "movidas": 0}
     for tipo in config.TIPOS:
         pubs = [p for p in pendientes if p.tipo == tipo]
@@ -406,6 +452,12 @@ def replanificar(slug: str, *, ahora: float | None = None, margen_s: int = 2700)
         else:
             mover.sort(key=lambda p: p.programada_en)
         ritmo = int((c.ritmo or {}).get(tipo, config.RITMO_DEFAULT.get(tipo, 1))) or 1
+        dias = config.SEPARACION_PRODUCTO_DIAS
+        if tipo == TIPO and dias > 0:
+            antes = [p.id for p in mover]
+            mover = espaciar(mover, lambda p: p.producto_ref, dias * ritmo,
+                             _recientes(de_la_cuenta, tipo, ahora, dias, excluir=set(antes)))
+            out["espaciadas"] = sum(1 for a, p in zip(antes, mover) if a != p.id)
         horas = (c.horas or {}).get(tipo) or config.HORAS_DEFAULT.get(tipo, ["12:00"])
         reloj = ingesta.huecos(ritmo, horas, max([ahora] + [p.programada_en for p in fijas]), semilla=slug)
         for p in mover:

@@ -250,6 +250,8 @@ pensado para el agente diario que busca los enlaces.
 
 **Orden por época** (`priorizar_epocas` en la cuenta): el tick, una vez por hora, rehace la cola (`tandas.replanificar`) sin huecos y con el ritmo y las horas de la cuenta. Producto va por prioridad: réplicas virales → Halloween → Black Friday → Navidad → otoño/invierno → neutro (época de Mis tandas), y dentro, semáforo verde antes que sin revisar y ámbar. Fuera de su ventana (`config.VENTANA_EPOCA`) una época no se encola y lo ya encolado pasa al final. Rojo nunca se encola. Los mudos «Solo Meta» de Ana entran revisados aunque no estén en TikTok. No toca lo ya empezado ni lo que sale en menos de 45 min.
 
+**El mismo producto no sale días seguidos** (`tandas.espaciar`, 9/11/2026): una tanda trae varios vídeos del mismo producto y salían uno detrás de otro (viva_salud publicó la misma proteína 7 días seguidos). Al encolar y al replanificar, un `producto_ref` no vuelve a salir hasta pasados `MULTIPLATAFORMA_SEPARACION_PRODUCTO_DIAS` (3; 0 = apagado), contando lo publicado esos días. Reordena lo mínimo dentro de la prioridad y nunca deja nada sin salir: si solo quedan vídeos de ese producto, salen. Solo cambia el orden, no lo que se publica.
+
 - `GET /cuentas/{slug}/productos?sin_enlace=1` — productos agrupados por
   `producto_key` (vídeos, subidos a TikTok, en cola, estado del enlace).
 - `GET /cuentas/{slug}/productos/{producto_key}/foto` (con auth).

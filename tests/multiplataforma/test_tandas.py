@@ -440,3 +440,54 @@ def test_garantia_diaria_no_actua_si_hoy_salio_o_queda(cuenta):
     cuenta.ritmo = {"producto": 0}
     cuentas_repo.guardar(cuenta)
     assert tandas.garantia_diaria(cuenta.slug, ahora=noche)["motivo"] == "apagada"
+
+
+# ---- el mismo producto no sale varios días seguidos ----
+def test_espaciar_reordena_lo_minimo():
+    k = lambda x: x[0]  # noqa: E731
+    assert tandas.espaciar(["a1", "b1", "c1"], k, 3) == ["a1", "b1", "c1"]  # sin repetidos, igual
+    assert tandas.espaciar(["a1", "a2", "a3", "b1", "c1", "d1"], k, 2) == ["a1", "b1", "c1", "a2", "d1", "a3"]
+    # si todo choca, sale el que lleva más sin salir (no se queda nada sin publicar)
+    assert tandas.espaciar(["a1", "a2", "b1", "b2"], k, 5) == ["a1", "b1", "a2", "b2"]
+    # lo que salió ayer cuenta; sin clave no hay restricción; ventana 0 = como antes
+    assert tandas.espaciar(["a1", "b1"], k, 2, recientes=["a"]) == ["b1", "a1"]
+    assert tandas.espaciar(["", "", "a1"], lambda x: x[:1], 3) == ["", "", "a1"]
+    assert tandas.espaciar(["a1", "a2"], k, 0) == ["a1", "a2"]
+
+
+def _cola_repetida(cuenta, refs):
+    cuentas_repo.guardar(CuentaDestino(slug="ama_shop", nombre="Ama Shop", dueno="ana",
+                                       ritmo={"producto": 1}, horas={"producto": ["20:30"]}))
+    ayer = _prod(cuenta, AHORA - 86400, producto_ref="whey",
+                 estado={"instagram": "publicado", "facebook": "publicado"})
+    for i, ref in enumerate(refs):
+        _prod(cuenta, AHORA + (i + 2) * 86400 + i, producto_ref=ref)
+    return ayer
+
+
+def _orden(ayer):
+    cola = sorted((p for p in publicaciones_repo.de_cuenta("ama_shop") if p.id != ayer.id),
+                  key=lambda p: p.programada_en)
+    return [p.producto_ref for p in cola]
+
+
+REFS = ["whey", "whey", "crema", "perfume", "espejo", "balsamo", "gel", "cepillo", "whey", "te", "cafe", "mate"]
+
+
+def test_replanificar_separa_el_mismo_producto(filas, drive, cuenta):
+    ayer = _cola_repetida(cuenta, REFS)
+    inf = tandas.replanificar("ama_shop", ahora=AHORA)
+    assert inf["espaciadas"] > 0
+    orden = _orden(ayer)
+    assert sorted(orden) == sorted(REFS)  # no se pierde ninguna
+    assert orden[:4] == ["crema", "perfume", "espejo", "whey"]  # ayer salió whey: espera 3 días
+    dias = [i for i, r in enumerate(orden) if r == "whey"]
+    assert all(b - a > 3 for a, b in zip(dias, dias[1:]))
+    assert tandas.replanificar("ama_shop", ahora=AHORA)["movidas"] == 0  # idempotente
+
+
+def test_replanificar_sin_separacion_deja_el_orden(filas, drive, cuenta, monkeypatch):
+    monkeypatch.setattr(config, "SEPARACION_PRODUCTO_DIAS", 0)
+    ayer = _cola_repetida(cuenta, REFS)
+    inf = tandas.replanificar("ama_shop", ahora=AHORA)
+    assert "espaciadas" not in inf and _orden(ayer) == REFS

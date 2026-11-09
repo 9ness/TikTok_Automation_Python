@@ -130,6 +130,11 @@ VENTANA_EPOCA: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
 PRIORIDAD_FUERA = 9
 # Semáforo de Mis tandas: lo 🟢 antes que lo no revisado y que lo 🟡; lo 🔴 no se encola.
 PRIORIDAD_SEMAFORO: dict[str, int] = {"verde": 0, "": 1, "ambar": 2}
+# El mismo producto (`producto_ref`) no vuelve a salir hasta pasados estos días:
+# una tanda trae varios vídeos del mismo producto seguidos y, sin esto, la cuenta
+# publicaba el mismo bote siete días seguidos (viva_salud, 3-9/11/2026). Solo
+# cambia el ORDEN de la cola, nunca qué se publica. 0 = como antes.
+SEPARACION_PRODUCTO_DIAS = int(os.getenv("MULTIPLATAFORMA_SEPARACION_PRODUCTO_DIAS", "3"))
 HASHTAGS_DEFECTO = ["hogar", "casa", "ideasparacasa"]
 # Si el título no encaja en ninguna fila, cada cuenta cae en los suyos (viva_salud
 # no puede salir con #hogar). Las que no estén aquí usan HASHTAGS_DEFECTO.
