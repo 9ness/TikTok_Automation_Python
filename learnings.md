@@ -1466,3 +1466,6 @@
 - 2026-11-09 · Fichas de TikTok Shop ES desde un Redmi con cuenta MX + VPN no sirven (catálogo distinto) → capturas en el Mi 8; si la pantalla está bloqueada, `adb shell wm dismiss-keyguard`.
 - 2026-11-09 · subir_comprobacion_movil: emojis del nombre de enlace dejaban un espacio final («nombre mal escrito») → normalizar con ' '.join(...split()).
 - 2026-11-09 · Réplicas rv| mudas salían sin música y por «Comprobación previa» no se puede añadir → registrar() mezcla una pista libre del banco _musica (musica_si_mudo); en el host Redis no guarda sin dar error, por eso se comprueba leyendo y si no, pista al azar.
+- 2026-11-09 · flow_cv.py adjunta la referencia buscando su nombre en la biblioteca de Flow: con «ref1.jpg» repetido cogió la de otro producto (salieron leggings con prompt de parka) → copiar la ref con nombre único (<id>_ref1.jpg) antes de flow_cv
+- 2026-11-09 · Estadísticas Shop al panel (Cuentas › Shop) → `scripts/estadisticas_movil/a_panel.py [usuario]` lee ventas:<u> del contenedor y POST /api/shop/stats; las rutinas lo llaman tras guardar_estadisticas
+- 2026-11-09 · GenAI Pro: imágenes Nano Banana Pro/2.1 atascadas ~1 h en «Generating…» → reenviar y recoger más tarde; no pasar a Flow si otro agente tiene «actividad inusual». MCP ness subir_clips_de_bandeja/videos_montados exigen menu+catalogo.
