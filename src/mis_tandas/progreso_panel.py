@@ -31,6 +31,7 @@ _TZ = zoneinfo.ZoneInfo("Europe/Madrid")
 _ESPERA = 2.0   # agrupa los marcados en bloque (completar_tanda) en una sola llamada
 _pendientes: set[str] = set()
 _cerrojo = threading.Lock()
+_en_curso = threading.Lock()   # una actualización a la vez: un PATCH viejo no pisa a uno nuevo
 log = logging.getLogger(__name__)
 
 
@@ -82,7 +83,8 @@ def avisar(usuario: str) -> None:
         with _cerrojo:
             _pendientes.discard(usuario)
         try:
-            actualizar(usuario)
+            with _en_curso:
+                actualizar(usuario)
         except Exception as e:  # noqa: BLE001 — el panel caído no afecta a Mis tandas
             log.warning("progreso del panel (%s): %s", usuario, e)
 
