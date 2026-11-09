@@ -120,7 +120,7 @@ def avisos_gasto(r: dict[str, Any]) -> list[dict]:
         out.append({
             "clave": f"gasto:claude_ritmo:{r['dia']}",
             "nivel": "aviso",
-            "texto": (f"Claude API va a {r['claude_prevision_mes']:.0f} $ este mes "
+            "texto": (f"Claude API (solo lo que apunta la Factory; la Console suma también Master Picks, dots…) va a {r['claude_prevision_mes']:.0f} $ este mes "
                       f"(llevamos {r['claude_mes']:.2f} $; crédito {r['presupuesto_claude']:.0f} $). "
                       f"Hoy por modelo: {_top(r['por_modelo'])}."),
         })
