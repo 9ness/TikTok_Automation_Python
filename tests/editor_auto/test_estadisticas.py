@@ -202,3 +202,50 @@ def test_fallidos_cuentan_coste_no_video():
     r = est.coste_por_video()
     assert r["videos"] == 1 and r["fallidos"] == 1
     assert r["coste_medio_usd"] == pytest.approx(0.04)  # coste real por vídeo entregado
+
+
+def test_margen_prorratea_plan_y_separa_pruebas(monkeypatch):
+    import time
+    monkeypatch.setenv("EDITOR_EUR_POR_USD", "1")
+    monkeypatch.setenv("EDITOR_EUR_MIN_RENDER", "0.1")
+    hoy = est._hoy()
+    est.actualizar_cuentas([
+        {"email": "p@x.com", "createdAt": hoy, "planId": "pro"},          # 49 €/mes
+        {"email": "t@x.com", "createdAt": hoy, "trialVideos": 3},          # prueba
+        {"email": "a@x.com", "createdAt": hoy, "planId": "pro", "role": "admin"},
+    ], {"p@x.com": "pago", "t@x.com": "prueba", "a@x.com": "jefe"})
+    t = time.time() - 300
+    est.registrar_trabajo(_job("m1", "pago", t, 120, 0.5))   # 0,5 € IA + 2 min × 0,1
+    est.registrar_trabajo(_job("m2", "prueba", t, 60, 0.3))
+    est.registrar_trabajo(_job("m3", "jefe", t, 60, 9.0))     # admin: fuera
+    est.registrar_trabajo(_job("m4", "interno", t, 60, 0.1))  # sin cuenta web
+    m = est.margen()
+    fila = m["clientes"][0]
+    # Pagó hoy → 1 día de los 7 del rango.
+    assert fila["dias"] == 1 and fila["ingreso_eur"] == pytest.approx(round(49 / 30, 2))
+    assert fila["coste_eur"] == pytest.approx(0.7)
+    assert m["prueba"] == {"usuarios": 1, "videos": 1, "coste_eur": pytest.approx(0.4)}
+    assert [o["usuario"] for o in m["otros"]] == ["interno"]
+    assert m["total"]["coste_eur"] == pytest.approx(0.7 + 0.4 + 0.2)
+    assert "jefe" not in str(m)
+    assert "Margen Editor" in est.informe_margen_texto(m)
+
+
+def test_margen_alerta_si_baja_del_umbral(monkeypatch):
+    import time
+    monkeypatch.setenv("EDITOR_EUR_POR_USD", "1")
+    est.actualizar_cuentas([{"email": "s@x.com", "createdAt": "2026-01-01", "planId": "starter"}],
+                           {"s@x.com": "caro"})
+    est.registrar_trabajo(_job("c1", "caro", time.time() - 60, 30, 5.0))
+    m = est.margen()
+    assert m["total"]["margen_pct"] < 50
+    assert any("caro" in a for a in m["alertas"])
+    from scripts import editor_informe_margen as inf
+    assert inf.main([]) == 2
+
+
+def test_margen_base_vacia_y_endpoint(cliente):
+    m = est.margen()
+    assert m["total"]["ingreso_eur"] == 0 and m["alertas"] == []
+    r = cliente.get("/api/v1/editor-auto/web/admin/margen").json()
+    assert "texto" in r and r["clientes"] == []

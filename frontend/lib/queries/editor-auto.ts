@@ -894,6 +894,42 @@ export interface RecuperarClientes {
   error?: string;
 }
 
+export interface MargenEditor {
+  desde: string;
+  hasta: string;
+  supuestos: { eur_por_usd: number; eur_min_render: number; alerta_pct: number; precios: Record<string, number> };
+  total: { ingreso_eur: number; coste_eur: number; margen_eur: number; margen_pct: number | null };
+  clientes: {
+    usuario: string;
+    plan: string;
+    precio_mes_eur: number;
+    dias: number;
+    ingreso_eur: number;
+    videos: number;
+    fallidos: number;
+    coste_ia_eur: number;
+    coste_render_eur: number;
+    min_render: number;
+    coste_eur: number;
+    margen_eur: number;
+    margen_pct: number | null;
+  }[];
+  prueba: { usuarios: number; videos: number; coste_eur: number };
+  otros: { usuario: string; videos: number; coste_eur: number }[];
+  alertas: string[];
+  texto: string;
+}
+
+/** Margen por cliente: precio del plan frente a coste de IA + render. */
+export function useMargenEditor(desde?: string) {
+  const q = desde ? `?desde=${desde}` : "";
+  return useQuery<MargenEditor>({
+    queryKey: [...editorAutoKeys.all, "margen", desde ?? ""] as const,
+    queryFn: () => api.get<MargenEditor>(`${WEB_ADMIN_ROOT}/margen${q}`),
+    refetchInterval: 300_000,
+  });
+}
+
 /** A quién iría hoy cada aviso de recuperar clientes (simulación, no manda nada). */
 export function useRecuperarClientes() {
   return useQuery<RecuperarClientes>({

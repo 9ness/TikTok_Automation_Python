@@ -441,3 +441,121 @@ def resumen(desde: str | None = None, hasta: str | None = None) -> dict[str, Any
         "por_dia": por_dia(desde, hasta),
         "clientes": por_cliente(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Margen: precio del plan frente a lo que cuesta servirlo
+# ---------------------------------------------------------------------------
+def _env_float(nombre: str, defecto: float) -> float:
+    try:
+        return float(os.getenv(nombre) or defecto)
+    except ValueError:
+        return defecto
+
+
+def margen(desde: str | None = None, hasta: str | None = None) -> dict[str, Any]:
+    """Margen por cliente en el rango (por defecto, 7 días hasta hoy).
+
+    Ingreso = precio del plan (`WEB_PLAN_PRICE_EUR`) prorrateado a los días
+    del rango en que ya pagaba. Coste = dólares de IA de sus trabajos (fallidos
+    incluidos) pasados a € + minutos de render valorados a
+    `EDITOR_EUR_MIN_RENDER`. Las pruebas gratis y los usuarios sin cuenta web
+    van aparte: son coste sin ingreso. Solo lee."""
+    from src.editor_auto.config import WEB_PLAN_PRICE_EUR
+
+    desde, hasta = _rango(desde, hasta, dias=7)
+    eur_usd = _env_float("EDITOR_EUR_POR_USD", 0.92)
+    eur_min = _env_float("EDITOR_EUR_MIN_RENDER", 0.01)
+    umbral = _env_float("EDITOR_MARGEN_ALERTA_PCT", 50.0)
+    try:
+        d0, d1 = date.fromisoformat(desde), date.fromisoformat(hasta)
+    except ValueError:
+        d0 = d1 = date.today()
+    with _lock:
+        c = _db()
+        cuentas = c.execute(
+            "SELECT usuario, plan, rol, primer_pago FROM cuentas WHERE usuario IS NOT NULL").fetchall()
+        tr = {u: (int(n or 0), int(k or 0), coste or 0.0, seg or 0.0) for u, n, k, coste, seg in c.execute(
+            "SELECT usuario, SUM(estado='hecho'), COUNT(*), SUM(coste_usd), SUM(COALESCE(seg_render,0)) "
+            "FROM trabajos WHERE dia BETWEEN ? AND ? GROUP BY usuario", (desde, hasta)).fetchall()}
+
+    def _coste(usuario: str) -> tuple[int, int, float, float, float]:
+        n, k, usd, seg = tr.pop(usuario, (0, 0, 0.0, 0.0))
+        ia, render = usd * eur_usd, seg / 60.0 * eur_min
+        return n, k, round(ia, 4), round(render, 4), seg
+
+    clientes, alertas = [], []
+    prueba = {"usuarios": 0, "videos": 0, "coste_eur": 0.0}
+    for usuario, plan, rol, pago in cuentas:
+        if rol == "admin":
+            tr.pop(usuario, None)
+            continue
+        n, k, ia, render, seg = _coste(usuario)
+        precio = WEB_PLAN_PRICE_EUR.get(plan or "")
+        if not plan or precio is None:
+            if k:
+                prueba["usuarios"] += 1
+                prueba["videos"] += n
+                prueba["coste_eur"] += ia + render
+            continue
+        inicio = max(d0, date.fromisoformat(pago)) if pago else d0
+        dias = max(0, (d1 - inicio).days + 1)
+        ingreso = round(precio * dias / 30.0, 2)
+        coste = round(ia + render, 4)
+        neto = round(ingreso - coste, 2)
+        pct = round(100 * neto / ingreso, 1) if ingreso else None
+        fila = {"usuario": usuario, "plan": plan, "precio_mes_eur": precio, "dias": dias,
+                "ingreso_eur": ingreso, "videos": n, "fallidos": k - n, "coste_ia_eur": ia,
+                "coste_render_eur": render, "min_render": round(seg / 60.0, 1),
+                "coste_eur": coste, "margen_eur": neto, "margen_pct": pct}
+        clientes.append(fila)
+        if pct is not None and pct < umbral:
+            alertas.append(f"{usuario} ({plan}): margen {pct} % — ingreso {ingreso} €, coste {coste} €")
+        if n and coste / n > precio / 30.0 / max(1, _plan_diario(plan)):
+            alertas.append(f"{usuario}: cada vídeo cuesta más de lo que paga por vídeo")
+
+    otros = [{"usuario": u, "videos": n, "coste_eur": round(usd * eur_usd + seg / 60 * eur_min, 4)}
+             for u, (n, _k, usd, seg) in sorted(tr.items(), key=lambda x: -(x[1][2]))]
+    prueba["coste_eur"] = round(prueba["coste_eur"], 4)
+    clientes.sort(key=lambda f: (f["margen_pct"] is None, f["margen_pct"] or 0))
+    ingreso = round(sum(f["ingreso_eur"] for f in clientes), 2)
+    coste_total = round(sum(f["coste_eur"] for f in clientes) + prueba["coste_eur"]
+                        + sum(o["coste_eur"] for o in otros), 4)
+    neto = round(ingreso - coste_total, 2)
+    if ingreso and 100 * neto / ingreso < umbral:
+        alertas.insert(0, f"Margen total {round(100 * neto / ingreso, 1)} % (< {umbral:g} %)")
+    elif not ingreso and coste_total > 0:
+        alertas.insert(0, f"Sin ingresos en el rango y {coste_total} € de coste")
+    return {
+        "desde": desde, "hasta": hasta,
+        "supuestos": {"eur_por_usd": eur_usd, "eur_min_render": eur_min, "alerta_pct": umbral,
+                      "precios": dict(WEB_PLAN_PRICE_EUR)},
+        "total": {"ingreso_eur": ingreso, "coste_eur": coste_total, "margen_eur": neto,
+                  "margen_pct": round(100 * neto / ingreso, 1) if ingreso else None},
+        "clientes": clientes, "prueba": prueba, "otros": otros, "alertas": alertas,
+    }
+
+
+def _plan_diario(plan: str | None) -> int:
+    from src.editor_auto.config import WEB_PLAN_DAILY
+    return WEB_PLAN_DAILY.get(plan or "", 1)
+
+
+def informe_margen_texto(datos: dict[str, Any] | None = None) -> str:
+    """El informe de `margen()` en texto corto (rutina de los lunes, panel)."""
+    m = datos or margen()
+    t = m["total"]
+    pct = "—" if t["margen_pct"] is None else f"{t['margen_pct']} %"
+    lineas = [f"Margen Editor {m['desde']} → {m['hasta']}: ingreso {t['ingreso_eur']} €, "
+              f"coste {t['coste_eur']} €, margen {t['margen_eur']} € ({pct})."]
+    for f in m["clientes"]:
+        lineas.append(f"- {f['usuario']} ({f['plan']}): {f['videos']} vídeos, "
+                      f"{f['ingreso_eur']} € − {f['coste_eur']} € = {f['margen_eur']} €")
+    p = m["prueba"]
+    if p["usuarios"]:
+        lineas.append(f"- Pruebas gratis: {p['usuarios']} cuentas, {p['videos']} vídeos, {p['coste_eur']} €")
+    if m["otros"]:
+        lineas.append(f"- Sin cuenta web: {len(m['otros'])} usuarios, "
+                      f"{round(sum(o['coste_eur'] for o in m['otros']), 2)} €")
+    lineas += [f"⚠ {a}" for a in m["alertas"]] or ["Sin alertas."]
+    return "\n".join(lineas)

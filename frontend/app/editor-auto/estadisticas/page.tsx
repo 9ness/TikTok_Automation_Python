@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEstadisticasEditor, useRecuperarClientes } from "@/lib/queries/editor-auto";
+import { useEstadisticasEditor, useMargenEditor, useRecuperarClientes } from "@/lib/queries/editor-auto";
 
 /**
  * Estadísticas del Editor Auto y de nebulabsmedia.com, guardadas en LOCAL
@@ -82,6 +82,60 @@ function AvisosRecuperar() {
             </div>
           ))
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const eur = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2)} €`);
+
+function Margen({ desde }: { desde: string }) {
+  const { data } = useMargenEditor(desde);
+  if (!data) return null;
+  const t = data.total;
+  const color = (pct: number | null) =>
+    pct == null ? "" : pct < 0 ? "text-red-500" : pct < data.supuestos.alerta_pct ? "text-amber-600" : "text-emerald-600";
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Margen</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-xs sm:text-sm">
+        <p>
+          Ingreso {eur(t.ingreso_eur)} · coste {eur(t.coste_eur)} ·{" "}
+          <span className={`font-semibold ${color(t.margen_pct)}`}>
+            margen {eur(t.margen_eur)}
+            {t.margen_pct != null && ` (${t.margen_pct} %)`}
+          </span>
+        </p>
+        {data.alertas.map((a) => (
+          <p key={a} className="break-words text-amber-600">⚠ {a}</p>
+        ))}
+        {data.clientes.map((c) => (
+          <div key={c.usuario} className="flex items-baseline justify-between gap-2 border-t py-1 first:border-t-0">
+            <span className="min-w-0 truncate">
+              {c.usuario} <span className="text-muted-foreground">· {c.plan}</span>
+            </span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {c.videos} víd. · {eur(c.ingreso_eur)} − {eur(c.coste_eur)} ={" "}
+              <span className={color(c.margen_pct)}>{eur(c.margen_eur)}</span>
+            </span>
+          </div>
+        ))}
+        {data.prueba.usuarios > 0 && (
+          <p className="text-muted-foreground">
+            Pruebas gratis: {data.prueba.usuarios} cuentas, {data.prueba.videos} vídeos, {eur(data.prueba.coste_eur)}
+          </p>
+        )}
+        {data.otros.length > 0 && (
+          <p className="text-muted-foreground">
+            Sin cuenta web: {data.otros.length} usuarios, {eur(data.otros.reduce((s, o) => s + o.coste_eur, 0))}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Precio fundador prorrateado a los días pagados. Coste = IA ({data.supuestos.eur_por_usd} €/$) + render a{" "}
+          {data.supuestos.eur_min_render} €/min (estimado).
+        </p>
       </CardContent>
     </Card>
   );
@@ -218,6 +272,8 @@ export default function EstadisticasEditorPage() {
               )}
             </CardContent>
           </Card>
+
+          <Margen desde={hace(dias)} />
 
           <AvisosRecuperar />
 

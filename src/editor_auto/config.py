@@ -530,6 +530,17 @@ WEB_PLAN_PRIORITY: dict[str, int] = {
 }
 WEB_TRIAL_PRIORITY = 0
 
+# Lo que paga HOY cada plan web (€/mes): el precio FUNDADOR
+# (`promoPriceMonthly` de `lib/pricing.ts`), que es el que se cobra en la
+# campaña. Lo usa el informe de margen. Si cambias precios en la web, aquí.
+WEB_PLAN_PRICE_EUR: dict[str, float] = {
+    "starter": 29.0,
+    "pro": 49.0,
+    "studio": 89.0,
+    "agencia": 129.0,
+    "vip": 149.0,
+}
+
 # Revisor automático: cuántas veces se re-edita SOLO un vídeo que no pasa la
 # auditoría (o que falla) antes de dejarlo al operador.
 AUTO_REVIEW_MAX_RETRIES = int(os.getenv("EDITOR_AUTO_REVIEW_RETRIES", "2"))

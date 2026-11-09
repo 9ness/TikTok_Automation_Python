@@ -980,6 +980,22 @@ def web_admin_estadisticas(
     return est.resumen(desde, hasta)
 
 
+@router.get("/admin/margen")
+def web_admin_margen(
+    _: Annotated[str, Depends(get_current_user)],
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> dict:
+    """Margen por cliente: precio del plan frente a coste de IA + render (7 días por defecto)."""
+    from src.editor_auto.services import estadisticas as est
+    for d in (desde, hasta):
+        if d is not None and not is_valid_day(d):
+            raise ValidationError("Día inválido (YYYY-MM-DD).", details={"dia": d})
+    datos = est.margen(desde, hasta)
+    datos["texto"] = est.informe_margen_texto(datos)
+    return datos
+
+
 @router.get("/admin/recuperar")
 def web_admin_recuperar(_: Annotated[str, Depends(get_current_user)]) -> dict:
     """A quién iría hoy cada aviso de recuperar clientes (SIMULAR: no manda nada)."""
