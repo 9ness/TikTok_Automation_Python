@@ -53,12 +53,15 @@ export interface DiagnosticsSummary {
   };
 }
 
-export function useDiagnosticsSummary() {
+/** `sondeo`: refrescar cada 30 s. Solo con el panel de Diagnóstico abierto;
+ *  la versión del pie de la sidebar sale en TODAS las pantallas y no necesita
+ *  pedirlo dos veces por minuto mientras la app está abierta. */
+export function useDiagnosticsSummary(sondeo = true) {
   return useQuery<DiagnosticsSummary>({
     queryKey: ["diagnostics", "summary"],
     queryFn: () => api.get<DiagnosticsSummary>(`/api/v1/diagnostics/summary`),
-    refetchInterval: 30_000, // refresh cada 30s
-    staleTime: 10_000,
+    refetchInterval: sondeo ? 30_000 : false,
+    staleTime: sondeo ? 10_000 : 5 * 60_000,
   });
 }
 

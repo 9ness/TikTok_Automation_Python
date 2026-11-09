@@ -869,7 +869,7 @@ function SidebarUserBadge() {
 function VersionLabel() {
   // Lee la versión del endpoint /api/v1/diagnostics/summary. Fallback al
   // texto estático si la API no responde aún (primer render).
-  const q = useDiagnosticsSummary();
+  const q = useDiagnosticsSummary(false);
   const v = q.data?.version || "0.1.0";
   return <span className="text-xs text-muted-foreground">v{v}</span>;
 }
