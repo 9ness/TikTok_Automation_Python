@@ -240,7 +240,7 @@ def test_margen_alerta_si_baja_del_umbral(monkeypatch):
     m = est.margen()
     assert m["total"]["margen_pct"] < 50
     assert any("caro" in a for a in m["alertas"])
-    from scripts import editor_informe_margen as inf
+    from src.editor_auto.services import informe_margen as inf
     assert inf.main([]) == 2
 
 
