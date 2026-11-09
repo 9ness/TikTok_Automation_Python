@@ -115,3 +115,37 @@ def test_plan_vacio(p):
     r = p.plan({"videos": [], "carruseles": [], "ventas": {}})
     assert r["reparto"] == {} and r["candidatos"] == []
     assert "Sin datos para repartir" in p.informe_md(r)
+
+
+def _fm(nombre, estado, pedidos, n):
+    return {"formato": nombre, "estado": estado, "pedidos": pedidos, "publicados": n, "con_ventana": n, "tasa": pedidos / n if n else 0}
+
+
+def test_bandit_cupo_semilla_y_sin_dejar(p):
+    fmts = [_fm("top", "vende", 16, 9), _fm("flojo", "vende", 1, 7), _fm("nuevo", "sin datos", 0, 1), _fm("muerto", "dejar", 0, 18)]
+    r1 = p.reparto_bandit(fmts, 6, semilla=7)
+    assert sum(r1.values()) == 6 and "muerto" not in r1 and r1["nuevo"] >= 1
+    assert r1 == p.reparto_bandit(fmts, 6, semilla=7)
+
+
+def test_bandit_favorece_al_que_vende(p):
+    fmts = [_fm("top", "vende", 16, 9), _fm("flojo", "vende", 1, 7), _fm("nuevo", "sin datos", 0, 1)]
+    tot = {"top": 0, "flojo": 0}
+    for s in range(200):
+        r = p.reparto_bandit(fmts, 6, semilla=s)
+        for k in tot:
+            tot[k] += r.get(k, 0)
+    assert tot["top"] > 8 * tot["flojo"]
+
+
+def test_bandit_casos_limite(p):
+    assert p.reparto_bandit([], 6) == {}
+    assert p.reparto_bandit([_fm("x", "sin datos", 0, 0)], 3, semilla=1) == {"x": 3}
+    assert p.reparto_bandit([_fm("x", "sin datos", 0, 0), _fm("y", "sin datos", 0, 2)], 1, explorar=2, semilla=1) == {"x": 1}
+
+
+def test_main_bandit(p, tmp_path, capsys):
+    f = tmp_path / "a.json"
+    f.write_text(json.dumps(datos()), encoding="utf-8")
+    assert p.main(["ana", "--desde-fichero", str(f), "--bandit", "--semilla", "3"]) == 0
+    assert "(bandit)" in capsys.readouterr().out
