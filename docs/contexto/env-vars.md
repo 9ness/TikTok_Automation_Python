@@ -69,6 +69,7 @@ PIXABAY_API_KEY=...
 # EDITOR_ASR_PROVIDER=deepgram + DEEPGRAM_API_KEY — transcripción de todo el editor (src/editor_auto/asr.py; Whisper de respaldo)
 # EDITOR_STATS_DB=/app/temp_work/estadisticas/editor.sqlite (default) + EDITOR_STATS_SALT (default API_KEY) — estadísticas LOCALES del editor y de nebulabsmedia (embudo sin cookies, prueba→pago, coste/tiempo por vídeo); src/editor_auto/services/estadisticas.py, página /editor-auto/estadisticas
 # EDITOR_RENDER_REMOTO=0 (default; 1 = encender) — renders finales del cortador en el PC de casa (Tailscale SSH sin claves, ffmpeg7 + NVENC), respaldo en el VPS ante cualquier fallo. Opcionales: EDITOR_RENDER_REMOTO_HOST (ness@100.125.167.31), _DIR (~/worker/remoto), _FFMPEG (~/worker/ffmpeg7), _MIN_S (20). src/editor_auto/services/render_remoto.py
+# EDITOR_RECUPERAR_ENVIAR=0 (default; 1 = mandar de verdad, SOLO con OK de Néstor) — avisos por email para recuperar clientes (sin empezar 48 h · prueba gastada 3 d · plan parado 7 d), 1 por regla y cuenta, máx 20/día desde las 10:00, baja de un clic. Sin él, Estadísticas muestra a quién iría. src/editor_auto/services/recuperar_clientes.py
 
 # === Programa 4 — Tiktok Shop AI Pro (Viralización) ===
 # Path raíz LOCAL (no Drive) de assets: gancho/audios/paisajes/música.

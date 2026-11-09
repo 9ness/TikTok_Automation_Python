@@ -326,6 +326,12 @@ async def sweeper_loop(stop_event: asyncio.Event) -> None:
         except Exception as e:
             logger.warning("[draft_sweeper] estadísticas falló: %s", e)
         try:
+            # Avisos para recuperar clientes (1 vez al día; solo con EDITOR_RECUPERAR_ENVIAR=1).
+            from src.editor_auto.services import recuperar_clientes
+            await asyncio.to_thread(recuperar_clientes.maybe_pasada, logger.info)
+        except Exception as e:
+            logger.warning("[draft_sweeper] recuperar clientes falló: %s", e)
+        try:
             await asyncio.wait_for(stop_event.wait(), timeout=INTERVAL_S)
         except asyncio.TimeoutError:
             pass

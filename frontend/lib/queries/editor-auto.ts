@@ -885,3 +885,20 @@ export function useEstadisticasEditor(desde?: string, hasta?: string) {
     refetchInterval: 60_000,
   });
 }
+
+export interface RecuperarClientes {
+  envio_activo: boolean;
+  candidatos: { usuario: string | null; email: string; regla: string; motivo: string }[];
+  enviados?: Record<string, number>;
+  bajas?: number;
+  error?: string;
+}
+
+/** A quién iría hoy cada aviso de recuperar clientes (simulación, no manda nada). */
+export function useRecuperarClientes() {
+  return useQuery<RecuperarClientes>({
+    queryKey: [...editorAutoKeys.all, "recuperar"] as const,
+    queryFn: () => api.get<RecuperarClientes>(`${WEB_ADMIN_ROOT}/recuperar`),
+    refetchInterval: 300_000,
+  });
+}

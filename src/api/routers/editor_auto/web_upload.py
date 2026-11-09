@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_current_user, get_queue
@@ -978,6 +978,28 @@ def web_admin_estadisticas(
         if d is not None and not is_valid_day(d):
             raise ValidationError("Día inválido (YYYY-MM-DD).", details={"dia": d})
     return est.resumen(desde, hasta)
+
+
+@router.get("/admin/recuperar")
+def web_admin_recuperar(_: Annotated[str, Depends(get_current_user)]) -> dict:
+    """A quién iría hoy cada aviso de recuperar clientes (SIMULAR: no manda nada)."""
+    from src.editor_auto.services import recuperar_clientes
+    return recuperar_clientes.simular()
+
+
+@router.get("/baja", response_class=HTMLResponse)
+def web_baja_avisos(c: str = "", f: str = "") -> HTMLResponse:
+    """Enlace de un clic de los emails de aviso: deja de mandarlos a esa cuenta."""
+    from src.editor_auto.services import recuperar_clientes
+    ok = recuperar_clientes.dar_de_baja(c[:80], f[:40])
+    texto = ("Listo: no te mandaremos más avisos de Nebulabs Media."
+             if ok else "El enlace no es válido o ha caducado.")
+    return HTMLResponse(
+        '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+        '<title>Nebulabs Media</title><body style="font-family:Arial,sans-serif;max-width:480px;'
+        f'margin:60px auto;padding:0 16px;color:#111827"><h1 style="font-size:20px">{texto}</h1>'
+        '<p><a href="https://nebulabsmedia.com">nebulabsmedia.com</a></p></body>',
+        status_code=200 if ok else 400)
 
 
 # ═══════════════════════ ADMIN — aprobación manual (API key) ═══════════════════════

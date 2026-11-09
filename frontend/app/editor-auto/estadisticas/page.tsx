@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEstadisticasEditor } from "@/lib/queries/editor-auto";
+import { useEstadisticasEditor, useRecuperarClientes } from "@/lib/queries/editor-auto";
 
 /**
  * Estadísticas del Editor Auto y de nebulabsmedia.com, guardadas en LOCAL
@@ -44,6 +44,48 @@ const RANGOS = [
   { dias: 30, label: "30 días" },
   { dias: 90, label: "90 días" },
 ];
+
+const NOMBRE_REGLA: Record<string, string> = {
+  sin_empezar: "Sin empezar",
+  prueba_gastada: "Prueba gastada",
+  plan_parado: "Plan parado",
+};
+
+function AvisosRecuperar() {
+  const { data } = useRecuperarClientes();
+  if (!data) return null;
+  const enviados = Object.values(data.enviados ?? {}).reduce((a, b) => a + b, 0);
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Avisos para recuperar clientes</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-xs sm:text-sm">
+        <p className={data.envio_activo ? "text-emerald-600" : "text-amber-600"}>
+          {data.envio_activo
+            ? "Envío ACTIVO: se mandan una vez al día (máx. 20)."
+            : "Modo simulación: no se manda nada. Así quedaría hoy."}
+          <span className="ml-1 text-muted-foreground">
+            Enviados {enviados} · bajas {data.bajas ?? 0}
+          </span>
+        </p>
+        {data.error && <p className="text-red-500">{data.error}</p>}
+        {data.candidatos.length === 0 ? (
+          <p className="text-muted-foreground">Nadie a quien avisar hoy.</p>
+        ) : (
+          data.candidatos.map((c) => (
+            <div key={c.email + c.regla} className="flex items-baseline justify-between gap-2 border-t py-1 first:border-t-0">
+              <span className="min-w-0 truncate">{c.usuario ?? c.email}</span>
+              <span className="shrink-0 text-muted-foreground">
+                {NOMBRE_REGLA[c.regla] ?? c.regla} · {c.motivo}
+              </span>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function Cifra({ titulo, valor, nota }: { titulo: string; valor: string; nota?: string }) {
   return (
@@ -176,6 +218,8 @@ export default function EstadisticasEditorPage() {
               )}
             </CardContent>
           </Card>
+
+          <AvisosRecuperar />
 
           <Card>
             <CardHeader className="pb-2">
