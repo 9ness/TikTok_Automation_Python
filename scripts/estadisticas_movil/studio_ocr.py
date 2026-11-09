@@ -150,3 +150,12 @@ def elegir_lectura(lecturas):
     for _, v in vals:
         cuenta[v] = cuenta.get(v, 0) + 1
     return max(cuenta, key=cuenta.get)
+
+
+PUZLE = re.compile(r"verifica|arrastra|desliza el|rompecabezas|puzzle|puzle|captcha|completa la pieza", re.I)
+
+
+def hay_puzle_ocr(pal) -> bool:
+    """El puzle de TikTok es un WebView: uiautomator no lo ve, se mira por OCR (6-9/11: ~22 en el Mi 8)."""
+    texto = " ".join(t for *_, t in pal)
+    return bool(PUZLE.search(texto))

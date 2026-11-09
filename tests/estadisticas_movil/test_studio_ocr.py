@@ -116,3 +116,13 @@ def test_ver_detalles_por_volcado_y_por_ocr():
            (750, 720, 50, 30, "Ver"), (810, 720, 110, 30, "detalles"), (100, 300, 90, 30, "detalles")]
     assert so.boton_ver_detalles([], ocr) == (825, 735)
     assert so.boton_ver_detalles([], []) is None
+
+
+@pytest.mark.parametrize("dia", ["2026-11-03", "2026-11-04", "2026-11-01", "2026-10-29"])
+def test_pagina_datos_no_es_puzle(dia):
+    assert not so.hay_puzle_ocr(pal(dia))
+
+
+def test_puzle_por_ocr():
+    assert so.hay_puzle_ocr([(100, 900, 300, 40, "Verifica"), (420, 900, 200, 40, "para"), (630, 900, 200, 40, "continuar")])
+    assert so.hay_puzle_ocr([(100, 900, 300, 40, "Arrastra"), (420, 900, 200, 40, "el"), (630, 900, 200, 40, "control")])

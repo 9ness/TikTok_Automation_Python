@@ -1,12 +1,15 @@
 # Estadísticas DÍA A DÍA de la cuenta árabe en el Xiaomi Mi 8 (1080x2248).
 # uso: python3 -I dias_mi8.py AAAA-MM-DD [AAAA-MM-DD …]   (o «DESDE..HASTA»)
 # Sale en $EST_DIR/dias_mi8.json: [{fecha, gmv, ventas, impresiones, clics, comision}] (euros como float).
+# Una sola pasada, sin force-stop (salvo --reiniciar), PAUSA_DIAS s entre días; puzle: X una vez y si vuelve, sale.
 # Arranca desde cualquier pantalla de TikTok: Perfil › TikTok Studio › TikTok Shop para creadores › «>» › Datos.
 # La página Datos es web (el volcado de uiautomator sale vacío): todo se lee por OCR (tesseract spa).
 # El OPPO tiene sus propios scripts (mes.py/tend.py, otra resolución); este no los toca.
 import datetime, json, os, re, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # con -I no entra la carpeta del script
 import studio_ocr as so
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "movil"))
+from puzle import boton_cerrar, detectar_puzle  # noqa: E402
 from studio_ocr import MESES, cabecera, donde, hay, num  # noqa: F401  (los usa elegir_dia)
 
 D = os.environ.get("MOVIL_ADB", "100.115.12.26:5555")
@@ -66,14 +69,48 @@ def volcado():
     return so.parse_volcado(x)
 
 
+X_PUESTA = False
+
+
+def vigilar_puzle(pal=None):
+    """Puzle: X UNA vez (regla de Néstor); si sigue o vuelve, se para (código 3) sin resolver ni reintentar."""
+    global X_PUESTA
+    xml = adb("exec-out", "sh", "-c", "uiautomator dump /sdcard/u.xml >/dev/null && cat /sdcard/u.xml")
+    pal = pal if pal is not None else palabras()
+    if not (detectar_puzle(xml) or so.hay_puzle_ocr(pal)):
+        return
+    cap("puzle")
+    if X_PUESTA:
+        guardar(); sys.exit(f"PUZLE otra vez: paro sin reintentar (captura {W}/puzle.png)")
+    p = boton_cerrar(xml)
+    if not p:
+        guardar(); sys.exit(f"PUZLE sin X visible: paro (captura {W}/puzle.png)")
+    X_PUESTA = True
+    tap(*p, 4)
+    if detectar_puzle(adb("exec-out", "sh", "-c", "uiautomator dump /sdcard/u.xml >/dev/null && cat /sdcard/u.xml")) \
+            or so.hay_puzle_ocr(palabras()):
+        guardar(); sys.exit(f"PUZLE sigue tras la X: paro (captura {W}/puzle.png)")
+
+
+RES = []
+
+
+def guardar():
+    json.dump(RES, open(f"{W}/dias_mi8.json", "w"), ensure_ascii=False, indent=1)
+
+
 def a_datos():
     """Llega a la página Datos: Perfil › TikTok Studio › «Ver detalles» de TikTok Shop para creadores › «>»."""
     pal = palabras()
     # el OCR no siempre lee los chips grises («Ayer»): «Datos clave» también confirma la página (8/11)
     if hay("Personalizado", pal) and (hay("Ayer", pal) or hay("clave", pal)):
         return
-    adb("shell", "am", "force-stop", PKG); time.sleep(1)
+    # SIN force-stop (Admin 9/11): reabrir TikTok tras cerrarlo a la fuerza es de lo que más saca el puzle.
+    # Con «--reiniciar» se fuerza una vez (máx. 1 por sesión) si la app se queda colgada.
+    if "--reiniciar" in sys.argv:
+        adb("shell", "am", "force-stop", PKG); time.sleep(1)
     adb("shell", "monkey", "-p", PKG, "1"); time.sleep(9)
+    vigilar_puzle()
     tap(972, 2006, 4)                                   # Perfil
     p = next(((x, y) for x, y, t in volcado() if t == "TikTok Studio"), (228, 843))
     tap(*p, 7)
@@ -182,16 +219,19 @@ def calendar_dias(f):
 
 if __name__ == "__main__":
     hoy = datetime.date.today()
-    res = []
+    res = RES
+    pausa = float(os.environ.get("PAUSA_DIAS", "45"))   # entre días: las ráfagas de lecturas sacan el puzle
     a_datos()
     # del más nuevo al más viejo: el selector se abre en el mes del último día elegido, y así el mes en
     # curso siempre se pide con el selector recién abierto en él (FILA0) y los anteriores se buscan por cabecera
-    for f in sorted(set(fechas(sys.argv[1:])), reverse=True):
+    for i, f in enumerate(sorted(set(fechas([a for a in sys.argv[1:] if not a.startswith("--")])), reverse=True)):
+        if i: time.sleep(pausa)
+        vigilar_puzle()
         for intento in range(2):
             try:
                 elegir_dia(f, hoy); r = leer(f); break
             except RuntimeError as e:
                 print("reintento:", e, flush=True); r = {"fecha": str(f), "error": str(e)}
         print(json.dumps(r, ensure_ascii=False), flush=True)
-        res.append(r)
-    json.dump(res, open(f"{W}/dias_mi8.json", "w"), ensure_ascii=False, indent=1)
+        res.append(r); guardar()                        # lo leído queda guardado aunque luego pare
+    guardar()
