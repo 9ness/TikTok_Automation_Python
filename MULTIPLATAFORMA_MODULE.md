@@ -328,6 +328,11 @@ de IG: por cuenta·formato (`viral_pablo_motos` y `remedios` salen del título),
 «despegaron» (≥10× la mediana de su cuenta), «no despegan» (≥48 h y <¼ de su mediana), FB a cero y seguidores frente a hace
 una semana. No se vuelca a `video_stats` del panel: ese esquema es de TikTok (programa, hora de México, recompensas).
 
+Del 9/11 (sprint Fable) también: «Hora dentro de cada formato» (franjas con ≥3 publicaciones del mismo formato: la tabla
+general de horas mezcla formatos y ahí gana la hora del formato que más rinde, no la mejor hora), «Mismo producto ≥3 veces»
+en la semana por `producto_ref` (viva_salud sacó el mismo whey 7 días seguidos), «Página de la bio» (embudo) y
+«Temporada: ¿cabe en la cola?» (`epocas` de cada cuenta).
+
 ## Vigía de salud (9/11/2026)
 
 `scripts/multiplataforma_salud.sh [--dry-run]`: el recolector `scripts/multiplataforma_salud.py` corre en el

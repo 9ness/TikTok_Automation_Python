@@ -263,6 +263,70 @@ def recomendaciones(pubs: list[dict]) -> list[str]:
     return out
 
 
+REPETIDO_MIN = 3  # veces que sale el mismo producto en la semana para avisar
+HORAS_MIN_N = 3   # publicaciones por franja para comparar horas dentro de un formato
+
+
+def repetidos(pubs: list[dict], minimo: int = REPETIDO_MIN) -> list[dict]:
+    """Productos que han salido `minimo` veces o más en una cuenta (vídeos de producto)."""
+    grupos: dict = collections.defaultdict(list)
+    for m in pubs:
+        if m.get("producto_ref") and (m.get("tipo") or "producto") == "producto":
+            grupos[(m["cuenta"], m["producto_ref"])].append(m)
+    out = []
+    for (cuenta, _), ms in grupos.items():
+        if len(ms) < minimo:
+            continue
+        ms.sort(key=lambda m: _ts(m) or 0)
+        r = resumen([vistas(m, "instagram") for m in ms])
+        out.append({"cuenta": cuenta, "titulo": ms[0].get("titulo") or "", "veces": len(ms),
+                    "dias": [(m.get("fecha") or "")[8:] for m in ms], "mediana": r["mediana"] if r else None})
+    return sorted(out, key=lambda x: (-x["veces"], x["cuenta"]))
+
+
+def seccion_repetidos(semana: list[dict]) -> list[str]:
+    """El mismo producto varias veces en la semana: a quien sigue la cuenta le sale lo mismo cada día."""
+    rep = repetidos(semana)
+    if not rep:
+        return []
+    l = [f"## 🔁 Mismo producto ≥{REPETIDO_MIN} veces (semana)", "",
+         "Vídeos de producto del mismo artículo en la misma cuenta. La cola ya los separa "
+         "(`MULTIPLATAFORMA_SEPARACION_PRODUCTO_DIAS`); si siguen saliendo aquí, faltan productos distintos en la cola.", ""]
+    l += _tabla(["cuenta", "veces", "días", "mediana IG", "producto"],
+                [[x["cuenta"], x["veces"], " ".join(x["dias"]), _n(x["mediana"]), x["titulo"][:45]] for x in rep[:10]])
+    return l + [""]
+
+
+def seccion_horas_por_formato(pubs: list[dict]) -> list[str]:
+    """La hora, comparada DENTRO de cada formato. La tabla general de horas mezcla
+    formatos (cada uno sale a la suya), así que ahí gana la hora del formato que
+    más rinde, no la mejor hora. Solo formatos con dos franjas o más con datos."""
+    def clave(m: dict):
+        fr = franja(m)
+        return (formato(m), fr) if fr else None
+
+    g = {k: r for k, r in agrupar(pubs, clave).items() if r["n"] >= HORAS_MIN_N}
+    por_formato: dict = collections.defaultdict(list)
+    for (f, fr), r in g.items():
+        por_formato[f].append((fr, r))
+    filas, notas = [], []
+    for f in sorted(por_formato):
+        franjas = sorted(por_formato[f], key=lambda x: -x[1]["mediana"])
+        if len(franjas) < 2:
+            continue
+        filas += [[f, fr, r["n"], _n(r["mediana"]), _n(r["max"])] for fr, r in franjas]
+        (h1, r1), (h2, r2) = franjas[0], franjas[-1]
+        if r2["mediana"] and r1["mediana"] / r2["mediana"] >= 1.5:
+            notas.append(f"- `{f}`: a las {h1} hace {r1['mediana'] / r2['mediana']:.1f}× la mediana de las {h2} "
+                         f"({_n(r1['mediana'])} vs {_n(r2['mediana'])}; n={r1['n']} y {r2['n']}). "
+                         "Con tan pocas, es una pista, no una prueba.")
+    if not filas:
+        return []
+    l = ["## Hora dentro de cada formato (histórico)", "",
+         f"Solo franjas con ≥{HORAS_MIN_N} publicaciones del mismo formato; así la hora no se confunde con el formato.", ""]
+    return l + _tabla(["formato", "franja", "n", "mediana", "máx"], filas) + [""] + notas + ([""] if notas else [])
+
+
 def seccion_epocas(ultimo: dict) -> list[str]:
     """¿Cabe lo de temporada antes de que acabe su época? Solo sale si hay
     vídeos de temporada en cola."""
@@ -354,6 +418,7 @@ def generar(fotos: list[tuple[str, dict]], ahora: float | None = None, dias: int
     l += ["## Por hora de publicación (histórico)", ""]
     horas = agrupar(todas, franja)
     l += (_tabla_grupos(horas, "franja") if horas else ["Sin horas aún (las lecturas viejas no las guardaban)."]) + [""]
+    l += seccion_horas_por_formato(todas)
     l += ["## Por día de la semana (histórico)", ""] + _tabla_grupos(agrupar(todas, dia_semana), "día") + [""]
 
     top = sorted((m for m in semana if vistas(m, "instagram") is not None), key=lambda m: -vistas(m, "instagram"))[:10]
@@ -362,6 +427,7 @@ def generar(fotos: list[tuple[str, dict]], ahora: float | None = None, dias: int
                 [[m["cuenta"], formato(m), f"{m.get('fecha', '')} {m.get('hora', '')}".strip(), _n(vistas(m, "instagram")),
                   _n(vistas(m, "threads")), _n(vistas(m, "facebook")), (m.get("titulo") or "")[:45]] for m in top]) + [""]
 
+    l += seccion_repetidos(semana)
     l += seccion_clics(semana)
     l += seccion_embudo(ultimo)
     l += seccion_epocas(ultimo)

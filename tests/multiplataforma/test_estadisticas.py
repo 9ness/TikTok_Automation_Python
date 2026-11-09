@@ -206,3 +206,33 @@ def test_seccion_epocas_del_informe():
     # sin temporada en cola (o lectura vieja): la sección no sale
     vacia = {"ritmo": 1, "ritmo_necesario": 0, "tarde": 0, "fuera_de_epoca": 0, "epocas": []}
     assert informe.seccion_epocas({"cuentas": {"viva_shop": {"epocas": vacia}, "x": {}}}) == []
+
+
+def _m(cuenta, ref, fecha, hora, ig, tipo="producto", titulo="Crema de manos"):
+    ts = dt.datetime.fromisoformat(f"{fecha}T{hora}:00").timestamp()
+    return {"cuenta": cuenta, "producto_ref": ref, "tipo": tipo, "titulo": titulo, "fecha": fecha, "hora": hora,
+            "ts": ts, "instagram": {"views": ig}}
+
+
+def test_seccion_repetidos_del_informe():
+    semana = [_m("viva_salud", "crema", f"2026-11-0{d}", "20:30", 100 * d) for d in (3, 4, 5, 6)]
+    semana += [_m("viva_shop", "crema", "2026-11-03", "20:30", 50), _m("viva_shop", "crema", "2026-11-04", "20:30", 50)]
+    semana += [_m("viva_salud", "", f"2026-11-0{d}", "13:00", 9, tipo="prueba_viral") for d in (3, 4, 5)]  # sin producto
+    semana += [_m("viva_salud", "foto", f"2026-11-0{d}", "13:00", 9, tipo="carrusel") for d in (3, 4, 5)]  # no es vídeo
+    (rep,) = informe.repetidos(semana)
+    assert (rep["cuenta"], rep["veces"], rep["dias"], rep["mediana"]) == ("viva_salud", 4, ["03", "04", "05", "06"], 450)
+    md = "\n".join(informe.seccion_repetidos(semana))
+    assert "| viva_salud | 4 | 03 04 05 06 | 450 | Crema de manos |" in md and "viva_shop" not in md
+    assert informe.seccion_repetidos(semana[4:]) == []
+
+
+def test_horas_dentro_de_cada_formato():
+    pubs = [_m("a", f"p{d}", f"2026-11-0{d}", "20:30", 300) for d in (1, 2, 3)]
+    pubs += [_m("a", f"q{d}", f"2026-11-0{d}", "13:10", 100) for d in (1, 2, 3)]
+    pubs += [_m("a", f"r{d}", f"2026-11-0{d}", "09:00", 999) for d in (1, 2)]  # n=2: no entra
+    pubs += [_m("a", "", f"2026-11-0{d}", "13:20", 5000, tipo="prueba_viral") for d in (1, 2, 3)]  # una sola franja
+    md = "\n".join(informe.seccion_horas_por_formato(pubs))
+    assert "| producto | 20-21 h | 3 | 300 | 300 |" in md and "| producto | 13-14 h | 3 | 100 | 100 |" in md
+    assert "09-10 h" not in md and "prueba_viral" not in md
+    assert "`producto`: a las 20-21 h hace 3.0× la mediana de las 13-14 h" in md
+    assert informe.seccion_horas_por_formato(pubs[:3]) == []
