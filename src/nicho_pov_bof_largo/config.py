@@ -272,6 +272,33 @@ CTA_TODO = (
 )
 
 
+# La escalera NEUTRA: mismas promesas y longitudes parecidas, sin «aplica tus
+# cupones» (no afirmar cupones que la ficha no tenga). Decisión de Néstor del
+# 9/11/2026: «que varíe entre una cosa u otra» → al locutar se sortea qué
+# escalera usa cada vídeo (`toca_cierre_neutro`). Todas nombran el carrito
+# naranja, así que `_CTA_FINAL_RE` las reconoce igual que las de cupones.
+CTA_NEUTRO = "Lo tienes en el carrito naranja."
+CTA_NEUTRO_BARATO = "Lo tienes en el carrito naranja a un precio que merece la pena."
+CTA_NEUTRO_ENVIO = "Lo tienes en el carrito naranja, revisa el envío gratis."
+CTA_NEUTRO_PLAZOS = "Lo tienes en el carrito naranja, revisa el pago a plazos."
+CTA_NEUTRO_ENVIO_BARATO = (
+    "Lo tienes en el carrito naranja a un precio que merece la pena y con "
+    "envío gratis."
+)
+CTA_NEUTRO_TODO = (
+    "Lo tienes en el carrito naranja a un precio que merece la pena, con envío "
+    "gratis y pudiendo pagarlo en cómodos plazos."
+)
+PROB_CIERRE_NEUTRO = 0.5
+
+
+def toca_cierre_neutro(rng=None) -> bool:
+    """¿Este vídeo cierra con la escalera neutra? Mitad y mitad."""
+    import random
+
+    return (rng or random).random() < PROB_CIERRE_NEUTRO
+
+
 # Los cierres de la VENTA INVERSA. No llevan cupones ni promesas: el cierre del
 # curso es solo «no te aseguro que siga disponible». También van de corto a
 # largo para que el ENCAJE de la voz pueda cuadrar la duración con ellos.
@@ -407,7 +434,9 @@ def es_cierre_inverso(guion: str) -> bool:
     return bool(frases) and "disponible" in frases[-1].lower()
 
 
-def ctas_posibles(plazos: bool, envio: bool, inversa: bool = False) -> tuple[str, ...]:
+def ctas_posibles(
+    plazos: bool, envio: bool, inversa: bool = False, neutro: bool = False,
+) -> tuple[str, ...]:
     """Los cierres que ese producto puede decir, de corto a largo.
 
     Los plazos van al final de la escalera a propósito: el cuerpo del guion ya
@@ -421,6 +450,15 @@ def ctas_posibles(plazos: bool, envio: bool, inversa: bool = False) -> tuple[str
     """
     if inversa:
         return tuple(sorted(CTAS_INVERSA, key=len))
+    if neutro:  # sin «aplica tus cupones» (ver `toca_cierre_neutro`)
+        escalera = [CTA_NEUTRO, CTA_NEUTRO_BARATO]
+        if envio:
+            escalera += [CTA_NEUTRO_ENVIO, CTA_NEUTRO_ENVIO_BARATO]
+        if plazos:
+            escalera.append(CTA_NEUTRO_PLAZOS)
+        if plazos and envio:
+            escalera.append(CTA_NEUTRO_TODO)
+        return tuple(sorted(dict.fromkeys(escalera), key=len))
     escalera = [CTA_CUPONES, CTA_CUPONES_BARATO]
     if envio:
         escalera += [CTA_ENVIO, CTA_ENVIO_BARATO]

@@ -2138,7 +2138,9 @@ def _montar_ropa_fish(
             segundos_max=round(metraje * largo_config.ESTIRADO_CLIP, 1),
             segundos_ideal=metraje,
             segundos_min=segundos,
-            ctas=largo_config.ctas_posibles(plazos, envio),
+            ctas=largo_config.ctas_posibles(
+                plazos, envio, neutro=largo_config.toca_cierre_neutro(),
+            ),
             ventana=largo_config.ventana_video(segundos, metraje),
         )
         texto = str(info.get("texto") or texto)
@@ -2677,6 +2679,8 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             ctas=largo_config.ctas_posibles(
                 plazos, envio_gratis,
                 inversa=largo_config.es_cierre_inverso(escrito["guion"]),
+                # Mitad de los vídeos sin «aplica tus cupones» (Néstor, 9/11).
+                neutro=largo_config.toca_cierre_neutro(),
             ),
             ventana=largo_config.ventana_video(segundos_pedidos, metraje),
         )
