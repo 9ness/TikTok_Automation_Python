@@ -210,6 +210,12 @@ def _rotundo(lecturas: list[dict]) -> bool:
     return len(_con_senal(lecturas)) * 2 >= len(lecturas)
 
 
+# Haiku con esfuerzo bajo (tarea "guion" del cliente Claude). Con fotos la
+# llamada pasaba sola a Sonnet (~0,054 $ cada una); A/B del 9/11/2026 en 6
+# vídeos montados: Haiku decidió el mismo sexo que Sonnet en los 6 (~0,003 $).
+TAREA_CLAUDE = "guion"
+
+
 def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
     """`{sexo, votos, total, pistas}`. `sexo` vacío si no se ve ninguna mano.
 
@@ -240,7 +246,7 @@ def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
         if not fotos:
             on_log("[mano] no pude sacar fotogramas del vídeo")
             return vacio
-        datos = generate_json(_PROMPT, "", images=fotos)
+        datos = generate_json(_PROMPT, "", tarea=TAREA_CLAUDE, images=fotos)
         lecturas = [x for x in ((datos or {}).get("fotogramas") or []) if x.get("hay_mano")]
         if not lecturas:
             on_log(f"[mano] ninguna mano en {len(fotos)} fotogramas; miro más")
@@ -253,7 +259,7 @@ def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
                 # estar, hay que mirar donde no suele.
                 sesgo=False,
             )
-            datos = generate_json(_PROMPT, "", images=fotos) if fotos else {}
+            datos = generate_json(_PROMPT, "", tarea=TAREA_CLAUDE, images=fotos) if fotos else {}
             lecturas = [
                 x for x in ((datos or {}).get("fotogramas") or []) if x.get("hay_mano")
             ]
@@ -280,7 +286,7 @@ def detectar(video: Path | list[Path], *, on_log: OnLog = _noop) -> dict:
                 sesgo=False,
             )
             if mas:
-                extra = generate_json(_PROMPT, "", images=mas) or {}
+                extra = generate_json(_PROMPT, "", tarea=TAREA_CLAUDE, images=mas) or {}
                 lecturas += [
                     x for x in (extra.get("fotogramas") or []) if x.get("hay_mano")
                 ]
