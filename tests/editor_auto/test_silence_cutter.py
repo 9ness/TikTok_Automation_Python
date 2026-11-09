@@ -446,7 +446,7 @@ class TestDetectRepeatedNgrams:
         assert cuts[0]["end_word_idx"] == 1
         assert cuts[0]["first_attempt"] == "esto costaba"
         assert cuts[0]["kept_version"] == "esto costaba"
-        assert cuts[0]["kind"] == "exact_ngram_repetition"
+        assert cuts[0]["kind"] == "ngram_restart"
 
     def test_3gram_preferred_over_2gram(self):
         # "el casco salva el casco salva vidas" → debe detectar "el casco
