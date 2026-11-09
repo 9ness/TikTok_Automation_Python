@@ -943,6 +943,11 @@ def marcar(
                     # Moda Mujer: subido y sin stock son del PRODUCTO (el
                     # mismo producto con vídeo de multimodo y de Aleatorios).
                     f.update({k: v for k, v in cambios.items() if k in ("uploaded", "uploaded_at", "sin_stock")})
+    if uploaded is not None:
+        # Progreso de la tarea «Subir vídeos» del panel (en segundo plano, nunca falla aquí).
+        from src.mis_tandas import progreso_panel
+
+        progreso_panel.avisar(usuario)
     return {"ok": True, "id": id_, **cambios}
 
 

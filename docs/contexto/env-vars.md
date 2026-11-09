@@ -92,4 +92,6 @@ PIXABAY_API_KEY=...
 # CR_DRIVE_DIR=Nebulabs/TikTok/Creator Reward     # antes TIKTOK_CR (TIKTOK_ROOT_PATH sale de aquí)
 # CURSO_DRIVE_DIR=Nebulabs/TikTok/TikTok Shop/_curso   # copias/paquetes de Productos España, Skool
 # DRIVE_ALIAS_JSON='{"viejo": "nuevo"}'      # alias extra de rutas viejas (al mover carpetas)
+# PANEL_URL=https://panel.nebulabsmedia.com  # Mis tandas pone el progreso de la tarea «Subir vídeos»
+# PANEL_TOKEN=                               #   del panel (src/mis_tandas/progreso_panel.py); los de /etc/panel-mcp.env
 ```
