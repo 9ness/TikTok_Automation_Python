@@ -190,3 +190,66 @@ def test_con_aprobacion_manual_lo_bueno_espera_al_agente(monkeypatch):
 def test_sin_aprobacion_manual_se_entrega_solo(monkeypatch):
     aprobados, avisos = _review(monkeypatch, gate=False)
     assert len(aprobados) == 1 and len(avisos) == 1
+
+
+# --- vídeos que fallan por el ARCHIVO del cliente ---------------------------
+def test_error_permanente_y_motivo():
+    from src.api.routers.editor_auto import web_upload as w
+    assert w._error_permanente("ValueError: El vídeo no tiene pista de audio.")
+    assert w._error_permanente("OSError: MoviePy error: failed to read the duration of file x")
+    assert not w._error_permanente("RuntimeError: CUDA out of memory")
+    assert "sonido" in w._motivo_cliente("El vídeo no tiene pista de audio.")
+    assert "dañado" in w._motivo_cliente("failed to read the duration")
+    assert "revisando" in w._motivo_cliente("otra cosa")
+
+
+def _fallido(monkeypatch, error, retries=0):
+    import types
+    from src.api.routers.editor_auto import web_upload as w
+    from src.queue.models import JobMode, JobStatus
+    from src.editor_auto import config as cfg
+
+    eventos = {"encolados": 0, "retenidos": [], "trial": None}
+
+    class _R:
+        sets: dict = {}
+
+        def sadd(self, k, v):
+            s = self.sets.setdefault(k, set())
+            nuevo = v not in s
+            s.add(v)
+            return int(nuevo)
+
+        def smembers(self, k):
+            return self.sets.get(k, set())
+
+    r = _R()
+    user = types.SimpleNamespace(id="u1", name="cli", account_email="c@x.es")
+    repo = types.SimpleNamespace(get=lambda _e: {"trialVideos": 0},
+                                 set_trial_videos=lambda _e, n: eventos.__setitem__("trial", n))
+    monkeypatch.setattr(w, "UserRepo", lambda: types.SimpleNamespace(get=lambda _i: user))
+    monkeypatch.setattr(w, "_get_day_jobs", lambda *_a: [{"job_id": "j1", "filename": "a.mp4"}])
+    monkeypatch.setattr(w, "get_editor_redis", lambda: r)
+    monkeypatch.setattr("src.editor_auto.repos.web_account_repo.get_web_account_repo", lambda: repo)
+    monkeypatch.setattr(w.os.path, "exists", lambda _p: True)
+    monkeypatch.setattr(w, "_enqueue_video", lambda *a, **k: eventos.__setitem__("encolados", 1) or "j2")
+    monkeypatch.setattr(w, "_save_day_jobs", lambda *a: None)
+    monkeypatch.setattr(cfg, "auto_review_enabled", lambda: True)
+    job = types.SimpleNamespace(id="j1", mode=JobMode.EDITOR_AUTO, status=JobStatus.FAILED,
+                                params={"output_subdir": "2026-11-05", "user_id": "u1",
+                                        "source_filename": "a.mp4", "auto_retry": retries},
+                                result_path=None, error=error)
+    w._auto_review(None, job)
+    return eventos, w._razon_fallo(job, "a.mp4", w._devueltos("u1", "2026-11-05"))
+
+
+def test_sin_audio_no_se_reintenta_y_devuelve_la_prueba(monkeypatch):
+    ev, razon = _fallido(monkeypatch, "ValueError: El vídeo no tiene pista de audio.")
+    assert ev["encolados"] == 0 and ev["trial"] == 1
+    assert "sonido" in razon and "devuelto" in razon
+
+
+def test_fallo_raro_se_reintenta_sin_motivo_al_cliente(monkeypatch):
+    ev, razon = _fallido(monkeypatch, "RuntimeError: algo raro")
+    assert ev["encolados"] == 1 and ev["trial"] is None
+    assert razon is None  # la web enseña «Reeditando…»

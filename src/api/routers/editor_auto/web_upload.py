@@ -26,6 +26,7 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -90,7 +91,11 @@ def _resolve_user(claims: TicketClaims) -> EditorUser:
 
 def _safe_name(filename: str) -> str:
     base = os.path.basename(filename or "video.mp4")
+    # «Mi vídeo.mp4» → «Mi_video.mp4» (no «Mi_v_deo»): quitamos las tildes antes.
+    base = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
     base = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("_") or "video.mp4"
+    if base.startswith("."):  # «日本.mp4» se queda sin nombre
+        base = "video" + base
     return base
 
 
@@ -671,7 +676,8 @@ def web_send_to_edit(
             errors.append({
                 "filename": v["filename"],
                 "error": (
-                    f"Solo te quedaban {trial_left} vídeos de prueba. Elige un plan para editar el resto."
+                    (f"Solo te quedaba {trial_left} vídeo de prueba. " if trial_left == 1 else
+                     f"Solo te quedaban {trial_left} vídeos de prueba. ") + "Elige un plan para editar el resto."
                     if trial_left is not None else
                     f"Has alcanzado tu límite de {eff_daily} vídeos para este día. "
                     f"Programa el resto para otro día."
@@ -710,6 +716,23 @@ def web_send_to_edit(
 
 # ─────────────────────────── Salida (vídeos editados) ───────────────────────────
 
+def _razon_fallo(job, source: str | None, devueltos: set[str]) -> str | None:
+    """Motivo visible para el cliente. Solo cuando ya no se va a reintentar
+    solo (error del archivo o retenido): mientras se re-edita, la web enseña
+    «Reeditando…»."""
+    from src.editor_auto.config import AUTO_REVIEW_MAX_RETRIES
+
+    if not job or job.status != JobStatus.FAILED:
+        return None
+    retries = int((job.params or {}).get("auto_retry") or 0)
+    if not (_error_permanente(job.error) or retries >= AUTO_REVIEW_MAX_RETRIES or source in devueltos):
+        return None
+    txt = _motivo_cliente(job.error)
+    if source and source in devueltos:
+        txt += " Te hemos devuelto el vídeo de prueba."
+    return txt
+
+
 @router.get("/output")
 def web_output(
     claims: Annotated[TicketClaims, Depends(require_web_ticket)],
@@ -735,6 +758,7 @@ def web_output(
 
     gate = manual_approval_enabled()
     approved = _approved_set(user.id, day)
+    devueltos = _devueltos(user.id, day)
 
     videos: list[dict] = []
     ready = 0
@@ -776,6 +800,7 @@ def web_output(
             "queue_position": None if is_scheduled else queue_pos,
             "scheduled": is_scheduled,
             "status": st.value if st else "unknown",
+            "failed_reason": _razon_fallo(job, m.get("filename"), devueltos),
         })
 
     # all_done para el cliente = todos terminados Y (sin gate o todos resueltos:
@@ -1106,7 +1131,8 @@ def _auto_review(queue: JobQueue, job) -> None:
                           job.status.value, retries)
         return
 
-    if source and retries < AUTO_REVIEW_MAX_RETRIES and os.path.exists(mount_path):
+    permanente = job.status == JobStatus.FAILED and _error_permanente(job.error)
+    if source and not permanente and retries < AUTO_REVIEW_MAX_RETRIES and os.path.exists(mount_path):
         try:
             new_id = _enqueue_video(
                 queue, user, mount_path, day,
@@ -1129,12 +1155,64 @@ def _auto_review(queue: JobQueue, job) -> None:
     _retener_y_avisar(user, day, source, motivo, job.status.value, retries)
 
 
+# Fallos del ARCHIVO del cliente: re-editarlo daría lo mismo (no se reintenta).
+_ERRORES_PERMANENTES = (
+    "no tiene pista de audio", "failed to read the duration",
+    "invalid data found", "moov atom not found",
+)
+_REFUND_KEY = "webday_refunded:"  # sources cuyo vídeo de prueba ya se devolvió
+
+
+def _error_permanente(error: str | None) -> bool:
+    e = (error or "").lower()
+    return any(k in e for k in _ERRORES_PERMANENTES)
+
+
+def _motivo_cliente(error: str | None) -> str:
+    """Motivo en lenguaje de cliente de un vídeo que no se pudo editar."""
+    e = (error or "").lower()
+    if "no tiene pista de audio" in e:
+        return "El vídeo no tiene sonido: necesitamos tu voz para cortarlo y subtitularlo."
+    if _error_permanente(error):
+        return "No pudimos abrir el archivo (¿está dañado o incompleto?). Súbelo de nuevo."
+    return "No pudimos editarlo. El equipo lo está revisando."
+
+
+def _devolver_prueba(user, day: str, source: str) -> bool:
+    """Devuelve el vídeo de prueba gastado en un vídeo que no se entregará
+    (solo cuentas sin plan; una vez por vídeo). True si se devolvió."""
+    from src.editor_auto.repos.web_account_repo import get_web_account_repo
+
+    try:
+        acc = get_web_account_repo().get(user.account_email)
+        if not acc or acc.get("planId"):
+            return False
+        if not get_editor_redis().sadd(f"{_REFUND_KEY}{user.id}:{day}", source):
+            return False  # ya devuelto
+        get_web_account_repo().set_trial_videos(
+            user.account_email, int(acc.get("trialVideos") or 0) + 1)
+        return True
+    except Exception as e:  # noqa: BLE001 — nunca romper la cola por esto
+        logger.warning("[auto_review] no pude devolver la prueba de %s: %s", source, e)
+        return False
+
+
+def _devueltos(user_id: str, day: str) -> set[str]:
+    try:
+        return set(get_editor_redis().smembers(f"{_REFUND_KEY}{user_id}:{day}") or [])
+    except Exception:
+        return set()
+
+
 def _retener_y_avisar(user, day: str, source: str, motivo: str, estado: str, retries: int) -> None:
-    """Deja el vídeo "en revisión" (no se entrega) y avisa al operador por email."""
+    """Deja el vídeo "en revisión" (no se entrega) y avisa al operador por email.
+    Si falló del todo, devuelve el vídeo de prueba al cliente."""
     try:
         get_editor_redis().sadd(f"{_ATTENTION_KEY}{user.id}:{day}", source)
     except Exception:
         pass
+    if estado == JobStatus.FAILED.value and source:
+        _devolver_prueba(user, day, source)
     try:
         from src.editor_auto.services import email_notify
         if email_notify.is_configured():
