@@ -216,6 +216,11 @@ Viva Shop/Salud con `duenos_extra=[nestor2, mauro]`.
 | `tandas_encoladas:<slug>` | SET | rutas de vídeo de Mis tandas ya encoladas (idempotencia de `encolar-tandas`) |
 | `musica_ultima:<slug>` | JSON | `{estilo: fichero}` última pista usada por estilo (rotación de la música) |
 | `garantia:<slug>` | JSON | `{dia, pub}` último día en que la garantía diaria adelantó un vídeo |
+| `corto:<código>` | JSON | enlace corto (#296): `{url, cuenta, pid, plataforma, producto_ref, creado_en}` |
+| `clics:<pid>` | HASH | `{red: clics}` del enlace corto de esa publicación |
+| `comenta_si:hecho:<comment_id>` · `comenta_si:usuario:<media>:<usuario>` | STR (EX 30 d) | «Comenta SÍ» ya atendido |
+| `comenta_si:hora:<slug>:<AAAAMMDDHH>` | INT (EX 1 h) | tope por cuenta y hora |
+| `comenta_si:seco:<fecha>` | JSON lista | lo que se HABRÍA mandado en seco (máx. 500/día) |
 
 ## API (`/api/v1/multiplataforma`, API key)
 
@@ -296,6 +301,8 @@ acceso Trial), `MULTIPLATAFORMA_DRY_RUN`, `MULTIPLATAFORMA_LIMITE_*`,
 `MULTIPLATAFORMA_AMAZON_DOMINIO`, `MULTIPLATAFORMA_VIDEO_URL_TTL_S`,
 `MULTIPLATAFORMA_DRIVE_ROOT`, `MULTIPLATAFORMA_TZ`, `MULTIPLATAFORMA_MUSICA_DIR`,
 `MULTIPLATAFORMA_MUSICA_TRABAJO`, `MULTIPLATAFORMA_MUSICA_LUFS`, `MULTIPLATAFORMA_CARRUSEL_REEL`,
+`MULTIPLATAFORMA_ENLACE_CORTO` (0), `MULTIPLATAFORMA_ENLACE_CORTO_AMAZON` (0), `MULTIPLATAFORMA_ENLACE_CORTO_BASE`,
+`MULTIPLATAFORMA_COMENTA_SI_ENVIAR` (0), `MULTIPLATAFORMA_COMENTA_SI_DIAS`, `MULTIPLATAFORMA_COMENTA_SI_TOPE_HORA`,
 `MULTIPLATAFORMA_RESCATE_S`, `MULTIPLATAFORMA_MAX_RESCATES`, `MULTIPLATAFORMA_GARANTIA_HORA`, `MULTIPLATAFORMA_IG_GRACIA_ERROR_S` (180: segundos que se sigue sondeando un contenedor de IG en ERROR antes de tirarlo).
 Reutiliza `PUBLIC_BASE_URL` y `AUTH_COOKIE_KEY`. Sin cost tracking: las APIs
 de publicación son gratuitas.
@@ -326,6 +333,25 @@ parado >45 min (grave, notifica) o con Traceback en los últimos 4, y recolector
 `~/multiplataforma/salud_estado.json`: una vez por incidencia, recordatorio a los 7 días, aviso si sube de nivel y
 «✅ Resuelto» al desaparecer; si el POST falla, se reintenta en el siguiente pase. No reintenta, no publica, no borra.
 Cron propuesto (pendiente de Néstor): `7 * * * * ~/proyectos/TikTok_Automation_Python/scripts/multiplataforma_salud.sh >> ~/multiplataforma/salud.log 2>&1`.
+
+## Enlace corto con clics (#296) y «Comenta SÍ» (#297) · 9/11/2026
+
+Los dos están **apagados**; encenderlos cambia lo que sale publicado → «sí» de Néstor.
+- **Enlace corto** (`services/enlace_corto.py`, `MULTIPLATAFORMA_ENLACE_CORTO=1`): en `publicador._ejecutar` la COPIA
+  que se envía lleva `<base>/<código>` en el texto de Threads, el comentario de FB y el `link` de Pinterest (la cola
+  guarda el original). Código = `sha1(pid|red)` en 8 letras base32 (reintentos no crean otro). Público
+  `GET|HEAD /api/v1/multiplataforma/links/r/{código}` → 302 al enlace guardado (solo https y sin acortadores), suma
+  `clics:<pid>` si es GET y no es rastreador (`config.BOTS_USER_AGENT`). Base por defecto la ruta larga, que
+  links.nebulabsmedia.com ya sirve; con una regla `/r/*` en el Caddy de vps-webs → `MULTIPLATAFORMA_ENLACE_CORTO_BASE`.
+  Amazon NO se acorta salvo `MULTIPLATAFORMA_ENLACE_CORTO_AMAZON=1` (normas de afiliados). Los clics van al JSON de
+  estadísticas (`clics`) y al informe semanal («🔗 Clics en el enlace»).
+- **Comenta SÍ** (`services/comenta_si.py`, pase con `scripts/multiplataforma_comenta_si.py` dentro del contenedor):
+  reels de IG publicados con enlace de los últimos `COMENTA_SI_DIAS` (7) → `GET /{media}/comments` → `es_si` (corto,
+  empieza por sí/siii/yes) → mensaje privado `POST /{ig_user_id}/messages` `{recipient:{comment_id}}` con
+  `prompts/comenta_si.md` (en IG un enlace en respuesta pública no es clicable). Una vez por comentario y por
+  usuario·reel, tope `COMENTA_SI_TOPE_HORA` (30) por cuenta; si el envío falla no se marca y se reintenta. En seco
+  (por defecto) solo anota en `comenta_si:seco:<fecha>`; enviar = `MULTIPLATAFORMA_COMENTA_SI_ENVIAR=1`, con la app en
+  Live y `instagram_manage_comments` + `instagram_manage_messages`. Sin cron todavía.
 
 ## Qué falta
 

@@ -94,6 +94,34 @@ class MultiplataformaRedis:
     def smembers(self, key: str) -> list[str]:
         return [a_absoluta(x) for x in (self._get(f"smembers/{self._enc(self._full_key(key))}") or [])]
 
+    # ---- contadores y cerrojos (enlace corto, «Comenta SÍ») ----
+    def hincrby(self, key: str, campo: str, n: int = 1) -> int:
+        r = self._post(f"hincrby/{self._enc(self._full_key(key))}/{self._enc(campo)}/{int(n)}")
+        return int(r or 0)
+
+    def hgetall(self, key: str) -> dict[str, int]:
+        plano = self._get(f"hgetall/{self._enc(self._full_key(key))}") or []
+        out: dict[str, int] = {}
+        for i in range(0, len(plano) - 1, 2):
+            try:
+                out[str(plano[i])] = int(plano[i + 1])
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    def incr_ttl(self, key: str, ttl_s: int) -> int:
+        """INCR + EXPIRE (contador de una ventana, p. ej. tope por hora)."""
+        k = self._enc(self._full_key(key))
+        n = int(self._post(f"incr/{k}") or 0)
+        if n == 1:
+            self._post(f"expire/{k}/{int(ttl_s)}")
+        return n
+
+    def set_nx(self, key: str, ttl_s: int, valor: str = "1") -> bool:
+        """SET NX EX: True solo la PRIMERA vez (deduplicar)."""
+        k = self._enc(self._full_key(key))
+        return self._post(f"set/{k}/{self._enc(valor)}/nx/ex/{int(ttl_s)}") == "OK"
+
 
 _INSTANCE: MultiplataformaRedis | None = None
 

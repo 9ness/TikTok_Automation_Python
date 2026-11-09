@@ -18,6 +18,7 @@ Decisiones:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import threading
 import time
@@ -452,3 +453,51 @@ def links_cache_dir() -> str:
     """Fotogramas de los vídeos publicados para las fotos de /links."""
     root = os.getenv("API_TEMP_ROOT") or "temp_work"
     return os.path.join(root, "multiplataforma_links")
+
+
+# ── Enlace corto con contador de clics (#296) ─────────────────────────────
+# APAGADO por defecto: encenderlo cambia los enlaces que salen publicados y
+# necesita el «sí» de Néstor. Con él, cada publicación y red lleva su propio
+# código (`/r/<código>` → redirección 302 al enlace de afiliado) y cada clic
+# suma en `clics:<publicación>`. Amazon fuera salvo que se pida: sus normas
+# de afiliados piden que el enlace muestre claramente que va a Amazon.
+def enlace_corto_activo() -> bool:
+    return os.getenv("MULTIPLATAFORMA_ENLACE_CORTO", "0").strip() == "1"
+
+
+def enlace_corto_amazon() -> bool:
+    return os.getenv("MULTIPLATAFORMA_ENLACE_CORTO_AMAZON", "0").strip() == "1"
+
+
+def enlace_corto_base() -> str:
+    """Delante del código. La ruta larga ya la sirve links.nebulabsmedia.com
+    (Caddy de vps-webs reenvía /api/v1/multiplataforma/links/*); si se añade
+    allí `/r/*`, poner MULTIPLATAFORMA_ENLACE_CORTO_BASE=https://links.nebulabsmedia.com/r/."""
+    return (os.getenv("MULTIPLATAFORMA_ENLACE_CORTO_BASE", "").strip()
+            or "https://links.nebulabsmedia.com/api/v1/multiplataforma/links/r/")
+
+
+ENLACE_CORTO_TTL_S = 400 * 86400  # el código vive ~13 meses
+
+# Visitas que NO son personas: los rastreadores de vista previa de cada red
+# abren el enlace al publicar y no deben contar como clic.
+BOTS_USER_AGENT = re.compile(
+    r"facebookexternalhit|facebookcatalog|meta-externalagent|instagram.*bot|threads.*bot|pinterest|"
+    r"twitterbot|slackbot|whatsapp|telegrambot|discordbot|googlebot|bingbot|crawler|spider|bot/|preview|"
+    r"curl/|python-|httpx|wget", re.I)
+
+
+# ── «Comenta SÍ» → enlace por mensaje privado (#297) ──────────────────────
+# Lee los comentarios de los reels de IG con enlace, detecta «sí» y responde
+# con un mensaje privado (Private Replies: un mensaje por comentario, en 7
+# días). EN SECO por defecto: solo anota lo que mandaría. Mandar de verdad
+# necesita la app en Live con instagram_manage_comments + instagram_manage_messages
+# y el «sí» de Néstor.
+def comenta_si_envia() -> bool:
+    return os.getenv("MULTIPLATAFORMA_COMENTA_SI_ENVIAR", "0").strip() == "1"
+
+
+COMENTA_SI_DIAS = int(os.getenv("MULTIPLATAFORMA_COMENTA_SI_DIAS", "7"))  # reels de los últimos N días
+COMENTA_SI_TOPE_HORA = int(os.getenv("MULTIPLATAFORMA_COMENTA_SI_TOPE_HORA", "30"))  # por cuenta
+COMENTA_SI_MAX_PALABRAS = 5
+COMENTA_SI_DEDUP_S = 30 * 86400

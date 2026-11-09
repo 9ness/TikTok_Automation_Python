@@ -33,7 +33,7 @@ from src.multiplataforma.clients.pinterest import PinterestClient
 from src.multiplataforma.clients.threads import ThreadsClient
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, publicaciones_repo
-from src.multiplataforma.services import ingesta, reel_fotos, tandas, video_url
+from src.multiplataforma.services import enlace_corto, ingesta, reel_fotos, tandas, video_url
 
 
 def _noop(_: str) -> None:
@@ -44,6 +44,9 @@ def _ejecutar(plataforma: str, pub: Publicacion, cuenta: CuentaDestino, *, dry_r
               http: httpx.Client | None, sleep: Callable[[float], None]) -> dict:
     """Publica `pub` en una plataforma. Lanza `ErrorPublicacion` si falla."""
     token = "" if dry_run else cuenta.token(plataforma)
+    # Enlace corto con contador (#296, apagado por defecto): solo cambia la
+    # copia que se envía; la cola guarda el enlace original.
+    pub = enlace_corto.para_envio(pub, plataforma, guardar=not dry_run)
     kw = {"dry_run": dry_run, "http": http, "sleep": sleep}
     previo = {k: v for k, v in (pub.resultados.get(plataforma) or {}).items() if k != "pasos"}
     destino = cuenta.destino(plataforma) or f"<sin {plataforma}_id>"

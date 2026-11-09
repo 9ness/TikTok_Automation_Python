@@ -196,6 +196,29 @@ def _tabla_grupos(grupos: dict, nombre: str) -> list[str]:
     return _tabla([nombre, "n", "mediana", "media", "máx"], filas)
 
 
+def clics_total(m: dict) -> int:
+    return sum(int(v or 0) for v in (m.get("clics") or {}).values())
+
+
+def seccion_clics(pubs: list[dict]) -> list[str]:
+    """Clics del enlace corto (#296). Sin ninguno, la sección no sale."""
+    con = [m for m in pubs if clics_total(m)]
+    if not con:
+        return []
+    por = collections.Counter()
+    for m in con:
+        for red, n in m["clics"].items():
+            por[(m["cuenta"], red)] += int(n or 0)
+    l = ["## 🔗 Clics en el enlace (semana)", "", "Clics acumulados de las publicadas esta semana (personas, sin rastreadores).", ""]
+    l += _tabla(["cuenta", "red", "clics"], [[c, r, _n(n)] for (c, r), n in sorted(por.items(), key=lambda kv: -kv[1])])
+    top = sorted(con, key=lambda m: -clics_total(m))[:10]
+    l += ["", "Top 10 por clics:", ""]
+    l += _tabla(["cuenta", "formato", "fecha", "clics", "IG vistas", "título"],
+                [[m["cuenta"], formato(m), m.get("fecha", ""), _n(clics_total(m)), _n(vistas(m, "instagram")),
+                  (m.get("titulo") or "")[:45]] for m in top])
+    return l + [""]
+
+
 def recomendaciones(pubs: list[dict]) -> list[str]:
     """Una línea por cuenta: el formato que más rinde frente al siguiente (por mediana de IG)."""
     out = []
@@ -286,6 +309,8 @@ def generar(fotos: list[tuple[str, dict]], ahora: float | None = None, dias: int
     l += _tabla(["cuenta", "formato", "fecha", "IG", "Threads", "FB", "título"],
                 [[m["cuenta"], formato(m), f"{m.get('fecha', '')} {m.get('hora', '')}".strip(), _n(vistas(m, "instagram")),
                   _n(vistas(m, "threads")), _n(vistas(m, "facebook")), (m.get("titulo") or "")[:45]] for m in top]) + [""]
+
+    l += seccion_clics(semana)
 
     flo = [m for m in flojas(todas, ahora) if (_ts(m) or 0) >= ahora - dias * 86400][:10]
     l += ["## No despegan (semana, ≥48 h y < 1/4 de la mediana de su cuenta y formato)", ""]

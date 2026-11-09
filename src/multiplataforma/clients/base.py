@@ -119,12 +119,12 @@ class ClienteBase:
                 timeout=timeout if timeout is not None else httpx.USE_CLIENT_DEFAULT,
             )
         except httpx.TimeoutException as e:
-            raise ErrorPublicacion(f"{self.plataforma}: timeout en {metodo} {url}") from e
+            raise ErrorPublicacion(_sin_token(f"{self.plataforma}: timeout en {metodo} {url}")) from e
         except httpx.HTTPError as e:
             raise ErrorPublicacion(f"{self.plataforma}: error de red en {metodo} {url}: {_sin_token(e)}") from e
         if r.status_code >= 400:
             raise ErrorPublicacion(
-                f"{self.plataforma}: HTTP {r.status_code} en {metodo} {url}: {self._mensaje_error(r)}",
+                _sin_token(f"{self.plataforma}: HTTP {r.status_code} en {metodo} {url}: {self._mensaje_error(r)}"),
                 reintentable=(r.status_code >= 500 or r.status_code == 429
                               or _codigo_graph(r) in CODIGOS_LIMITE),
             )

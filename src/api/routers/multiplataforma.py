@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -24,7 +24,7 @@ from src.api.exceptions import APIError
 from src.multiplataforma import config, publicador
 from src.multiplataforma.models import CuentaDestino, Publicacion
 from src.multiplataforma.repos import cuentas_repo, enlaces_repo, publicaciones_repo
-from src.multiplataforma.services import carruseles, conectar_meta, enlaces, ingesta, tandas, textos, video_url
+from src.multiplataforma.services import carruseles, conectar_meta, enlace_corto, enlaces, ingesta, tandas, textos, video_url
 
 router = APIRouter(
     prefix="/api/v1/multiplataforma",
@@ -335,6 +335,18 @@ def links_publicos(slug: str) -> JSONResponse:
     except tandas.ErrorTandas as e:
         raise _err_tandas(e) from e
     return JSONResponse(datos, headers={"Cache-Control": "public, max-age=120"})
+
+
+@router_publico.api_route("/links/r/{codigo}", methods=["GET", "HEAD"])
+def enlace_corto_redirigir(codigo: str, request: Request) -> RedirectResponse:
+    """PÚBLICO: enlace corto de una publicación → 302 al enlace de afiliado.
+    Cuenta el clic (no HEAD ni rastreadores de vista previa)."""
+    url = enlace_corto.resolver(codigo, user_agent=request.headers.get("user-agent", ""),
+                                contar=request.method == "GET")
+    if not url:
+        raise APIError("No existe", status_code=404)
+    return RedirectResponse(url, status_code=302, headers={"Cache-Control": "no-store",
+                                                           "Referrer-Policy": "no-referrer"})
 
 
 @router_publico.get("/links/{slug}/marca/{tipo}")

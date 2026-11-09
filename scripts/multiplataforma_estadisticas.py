@@ -23,6 +23,11 @@ import httpx
 from src.multiplataforma import config
 from src.multiplataforma.repos import cuentas_repo, publicaciones_repo
 
+try:  # el script se copia al contenedor: puede ir por delante del despliegue
+    from src.multiplataforma.services import enlace_corto
+except ImportError:  # pragma: no cover
+    enlace_corto = None
+
 ZONA = ZoneInfo(config.ZONA_HORARIA)
 CUENTAS = ("viva_shop", "viva_salud", "ama_shop")
 IG_MEDIA = ("views", "reach", "likes", "comments", "shares", "saved")
@@ -111,6 +116,9 @@ def medir_publicacion(p, c, errores: list[str]) -> dict:
         datos = leer(f"{config.threads_base()}/{th}/insights", c.token("threads"), errores, f"th {p.id[:8]}",
                      metric=",".join(TH_MEDIA))
         out["threads"] = metricas(datos, TH_MEDIA)
+    clics = enlace_corto.clics(p.id) if enlace_corto else {}
+    if clics:
+        out["clics"] = clics  # {red: n} del enlace corto (#296), acumulados
     return out
 
 

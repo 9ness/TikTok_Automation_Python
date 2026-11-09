@@ -41,6 +41,24 @@ class FakeRedis:
     def smembers(self, k):
         return list(self.sets.get(k, set()))
 
+    def hincrby(self, k, campo, n=1):
+        h = self.data.setdefault(k, {})
+        h[campo] = int(h.get(campo, 0)) + n
+        return h[campo]
+
+    def hgetall(self, k):
+        return {c: int(v) for c, v in (self.data.get(k) or {}).items()}
+
+    def incr_ttl(self, k, ttl_s):
+        self.data[k] = int(self.data.get(k) or 0) + 1
+        return self.data[k]
+
+    def set_nx(self, k, ttl_s, valor="1"):
+        if k in self.data:
+            return False
+        self.data[k] = valor
+        return True
+
 
 @pytest.fixture(autouse=True)
 def redis(monkeypatch):
