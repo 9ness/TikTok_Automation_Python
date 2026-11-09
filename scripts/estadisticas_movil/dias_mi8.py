@@ -5,13 +5,15 @@
 # La página Datos es web (el volcado de uiautomator sale vacío): todo se lee por OCR (tesseract spa).
 # El OPPO tiene sus propios scripts (mes.py/tend.py, otra resolución); este no los toca.
 import datetime, json, os, re, subprocess, sys, time
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # con -I no entra la carpeta del script
+import studio_ocr as so
+from studio_ocr import MESES, cabecera, donde, hay, num  # noqa: F401  (los usa elegir_dia)
 
 D = os.environ.get("MOVIL_ADB", "100.115.12.26:5555")
 W = os.environ.get("EST_DIR", "/tmp/est_mi8"); os.makedirs(W, exist_ok=True)
 PKG = "com.zhiliaoapp.musically"
 COLS = [113, 255, 397, 538, 679, 820, 961]          # Lun … Dom en el calendario
 FILA0, PASO = 1118, 126                             # 1.ª fila del mes en curso al abrir el selector; alto de fila
-MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
 def adb(*a, b=False):
@@ -37,12 +39,7 @@ def palabras(png=None):
     png = png or cap()
     tsv = subprocess.run(["tesseract", png, "-", "-l", "spa", "--psm", "11", "tsv"],
                          capture_output=True, text=True).stdout
-    out = []
-    for l in tsv.splitlines()[1:]:
-        c = l.split("\t")
-        if len(c) == 12 and c[11].strip() and float(c[10]) > 30:
-            out.append((int(c[6]), int(c[7]), int(c[8]), int(c[9]), c[11].strip()))
-    return out
+    return so.parse_tsv(tsv)
 
 
 def ocr_zona(png, x, y, w, h, psm=7):
@@ -52,32 +49,21 @@ def ocr_zona(png, x, y, w, h, psm=7):
                           capture_output=True, text=True).stdout.strip()
 
 
-def hay(texto, pal):
-    return any(texto.lower() in p[4].lower() for p in pal)
-
-
-def donde(texto, pal):
-    return next(((x + w // 2, y + h // 2) for x, y, w, h, t in pal if texto.lower() in t.lower()), None)
-
-
-def num(s):
-    s = s.replace("€", "").replace(" ", "").replace("O", "0").replace("o", "0")
-    m = re.search(r"\d[\d.,]*K?", s)
-    if not m: return None
-    s = m.group(0); k = 1000 if s.endswith("K") else 1; s = s.rstrip("K")
-    if k > 1: s = s.replace(",", ".")
-    else: s = s.replace(".", "").replace(",", ".")
-    try: return round(float(s) * k, 2)
-    except ValueError: return None
+def ocr_cifra(png, zona, escala):
+    x, y, w, h = zona
+    subprocess.run(["convert", png, "-crop", f"{w}x{h}+{x}+{y}", "-colorspace", "gray", "-resize", escala,
+                    "-bordercolor", "white", "-border", "30", f"{W}/z.png"])
+    return subprocess.run(["tesseract", f"{W}/z.png", "-", "-l", "spa", "--psm", "7"],
+                          capture_output=True, text=True).stdout.strip()
 
 
 def volcado():
     """[(x, y, texto)] centro de cada nodo del volcado nativo (vacío en páginas web)."""
-    import html as _h
     adb("shell", "uiautomator", "dump", "/sdcard/u.xml")
     x = adb("exec-out", "cat", "/sdcard/u.xml")
-    return [((int(m[2]) + int(m[4])) // 2, (int(m[3]) + int(m[5])) // 2, _h.unescape(m[1]))
-            for m in re.finditer(r'(?:text|content-desc)="([^"]+)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]', x)]
+    try: open(f"{W}/u.xml", "w").write(x)          # para diagnosticar si la pantalla cambia
+    except OSError: pass
+    return so.parse_volcado(x)
 
 
 def a_datos():
@@ -91,14 +77,16 @@ def a_datos():
     tap(972, 2006, 4)                                   # Perfil
     p = next(((x, y) for x, y, t in volcado() if t == "TikTok Studio"), (228, 843))
     tap(*p, 7)
-    for _ in range(3):
-        v = volcado()
-        ps = sorted((x, y) for x, y, t in v if "Ver detalles" in t)
-        if ps: break
-        tap(927, 739, 2)                                # aviso «Estado de la cuenta» (no sale en el volcado)
+    p = None
+    for i in range(4):
+        # desde 7/11 a veces no sale en el volcado nativo: se busca también por OCR
+        p = so.boton_ver_detalles(volcado(), palabras(cap(f"studio_{i}")))
+        if p: break
+        if i == 1: swipe(1500, 900)                     # la tarjeta puede quedar debajo de un banner
+        else: tap(927, 739, 2)                          # aviso «Estado de la cuenta» (no sale en el volcado)
     else:
-        sys.exit("no encuentro «Ver detalles» en TikTok Studio")
-    tap(*ps[-1], 7)                                     # la tarjeta de la derecha: «para creadores»
+        sys.exit(f"no encuentro «Ver detalles» en TikTok Studio (capturas {W}/studio_*.png y u.xml)")
+    tap(*p, 7)                                          # la tarjeta de la derecha: «para creadores»
     fila = donde("Últimos", palabras()) or donde("días", palabras())   # un banner de campaña lo baja (Black Friday, 6/11)
     tap(1017, fila[1] if fila else 692, 6)              # «>» de Hoy / Últimos 7 días
     if not hay("Personalizado", palabras()): sys.exit("no llego a Datos")
@@ -156,40 +144,22 @@ def elegir_dia(f: datetime.date, hoy: datetime.date):
     tap(*p, 4)
 
 
-def cabecera(pal):
-    """La línea «4 nov 2026 GMT+1» bajo los chips, esté donde esté (los avisos de arriba la bajan)."""
-    g = [(y, x) for x, y, w, h, t in pal if t.startswith("GMT") and y < 1100]
-    if not g: return ""
-    yg = g[0][0]
-    return " ".join(t for x, y, w, h, t in sorted(pal) if abs(y - yg) < 25 and x < 700).lower()
-
-
 def leer(f: datetime.date):
     png = cap(f"d_{f}")
     pal = palabras(png)
     # cabecera «2 nov 2026 GMT+1» bajo los chips: la comprobación de verdad del día elegido
-    cab = cabecera(pal) or " ".join(t for x, y, w, h, t in sorted(pal) if 360 < y < 430 and x < 700).lower()
-    if not re.search(rf"(^|\s)0?{f.day}\s+{MESES[f.month - 1]}", cab):
-        raise RuntimeError(f"la página no es de {f}: «{cab}»")
-    out = {"fecha": str(f)}
-    def cifra(pal, e):
-        lado = (lambda x: x < 540) if e[0] < 540 else (lambda x: x >= 540)
-        # la cifra grande (alto ≥ 35 px) que hay debajo de la etiqueta, en su misma columna
-        c = sorted((y, t) for x, y, w, h, t in pal if lado(x) and e[1] + 30 < y < e[1] + 220
-                   and h >= 35 and re.search(r"\d", t))
-        return num(c[0][1]) if c else None
-    pestanas = [(x, y) for x, y, w, h, t in pal if t == "Comisiones"
-                and any(t2 == "Resumen" and abs(y2 - y) < 20 for _, y2, _, _, t2 in pal)]
-    for clave, etiqueta in [("gmv", "GMV"), ("ventas", "Ventas"), ("impresiones", "Impresiones"),
-                            ("clics", "Clics"), ("comision", "Comisiones")]:
-        e = next(((x, y) for x, y, w, h, t in pal if t.startswith(etiqueta) and (x, y) not in pestanas), None)
-        out[clave] = cifra(pal, e) if e else None
+    try: out = so.extraer_resumen(pal, f)
+    except ValueError as e: raise RuntimeError(str(e))
+    pest0 = so.pestanas_comision(pal)
+    for clave, etiqueta in so.ETIQUETAS:                # cifra que el OCR de pantalla entera no leyó
+        e = next(((x, y) for x, y, w, h, t in pal if t.startswith(etiqueta) and (x, y) not in pest0), None)
+        if out.get(clave) is None and e:
+            out[clave] = so.elegir_lectura([ocr_cifra(png, so.zona_cifra(e), r) for r in ("50%", "100%", "200%")])
+    pestanas = so.pestanas_comision(pal)
     if pestanas:                                        # días pasados: «Resumen | Comisiones»
         tap(pestanas[0][0] + 60, pestanas[0][1] + 20, 2.5)
         pal2 = palabras(cap(f"c_{f}"))
-        e = next(((x, y) for x, y, w, h, t in pal2 if t == "estimadas"), None)
-        e = e and next(((x, y) for x, y, w, h, t in pal2 if t.startswith("Comisi") and abs(y - e[1]) < 15), e)
-        out["comision"] = cifra(pal2, e) if e else None
+        out["comision"] = so.extraer_comision(pal2)
         r = next(((x, y) for x, y, w, h, t in pal2 if t == "Resumen"), None)
         if r: tap(r[0] + 60, r[1] + 20, 1.5)
     return out
