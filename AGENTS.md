@@ -130,6 +130,7 @@ src/
   cost_tracking.py          # OBLIGATORIO para toda API de pago (record_*)
   locutor.py, subtitles*.py, text_hook.py, logic.py, guionista.py, video_remover.py   # transversales
   pronosticos/ construccion_pov/ tiktok_shop/ editor_auto/ viralizacion/ nicho_*/ agente_mcp/ …  # un dir por programa/nicho
+whatsapp_bot/               # bot de WhatsApp del Editor: servicio AUTÓNOMO para vps-webs (no importa src/; ver su README)
 frontend/                   # Next.js App Router
 tests/                      # pytest + FakeRedis
 deploy/                     # setup.sh, install_app.sh, deploy_safe.sh, webhook_listener.py, systemd/
