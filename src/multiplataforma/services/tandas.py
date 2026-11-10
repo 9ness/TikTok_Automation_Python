@@ -741,17 +741,23 @@ def _links_publicos(slug: str) -> dict:
         if not publicado:
             continue
         titulo = _corto(e.get("titulo") or "Producto")
+        tienda = "amazon" if enlaces.es_amazon(e["enlace"]) else ("shein" if enlaces.es_shein(e["enlace"]) else "")
         items.append((publicado, {
             "id": k,
             "titulo": titulo,
             "foto": f"/api/v1/multiplataforma/links/{slug}/foto/{k}",
             "enlace": e["enlace"],
-            "tienda": "amazon" if enlaces.es_amazon(e["enlace"]) else ("shein" if enlaces.es_shein(e["enlace"]) else ""),
+            "tienda": tienda,
             "categoria": categoria_link(e.get("titulo") or ""),
             "publicado_en": int(publicado),
         }))
     items.sort(key=lambda t: t[0], reverse=True)
     productos_ = [i[1] for i in items[:MAX_LINKS]]
+    # Clics contados por el redirector del panel (`?d=links`); si no, directo.
+    from src.multiplataforma.services import enlaces_panel
+
+    for p in productos_:
+        p["enlace"] = enlaces_panel.contado(slug, p["id"], p["enlace"], p["titulo"], p["tienda"] == "amazon")
     hay_amazon = any(p["tienda"] == "amazon" for p in productos_)
     base = f"/api/v1/multiplataforma/links/{slug}/marca"
     return {
