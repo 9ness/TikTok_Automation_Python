@@ -35,6 +35,7 @@ NO_DISPONIBLE = ("isn't available", "isn’t available", "no está disponible", 
                  "no se ha podido encontrar")
 SECO = "--seco" in sys.argv
 MAX = int(os.environ.get("MAX", "0"))
+SIN_RESERVA: list[str] = []   # carruseles sin sonido disponible y sin reserva → «medias» en el panel
 
 
 def _items(datos: dict):
@@ -129,6 +130,7 @@ def main() -> None:
                 elegido = next((r for r in reservas_por_estilo.get(_estilo(c), []) + reservas_por_estilo.get("*", [])
                                 if r["id"] != s["id"] and ch.disponible(r)), None)
                 if not elegido:
+                    SIN_RESERVA.append(c["id"])
                     print(f"✗ {c['id']} «{s.get('titulo')}» NO disponible y sin reserva", flush=True)
                     continue
                 reserva[c["id"]] = {**elegido, "motivo": f"no disponible: {s.get('titulo')} ({s['id']})",
@@ -143,5 +145,25 @@ def main() -> None:
           f"{' (seco: no escrito)' if SECO else f' en {RESERVA}'}", flush=True)
 
 
+def _cerrar_panel(inicio: int, res: str, txt: str) -> None:
+    """10/11 (Admin): cierra la tarea 46 del panel si sigue pendiente/en curso (solo en el VPS, no en --seco)."""
+    md = Path("/home/nebulabsai/rutinas/panel-viva-comprobador-sonidos.md")
+    if SECO or not md.exists() or not os.path.exists("/usr/local/bin/rutina-panel-cerrar"):
+        return
+    import subprocess
+    try:
+        subprocess.run(["/usr/local/bin/rutina-panel-cerrar", "Comprobador sonidos Viva Shop", str(inicio), res,
+                        str(md), txt], timeout=60)
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
-    main()
+    _inicio = int(time.time())
+    try:
+        main()
+    except BaseException as ex:
+        _cerrar_panel(_inicio, "mal", f"error: {ex!r}"[:300])
+        raise
+    _cerrar_panel(_inicio, "medias" if SIN_RESERVA else "bien",
+                  f"{len(SIN_RESERVA)} carruseles sin sonido disponible ni reserva" if SIN_RESERVA else "sonidos comprobados")
