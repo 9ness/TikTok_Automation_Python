@@ -152,7 +152,7 @@ def elegir_lectura(lecturas):
     return max(cuenta, key=cuenta.get)
 
 
-PUZLE = re.compile(r"verifica|arrastra|desliza el|rompecabezas|puzzle|puzle|captcha|completa la pieza", re.I)
+PUZLE = re.compile(r"verifica\b|arrastra|desliza el|rompecabezas|puzzle|puzle|captcha|completa la pieza", re.I)
 
 
 def hay_puzle_ocr(pal) -> bool:
