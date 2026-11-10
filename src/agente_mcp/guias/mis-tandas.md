@@ -233,6 +233,21 @@ imagen: pide la pantalla APAGADA y que no se encienda nada.
   6 al día, y los mudos sin subir salen en «📘 Solo Meta» (`solo_meta`). No se
   ocultan ni se borran: van a Meta. Cada vídeo trae `habla`.
 
+## GMV Max (Black Friday, 13-30/11)
+
+Productos cuyas tiendas **inyectan GMV Max** (anuncios de TikTok Shop): su tráfico pagado empuja
+también nuestros vídeos de afiliado, así que en el Black Friday **se suben primero**.
+
+- **Marcar** (al cruzar con Social1/Kalodata): `marcar_gmv_max(tienda="…")` marca todas las piezas
+  de esa tienda; `marcar_gmv_max(producto="parte del título")` todas tus piezas con ese título;
+  `marcar_gmv_max(id="…")` una de `mis_tandas` (vale `car|…`). `nota` = de dónde lo sacaste;
+  `si=False` la quita. La marca es **común a todas las cuentas** (Viva, Ama, Casca…).
+- **Ver**: `lista_gmv_max()` → marcas + tus vídeos/carruseles pendientes que las llevan, con semáforo.
+  En `mis_tandas` cada pieza trae `gmv_max: true` y cada tanda `gmv_max` = pendientes marcados.
+- **Web**: chip «🚀 GMV Max» en Mis tandas (filtra y pone primero) y botón 🚀 en cada tarjeta.
+- Marca solo lo que hayas VISTO inyectando (Social1 › anuncios de la tienda/producto). No cambia el
+  semáforo: un GMV Max sin verde sigue sin poder subirse.
+
 ## Replicar virales (id `rv|<id>`)
 
 Los MP4 de virales replicados y montados fuera de la app (con IA en Omni o sin

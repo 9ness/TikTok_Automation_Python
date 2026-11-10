@@ -133,6 +133,39 @@ def set_epoca(
         raise _error(e) from e
 
 
+class GmvMaxRequest(BaseModel):
+    """Marca GMV Max (Black Friday): por `tienda`, por `id` de Mis tandas o por `producto` (título)."""
+
+    id: str = ""
+    producto: str = ""
+    tienda: str = ""
+    si: bool = True
+    nota: str = ""
+    por: str = ""
+
+
+@router.post("/gmv-max")
+def set_gmv_max(
+    body: GmvMaxRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> dict:
+    """Marca (o quita, `si=false`) un producto o tienda que inyecta GMV Max: se sube primero."""
+    try:
+        return servicio.marcar_gmv_max(usuario, id_=body.id, producto=body.producto, tienda=body.tienda,
+                                       si=body.si, nota=body.nota, por=body.por)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
+@router.get("/gmv-max")
+def get_gmv_max(usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Tiendas y productos marcados GMV Max y las piezas pendientes del usuario que los llevan."""
+    try:
+        return servicio.lista_gmv_max(usuario)
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
 class CompletarRequest(BaseModel):
     """Los vídeos de la tanda que se da por terminada (todos)."""
 

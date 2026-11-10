@@ -852,6 +852,29 @@ async def epoca_video(ctx: Context, id: str, epoca: str) -> str:
 
 
 @_herramienta(structured_output=False)
+async def marcar_gmv_max(ctx: Context, producto: str = "", tienda: str = "", id: str = "",
+                         si: bool = True, nota: str = "") -> str:
+    """Black Friday (13-30/11): marca un producto o una tienda que INYECTA GMV Max
+    (lo ves en Social1/Kalodata) para subir primero sus vídeos y carruseles en
+    Mis tandas. Una de tres: `tienda` (todas sus piezas, de cualquier cuenta),
+    `id` (de `mis_tandas`, también `car|…`) o `producto` (parte del título: marca
+    todos tus vídeos/carruseles que lo lleven). `si=False` quita la marca; `nota`
+    = de dónde lo sacaste. La marca es común a todas las cuentas. Guía
+    `mis-tandas.md` › GMV Max."""
+    return _json(await Interno(_usuario(ctx)).post("/api/v1/mis-tandas/gmv-max", {
+        "id": id, "producto": producto, "tienda": tienda, "si": si, "nota": nota,
+        "por": _usuario(ctx)}))
+
+
+@_herramienta(structured_output=False)
+async def lista_gmv_max(ctx: Context) -> str:
+    """Tiendas y productos marcados GMV Max y tus vídeos/carruseles PENDIENTES de
+    subir que los llevan (con su semáforo): súbelos primero en el Black Friday.
+    En `mis_tandas` cada vídeo trae `gmv_max` y cada tanda cuántos. Solo lee."""
+    return _json(await Interno(_usuario(ctx)).get("/api/v1/mis-tandas/gmv-max"))
+
+
+@_herramienta(structured_output=False)
 async def tareas_tiktok(ctx: Context) -> str:
     """Tareas de «Campañas de creadores» de TikTok guardadas para el usuario
     (cupones/dinero por subir N vídeos de ciertos productos antes de una fecha).

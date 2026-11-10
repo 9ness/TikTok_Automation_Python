@@ -73,6 +73,11 @@ FIJAS_KEY = "mis_tandas:fijas:{usuario}"
 EPOCA_KEY = "mis_tandas:epoca:{usuario}"
 EPOCAS = ("neutro", "otono", "halloween", "black_friday", "invierno", "navidad")
 
+# Marca «GMV Max» (Black Friday 2026): tiendas o productos que inyectan anuncios GMV Max y se suben
+# primero. GLOBAL, no por usuario: {"tiendas": {norm: meta}, "productos": {id_tiktok|tienda|titulo: meta}}.
+# Ver `gmv_max.py`; la ponen los agentes con `marcar_gmv_max` del MCP.
+GMV_MAX_KEY = "mis_tandas:gmv_max"
+
 # Cuentas que en TikTok SOLO publican vídeos con voz (oct 2026: la de Ana se
 # sancionó por «muchos vídeos cortos de baja calidad o parecidos» — mudos de
 # 10 s con música). Sus tandas son solo de hablados; los mudos salen aparte en

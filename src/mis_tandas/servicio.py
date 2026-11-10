@@ -726,8 +726,14 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
         v["habla"] = habla(v)
     # Tareas de Campañas de creadores: etiqueta por vídeo + progreso.
     esperando = [_publica(f) for f in sin_stock]
+    from src.mis_tandas import gmv_max
+
+    marcas_gmv = gmv_max.marcas()
     for v in meta_items + esperando + [v for t in salida for v in t.get("items", [])]:
         v["tareas"] = tareas_de.get(v["id"], [])
+        v["gmv_max"] = gmv_max.es_gmv_max(v, marcas_gmv)
+    for t in salida:
+        t["gmv_max"] = sum(1 for v in t.get("items", []) if v["gmv_max"] and not v["uploaded"])
     for t in salida:
         for v in t.get("items", []):
             v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
@@ -970,6 +976,68 @@ def marcar(
 # ---------------------------------------------------------------------------
 # Vídeo y foto
 # ---------------------------------------------------------------------------
+def marcar_gmv_max(usuario: str, *, id_: str = "", producto: str = "", tienda: str = "",
+                   si: bool = True, nota: str = "", por: str = "") -> dict:
+    """Marca GMV Max (global) por tienda, por un vídeo/carrusel (`id_`) o por título de producto
+    (todas las piezas del usuario cuyo título lo contenga). Ver `gmv_max.py`."""
+    from src.mis_tandas import fotos, gmv_max
+
+    usuario = usuario or "ness"
+    piezas: list[dict] = []
+    if id_:
+        if id_.startswith(CARRUSEL):
+            cid = id_[len(CARRUSEL):]
+            piezas = [c for t in fotos.tandas(usuario, todas=True)["tandas"] for c in t.get("items", [])
+                      if c["id"] == cid]
+            if not piezas:
+                raise ErrorTanda("Ese carrusel no es tuyo o ya no existe.", status=404)
+        else:
+            piezas = [_fila_de(usuario, id_)]
+    elif producto:
+        q = gmv_max.norm(producto)
+        if len(q) < 4:
+            raise ErrorTanda("Título demasiado corto: pon al menos 4 letras.")
+        vistos: dict[str, dict] = {}
+        carr = [c for t in fotos.tandas(usuario, todas=True)["tandas"] for c in t.get("items", [])]
+        for f in filas(usuario) + carr:
+            if q in gmv_max.norm(f.get("titulo", "")):
+                vistos.setdefault(gmv_max.clave_producto(f), f)
+        piezas = list(vistos.values())
+        if not piezas:
+            raise ErrorTanda(f"Ningún vídeo ni carrusel de {usuario} tiene «{producto}» en el título.", status=404)
+    if not piezas and not tienda:
+        raise ErrorTanda("Di `tienda`, `id` (de mis_tandas) o `producto` (parte del título).")
+    salida: dict = {}
+    if tienda:
+        salida = gmv_max.poner(tienda=tienda, si=si, nota=nota, por=por or usuario)
+    marcados = list(salida.get("marcado") or [])
+    for f in piezas:
+        salida = gmv_max.poner(pieza=f, si=si, nota=nota, por=por or usuario)
+        marcados += salida["marcado"]
+    _cache.pop(usuario, None)
+    return {**salida, "marcado": marcados}
+
+
+def lista_gmv_max(usuario: str) -> dict:
+    """Las marcas GMV Max y qué piezas PENDIENTES de este usuario las llevan (para subirlas primero)."""
+    from src.mis_tandas import fotos, gmv_max
+
+    usuario = usuario or "ness"
+    m = gmv_max.marcas()
+    t = tandas(usuario)
+    videos = [{"id": v["id"], "titulo": v.get("titulo", ""), "tienda": v.get("tienda", ""),
+               "semaforo": (v.get("semaforo") or {}).get("color", "")}
+              for x in t["tandas"] for v in x.get("items", []) if v.get("gmv_max") and not v["uploaded"]]
+    carr = [{"id": CARRUSEL + c["id"], "titulo": c["titulo"], "tienda": c["tienda"],
+             "semaforo": (c.get("semaforo") or {}).get("color", "")}
+            for x in fotos.tandas(usuario)["tandas"] for c in x.get("items", [])
+            if c.get("gmv_max") and not c["subido"]]
+    return {"tiendas": [v.get("nombre") or k for k, v in m["tiendas"].items()],
+            "productos": [{"titulo": v.get("titulo", ""), "tienda": v.get("tienda", "")}
+                          for v in m["productos"].values()],
+            "pendientes_videos": videos, "pendientes_carruseles": carr}
+
+
 def _fila_de(usuario: str, id_: str) -> dict:
     _partes(id_)
     for f in filas(usuario):

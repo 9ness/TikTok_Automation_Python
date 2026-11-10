@@ -214,6 +214,11 @@ def tandas(usuario: str, todas: bool = False) -> dict:
 
     sem = servicio.semaforos(usuario)
     lista = [_publica(d, _clave(d) in agotados, sem) for d in docs]
+    from src.mis_tandas import gmv_max
+
+    marcas_gmv = gmv_max.marcas()
+    for c in lista:
+        c["gmv_max"] = gmv_max.es_gmv_max(c, marcas_gmv)
     dia = dt.datetime.now(_TZ).date()
     hoy = sum(
         1 for c in lista
@@ -236,6 +241,7 @@ def tandas(usuario: str, todas: bool = False) -> dict:
             "sin_revisar": sum(1 for c in grupo if not c["subido"] and not c["sin_stock"]
                                and servicio.sin_revisar(c)),
             "abierta": abierta,
+            "gmv_max": sum(1 for c in grupo if c["gmv_max"] and not c["subido"]),
             "desde": min(c["creado_at"] for c in grupo),
             "hasta": max(c["creado_at"] for c in grupo),
         }
