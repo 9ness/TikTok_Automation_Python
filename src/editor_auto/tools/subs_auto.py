@@ -167,6 +167,15 @@ class SubsAutoTool:
             quality_label,
             {"preset": "medium", "crf": 20, "max_long_side": 1280},
         )
+        # Preset x264 (10/11/2026): en 30 s de 1080x1920 con 4 núcleos, el
+        # render entero de subtítulos tarda 112,9 s en slow y 78,1 s en
+        # veryfast; solo el encoder, 84,5 s frente a 22,2 s, con SSIM
+        # 0,9899/0,9887 (como en el cortador, tarea 255). El crf y la
+        # resolución siguen siendo los de la calidad elegida.
+        # EDITOR_SUBS_PRESET lo cambia; "calidad" deja el de la tabla.
+        _p = os.environ.get("EDITOR_SUBS_PRESET", "veryfast").strip()
+        if _p and _p != "calidad" and quality.get("preset") in ("slow", "medium"):
+            quality = {**quality, "preset": _p}
 
         ctx.on_progress(0.02, "🔊 Extrayendo audio…")
         ctx.on_log("[subs_auto] Extrayendo audio del vídeo…")
