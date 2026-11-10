@@ -177,5 +177,9 @@ class ClienteBase:
     def _fichero(video_path: str) -> Path:
         p = Path(video_path)
         if not p.is_file():
+            from src.multiplataforma.services import musica  # copia con música borrada → se rehace
+
+            musica.recuperar(video_path)
+        if not p.is_file():
             raise ErrorPublicacion(f"No existe el vídeo {video_path}", reintentable=False)
         return p

@@ -150,3 +150,17 @@ def test_encolar_usa_la_copia_con_musica_solo_en_mudos(banco, tmp_path, monkeypa
     assert pubs[1].video_path == str(hablado)
     # Idempotente: el SET guarda el ORIGINAL.
     assert tandas.encolar("ama_shop", ahora=AHORA)["total"] == 0
+
+
+def test_recuperar_rehace_la_copia_borrada_en_su_misma_ruta(banco, tmp_path):
+    v = _video(tmp_path / "ana" / "bolso.mp4", 2.0)
+    r = musica.con_musica(str(v), {"busqueda": "autumn lofi"}, "ama_shop")
+    copia = Path(r["path"])
+    copia.unlink()  # temp_work limpiado: queda solo el .json
+    assert musica.recuperar(str(copia))
+    assert copia.is_file() and sorted(_streams(copia)) == sorted(["h264,video", "aac,audio"])
+    # Sin .json o sin original: no rehace y quien llama da el error de siempre.
+    assert not musica.recuperar(str(tmp_path / "trabajo" / "ama_shop" / "nada.mp4"))
+    copia.unlink()
+    v.unlink()
+    assert not musica.recuperar(str(copia))

@@ -192,6 +192,39 @@ def mezclar(video: Path, pista: Path, destino: Path) -> None:
         tmp.unlink(missing_ok=True)
 
 
+def recuperar(video_path: str, log: Callable[[str], None] = _noop) -> bool:
+    """Rehace en SU MISMA ruta una copia con música que ya no está (temp_work
+    limpiado, 10/11/2026: 142 de ama_shop fallaban con «No existe el vídeo»).
+    Usa el `.json` de al lado: original (llevado a la ruta de HOY del Drive) y
+    la misma pista. Así la cola no cambia. True si el fichero queda en su sitio."""
+    destino = Path(video_path)
+    if destino.is_file():
+        return True
+    meta_path = destino.with_suffix(".json")
+    try:
+        if not meta_path.is_file():
+            return False
+        meta = json.loads(meta_path.read_text("utf-8"))
+        from src import rutas_drive
+
+        original = Path(str(rutas_drive.a_absoluta(str(meta.get("original") or ""))))
+        if not original.is_file():
+            log(f"[multiplataforma] sin original para rehacer {destino.name}: {original}")
+            return False
+        pista = next((p for p in pistas(meta.get("estilo") or "") if p.name == meta.get("pista")), None)
+        if pista is None:
+            lista = pistas(meta.get("estilo") or "")
+            pista = lista[0] if lista else None
+        if pista is None:
+            return False
+        mezclar(original, pista, destino)
+        log(f"[multiplataforma] copia con música rehecha: {destino.name}")
+        return destino.is_file()
+    except Exception as e:  # noqa: BLE001 — quien llama decide qué hacer
+        log(f"[multiplataforma] no se pudo rehacer {destino.name}: {e}")
+        return False
+
+
 def con_musica(video_path: str, musica: dict | str | None, cuenta: str,
                log: Callable[[str], None] = _noop) -> dict | None:
     """Copia con música de un vídeo MUDO. Devuelve `{path, estilo, pista,
