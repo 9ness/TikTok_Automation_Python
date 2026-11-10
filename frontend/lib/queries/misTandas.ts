@@ -53,6 +53,8 @@ export interface VideoTanda {
   habla?: boolean;
   /** Ids de las tareas de Campañas de creadores en las que cuenta. */
   tareas?: string[];
+  /** Su tienda o producto inyecta GMV Max: se sube primero en el Black Friday. */
+  gmv_max?: boolean;
 }
 
 /** Tarea de «Campañas de creadores» con su progreso (`src/mis_tandas/tareas.py`). */
@@ -98,6 +100,8 @@ export interface Tanda {
   semaforo?: Record<ColorSemaforo, number>;
   /** Pendientes sin semáforo vigente o en rojo: no se pueden bajar para publicar. */
   sin_revisar?: number;
+  /** Pendientes de subir marcados GMV Max. */
+  gmv_max?: number;
   items: VideoTanda[];
 }
 
@@ -198,6 +202,19 @@ export function useEpocaTanda() {
   return useMutation<unknown, Error, { id: string; epoca: Epoca | "" }>({
     mutationFn: (body) => api.post(`${ROOT}/epoca`, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: misTandasKeys.all }),
+    onError: (e) => toast.error(`No se pudo: ${e.message}`),
+  });
+}
+
+/** Marca GMV Max (global, todas las cuentas) del producto de un vídeo/carrusel (`car|<id>`). */
+export function useGmvMax() {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { id?: string; tienda?: string; si: boolean }>({
+    mutationFn: (body) => api.post(`${ROOT}/gmv-max`, body),
+    onSuccess: (_r, b) => {
+      toast.success(b.si ? "🚀 Marcado GMV Max" : "GMV Max quitado");
+      void qc.invalidateQueries({ queryKey: misTandasKeys.all });
+    },
     onError: (e) => toast.error(`No se pudo: ${e.message}`),
   });
 }
@@ -380,6 +397,8 @@ export interface CarruselTanda {
   pais?: string;
   /** Revisión antes de subir (id `car|<id>` en el semáforo); null = sin revisar. */
   semaforo?: SemaforoVideo | null;
+  /** Su tienda o producto inyecta GMV Max. */
+  gmv_max?: boolean;
 }
 
 export interface TandaFotos {

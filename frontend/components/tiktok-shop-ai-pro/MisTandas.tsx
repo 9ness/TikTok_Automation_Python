@@ -12,6 +12,7 @@ import {
   sinRevisar,
   useCompletarTanda,
   useEpocaTanda,
+  useGmvMax,
   useMarcarTanda,
   useMisTandas,
   useOcultarTanda,
@@ -75,6 +76,26 @@ const EPOCAS: Record<Epoca, string> = {
   invierno: "❄️ Invierno",
   navidad: "🎄 Navidad",
 };
+
+/** 🚀 GMV Max: marca/quita el producto del vídeo (su tienda inyecta anuncios → subir primero). */
+function BotonGmvMax({ v }: { v: VideoTanda }) {
+  const gmv = useGmvMax();
+  return (
+    <button
+      type="button"
+      disabled={gmv.isPending}
+      onClick={() => gmv.mutate({ id: v.id, si: !v.gmv_max })}
+      title={v.gmv_max ? "GMV Max: se sube primero. Toca para quitarlo" : "Marcar GMV Max (su tienda inyecta anuncios)"}
+      className={`rounded border px-1.5 py-px text-[9px] font-semibold ${
+        v.gmv_max
+          ? "border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-600 dark:text-fuchsia-400"
+          : "border-border/60 text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      🚀{v.gmv_max ? " GMV Max" : ""}
+    </button>
+  );
+}
 
 /** La época del vídeo, editable: cuándo publicarlo en TikTok y en Meta. */
 function SelectorEpoca({ v }: { v: VideoTanda }) {
@@ -197,12 +218,17 @@ export function MisTandas() {
   const [abierta, setAbierta] = useState<number | null>(null);
   // Filtro por tarea de Campañas de creadores: "" todas, SIN_TAREA o el id.
   const [filtro, setFiltro] = useState("");
+  // Black Friday: solo lo de productos/tiendas que inyectan GMV Max.
+  const [soloGmv, setSoloGmv] = useState(false);
 
   const datos = tandas.data;
   const tareasActivas = datos?.tareas_activas ?? [];
   const filtroReal = filtro === SIN_TAREA || tareasActivas.some((x) => x.id === filtro) ? filtro : "";
+  const hayFiltro = !!filtroReal || soloGmv;
+  const totalGmv = (datos?.tandas ?? []).reduce((n, t) => n + (t.gmv_max ?? 0), 0);
   const pasa = (v: VideoTanda) =>
-    !filtroReal || (filtroReal === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(filtroReal));
+    (!soloGmv || !!v.gmv_max) &&
+    (!filtroReal || (filtroReal === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(filtroReal)));
   const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
   const primeraPendiente = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
   const abiertaReal = abierta ?? primeraPendiente;
@@ -307,6 +333,21 @@ export function MisTandas() {
             {verOcultos ? "Ocultar" : "Ver"} los {datos.ocultos} quitados
           </button>
         ) : null}
+      </div>
+
+      <div className="mb-2 flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setSoloGmv((x) => !x)}
+          title="Black Friday: solo los vídeos de productos cuyas tiendas inyectan GMV Max (súbelos primero). Se marcan con 🚀 en cada vídeo"
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${
+            soloGmv
+              ? "border-fuchsia-500 bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400"
+              : "border-border/60 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          🚀 GMV Max · {totalGmv} por subir
+        </button>
       </div>
 
       {tareasActivas.length ? (
@@ -482,9 +523,9 @@ export function MisTandas() {
           {datos.tandas.map((t) => {
             const completa = !t.abierta;
             const visibles = t.items.filter(pasa);
-            if (filtroReal && !visibles.length) return null;
+            if (hayFiltro && !visibles.length) return null;
             // Con filtro se ven todas las tandas que tengan algo de la tarea.
-            const abiertaEsta = filtroReal ? abierta !== t.numero : abiertaReal === t.numero;
+            const abiertaEsta = hayFiltro ? abierta !== t.numero : abiertaReal === t.numero;
             return (
               <div
                 key={t.numero}
@@ -494,15 +535,16 @@ export function MisTandas() {
                   <button
                     type="button"
                     onClick={() =>
-                      filtroReal ? setAbierta(abiertaEsta ? t.numero : null) : setAbierta(abiertaEsta ? -1 : t.numero)
+                      hayFiltro ? setAbierta(abiertaEsta ? t.numero : null) : setAbierta(abiertaEsta ? -1 : t.numero)
                     }
                     className="min-w-0 flex-1 text-left"
                   >
                     <span className="text-xs font-semibold sm:text-sm">
                       {abiertaEsta ? "▾" : "▸"} Tanda {t.numero}
-                      {filtroReal ? (
+                      {hayFiltro ? (
                         <span className="ml-1 text-[10px] font-normal text-amber-500">
-                          · {visibles.length} de {t.items.length} {filtroReal === SIN_TAREA ? "sin tarea" : "de la tarea"}
+                          · {visibles.length} de {t.items.length}{" "}
+                          {!filtroReal ? "GMV Max" : filtroReal === SIN_TAREA ? "sin tarea" : "de la tarea"}
                         </span>
                       ) : null}
                     </span>
@@ -578,7 +620,7 @@ export function MisTandas() {
                         }}
                         onBlur={() => setACompletar((x) => (x === t.numero ? null : x))}
                         title={
-                          filtroReal && visibles.length < t.items.length
+                          hayFiltro && visibles.length < t.items.length
                             ? `Cierra la tanda ${t.numero} entera (${t.items.length} vídeos, no solo los de la tarea). No marca nada como subido`
                             : "Da la tanda por terminada y pasa a la siguiente. No marca nada como subido"
                         }
@@ -675,6 +717,7 @@ export function MisTandas() {
                                 </span>
                               ))}
                               <SelectorEpoca v={v} />
+                              <BotonGmvMax v={v} />
                               {v.desde ? (
                                 <span
                                   title="Su carpeta no se publica antes de este día"
