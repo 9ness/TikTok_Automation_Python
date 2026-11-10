@@ -34,6 +34,10 @@ export interface ReplicaVideo {
   rehacer: boolean;
   rehacer_nota: string;
   rehecho: boolean;
+  /** Variante sin créditos de otro vídeo (su original, nº 1-3 y el gancho que lleva). */
+  variante?: { de: string; n: number; gancho: string } | null;
+  /** Solo en la lista: por qué hoy no se puede subir (familia de variantes); vacío = se puede. */
+  espera?: string;
   /** Id de la fila en Mis tandas. */
   id_tandas: string;
   /** El MP4 sigue en el Drive. */

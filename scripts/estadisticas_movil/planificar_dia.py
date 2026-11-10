@@ -14,6 +14,7 @@ import datetime as dt
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -194,12 +195,62 @@ def plan_produccion(items: list[dict], ranking_prod: list[dict], por_formato: li
             "sin_cubrir_para_objetivo_total": extra}
 
 
+# ---------------------------------------------------------------- variantes
+_CODIGO_FAMILIAS = r"""
+import json
+from src.replicar_viral import variantes
+print('@@JSON@@' + json.dumps(variantes.estado_publicacion(%r), ensure_ascii=False))
+"""
+
+
+def leer_familias(usuario: str) -> dict:
+    """Familias de variantes sin créditos (`src/replicar_viral/variantes.py`) y las
+    que hoy no se pueden subir. Si la app aún no lo tiene o falla, vacío: el
+    plan sale igual que antes."""
+    cmd = ["docker", "exec", "-w", "/app", "-e", "PYTHONPATH=/app", "tiktok-api",
+           "python", "-c", _CODIGO_FAMILIAS % usuario]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        linea = [l for l in r.stdout.splitlines() if l.startswith("@@JSON@@")][-1]
+        d = json.loads(linea[len("@@JSON@@"):])
+        return {"familia": dict(d.get("familia") or {}), "bloqueadas": dict(d.get("bloqueadas") or {})}
+    except Exception:  # noqa: BLE001 — sin variantes el plan no cambia
+        return {}
+
+
+def filtrar_familias(ordenados: list[dict], familias: dict | None) -> tuple[list[dict], list[dict]]:
+    """Anti-duplicado de las variantes: fuera las que hoy no tocan (antes que su
+    original o con menos de 3 días desde la última subida de su familia) y, de
+    cada familia, solo el primero (nunca dos el mismo día). Devuelve (los que
+    siguen, los que esperan con su motivo)."""
+    familia = (familias or {}).get("familia") or {}
+    bloqueadas = (familias or {}).get("bloqueadas") or {}
+    siguen, esperan, vistas = [], [], set()
+    for i in ordenados:
+        k = str(i.get("id") or "").split("|")[-1]
+        raiz = familia.get(k)
+        if k in bloqueadas:
+            esperan.append({"id": i.get("id"), "producto": producto_de(i), "motivo": bloqueadas[k]})
+        elif raiz and raiz in vistas:
+            esperan.append({"id": i.get("id"), "producto": producto_de(i),
+                            "motivo": "hoy ya sale otro vídeo de su familia"})
+        else:
+            if raiz:
+                vistas.add(raiz)
+            siguen.append(i)
+    return siguen, esperan
+
+
 # ---------------------------------------------------------------- salida
-def informe(usuario: str, fecha: str, subida: list[dict], prod: dict, ndejar: set[str]) -> str:
+def informe(usuario: str, fecha: str, subida: list[dict], prod: dict, ndejar: set[str],
+            esperan: list[dict] | None = None) -> str:
     p = [f"# Plan del día {fecha} · {usuario}", "", "## 1. Subir hoy", ""]
     for r in subida:
         p += [f"{r['orden']}. **{r['producto']}** · `{r['id']}` · {r['formato']}",
               f"   - MP4: {r['mp4']}", f"   - Caption: {r['caption']}"]
+    if esperan:
+        p += ["", "Variantes que hoy NO se suben (misma familia): "
+              + "; ".join(f"`{e['id']}` {e['producto']} ({e['motivo']})" for e in esperan)]
     p += ["", f"Excluidos por «dejar»: {', '.join(sorted(ndejar)) or '-'}", "",
           "## 2. Producir para mañana", "",
           f"Stock verde: {prod['stock_total']} / objetivo {prod['objetivo_total']} · formato: {prod['formato']} (nunca sin IA)", "",
@@ -212,15 +263,17 @@ def informe(usuario: str, fecha: str, subida: list[dict], prod: dict, ndejar: se
     return "\n".join(p)
 
 
-def construir(usuario: str, ventas: dict, items: list[dict], n: int = 10, fecha: str | None = None) -> dict:
+def construir(usuario: str, ventas: dict, items: list[dict], n: int = 10, fecha: str | None = None,
+              familias: dict | None = None) -> dict:
     fecha = fecha or dt.date.today().isoformat()
     r = va.analizar(ventas, items)
     dejar = productos_dejar(r["por_producto"])
-    sel = seleccionar(ordenar(candidatos(items), r["por_producto"]), n, dejar)
+    ordenados, esperan = filtrar_familias(ordenar(candidatos(items), r["por_producto"]), familias)
+    sel = seleccionar(ordenados, n, dejar)
     subida = [fila_plan(i, k) for k, i in enumerate(sel, 1)]
     prod = plan_produccion(items, r["por_producto"], r["por_formato"])
     return {"usuario": usuario, "fecha": fecha, "subir_hoy": subida, "producir": prod,
-            "dejar": sorted(dejar), "_dejar": dejar}
+            "dejar": sorted(dejar), "_dejar": dejar, "variantes_en_espera": esperan}
 
 
 def main(argv=None) -> int:
@@ -230,8 +283,9 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
     ventas, items = va.leer_fuentes(a.usuario)
-    plan = construir(a.usuario, ventas, items, a.n)
-    txt = informe(a.usuario, plan["fecha"], plan["subir_hoy"], plan["producir"], plan.pop("_dejar"))
+    plan = construir(a.usuario, ventas, items, a.n, familias=leer_familias(a.usuario))
+    txt = informe(a.usuario, plan["fecha"], plan["subir_hoy"], plan["producir"], plan.pop("_dejar"),
+                  plan["variantes_en_espera"])
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     base = OUT_DIR / f"plan_{a.usuario}_{plan['fecha']}"
     base.with_suffix(".md").write_text(txt, encoding="utf-8")

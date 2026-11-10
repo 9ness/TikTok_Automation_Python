@@ -300,6 +300,44 @@ def test_registrar_replica_video_desde_la_bandeja(app_client, usuarios, tmp_path
     assert [i["id"] for i in json.loads(res["content"][0]["text"])["items"]] == [doc["id"]]
 
 
+def test_registrar_variante_video_solo_de_un_verde_y_con_su_espera(app_client, usuarios, tmp_path, monkeypatch):
+    """`registrar_variante_video`: la variante hereda el producto del original en
+    verde, entra sin semáforo y la lista dice por qué hoy no se puede subir."""
+    from src.mis_tandas import servicio as mt
+    from src.replicar_viral import servicio, video
+    from tests.replicar_viral.test_video import MP4, FakeRedis
+
+    r = FakeRedis()
+    monkeypatch.setattr(servicio, "_redis", lambda: r)
+    monkeypatch.setattr(video, "_raiz", lambda: tmp_path / "drive")
+    monkeypatch.setenv("AGENTE_BANDEJA_DIR", str(tmp_path / "bandeja"))
+    colores: dict = {}
+    monkeypatch.setattr(mt, "semaforos", lambda u: colores)
+    (config.bandeja_dir("ness") / "variantes").mkdir(parents=True, exist_ok=True)
+    (config.bandeja_dir("ness") / "variantes" / "o_var1.mp4").write_bytes(MP4 + b"1")
+    (tmp_path / "o.mp4").write_bytes(MP4)
+    orig = video.registrar("ness", modo="con_ia", origen=tmp_path / "o.mp4", titulo="Copas navideñas",
+                           product_url="https://www.tiktok.com/view/product/1729123456789", caption="Para la cena")
+
+    url = f"/api/mcp/{config.token_de('ness')}"
+    args = {"origen_id": f"rv|{orig['id']}", "ruta_bandeja": "variantes/o_var1.mp4", "n": 1,
+            "gancho": "Mira cómo quedan en la mesa antes de la cena 🥂"}
+    res = _rpc(app_client, url, "tools/call", {"name": "registrar_variante_video", "arguments": args})
+    assert res["isError"] and "verde" in res["content"][0]["text"]
+
+    colores[f"rv|{orig['id']}"] = {"color": "verde"}
+    res = _rpc(app_client, url, "tools/call", {"name": "registrar_variante_video", "arguments": args})
+    assert not res.get("isError"), res
+    v = json.loads(res["content"][0]["text"])
+    assert v["variante"]["de"] == orig["id"] and v["titulo"] == "Copas navideñas" and v["caption"] == "Para la cena"
+    assert "original" in v["espera"] and "descargar" in v
+    assert (tmp_path / "drive" / "ness" / f"{v['id']}.mp4").read_bytes() == MP4 + b"1"
+
+    res = _rpc(app_client, url, "tools/call", {"name": "listar_replicas_video", "arguments": {}})
+    items = {i["id"]: i for i in json.loads(res["content"][0]["text"])["items"]}
+    assert items[v["id"]]["espera"] and items[orig["id"]]["espera"] == "" and items[orig["id"]]["variante"] is None
+
+
 class ApiSubida(ApiFalsa):
     def __init__(self, respuestas):
         super().__init__(respuestas)

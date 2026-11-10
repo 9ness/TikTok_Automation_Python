@@ -16,7 +16,7 @@ from src.api.dependencies import get_current_user, get_web_user
 from src.api.exceptions import APIError
 from pydantic import BaseModel, Field
 
-from src.replicar_viral import carrusel, catalogo, servicio, video
+from src.replicar_viral import carrusel, catalogo, servicio, variantes, video
 
 router = APIRouter(
     prefix="/api/v1/replicar-viral",
@@ -45,6 +45,8 @@ def _texto_a_lista(x: str) -> list[str]:
 def _error(e: Exception) -> APIError:
     if isinstance(e, servicio.ErrorReplica):
         return APIError(str(e), status_code=e.status)
+    if isinstance(e, variantes.ErrorVariante):
+        return APIError(str(e), status_code=400)
     return APIError(f"{type(e).__name__}: {e}", status_code=500)
 
 
@@ -164,11 +166,36 @@ def video_bandeja(body: VideoBandejaRequest, usuario: Annotated[str, Depends(get
         raise _error(e) from e
 
 
+class VideoVarianteRequest(BaseModel):
+    origen_id: str
+    ruta: str
+    n: int
+    gancho: str
+
+
+@router.post("/video/variante")
+def video_variante(body: VideoVarianteRequest, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
+    """Alta de una VARIANTE sin créditos (`src/replicar_viral/variantes.py`) de un
+    vídeo en verde: el MP4 sale de la bandeja de quien llama y hereda producto,
+    caption y hashtags del original. Queda sin semáforo y con su `espera`."""
+    try:
+        doc = variantes.registrar_variante(usuario, body.origen_id, video.ruta_bandeja(usuario, body.ruta),
+                                           n=body.n, gancho=body.gancho)
+        espera = variantes.bloqueadas(video.listar(usuario), variantes.hoy_madrid())
+        return {**video.resumen(doc), "espera": espera.get(doc["id"], "")}
+    except Exception as e:  # noqa: BLE001
+        raise _error(e) from e
+
+
 @router.get("/video")
 def video_listar(modo: str = "", usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
-    """Las réplicas en vídeo del usuario (lo último primero)."""
+    """Las réplicas en vídeo del usuario (lo último primero). `espera`: por qué
+    una variante (o su original) no se puede subir hoy; vacío si se puede."""
     try:
-        return {"modos": video.MODOS, "items": [video.resumen(d) for d in video.listar(usuario, modo)]}
+        docs = video.listar(usuario, modo)
+        espera = variantes.bloqueadas(video.listar(usuario) if modo else docs, variantes.hoy_madrid())
+        return {"modos": video.MODOS,
+                "items": [{**video.resumen(d), "espera": espera.get(d.get("id", ""), "")} for d in docs]}
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 

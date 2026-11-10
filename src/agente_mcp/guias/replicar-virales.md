@@ -265,3 +265,58 @@ se quita el «rehacer» y el vídeo sale de su tanda para entrar en una nueva.
 Para verlas: `listar_replicas_video(modo="")`. Con `id`, la réplica entera con
 sus prompts. `borrar_replica_video(id, confirmar=True)` solo se usa si el
 operador lo pide.
+
+## 4. Variantes sin créditos (Casca Chollos, 10/11/2026)
+
+De una réplica **ya en verde** salen hasta **tres** variantes sin generar nada
+(0 créditos: ffmpeg). Cada una cambia varias cosas a la vez: gancho nuevo en
+una píldora de otro color que tapa la del original, otro orden de los planos
+sin flecha, un movimiento lento de cámara y otra música libre del banco
+(`Multiplataforma/_musica`). La cola con la flecha no se toca nunca. Sirve
+para llenar el día con lo que ya funciona; no sustituye a hacer vídeos nuevos.
+
+**Reglas (la app las hace cumplir):**
+
+- Solo de un vídeo en 🟢, y nunca variante de una variante. Máximo 3 por original.
+- El original y sus variantes son una **familia**: de una familia sale **uno al
+  día**, con **3 días** como mínimo desde la última subida de cualquiera de
+  ellos, y ninguna variante antes que su original.
+- **Espejo (`--espejo`) solo si el producto es simétrico y no lleva texto ni
+  logos.** Lo decides tú mirando la ficha y el vídeo; ante la duda, sin espejo.
+  Un producto espejado ya no es idéntico a la ficha.
+- El gancho no lleva precios, porcentajes, cupones, «oferta», «gratis» ni «el
+  mejor» (ni la app ni la CLI lo aceptan). 40-75 caracteres, 1-2 emojis al
+  final. En la variante 2 (píldora amarilla) evita emojis amarillos (✨⭐💛): no se ven.
+- Vídeo hablado: `--conservar-audio` (ni música nueva ni reorden de planos).
+
+**Pasos** (en el VPS, desde el repo; unos 20 s por variante):
+
+1. Mira el original (`listar_replicas_video(id=…)`) y escribe tres ganchos con
+   ángulos distintos (curiosidad, problema que quita, regalo…), distintos del
+   que ya lleva.
+2. Móntalas:
+   ```
+   python3 -m src.replicar_viral.variantes crear \
+     "<…>/Replicar_Viral/<usuario>/<id>.mp4" --id <id> \
+     --ganchos "gancho 1 🎄|gancho 2 😮|gancho 3 🎁" \
+     --salida /mnt/HC_Volume_106974679/agentes/trabajo/<tema>/variantes
+   ```
+   Deja `<id>_var1..3.mp4`, una hoja a 2 fps al lado (`.hoja.jpg`) y
+   `<id>_variantes.json` con el control de cada una (formato 1080x1920 sin
+   bandas, audio, movimiento, restos de la píldora vieja). Si alguna no pasa el
+   control, no se registra: se arregla o se descarta.
+3. **Mira cada hoja** como cualquier vídeo: la píldora nueva tapa del todo la
+   vieja, el texto se lee y no pisa el producto, el producto es idéntico a la
+   ficha (si usaste espejo, que no haya letras al revés), los cortes tienen
+   sentido y la flecha sigue en su sitio.
+4. Copia las buenas a tu bandeja (`_agente/<usuario>/variantes/`) y regístralas:
+   ```
+   registrar_variante_video(origen_id="<id>", ruta_bandeja="variantes/<id>_var1.mp4",
+                            n=1, gancho="gancho 1 🎄")
+   ```
+   Hereda producto, enlace, caption y hashtags del original, entra en Mis tandas
+   **sin semáforo** y devuelve `espera`: desde cuándo se puede subir.
+5. `semaforo_tanda(id="rv|<id nuevo>", …)` tras mirarla, como siempre.
+6. Al subir: `listar_replicas_video` trae `variante` (de quién es) y `espera`
+   (vacío = se puede hoy). El plan del día de Casca (`planificar_dia.py`) ya no
+   pone dos de la misma familia ni una que espera, y lo dice en el informe.

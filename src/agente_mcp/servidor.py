@@ -1023,10 +1023,30 @@ async def registrar_replica_video(
 
 
 @_herramienta(structured_output=False)
+async def registrar_variante_video(ctx: Context, origen_id: str, ruta_bandeja: str, n: int, gancho: str) -> str:
+    """Registra una VARIANTE sin créditos de un vídeo tuyo que ya está en VERDE
+    (el mismo vídeo con otro gancho, otro orden de planos, otro movimiento y otra
+    música libre; se hacen con `python3 -m src.replicar_viral.variantes crear`,
+    ver `guia("replicar-virales")` › «Variantes sin créditos»). `origen_id`: el
+    `rv|<id>` del original; `ruta_bandeja`: el MP4 de la variante en tu bandeja;
+    `n`: 1, 2 o 3 (máximo tres por original); `gancho`: el texto que lleva.
+    Hereda producto, caption y hashtags del original y entra en `mis_tandas` SIN
+    semáforo: revísala a 2 fps y ponle `semaforo_tanda` como a cualquier vídeo.
+    `espera` dice si hoy no se puede subir: nunca dos de la misma familia el
+    mismo día, tres días entre ellas y nunca antes que su original."""
+    u = _usuario(ctx)
+    r = await Interno(u).post("/api/v1/replicar-viral/video/variante",
+                              {"origen_id": origen_id, "ruta": ruta_bandeja, "n": n, "gancho": gancho})
+    return _json(_enlaces_replica_video(u, r))
+
+
+@_herramienta(structured_output=False)
 async def listar_replicas_video(ctx: Context, modo: str = "", id: str = "") -> str:
     """Las réplicas en vídeo registradas (lo último primero), con su estado
     (subido, sin stock, rehacer + nota), `id_tandas` (el id en `mis_tandas`
-    para `semaforo_tanda`/`marcar_tanda`/`epoca_video`) y `descargar`.
+    para `semaforo_tanda`/`marcar_tanda`/`epoca_video`) y `descargar`. Las
+    variantes sin créditos traen `variante` (de qué original) y todas `espera`
+    (por qué hoy no se puede subir; vacío = se puede).
     `modo`: con_ia | genjutsu | sin_ia. Con `id`: esa réplica entera, con sus `prompts`."""
     u = _usuario(ctx)
     api = Interno(u)

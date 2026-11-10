@@ -346,6 +346,7 @@ def listar(usuario: str, modo: str = "") -> list[dict]:
 def resumen(doc: dict) -> dict:
     """Lo que enseña la lista (sin prompts largos)."""
     prod = doc.get("producto") or {}
+    var = doc.get("variante") or {}
     return {
         "id": doc.get("id", ""), "tipo": TIPO, "modo": doc.get("modo", ""),
         "modo_label": MODOS.get(doc.get("modo", ""), doc.get("modo", "")),
@@ -358,6 +359,8 @@ def resumen(doc: dict) -> dict:
         "rehacer": bool(doc.get("rehacer")), "rehacer_nota": doc.get("rehacer_nota", ""),
         "rehecho": bool(doc.get("rehecho")),
         "catalogo_ref": doc.get("catalogo_ref") or None,
+        # variante sin créditos de otro vídeo (`variantes.py`): de cuál, qué número y su gancho
+        "variante": ({k: var.get(k) for k in ("de", "n", "gancho")} if var.get("de") else None),
         "id_tandas": f"rv|{doc.get('id', '')}",
         "existe": Path(doc.get("video_path") or "").is_file(),
     }

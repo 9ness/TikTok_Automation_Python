@@ -94,3 +94,28 @@ def test_max_dos_por_producto_y_no_probar_caros(tmp_path=None):
     assert m._NO_PROBAR.search("Sofá Litbird en U") and m._NO_PROBAR.search("Colchón DEWINNER")
     assert m._raiz("Libro 100000 Porqués infantil") & m._raiz("100000 Porqués · mal padre")
     assert not (m._raiz("Copas navideñas de cristal") & m._raiz("Proyector LED árbol de Navidad"))
+
+
+
+def test_variantes_una_por_familia_y_fuera_las_que_esperan():
+    """Variantes sin créditos: nunca dos de la misma familia el mismo día, ni la
+    que aún no toca (antes que su original o con menos de 3 días)."""
+    items = [it("rv|o1", "Copas", t=1), it("rv|v1", "Copas", t=2), it("rv|v2", "Copas", t=3),
+             it("rv|v9", "Celo", t=4), it("rv|s1", "Taza", t=5)]
+    fam = {"familia": {"o1": "o1", "v1": "o1", "v2": "o1", "o9": "o9", "v9": "o9"},
+           "bloqueadas": {"v9": "su familia subió el 09/11: no antes del 12/11"}}
+    siguen, esperan = pd.filtrar_familias(items, fam)
+    assert [i["id"] for i in siguen] == ["rv|o1", "rv|s1"]
+    assert {e["id"]: e["motivo"] for e in esperan} == {
+        "rv|v1": "hoy ya sale otro vídeo de su familia", "rv|v2": "hoy ya sale otro vídeo de su familia",
+        "rv|v9": "su familia subió el 09/11: no antes del 12/11"}
+    # sin datos de variantes (app sin desplegar): el plan no cambia
+    assert pd.filtrar_familias(items, None) == (items, [])
+    assert pd.filtrar_familias(items, {}) == (items, [])
+
+    plan = pd.construir("nestor2", {}, items, n=10, fecha="2026-11-10", familias=fam)
+    ids = [r["id"] for r in plan["subir_hoy"]]
+    assert "rv|v9" not in ids and len({"rv|o1", "rv|v1", "rv|v2"} & set(ids)) == 1 and "rv|s1" in ids
+    txt = pd.informe("nestor2", plan["fecha"], plan["subir_hoy"], plan["producir"], plan["_dejar"],
+                     plan["variantes_en_espera"])
+    assert "hoy NO se suben" in txt and "rv|v9" in txt
