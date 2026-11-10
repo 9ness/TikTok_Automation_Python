@@ -51,6 +51,7 @@ CARPETA_MOVIL = "/sdcard/Pictures/carr_tmp"
 MCP_URLS = Path(__file__).resolve().parent.parent / "MCP_URLS.local.md"
 USUARIO = os.environ.get("MCP_USUARIO", "ness")
 SONIDO_ID = os.environ.get("SONIDO_ID", "")   # sonido comercial fijo (Ama Shop), por enlace y con `rapido`: sin lista ni lupa
+SONIDOS_DIR = Path(os.environ.get("SONIDOS_DIR", "/mnt/HC_Volume_106974679/agentes/trabajo/sonidos"))   # reserva_<usuario>.json (#331)
 
 # Cronómetro por fase (9/11): solo mide, no cambia nada. Cada orden (rapido/producto/publicar) guarda
 # sus fases en TMP/fases_<id>.json; publicar añade el total a TMP/fases.jsonl.
@@ -372,6 +373,15 @@ def carrusel(cid: str) -> dict:
     if SONIDO_ID:
         c["musica"]["tiktok"] = {"titulo": f"fijo {SONIDO_ID}",
                                  "enlace": f"https://www.tiktok.com/music/sonido-{SONIDO_ID}"}
+    else:   # #331: el comprobador de la tarde dejó otro sonido si el del viral no está disponible en España
+        try:
+            r = json.loads((SONIDOS_DIR / f"reserva_{USUARIO}.json").read_text()).get(cid)
+        except (OSError, ValueError):
+            r = None
+        if r and r.get("enlace"):
+            print(f"SONIDO DE RESERVA: «{r.get('titulo')}» ({r.get('motivo')})", flush=True)
+            c = {**c, "musica": {**(c.get("musica") or {}), "tiktok": {
+                k: r[k] for k in ("titulo", "autor", "original", "id", "enlace") if k in r}}}
     return c
 
 
