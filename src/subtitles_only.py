@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 import numpy as np
+import os
 
 
 # ---------------------------------------------------------------------
@@ -787,6 +788,97 @@ def _split_chunks_to_one_line(
     return out
 
 
+def _render_overlays_ffmpeg(
+    video_path: str,
+    overlays: list,
+    size: tuple[int, int],
+    fps: float,
+    quality_settings: dict,
+    output_path: str,
+) -> None:
+    """Compone en UNA pasada de ffmpeg las capas ya calculadas por
+    `render_subtitles_on_video` (ImageClip estáticos con start/end/posición).
+    Audio del input tal cual a AAC, como el render en 2 pasos de moviepy."""
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    from PIL import Image as _Image
+
+    W, H = size
+    # Tamaño mostrado del input (con rotación): si no cuadra con el de moviepy
+    # salvo el downscale, mejor caer a moviepy que deformar.
+    pr = _sp.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=width,height:stream_side_data=rotation:stream_tags=rotate",
+         "-of", "json", video_path],
+        capture_output=True, text=True, check=True,
+    )
+    st = (_json.loads(pr.stdout).get("streams") or [{}])[0]
+    iw, ih = int(st["width"]), int(st["height"])
+    rot = str((st.get("tags") or {}).get("rotate", "0"))
+    for sd in st.get("side_data_list") or []:
+        if "rotation" in sd:
+            rot = str(sd["rotation"])
+    if rot.lstrip("-") in ("90", "270"):
+        iw, ih = ih, iw
+    if abs(iw / ih - W / H) > 0.01:
+        raise RuntimeError(f"tamaño {iw}x{ih} no cuadra con {W}x{H}")
+
+    tmp = _tf.mkdtemp(prefix="subs_ff_", dir=os.path.dirname(os.path.abspath(output_path)))
+    try:
+        inputs: list[str] = []
+        filt = [f"[0:v]scale={W}:{H}[b]"] if (iw, ih) != (W, H) else []
+        prev = "b" if filt else "0:v"
+        for k, c in enumerate(overlays):
+            arr = np.asarray(c.get_frame(0)).astype(np.uint8)
+            if c.mask is not None:
+                alpha = (np.clip(c.mask.get_frame(0), 0, 1) * 255).astype(np.uint8)
+            else:
+                alpha = np.full(arr.shape[:2], 255, np.uint8)
+            p = os.path.join(tmp, f"{k}.png")
+            _Image.fromarray(np.dstack([arr[:, :, :3], alpha]), "RGBA").save(p, compress_level=1)
+            inputs += ["-i", p]
+            x, y = c.pos(0)
+            xs = "(W-w)/2" if x == "center" else str(int(x))
+            a, b = float(c.start), float(c.end)
+            filt.append(
+                f"[{prev}][{k + 1}:v]overlay=x={xs}:y={int(y)}"
+                f":enable='between(t,{a:.4f},{b - 0.0005:.4f})'[v{k}]"
+            )
+            prev = f"v{k}"
+        # Como moviepy: el último fotograma se alarga para que -shortest corte
+        # por el AUDIO y no se coma los últimos ms del cierre de la voz.
+        con_audio = bool(_sp.run(
+            ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
+             "stream=index", "-of", "csv=p=0", video_path],
+            capture_output=True, text=True,
+        ).stdout.strip())
+        if con_audio:
+            filt.append(f"[{prev}]tpad=stop_mode=clone:stop_duration=0.5[vout]")
+            prev = "vout"
+        script = os.path.join(tmp, "filtro.txt")
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(";".join(filt))
+        _sp.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+             "-i", video_path, *inputs,
+             "-filter_complex_script", script,
+             "-map", f"[{prev}]", "-map", "0:a:0?",
+             "-r", f"{float(fps):.6g}",
+             "-c:v", "libx264", "-preset", str(quality_settings.get("preset", "medium")),
+             "-crf", str(quality_settings.get("crf", 20)), "-pix_fmt", "yuv420p",
+             "-threads", "8",
+             "-c:a", "aac", "-b:a", "192k",
+             "-shortest", "-movflags", "+faststart", output_path],
+            check=True, capture_output=True, text=True,
+        )
+    except _sp.CalledProcessError as e:
+        raise RuntimeError((e.stderr or "")[-300:]) from None
+    finally:
+        _sh.rmtree(tmp, ignore_errors=True)
+
+
 def render_subtitles_on_video(
     video_path: str,
     words: list[dict],
@@ -970,6 +1062,23 @@ def render_subtitles_on_video(
 
     if log_callback:
         log_callback(f"🎞️ Componiendo {len(overlays)} sub-clips sobre {W}x{H}…")
+
+    # Motor ffmpeg (10/11/2026, solo quien lo pide: el Editor Auto). Las MISMAS
+    # imágenes y tiempos, pero compuestas con `overlay` de ffmpeg en vez de
+    # moviepy fotograma a fotograma en Python: 30 s 1080x1920 → 78 s a 31 s.
+    # Cualquier fallo → se sigue por moviepy como siempre.
+    if (quality_settings.get("motor") == "ffmpeg" and overlays
+            and s.get("entrance_anim") != "pop"):
+        try:
+            _render_overlays_ffmpeg(video_path, overlays, (W, H), video.fps,
+                                    quality_settings, output_path)
+            if log_callback:
+                log_callback(f"⚡ Subtítulos compuestos con ffmpeg ({len(overlays)} capas)")
+            video.close()
+            return output_path
+        except Exception as e:  # noqa: BLE001 — nunca romper: moviepy de respaldo
+            if log_callback:
+                log_callback(f"⚠️ ffmpeg overlay falló ({type(e).__name__}: {e}); sigo con moviepy")
 
     final = CompositeVideoClip([video] + overlays, size=(W, H))
 

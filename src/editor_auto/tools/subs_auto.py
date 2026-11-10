@@ -176,6 +176,10 @@ class SubsAutoTool:
         _p = os.environ.get("EDITOR_SUBS_PRESET", "veryfast").strip()
         if _p and _p != "calidad" and quality.get("preset") in ("slow", "medium"):
             quality = {**quality, "preset": _p}
+        # Composición con ffmpeg en vez de moviepy (2,5× más rápido, mismas
+        # capas). EDITOR_SUBS_MOTOR=moviepy vuelve al de siempre.
+        if os.environ.get("EDITOR_SUBS_MOTOR", "ffmpeg").strip() == "ffmpeg":
+            quality = {**quality, "motor": "ffmpeg"}
 
         ctx.on_progress(0.02, "🔊 Extrayendo audio…")
         ctx.on_log("[subs_auto] Extrayendo audio del vídeo…")
