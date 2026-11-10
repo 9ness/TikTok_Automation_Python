@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 import { ClavesApi } from "@/components/settings/ClavesApi";
 import { NavegadorRemoto } from "@/components/settings/NavegadorRemoto";
@@ -46,6 +47,22 @@ export default function AccesosPage() {
         <p className="text-sm text-muted-foreground">Esta pantalla es solo del administrador.</p>
       ) : (
         <>
+          {/* Conectar Meta (FB/IG/Threads de Multiplataforma): es lo único de AI Pro
+              que Néstor abre a mano aparte de Mis tandas, y en el menú va en «Más». */}
+          <Card>
+            <CardContent className="flex items-center justify-between gap-3 p-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">🔌 Conectar Meta</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Tokens de Facebook, Instagram y Threads para Multiplataforma.
+                </p>
+              </div>
+              <Button asChild size="sm" variant="outline" className="shrink-0">
+                <Link href="/tiktok-shop-ai-pro/conectar-meta">Abrir</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Los navegadores con sus botones (encender / abrir / apagar): VPS y PC de casa. */}
           <NavegadorRemoto />
           <NavegadorRemoto maquina="casa" />
