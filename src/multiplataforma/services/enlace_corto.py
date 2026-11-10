@@ -17,7 +17,11 @@ import base64
 import dataclasses
 import hashlib
 import re
+import json
+import os
 import time
+import unicodedata
+import urllib.request
 
 from src.multiplataforma import config
 from src.multiplataforma.models import Publicacion
@@ -53,9 +57,67 @@ def registrar(pub: Publicacion, plataforma: str, *, guardar: bool = True) -> str
     return url_corta(cod)
 
 
+# ── Redirector del panel (10/11/2026, encargo de Néstor) ─────────────────
+# https://panel.nebulabsmedia.com/r/<cuenta>/<enlace>?d=ig|fb|threads → 302 al
+# afiliado; los clics salen en el panel (Cuentas › Tráfico). Un enlace por
+# producto y cuenta. Solo Meta; Amazon solo con MULTIPLATAFORMA_ENLACE_CORTO_AMAZON=1.
+RED_PANEL = {"instagram": "ig", "instagram_dm": "ig", "facebook": "fb", "threads": "threads"}
+
+
+def panel_activo() -> bool:
+    return (os.getenv("MULTIPLATAFORMA_ENLACE_PANEL", "1").strip() == "1"
+            and bool(os.getenv("PANEL_URL")) and bool(os.getenv("PANEL_TOKEN")))
+
+
+def nombre_panel(pub: Publicacion) -> str:
+    """`enlace` del panel ([a-z0-9_-], ≤40): título legible + huella del destino."""
+    base = unicodedata.normalize("NFKD", pub.titulo or pub.producto_ref or "producto")
+    base = re.sub(r"[^a-z0-9]+", "-", base.encode("ascii", "ignore").decode().lower()).strip("-")[:31] or "producto"
+    return f"{base}-{hashlib.sha1(pub.enlace.encode()).hexdigest()[:6]}"
+
+
+def _registrar_panel(pub: Publicacion, enlace: str) -> str:
+    url = os.getenv("PANEL_URL", "").rstrip("/") + "/api/redirecciones"
+    cuerpo = {"cuenta": pub.cuenta, "enlace": enlace, "url": pub.enlace, "titulo": (pub.titulo or enlace)[:100]}
+    req = urllib.request.Request(url, method="POST", data=json.dumps(cuerpo).encode(), headers={
+        "Authorization": f"Bearer {os.getenv('PANEL_TOKEN', '')}", "X-Agente": "Multiplataforma",
+        "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return str(json.loads(r.read().decode() or "{}").get("corta") or "")
+
+
+def _corto_panel(pub: Publicacion, plataforma: str, guardar: bool) -> str:
+    """URL del panel con su `?d=`, o "" si no aplica o el panel falla (se
+    publica con el enlace directo: medir nunca para una publicación)."""
+    red = RED_PANEL.get(plataforma)
+    if not red or not pub.enlace or not panel_activo():
+        return ""
+    if enlaces.es_amazon(pub.enlace) and not config.enlace_corto_amazon():
+        return ""
+    nombre = nombre_panel(pub)
+    try:
+        corta = _registrar_panel(pub, nombre) if guardar else ""
+    except Exception:  # noqa: BLE001
+        return ""
+    corta = corta or f"https://panel.nebulabsmedia.com/r/{pub.cuenta}/{nombre}"
+    return f"{corta}?d={red}"
+
+
+def _cambiar(pub: Publicacion, plataforma: str, corto: str) -> Publicacion:
+    textos = dict(pub.textos)
+    if plataforma in textos:
+        textos[plataforma] = textos[plataforma].replace(pub.enlace, corto)
+    return dataclasses.replace(pub, enlace=corto, textos=textos,
+                               comentario=(pub.comentario or "").replace(pub.enlace, corto))
+
+
 def para_envio(pub: Publicacion, plataforma: str, *, guardar: bool = True) -> Publicacion:
     """Copia de `pub` con el enlace cambiado por el corto en el texto de esa
-    red, el comentario de FB y el `link` de Pinterest. Si no aplica, `pub`."""
+    red, el comentario de FB y el `link` de Pinterest. Si no aplica, `pub`.
+    Meta va por el redirector del panel; si no, el corto propio (#296)."""
+    corto = _corto_panel(pub, plataforma, guardar)
+    if corto:
+        return _cambiar(pub, plataforma, corto)
     if not aplica(pub.enlace):
         return pub
     corto = registrar(pub, plataforma, guardar=guardar)

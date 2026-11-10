@@ -349,6 +349,7 @@ Cron propuesto (pendiente de Néstor): `7 * * * * ~/proyectos/TikTok_Automation_
 ## Enlace corto con clics (#296) y «Comenta SÍ» (#297) · 9/11/2026
 
 Los dos están **apagados**; encenderlos cambia lo que sale publicado → «sí» de Néstor.
+- **Redirector del panel** (10/11/2026, por defecto encendido; `MULTIPLATAFORMA_ENLACE_PANEL=0` lo apaga; necesita `PANEL_URL`/`PANEL_TOKEN`): en Meta (Threads, comentario de FB, DM de IG) el enlace NO Amazon sale como `https://panel.nebulabsmedia.com/r/<cuenta>/<titulo-huella>?d=ig|fb|threads`, registrado al publicar (`POST /api/redirecciones`). Clics en el panel › Cuentas › Tráfico. Si el panel falla, va el enlace directo. Amazon siempre directo (decisión de Néstor). Tiene prioridad sobre el corto propio de abajo.
 - **Enlace corto** (`services/enlace_corto.py`, `MULTIPLATAFORMA_ENLACE_CORTO=1`): en `publicador._ejecutar` la COPIA
   que se envía lleva `<base>/<código>` en el texto de Threads, el comentario de FB y el `link` de Pinterest (la cola
   guarda el original). Código = `sha1(pid|red)` en 8 letras base32 (reintentos no crean otro). Público

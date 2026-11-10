@@ -256,3 +256,47 @@ def test_sin_token_no_toca_la_red(redis):
     c = cuentas_repo.guardar(CuentaDestino(slug="casa", ig_user_id="17841"))
     inf = comenta_si.procesar_cuenta(c, ahora=AHORA, http=Grabadora([]).cliente())
     assert inf["errores"] == ["sin token o ig_user_id de Instagram"]
+
+
+# ── Redirector del panel (10/11/2026) ──────────────────────────────────────
+
+@pytest.fixture
+def panel(monkeypatch):
+    monkeypatch.setenv("PANEL_URL", "https://panel.test")
+    monkeypatch.setenv("PANEL_TOKEN", "x")
+    llamadas = []
+
+    def falso(pub, nombre):
+        llamadas.append((pub.cuenta, nombre, pub.enlace))
+        return f"https://panel.nebulabsmedia.com/r/{pub.cuenta}/{nombre}"
+
+    monkeypatch.setattr(enlace_corto, "_registrar_panel", falso)
+    return llamadas
+
+
+def test_panel_meta_por_red_y_original_intacta(panel):
+    pub = _pub(titulo="Bolso de Cuero Ñandú")
+    th = enlace_corto.para_envio(pub, "threads")
+    fb = enlace_corto.para_envio(pub, "facebook")
+    dm = enlace_corto.para_envio(pub, "instagram_dm")
+    nombre = enlace_corto.nombre_panel(pub)
+    assert nombre.startswith("bolso-de-cuero-nandu-") and len(nombre) <= 40
+    base = f"https://panel.nebulabsmedia.com/r/casa/{nombre}"
+    assert th.enlace == f"{base}?d=threads" and th.textos["threads"].endswith(f"{base}?d=threads")
+    assert fb.comentario.endswith(f"{base}?d=fb") and dm.enlace == f"{base}?d=ig"
+    assert pub.enlace == SHEIN and SHEIN in pub.textos["threads"]
+    assert panel[0] == ("casa", nombre, SHEIN)
+
+
+def test_panel_no_toca_amazon_ni_pinterest_y_si_falla_va_directo(panel, monkeypatch):
+    assert enlace_corto.para_envio(_pub(enlace=AMAZON, textos={"threads": AMAZON}), "threads").enlace == AMAZON
+    assert enlace_corto.para_envio(_pub(), "pinterest").enlace == SHEIN
+    assert not panel
+
+    def roto(pub, nombre):
+        raise OSError("caído")
+
+    monkeypatch.setattr(enlace_corto, "_registrar_panel", roto)
+    assert enlace_corto.para_envio(_pub(), "threads").enlace == SHEIN
+    monkeypatch.setenv("MULTIPLATAFORMA_ENLACE_PANEL", "0")
+    assert enlace_corto.para_envio(_pub(), "threads").enlace == SHEIN
