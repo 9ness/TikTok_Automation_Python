@@ -48,11 +48,25 @@ _ID_EN_URL = re.compile(r"/(?:view/product|pdp)/(\d{10,})")
 _VOLCADO = r'''
 import json
 from src.mis_tandas import servicio as s
+from src.nicho_pov_bof.repos import product_repo as pr
 out = []
+_carpetas = {}
+def _pid(u, f):
+    """Id guardado en la ficha (filas largo sin enlace: Mis Productos, Tareas…)."""
+    if f.get("nicho") != "largo" or not f.get("source") or not f.get("carpeta"):
+        return ""
+    k = (f["source"], f["carpeta"], u)
+    if k not in _carpetas:
+        try:
+            _carpetas[k] = pr.load_folder_para(f["source"], f["carpeta"], u).get("productos") or {}
+        except Exception:
+            _carpetas[k] = {}
+    return str((_carpetas[k].get(str(f.get("producto"))) or {}).get("product_id") or "")
 for u in %r:
     sem = s.semaforos(u)
     for f in s.filas(u):
         out.append({
+            "product_id": _pid(u, f),
             "usuario": u, "id": f.get("id") or "",
             "color": (sem.get(f.get("id")) or {}).get("color") or "",
             "titulo": f.get("titulo") or "", "product_url": f.get("product_url") or "",
@@ -139,7 +153,7 @@ def cruzar(filas: list[dict], banco: dict[str, dict], hechos: dict[str, list[str
         if f.get("color") != "verde":
             continue
         url = f.get("product_url") or ""
-        pid = id_en_url(url) or ids_cortos.get(url, "")
+        pid = id_en_url(url) or ids_cortos.get(url, "") or str(f.get("product_id") or "")
         if not pid or pid not in banco:
             continue
         cand = {
@@ -269,7 +283,8 @@ def cmd_cruce(a: argparse.Namespace) -> int:
     res.update({"filas_en_verde": len(verdes),
                 "verdes_sin_id": sum(1 for f in verdes
                                      if not (id_en_url(f.get("product_url") or "")
-                                             or ids.get(f.get("product_url") or ""))),
+                                             or ids.get(f.get("product_url") or "")
+                                             or f.get("product_id"))),
                 "banco": len(leer_banco())})
     salida.mkdir(parents=True, exist_ok=True)
     (salida / "REAPROVECHAR.json").write_text(

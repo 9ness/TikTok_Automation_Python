@@ -99,3 +99,11 @@ def test_cruzar_avisa_si_la_bandeja_cambio_despues_del_verde_y_marca_lo_ya_hecho
     assert "POSTERIORES" in cands[0]["aviso"]
     assert cands[0]["ya_hecho"] == ["hmizat_ronda9:4"]
     assert rea.resumen(cands)["productos_con_brutos_sin_hacer"] == 0
+
+
+def test_cruzar_usa_el_id_de_la_ficha_si_la_fila_no_tiene_enlace(tmp_path):
+    filas = [_fila(id="largo|mis_productos|Mis Productos 5|8|dolor", product_url="",
+                   product_id=PID)]
+    cands = rea.cruzar(filas, {PID: {"producto": "Lavabo"}}, {}, {},
+                       bandejas=tmp_path, subidos=tmp_path / "nada")
+    assert [c["product_id"] for c in cands] == [PID]

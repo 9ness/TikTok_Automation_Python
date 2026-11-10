@@ -151,6 +151,9 @@ Un producto del banco que `ness`, `nestor2` o `ana` ya tienen montado y en verde
 Hoy (10/11): banco de 191 ids, 7 con vídeo verde en otra cuenta y solo 2 con brutos (lavabo con cascada: 4 juegos de clips;
 Medicube: 1, rechazado). Los otros 5 se montaron sin dejar los clips en la bandeja o son réplicas (`rv|…`). Sale más a cuenta
 al revés: elegir para el banco productos que ya tengan verde y brutos. Prueba: `hmizat_reaprovechar/videos/01_…` y `02_…`.
+**Regla (Admin, 10/11): al llenar el banco, primero los productos que ya tienen verde y clips brutos en otra cuenta.**
+Filas sin enlace (Mis Productos, Tareas…): el cruce usa el `product_id` guardado en la ficha; los verdes que no tienen
+ni enlace ni id (43 el 10/11) no cruzan hasta que se les ponga la URL. Los 2 lavabos de prueba NO se publican sin el OK de Néstor.
 
 ### Receta probada: 10 POV replicados en un día (ronda 8, 31/10)
 
