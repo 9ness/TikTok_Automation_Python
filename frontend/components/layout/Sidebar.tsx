@@ -374,14 +374,13 @@ const SOLO_ALGUNOS: Record<string, string[]> = {
  *  arriba y el grupo se queda en «Más» con el resto. El orden es este.
  *  Quien no está aquí ve su menú como siempre, sin «Más». */
 export const PRINCIPAL: Record<string, string[]> = {
+  // 10/11/2026: «prácticamente solo uso Mis tandas»; Conectar Meta está
+  // ahora también dentro de Accesos. Lo de los agentes, en «Más».
   ness: [
     `/tiktok-shop-ai-pro/mis-tandas`,
     "/subidas",
     "/estadisticas",
-    "/costs",
-    "/claude",
     "/accesos",
-    "/editor-auto",
   ],
 };
 

@@ -135,6 +135,26 @@ viral. `tipo: camara_a_pov` = el viral es una chica hablando a cámara y lo hace
 en 1ª persona (Néstor, 1/11). Se coge de arriba abajo y se marca `hecho: true`. Antes de producir un
 producto nuevo, comprobar que se puede enlazar (buscarlo por ID en «Añadir enlace → Producto»).
 
+### Reaprovechar clips en verde de otras cuentas (10/11)
+Un producto del banco que `ness`, `nestor2` o `ana` ya tienen montado y en verde no necesita Flow ni clips nuevos
+(0 créditos, sin los ~40 min de imágenes y vídeo): sus clips brutos, sin texto, voz ni CTA, siguen en la bandeja del Drive
+(`_agente/<usuario>/pov_bof_largo/<carpeta>/<N>_<título>/clip_K.mp4`).
+1. `python3 scripts/cuenta_arabe_pov/reaprovechar.py cruce` → tabla y `REAPROVECHAR.json` (en `hmizat_reaprovechar/`).
+   Mismo producto = mismo id de ficha (`/view/product/<id>` o `/pdp/<id>`; los enlaces cortos se resuelven y se guardan
+   en `ids_enlaces.json`). Solo filas en verde; dice cuáles tienen brutos y cuáles ya se hicieron en una ronda.
+2. `reaprovechar.py traer --ronda <carpeta de ronda> --numero N --fila "largo|…"` → `brutos/NN_K_r.mp4` a 1080x1920,
+   hoja a 2 fps `revision/NN_K_bruto.jpg` y el esqueleto de `PLAN.json` y `CONTROL_CALIDAD.json` (`omni: true` si lleva la estrella).
+3. Mirar las hojas contra la ficha y aceptar a mano (`aceptado: true`, `duraciones`): **el verde de la otra cuenta no exime**.
+   El Medicube estaba en verde y su clip 2 lleva un tapón que no es el de la ficha.
+4. Cabecera en árabe en `PLAN.json`, guion en `audio/guiones.json` y lo de siempre: `voz8.py` → `subs8.py` → `alinear8.py` → montaje.
+
+Hoy (10/11): banco de 191 ids, 7 con vídeo verde en otra cuenta y solo 2 con brutos (lavabo con cascada: 4 juegos de clips;
+Medicube: 1, rechazado). Los otros 5 se montaron sin dejar los clips en la bandeja o son réplicas (`rv|…`). Sale más a cuenta
+al revés: elegir para el banco productos que ya tengan verde y brutos. Prueba: `hmizat_reaprovechar/videos/01_…` y `02_…`.
+**Regla (Admin, 10/11): al llenar el banco, primero los productos que ya tienen verde y clips brutos en otra cuenta.**
+Filas sin enlace (Mis Productos, Tareas…): el cruce usa el `product_id` guardado en la ficha; los verdes que no tienen
+ni enlace ni id (43 el 10/11) no cruzan hasta que se les ponga la URL. Los 2 lavabos de prueba NO se publican sin el OK de Néstor.
+
 ### Receta probada: 10 POV replicados en un día (ronda 8, 31/10)
 
 Scripts en [`scripts/cuenta_arabe_pov/`](../scripts/cuenta_arabe_pov/README.md): se copian
