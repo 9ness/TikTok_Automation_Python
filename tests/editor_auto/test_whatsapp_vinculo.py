@@ -167,6 +167,7 @@ def _montar(monkeypatch, *, cuenta, jobs, jobs_meta, hoy="2026-11-09"):
     from src.queue.models import Job, JobStatus
     import src.editor_auto.repos.web_account_repo as war
 
+    monkeypatch.setattr(v, "_hoy_madrid", lambda: hoy)  # sin esto falla otro dia
     monkeypatch.setenv("WEB_UPLOAD_SECRET", "s3cret")
     monkeypatch.setenv("EDITOR_BOX_PUBLIC_URL", "https://box.test/")
     r = FakeR()
@@ -237,3 +238,14 @@ def test_resumen_prueba(monkeypatch):
     res = v.resumen_cliente("612345678", redis=r, web_repo=web, user_repo=repo, queue=queue)
     assert res["es_prueba"] and res["prueba_restantes"] == 2 and res["quedan_hoy"] == 2
     assert res["dias"] == [] and res["nombre"] == "Ana"
+
+
+def test_tope_de_codigos_por_email():
+    """Desde muchos numeros no se puede llenar de codigos el buzon de un cliente."""
+    r = FakeR()
+    web = FakeWeb({"ana@x.com": {"email": "ana@x.com"}})
+    enviados = []
+    env = lambda *a, **k: enviados.append(a) or {"ok": True}  # noqa: E731
+    for i in range(v.MAX_PEDIDOS + 2):
+        assert v.pedir_codigo(f"6123450{i:02d}", "ana@x.com", redis=r, web_repo=web, enviar=env) == {"ok": True}
+    assert len(enviados) == v.MAX_PEDIDOS

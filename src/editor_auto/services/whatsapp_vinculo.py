@@ -5,6 +5,9 @@ Claves NUEVAS (prefijo del editor, `editor_auto:`):
     wa:by_email:{email} -> telefono
     wa:codigo:{tel}     -> JSON {email, codigo, intentos, creado}  (TTL 15 min)
     wa:pedidos:{tel}    -> contador de peticiones de codigo        (TTL 1 h)
+    wa:pedidos_email:{email} -> peticiones a ese email (TTL 1 h), para no
+                           usar el bot de buzon de spam desde muchos numeros
+    wa:intentos:{tel}   -> intentos de confirmar (INCR atomico, TTL del codigo)
 
 El codigo se envia al email de la cuenta (por eso prueba que el telefono es de
 su dueno). `pedir_codigo` nunca revela si la cuenta existe.
@@ -36,6 +39,8 @@ _K_PHONE = "wa:by_phone:"
 _K_EMAIL = "wa:by_email:"
 _K_CODIGO = "wa:codigo:"
 _K_PEDIDOS = "wa:pedidos:"
+_K_PEDIDOS_EMAIL = "wa:pedidos_email:"
+_K_INTENTOS = "wa:intentos:"
 
 
 def normalizar_telefono(txt: Any) -> str:
@@ -124,10 +129,17 @@ def pedir_codigo(telefono: str, email: str, *, redis=None, web_repo=None, enviar
     acc = _web_repo(web_repo).get(em) if "@" in em else None
     if not acc:
         return {"ok": True}  # no se revela si la cuenta existe
+    ke = f"{_K_PEDIDOS_EMAIL}{em}"
+    ne = r.incr(ke)
+    if ne == 1:
+        r.expire(ke, PEDIDOS_TTL_S)
+    if ne > MAX_PEDIDOS:
+        return {"ok": True}  # tope por email: callado, como si no existiera
     codigo = f"{secrets.randbelow(1_000_000):06d}"
     kc = f"{_K_CODIGO}{tel}"
-    r.set_json(kc, {"email": em, "codigo": codigo, "intentos": 0, "creado": time.time()})
+    r.set_json(kc, {"email": em, "codigo": codigo, "creado": time.time()})
     r.expire(kc, CODIGO_TTL_S)
+    r.delete(f"{_K_INTENTOS}{tel}")
     texto = (
         f"Tu código para vincular WhatsApp: {codigo}. Caduca en 15 minutos. "
         "Si no lo has pedido, ignora este correo."
@@ -155,14 +167,15 @@ def confirmar_codigo(telefono: str, codigo: str, *, redis=None, web_repo=None) -
     dato = r.get_json(kc)
     if not isinstance(dato, dict):
         return {"ok": False, "motivo": "caducado"}
-    intentos = int(dato.get("intentos") or 0)
-    if intentos >= MAX_INTENTOS:
+    # INCR atomico: dos confirmaciones a la vez no pueden leer el mismo
+    # contador y pasar ambas del tope (antes era leer-sumar-escribir).
+    ki = f"{_K_INTENTOS}{tel}"
+    intentos = int(r.incr(ki) or 0)
+    if intentos == 1:
+        restante = max(1, int(CODIGO_TTL_S - (time.time() - float(dato.get("creado") or 0))))
+        r.expire(ki, restante)
+    if intentos > MAX_INTENTOS:
         return {"ok": False, "motivo": "intentos"}
-    intentos += 1
-    dato["intentos"] = intentos
-    restante = max(1, int(CODIGO_TTL_S - (time.time() - float(dato.get("creado") or 0))))
-    r.set_json(kc, dato)
-    r.expire(kc, restante)
     dado = re.sub(r"\D", "", str(codigo or ""))
     if not hmac.compare_digest(dado.encode(), str(dato.get("codigo") or "").encode()):
         return {"ok": False, "motivo": "intentos" if intentos >= MAX_INTENTOS else "codigo"}
@@ -177,6 +190,7 @@ def confirmar_codigo(telefono: str, codigo: str, *, redis=None, web_repo=None) -
     r.set_str(f"{_K_PHONE}{tel}", em)
     r.set_str(f"{_K_EMAIL}{em}", tel)
     r.delete(kc)
+    r.delete(ki)
     acc = _web_repo(web_repo).get(em) or {}
     return {"ok": True, "email": em, "nombre": _nombre_cuenta(acc)}
 
