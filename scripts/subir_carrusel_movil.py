@@ -650,6 +650,10 @@ def preparar(cid: str) -> None:
 
 def copiar_caption(c: dict) -> None:
     texto = c["caption"] + " " + " ".join(c.get("hashtags", []))
+    # CAPTION_EXTRA (p. ej. hashtags de campaña): se añade lo que aún no esté en el caption.
+    extra = [t for t in os.environ.get("CAPTION_EXTRA", "").split() if t.lower() not in texto.lower()]
+    if extra:
+        texto = texto.rstrip() + " " + " ".join(extra)
     if sin_combos():
         video_movil().al_portapapeles(texto)
         return
