@@ -293,6 +293,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     links_stop = asyncio.Event()
     links_task = asyncio.create_task(links_precalentado(links_stop))
 
+    # Embudo de /links → panel (Cuentas › Tráfico): Amazon va directo y el panel
+    # no lo ve por /r. Cada hora, hoy y ayer (el panel fusiona el mismo día).
+    from src.multiplataforma.services.embudo_panel import bucle as embudo_panel_bucle
+
+    embudo_stop = asyncio.Event()
+    embudo_task = asyncio.create_task(embudo_panel_bucle(embudo_stop))
+
     # Nicho POV BOF · copia diaria del Drive del curso. El admin de aquel Drive
     # borra carpetas sin avisar y hasta ahora la copia dependía de que alguien
     # pulsara el botón: se perdieron ocho productos de "10 Agosto 2026" por dos
@@ -329,6 +336,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.wait_for(carruseles_task, timeout=5)
         except asyncio.TimeoutError:
             carruseles_task.cancel()
+        embudo_stop.set()
+        try:
+            await asyncio.wait_for(embudo_task, timeout=5)
+        except asyncio.TimeoutError:
+            embudo_task.cancel()
         links_stop.set()
         try:
             await asyncio.wait_for(links_task, timeout=5)
