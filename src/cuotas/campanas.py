@@ -143,6 +143,47 @@ REGLA_PROMOCION = (
 )
 
 
+# Lo que mandó la agencia (Miture, 11/11/2026) para Black Friday. Solo lo lee el
+# MCP (`campanas`): la franja de la web no lo pinta y los guiones automáticos
+# (`contexto_guion`) no cambian. Los hashtags por categoría valen del 11 al 17/11.
+BLACK_FRIDAY_AGENCIA: dict = {
+    "inicio": "2026-11-11",
+    "fin": "2026-11-30",
+    "calentamiento": {"inicio": "2026-11-11", "fin": "2026-11-22"},
+    "hashtag_principal": "#TikTokShopBlackFriday",
+    "hashtag_directos": "#ofertasenlive",
+    "hashtags_categoria": {
+        "inicio": "2026-11-11",
+        "fin": "2026-11-17",
+        "belleza": "#BlackFridayBeauty",
+        "moda": "#BlackFridayFashion",
+        "hogar": "#BlackFridayHome",
+        "esenciales": "#BlackFridayEssentials",
+        "tecnologia": "#BlackFridayTech",
+    },
+    "cupon_plataforma": {
+        "desde": "2026-11-11",
+        "descuento": "20 %",
+        "compra_minima": "25 €",
+        "descuento_maximo": "10 € por cupón",
+        "frase_permitida": "usa el cupón del 20 % de TikTok Shop (mín. 25 €)",
+        "nota": "Lo pone la plataforma, no la tienda: se puede decir. Ningún otro precio o "
+                "descuento que la ficha no tenga.",
+    },
+}
+
+
+def _black_friday(hoy: date) -> dict | None:
+    bf = BLACK_FRIDAY_AGENCIA
+    if not _d(bf["inicio"]) <= hoy <= _d(bf["fin"]):
+        return None
+    out = {**bf, "en_calentamiento": _d(bf["calentamiento"]["inicio"]) <= hoy <= _d(bf["calentamiento"]["fin"])}
+    cat = bf["hashtags_categoria"]
+    if not _d(cat["inicio"]) <= hoy <= _d(cat["fin"]):
+        out.pop("hashtags_categoria")
+    return out
+
+
 def _d(s: str) -> date:
     return date.fromisoformat(s)
 
@@ -242,6 +283,7 @@ def estado(hoy: date | None = None) -> dict:
         "niveles": NIVELES,
         "semanas": _semanas(),
         "regla_promocion": REGLA_PROMOCION,
+        "black_friday": _black_friday(hoy),
     }
 
 
