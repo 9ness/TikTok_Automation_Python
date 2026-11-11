@@ -87,6 +87,7 @@ editable por usuario sin tablas separadas.
 | Tool ID | Peso | API externas | Coste | Notas |
 |---|---|---|---|---|
 | `silence_cutter` | 10 | Silero VAD (local) + Claude Haiku (OpenAI de respaldo) | tokens Claude/OpenAI | Cortes A/V con concat MoviePy |
+| `audio_clean`    | 20 | — (ffmpeg local) | — | «Mejorar voz»: ruido + volumen tras el corte. **Apagada: no está en el flujo de nadie** (ver abajo) |
 | `vip_overlays`   | 60 | faster-whisper (local) + Claude Haiku | ~0,003 $ | Edición VIP: gancho, rótulos, zooms, fotos, SFX |
 | `subs_auto`      | 90 | faster-whisper (local) | — | Reusa `src/subtitles*.py` |
 | `sticker_arrow`  | — | — | — | Flecha CTA (`.mov` de `Assets/flechas/`) |
@@ -104,6 +105,23 @@ mano (`vip_overlays`) se conservan al re-sincronizar con el estilo de la web.
 [`src/catalogo_edicion/`](src/catalogo_edicion/README.md): solo lo aprobado
 (`editor_auto: true`) se ofrece en la web y en el modo «Inteligente»; las de
 Navidad son de «entrada» (se reproducen una vez y se quedan señalando).
+
+**«Mejorar voz» (`audio_clean`, 10/11/2026 — sin activar):** para vídeos que se
+oyen poco o con ruido. Tras el cortador (peso 20, así el corte sigue decidiendo
+con el audio original) pasa el audio por: highpass 80 Hz → `adeclick` (opcional)
+→ reducción de ruido (`motor`: `rnnoise` = filtro `arnndn` con un modelo `.rnnn`;
+`afftdn`; `ninguno`) → compresor (opcional) → `loudnorm` a −16 LUFS en dos
+pasadas. El vídeo va con `-c:v copy` (solo se recodifica el audio a AAC 192k /
+48 kHz) y no usa ninguna API de pago. Si no hay pista de audio, está en silencio
+o ffmpeg falla, copia la entrada y sigue. El modelo se busca en
+`assets/rnnoise/sh.rnnn` (clave `modelo_rnnoise`); **todavía no está en el repo**
+(pendiente de que Néstor decida la licencia): mientras falte, `rnnoise` solo
+nivela y lo avisa (no cae a `afftdn`: medido, apaga la voz y empeora música, clics
+y voz baja). Medidas y plan: `docs/editor/2026-11-10_audio_y_estilo_vip.md`. `build_tool_flow` (el flujo de la web) NO la añade: se pone a mano en
+el flujo de un usuario (Usuarios › flujo › añadir herramienta «🔊 Mejorar voz»,
+o `ToolStep(tool_id="audio_clean", enabled=True, config={...})`) y
+`conservar_pasos_del_equipo` la mantiene al re-sincronizar con la web. Tests:
+`tests/editor_auto/test_audio_clean.py`.
 
 **Position weight**: menor peso = se ejecuta antes. `silence_cutter`
 DEBE ir antes que cualquier overlay porque modifica timestamps. El

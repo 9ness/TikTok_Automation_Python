@@ -466,6 +466,7 @@ TOOL_SILENCE_CUTTER_SCRIPTED = "silence_cutter_scripted"
 TOOL_STICKER_ARROW = "sticker_arrow"
 TOOL_PHOTO_INSERT = "photo_insert"
 TOOL_VIP_OVERLAYS = "vip_overlays"
+TOOL_AUDIO_CLEAN = "audio_clean"
 
 # Grupos de herramientas mutuamente excluyentes — el validador del repo
 # rechaza un `tool_flow` que tenga dos tools del mismo grupo. Ambos
@@ -488,6 +489,10 @@ TOOL_EXCLUSIVE_GROUPS: list[set[str]] = [
 TOOL_POSITION_WEIGHTS: dict[str, int] = {
     TOOL_SILENCE_CUTTER: 10,
     TOOL_SILENCE_CUTTER_SCRIPTED: 10,
+    # 20: «Mejorar voz» (ruido + volumen) justo tras el corte: el cortador
+    # decide con el audio ORIGINAL y todo lo demás ya oye la voz limpia.
+    # No la añade la web: la pone el equipo a mano en el flujo del usuario.
+    TOOL_AUDIO_CLEAN: 20,
     # 80: sticker overlay después de cortes (timestamps ya estables) y
     # antes de subs (90) para que los subtítulos queden ENCIMA del sticker
     # si colisionan — la legibilidad del texto prima sobre la flecha.
