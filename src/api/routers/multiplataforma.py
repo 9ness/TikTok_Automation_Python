@@ -379,6 +379,14 @@ def links_marca(slug: str, tipo: str) -> FileResponse:
     p = config.fichero_marca(slug, tipo)
     if not p:
         raise APIError("No existe", status_code=404)
+    # El logo se ve a ~110 px y venía de 460 KB: copia reducida (cacheada en disco).
+    try:
+        from src.nicho_pov_bof.services import thumbs
+
+        if Path(p).suffix.lower() in (".jpg", ".jpeg"):  # PNG: perdería la transparencia
+            p = thumbs.miniatura(Path(p), 400 if tipo == "logo" else 1080) or p
+    except Exception:  # noqa: BLE001 — sin miniatura, el original
+        pass
     return FileResponse(p, headers={"Cache-Control": "public, max-age=3600"})
 
 

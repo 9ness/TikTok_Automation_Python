@@ -286,6 +286,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     replicas_stop = asyncio.Event()
     replicas_task = asyncio.create_task(replicas_precalentado(replicas_stop))
 
+    # Multiplataforma · página pública /links/<cuenta>: datos y miniaturas en
+    # memoria; tras un deploy la 1.ª visita esperaba al Drive (hasta 83 s).
+    from src.multiplataforma.services.tandas import bucle_precalentado as links_precalentado
+
+    links_stop = asyncio.Event()
+    links_task = asyncio.create_task(links_precalentado(links_stop))
+
     # Nicho POV BOF · copia diaria del Drive del curso. El admin de aquel Drive
     # borra carpetas sin avisar y hasta ahora la copia dependía de que alguien
     # pulsara el botón: se perdieron ocho productos de "10 Agosto 2026" por dos
@@ -322,6 +329,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.wait_for(carruseles_task, timeout=5)
         except asyncio.TimeoutError:
             carruseles_task.cancel()
+        links_stop.set()
+        try:
+            await asyncio.wait_for(links_task, timeout=5)
+        except asyncio.TimeoutError:
+            links_task.cancel()
         replicas_stop.set()
         try:
             await asyncio.wait_for(replicas_task, timeout=5)

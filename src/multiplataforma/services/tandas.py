@@ -704,13 +704,75 @@ def links_publicos(slug: str) -> dict:
     hit = _links_cache.get(slug)
     if hit and time.time() - hit[0] < _LINKS_TTL_S:
         return hit[1]
-    datos = _links_publicos(slug)
-    _links_cache[slug] = (time.time(), datos)
+    if hit:
+        # Caducado: se sirve lo de antes al momento y se recalcula aparte (con el
+        # VPS cargado, recalcular en la visita dejaba la página en esqueleto).
+        _refrescar_aparte(slug)
+        return hit[1]
+    return _recalcular_links(slug)
+
+
+_refrescando: set[str] = set()
+
+
+def _refrescar_aparte(slug: str) -> None:
     import threading
 
-    threading.Thread(target=_precalentar_fotos, args=(slug, [p["id"] for p in datos["productos"]]),
-                     daemon=True, name=f"links-fotos-{slug}").start()
+    if slug in _refrescando:
+        return
+    _refrescando.add(slug)
+
+    def _hilo() -> None:
+        try:
+            _recalcular_links(slug)
+        except Exception:  # noqa: BLE001 — se queda lo de antes
+            pass
+        finally:
+            _refrescando.discard(slug)
+
+    threading.Thread(target=_hilo, daemon=True, name=f"links-{slug}").start()
+
+
+def _recalcular_links(slug: str, precalentar: bool = True) -> dict:
+    datos = _links_publicos(slug)
+    _links_cache[slug] = (time.time(), datos)
+    if precalentar:
+        import threading
+
+        threading.Thread(target=_precalentar_fotos, args=(slug, [p["id"] for p in datos["productos"]]),
+                         daemon=True, name=f"links-fotos-{slug}").start()
     return datos
+
+
+def precalentar_links() -> None:
+    """Datos y miniaturas de TODAS las cuentas activas, uno tras otro. La caché
+    vive en memoria y cada despliegue la vacía: sin esto, la 1.ª visita tras un
+    deploy esperaba a bajar la foto del Drive (hasta 83 s, 11/11/2026)."""
+    for c in cuentas_repo.listar():
+        if not c.activa:
+            continue
+        try:
+            datos = _recalcular_links(c.slug, precalentar=False)
+            _precalentar_fotos(c.slug, [p["id"] for p in datos["productos"]])
+        except Exception:  # noqa: BLE001 — una cuenta rota no para las demás
+            continue
+
+
+async def bucle_precalentado(stop) -> None:
+    """Al arrancar la API y cada 20 min, `precalentar_links` en un hilo."""
+    import asyncio
+    import logging
+
+    log = logging.getLogger("api")
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(precalentar_links)
+        except Exception as e:  # noqa: BLE001
+            log.warning("precalentado de /links falló: %s", e)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=1200)
+        except asyncio.TimeoutError:
+            pass
 
 
 def categoria_link(titulo: str) -> str:
