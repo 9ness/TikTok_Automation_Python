@@ -879,6 +879,11 @@ def producto(cid: str) -> None:
     puntos = [(b["x"], b["y"]) for b in botones_anadir()[:1]] or [(pt("anadir_x"), y) for y in pt("anadir_ys")]
     for x, y in puntos:
         tap(x, y, 4)
+        # 11/11 (Black Friday): en algunos productos «Añadir» abre su ficha con «Gana X € por cada venta»
+        # y un botón «Añadir al vídeo» (captura 3_sin_campo del 11/11: 8 de 20 saltados por esto)
+        n = buscar(r"^\W*Añadir al v[ií]deo\W*$", intentos=2)
+        if n:
+            tap(n["x"], n["y"], 4)
         if buscar(r"Obtener una muestra", intentos=1):
             tecla(4)                      # se pulsó la tarjeta, no «Añadir»
             time.sleep(2)
