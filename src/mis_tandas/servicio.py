@@ -726,12 +726,13 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
         v["habla"] = habla(v)
     # Tareas de Campañas de creadores: etiqueta por vídeo + progreso.
     esperando = [_publica(f) for f in sin_stock]
-    from src.mis_tandas import gmv_max
+    from src.mis_tandas import campana_bf, gmv_max
 
     marcas_gmv = gmv_max.marcas()
     for v in meta_items + esperando + [v for t in salida for v in t.get("items", [])]:
         v["tareas"] = tareas_de.get(v["id"], [])
         v["gmv_max"] = gmv_max.es_gmv_max(v, marcas_gmv)
+        v["hashtags_campana"] = campana_bf.hashtags(usuario, v)
     for t in salida:
         t["gmv_max"] = sum(1 for v in t.get("items", []) if v["gmv_max"] and not v["uploaded"])
     for t in salida:

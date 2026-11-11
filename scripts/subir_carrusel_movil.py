@@ -649,7 +649,9 @@ def preparar(cid: str) -> None:
 
 
 def copiar_caption(c: dict) -> None:
-    texto = c["caption"] + " " + " ".join(c.get("hashtags", []))
+    tags = list(c.get("hashtags", []))
+    tags += [h for h in c.get("hashtags_campana", []) if h.lower() not in {x.lower() for x in tags}]  # BF agencia
+    texto = c["caption"] + " " + " ".join(tags)
     # CAPTION_EXTRA (p. ej. hashtags de campaña): se añade lo que aún no esté en el caption.
     extra = [t for t in os.environ.get("CAPTION_EXTRA", "").split() if t.lower() not in texto.lower()]
     if extra:

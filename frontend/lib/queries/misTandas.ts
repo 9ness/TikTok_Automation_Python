@@ -55,6 +55,8 @@ export interface VideoTanda {
   tareas?: string[];
   /** Su tienda o producto inyecta GMV Max: se sube primero en el Black Friday. */
   gmv_max?: boolean;
+  /** Hashtags de campaña (Black Friday de la agencia) que se añaden al caption. */
+  hashtags_campana?: string[];
 }
 
 /** Tarea de «Campañas de creadores» con su progreso (`src/mis_tandas/tareas.py`). */
@@ -399,6 +401,8 @@ export interface CarruselTanda {
   semaforo?: SemaforoVideo | null;
   /** Su tienda o producto inyecta GMV Max. */
   gmv_max?: boolean;
+  /** Hashtags de campaña (Black Friday de la agencia) que se añaden al caption. */
+  hashtags_campana?: string[];
 }
 
 export interface TandaFotos {

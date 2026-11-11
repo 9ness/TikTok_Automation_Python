@@ -214,11 +214,13 @@ def tandas(usuario: str, todas: bool = False) -> dict:
 
     sem = servicio.semaforos(usuario)
     lista = [_publica(d, _clave(d) in agotados, sem) for d in docs]
-    from src.mis_tandas import gmv_max
+    from src.mis_tandas import campana_bf, gmv_max
 
     marcas_gmv = gmv_max.marcas()
     for c in lista:
         c["gmv_max"] = gmv_max.es_gmv_max(c, marcas_gmv)
+        c["hashtags_campana"] = [h for h in campana_bf.hashtags(usuario, c)
+                                 if h.lower() not in {x.lower() for x in (c.get("hashtags") or [])}]
     dia = dt.datetime.now(_TZ).date()
     hoy = sum(
         1 for c in lista

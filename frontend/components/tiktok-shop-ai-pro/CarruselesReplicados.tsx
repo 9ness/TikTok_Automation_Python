@@ -228,7 +228,7 @@ export function CarruselesReplicados() {
                           />
                           <CopyChip
                             label="Caption"
-                            text={[c.caption, c.hashtags.join(" ")].filter(Boolean).join(" ")}
+                            text={[c.caption, [...c.hashtags, ...(c.hashtags_campana ?? [])].join(" ")].filter(Boolean).join(" ")}
                           />
                           <a
                             href="/tiktok-shop-ai-pro/replicar-carrusel"

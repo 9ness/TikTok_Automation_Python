@@ -199,7 +199,9 @@ export function MisTandas() {
   };
   const captionDe = (v: VideoTanda) =>
     v.caption
-      ? [v.caption, v.emojis, (hashtagsDe[v.hashtags_nicho] ?? []).join(" ")].filter(Boolean).join(" ")
+      ? [v.caption, v.emojis, [...(hashtagsDe[v.hashtags_nicho] ?? []), ...(v.hashtags_campana ?? [])]
+          .filter((h, i, l) => l.findIndex((x) => x.toLowerCase() === h.toLowerCase()) === i).join(" ")]
+          .filter(Boolean).join(" ")
       : "";
 
   const [aRehacer, setARehacer] = useState<VideoTanda | null>(null);
