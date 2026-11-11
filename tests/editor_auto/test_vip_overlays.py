@@ -20,7 +20,7 @@ def test_sanitize_quita_solapes_y_recorta():
         "zooms": [{"t0": 5, "t1": 8, "nivel": 3}, {"t0": 7, "t1": 9, "nivel": 1.1}],
         "fotos": [{"busqueda": "moto calle", "t0": 30, "t1": 33}],
     }
-    out = _sanitize(plan, 60.0, _cfg())
+    out = _sanitize(plan, 60.0, _cfg(fotos_internet=True))
     assert out["gancho"]["texto"] == "SI TOCAN TU MOTO..."
     assert out["gancho"]["clip"] == {"t0": 50.0, "t1": 53.0}  # máx 3 s
     textos = [r["texto"] for r in out["rotulos"]]
@@ -138,9 +138,58 @@ def test_pildora_clara_texto_oscuro():
 def test_foto_del_gancho_solo_con_fotos():
     from src.editor_auto.tools.vip_overlays import _sanitize
     plan = {"gancho": {"texto": "¿TE GUSTA ELSA PATAKY?", "foto": "Elsa Pataky"}}
-    cfg = {"densidad_rotulos": "media", "fotos": True, "zooms": False, "gancho": True}
+    cfg = {"densidad_rotulos": "media", "fotos": True, "zooms": False, "gancho": True,
+           "fotos_internet": True, "max_fotos": 3}
     assert _sanitize(plan, 30.0, cfg)["gancho"]["foto"] == "Elsa Pataky"
     assert _sanitize(plan, 30.0, {**cfg, "fotos": False})["gancho"]["foto"] == ""
+
+
+def test_sin_permiso_no_hay_fotos_de_internet():
+    """Por defecto nada de internet: otras marcas = «producto incoherente», famosos = derechos."""
+    plan = {"gancho": {"texto": "¿TE GUSTA ELSA PATAKY?", "foto": "Elsa Pataky"},
+            "fotos": [{"busqueda": "colageno marino bote", "t0": 5, "t1": 8}]}
+    out = _sanitize(plan, 30.0, _cfg())
+    assert out["gancho"]["foto"] == "" and out["fotos"] == []
+
+
+def test_frases_enteras_o_nada():
+    assert _clean_text("enlace en el carrito naranja", 30, entera=True) == "ENLACE EN EL CARRITO NARANJA"
+    assert _clean_text("enlace en el", 30, entera=True) == ""  # a medias
+    assert _clean_text("¿a ti te gusta tanto el colágeno de Elsa Pataky?", 30, entera=True) == ""
+    plan = {"rotulos": [{"texto": "enlace en el carrito naranja", "t0": 5, "t1": 7, "rol": "ok"}]}
+    assert _sanitize(plan, 30.0, _cfg(gancho=False))["rotulos"][0]["texto"] == "ENLACE EN EL CARRITO NARANJA"
+
+
+def test_pildora_larga_va_a_dos_lineas(tmp_path, monkeypatch):
+    from PIL import Image
+    from src.editor_auto.tools import vip_overlays as v
+    partes = []
+    orig = v._dos_lineas
+    monkeypatch.setattr(v, "_dos_lineas", lambda t: partes.append(t) or orig(t))
+    cfg = _cfg()
+    v._pill("15 €/KG", (255, 214, 0, 255), 84, 930, cfg, str(tmp_path / "a.png"))
+    assert partes == []
+    p = v._pill("ESTO ES LO QUE NECESITAS PARA ENTRENAR", (255, 214, 0, 255), 84, 930, cfg,
+                str(tmp_path / "b.png"))
+    assert len(partes) == 1 and Image.open(p).size[0] <= 930 + 40
+
+
+def test_rotulo_fuera_de_cara_y_subtitulos():
+    from src.editor_auto.tools.vip_overlays import _y_libre
+    H = 1920
+    subs, cara = (int(0.55 * H), int(0.69 * H)), (int(0.10 * H), int(0.40 * H))
+    y = _y_libre(180, int(0.16 * H), [subs, cara], H)
+    for a, b in (subs, cara):
+        assert y + 180 <= a or y >= b
+    # sin sitio libre, antes la cara que los subtítulos
+    y = _y_libre(900, int(0.16 * H), [subs, (0, H)], H)
+    assert y + 900 <= subs[0] or y >= subs[1]
+
+
+def test_borde_vip_en_subtitulos():
+    from src.editor_auto.tools.subs_auto import _borde_contraste
+    assert _borde_contraste("#FFD600") == "#000000"
+    assert _borde_contraste("#111111") == "#FFFFFF"
 
 
 def test_corregir_nombres_en_subs():

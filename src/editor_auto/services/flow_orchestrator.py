@@ -88,6 +88,16 @@ def run_flow(
     current_input = input_video_path
     temp_outputs: list[str] = []
     extras: dict = {}  # lo comparten todos los pasos del job (ToolContext.extras)
+    # Altura de los subtítulos del flujo: el VIP la necesita ANTES de que
+    # corran (subs_auto va después) para no poner rótulos en su franja.
+    for st in ordered:
+        if st.tool_id == "subs_auto" and get_tool("subs_auto") is not None:
+            try:
+                cfg_subs = {**get_tool("subs_auto").default_config(), **(st.config or {})}
+                extras["subs_y"] = float(cfg_subs.get("y_position"))
+            except (TypeError, ValueError):
+                pass
+            break
 
     try:
         for i, step in enumerate(ordered):

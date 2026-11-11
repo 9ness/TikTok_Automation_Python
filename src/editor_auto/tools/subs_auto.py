@@ -260,6 +260,15 @@ class SubsAutoTool:
             except OSError:
                 pass
 
+        # Edición VIP: borde obligatorio (sin él, letra fina blanca o amarilla
+        # desaparece sobre caras, fondos claros y el propio producto).
+        borde = int(ctx.extras.get("subs_borde_min") or 0)
+        pildora_sola = config.get("highlight_mode") == "pill" and int(config.get("max_words") or 0) <= 1
+        if borde and not pildora_sola and int(config.get("stroke_width") or 0) < borde:
+            config = {**config, "stroke_width": borde,
+                      "stroke_color": _borde_contraste(config.get("text_color"))}
+            ctx.on_log(f"[subs_auto] borde VIP {borde}px {config['stroke_color']}")
+
         ctx.on_progress(0.58, "🎬 Render overlay subtítulos…")
         style = {
             "font_path": config["font_path"],
@@ -335,3 +344,12 @@ def _corregir_nombres(words: list[dict], correcciones: list[dict]) -> int:
                 i += 1
     return hechas
 
+
+def _borde_contraste(text_color) -> str:
+    """Borde negro para letra clara y blanco para letra oscura."""
+    h = str(text_color or "#FFFFFF").lstrip("#")
+    try:
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return "#000000"
+    return "#000000" if 0.299 * r + 0.587 * g + 0.114 * b > 110 else "#FFFFFF"

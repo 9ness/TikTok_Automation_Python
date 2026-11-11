@@ -71,6 +71,10 @@ class VipOverlaysTool:
             "gancho": True,
             "gancho_clip": True,
             "fotos": True,
+            # Fotos buscadas en internet (gancho y apoyo). Apagado: en vídeos de
+            # producto salen otras marcas (TikTok Shop sanciona «producto
+            # incoherente») o famosos (derechos de imagen).
+            "fotos_internet": False,
             "max_fotos": 3,
             "zooms": True,
             "sfx": True,
@@ -98,6 +102,8 @@ class VipOverlaysTool:
             {"key": "gancho_clip", "label": "Copiar el momento más llamativo al principio",
              "type": "bool"},
             {"key": "fotos", "label": "Fotos de apoyo (lo que se nombra y no se ve)",
+             "type": "bool"},
+            {"key": "fotos_internet", "label": "Permitir fotos de internet (nunca en vídeos de producto: sanción)",
              "type": "bool"},
             {"key": "max_fotos", "label": "Máximo de fotos", "type": "int",
              "min": 0, "max": 8, "step": 1},
@@ -284,7 +290,7 @@ def _plan(words: list[dict], dur: float, eventos: list[dict], cfg: dict,
             "max_rotulos": max(2, int(dur / _DENSIDAD.get(cfg.get("densidad_rotulos"), 7.0))),
             "gancho": bool(cfg.get("gancho")),
             "clip_de_gancho": bool(cfg.get("gancho_clip")),
-            "fotos": bool(cfg.get("fotos")) and int(cfg.get("max_fotos") or 0) > 0,
+            "fotos": _fotos_ok(cfg),
             "max_fotos": int(cfg.get("max_fotos") or 0),
             "zooms": bool(cfg.get("zooms")),
             "notas": str(cfg.get("notas_estilo") or "")[:1500],
@@ -307,10 +313,23 @@ def _num(v, default=0.0) -> float:
         return default
 
 
-def _clean_text(t: str, n: int = 22) -> str:
+# Una frase que acaba en una de estas está a medias («ENLACE EN EL»).
+_FINAL_A_MEDIAS = {"EL", "LA", "LOS", "LAS", "LO", "UN", "UNA", "EN", "DE", "DEL", "AL", "A",
+                   "Y", "O", "CON", "SIN", "POR", "PARA", "QUE", "TU", "TE", "MI", "SU", "SE",
+                   "MUY", "MAS", "MÁS", "TAN", "TANTO", "ES"}
+
+
+def _clean_text(t: str, n: int = 22, entera: bool = False) -> str:
+    """Mayúsculas y sin emojis. Con `entera`, una frase que no cabe en `n` o que
+    queda a medias se descarta entera («ENLACE EN EL», «¿TE GUSTA TANTO EL»):
+    mejor sin rótulo que con uno cortado."""
     t = "".join(ch for ch in str(t or "") if ord(ch) < 0x2000 or ch in "€")
     t = re.sub(r"\s+", " ", t).strip().upper()
-    if len(t) > n:  # nunca a mitad de palabra («ELSA PA»)
+    if entera:
+        ult = re.sub(r"[^\wÁÉÍÓÚÜÑ]", "", t.rsplit(" ", 1)[-1]) if t else ""
+        if len(t) > n or ult in _FINAL_A_MEDIAS:
+            return ""
+    elif len(t) > n:  # nunca a mitad de palabra («ELSA PA»)
         t = t[:n + 1].rsplit(" ", 1)[0] if " " in t[:n + 1] else t[:n]
     # unidades que en mayúsculas cambian de sentido o quedan raras
     return re.sub(r"(\d)\s?DB\b", r"\1 dB", t)
@@ -324,6 +343,11 @@ _COLORES_STOCK = {
     "beige": "#D7C4A3", "marron": "#6D4C41", "marrón": "#6D4C41", "dorado": "#D4AF37",
     "plateado": "#C0C0C0", "plata": "#C0C0C0", "turquesa": "#26C6DA", "granate": "#7B1F2A",
 }
+
+
+def _fotos_ok(cfg: dict) -> bool:
+    return bool(cfg.get("fotos") and cfg.get("fotos_internet")
+                and int(cfg.get("max_fotos") or 0) > 0)
 
 
 def _hex_color(c) -> str:
@@ -344,10 +368,11 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
         return a, min(b, a + mx)
 
     g = plan.get("gancho") or {}
-    gancho = {"texto": _clean_text(g.get("texto"), 28) if cfg.get("gancho") else "",
-              "dato": _clean_text(g.get("dato"), 10) if cfg.get("gancho") else "", "clip": None,
+    gancho = {"texto": _clean_text(g.get("texto"), 44, entera=True) if cfg.get("gancho") else "",
+              "dato": _clean_text(g.get("dato"), 12, entera=True) if cfg.get("gancho") else "",
+              "clip": None,
               "foto": str(g.get("foto") or "").strip()[:80]
-              if cfg.get("gancho") and cfg.get("fotos") else ""}
+              if cfg.get("gancho") and _fotos_ok(cfg) else ""}
     c = g.get("clip") if cfg.get("gancho_clip") else None
     if isinstance(c, dict):
         s = span(c, 1.2, 3.0)
@@ -357,7 +382,7 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
     top = []  # rótulos y fotos comparten la franja de arriba: nunca a la vez
     max_rot = max(2, int(dur / _DENSIDAD.get(cfg.get("densidad_rotulos"), 7.0)))
     for r in (plan.get("rotulos") or [])[: max_rot + 3]:
-        s, txt = span(r, 0.5, 3.5), _clean_text(r.get("texto"), 18)
+        s, txt = span(r, 0.5, 3.5), _clean_text(r.get("texto"), 30, entera=True)
         if s and txt:
             rol = r.get("rol") if r.get("rol") in ("alerta", "dato", "ok", "neutro") else "neutro"
             top.append({"tipo": "rotulo", "texto": txt, "rol": rol, "t0": s[0], "t1": s[1]})
@@ -370,7 +395,7 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
         if s and quedan:
             top.append({"tipo": "stock", "quedan": quedan, "agotados": agot,
                         "t0": s[0], "t1": s[1]})
-    if cfg.get("fotos"):
+    if _fotos_ok(cfg):
         for f in (plan.get("fotos") or [])[: int(cfg.get("max_fotos") or 0)]:
             s, q = span(f, 1.0, 3.5), str(f.get("busqueda") or "").strip()[:80]
             if s and q:
@@ -438,22 +463,42 @@ def _font(cfg: dict, sz: int):
     return ImageFont.load_default()
 
 
+def _dos_lineas(text: str) -> str:
+    """Parte la frase en dos líneas lo más parejas posible."""
+    ws = text.split(" ")
+    best = min(range(1, len(ws)), key=lambda i: abs(len(" ".join(ws[:i])) - len(" ".join(ws[i:]))))
+    return " ".join(ws[:best]) + "\n" + " ".join(ws[best:])
+
+
 def _pill(text: str, bg: tuple, sz: int, maxw: int, cfg: dict, path: str, rot: float = 0) -> str:
     from PIL import Image, ImageDraw, ImageFilter
+    sz0 = sz
+    probe = ImageDraw.Draw(Image.new("RGBA", (4, 4)))
+
+    def ancho(t, f):
+        return probe.multiline_textbbox((0, 0), t, font=f, align="center")[2]
+
     f = _font(cfg, sz)
-    while sz > 30 and f.getbbox(text)[2] + sz * 1.2 > maxw:
-        sz -= 4
+    while sz > 30 and ancho(text, f) + sz * 1.2 > maxw:
+        if "\n" not in text and " " in text and sz < sz0 * 0.8:
+            text = _dos_lineas(text)  # antes que letra diminuta, dos líneas
+            sz = sz0
+        else:
+            sz -= 4
         f = _font(cfg, sz)
     pad = (int(sz * 0.55), int(sz * 0.32))
-    bb = f.getbbox(text)
+    sp = int(sz * 0.12)
+    bb = [int(round(v)) for v in probe.multiline_textbbox((0, 0), text, font=f, align="center", spacing=sp)]
     w, h = bb[2] + pad[0] * 2, bb[3] + pad[1] * 2
+    rad = h // 2 if "\n" not in text else int(sz * 0.5)
     im = Image.new("RGBA", (w + 40, h + 40), (0, 0, 0, 0))
     sh = Image.new("RGBA", im.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle((24, 28, w + 24, h + 28), radius=h // 2, fill=(0, 0, 0, 140))
+    ImageDraw.Draw(sh).rounded_rectangle((24, 28, w + 24, h + 28), radius=rad, fill=(0, 0, 0, 140))
     im = Image.alpha_composite(im, sh.filter(ImageFilter.GaussianBlur(8)))
     d = ImageDraw.Draw(im)
-    d.rounded_rectangle((20, 20, w + 20, h + 20), radius=h // 2, fill=bg)
-    d.text((20 + pad[0], 20 + pad[1] - bb[1] // 2), text, font=f, fill=_ink(bg))
+    d.rounded_rectangle((20, 20, w + 20, h + 20), radius=rad, fill=bg)
+    d.multiline_text((20 + pad[0], 20 + pad[1] - bb[1] // 2), text, font=f, fill=_ink(bg),
+                     align="center", spacing=sp)
     if rot:
         im = im.rotate(rot, expand=True, resample=Image.BICUBIC)
     im.save(path)
@@ -549,6 +594,74 @@ def _sfx(tipo: str, path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Dónde poner los rótulos: nunca sobre la cara ni sobre los subtítulos
+# ---------------------------------------------------------------------------
+def _franja_cara(src: str, info: dict, ctx: ToolContext) -> tuple[int, int] | None:
+    """Franja vertical (px) que ocupa la cara en el vídeo, frente incluida.
+    Haar de OpenCV sobre 8 fotogramas; None si no hay cara clara."""
+    try:
+        import cv2
+        import numpy as np
+    except Exception:  # noqa: BLE001
+        return None
+    W, H, dur = info["w"], info["h"], info["dur"]
+    det = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    sw, sh = 360, int(360 * H / W) // 2 * 2
+    tops, bots = [], []
+    for i in range(8):
+        t = dur * (i + 0.5) / 8
+        p = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", src, "-frames:v", "1",
+                            "-vf", f"scale={sw}:{sh}", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+                           capture_output=True, timeout=60)
+        if p.returncode != 0 or len(p.stdout) != sw * sh:
+            continue
+        img = np.frombuffer(p.stdout, np.uint8).reshape(sh, sw)
+        caras = det.detectMultiScale(img, 1.1, 5, minSize=(sw // 10, sw // 10))
+        if len(caras):
+            x, y, w, h = max(caras, key=lambda c: c[2] * c[3])
+            tops.append((y - 0.45 * h) * H / sh)  # frente y pelo
+            bots.append((y + 1.1 * h) * H / sh)   # barbilla
+    if len(tops) < 3:
+        return None
+    tops.sort()
+    bots.sort()
+    y0, y1 = int(tops[len(tops) // 5]), int(bots[-1 - len(bots) // 5])
+    ctx.on_log(f"[vip] cara entre {100 * y0 / H:.0f}% y {100 * y1 / H:.0f}% ({len(tops)}/8 fotogramas)")
+    return max(0, y0), min(H, y1)
+
+
+def _franja_subs(cfg: dict, ctx: ToolContext, H: int) -> tuple[int, int] | None:
+    y = ctx.extras.get("subs_y")
+    if y is None:
+        y = ((cfg.get("_flujo") or {}).get("subs_auto") or {}).get("y_position")
+    try:
+        c = float(y) * H
+    except (TypeError, ValueError):
+        return None
+    return int(c - 0.07 * H), int(c + 0.07 * H)
+
+
+def _y_libre(alto: int, pref: int, ocupado: list[tuple[int, int]], H: int) -> int:
+    """La y más cercana a la del estilo que no pisa nada de `ocupado`.
+    Si no cabe en ningún sitio, la que menos pisa (lo primero, los subtítulos, pesa más)."""
+    paso, mg = max(1, H // 100), int(0.01 * H)
+    mejor = None
+    for y in range(int(0.04 * H), int(0.86 * H) - alto, paso):
+        pisa = sum(max(0, min(y + alto, b + mg) - max(y, a - mg)) * (3 if i == 0 else 1)
+                   for i, (a, b) in enumerate(ocupado))
+        clave = (pisa, abs(y - pref))
+        if mejor is None or clave < mejor[0]:
+            mejor = (clave, y)
+    return mejor[1] if mejor else pref
+
+
+def _alto_png(path: str) -> int:
+    from PIL import Image
+    with Image.open(path) as im:
+        return im.size[1]
+
+
+# ---------------------------------------------------------------------------
 # Render
 # ---------------------------------------------------------------------------
 def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
@@ -560,15 +673,24 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
     off = (clip["t1"] - clip["t0"]) if clip else 0.0
     total = dur + off
     y_rot = int(H * float(cfg.get("rotulo_y_pct", 16.0)) / 100)
+    # Lo que no se puede tapar: subtítulos (primero, pesan más) y la cara.
+    prohibido = [b for b in (_franja_subs(cfg, ctx, H), _franja_cara(src, info, ctx)) if b]
+
+    def y_para(png: str, pref: int, extra: list | None = None) -> int:
+        return _y_libre(_alto_png(png), pref, prohibido + (extra or []), H)
+
     col = {r: _rgba(cfg.get(f"color_{r}")) for r in ("alerta", "dato", "ok", "neutro")}
 
     # (png, t0, t1, y) en tiempos de SALIDA
     ovl: list[tuple[str, float, float, int]] = []
     sfx_at: list[tuple[str, float]] = []
     gl = clip["t1"] - clip["t0"] if clip else 2.0
+    gancho_ocupa: list[tuple[int, int]] = []
     if g.get("texto"):
-        ovl.append((_pill(g["texto"], col["alerta"], int(82 * k), int(W * 0.9), cfg,
-                          str(tmp / "g0.png"), -3), 0.0, gl, int(H * 0.135)))
+        p = _pill(g["texto"], col["alerta"], int(82 * k), int(W * 0.9), cfg, str(tmp / "g0.png"), -3)
+        y = y_para(p, int(H * 0.135))
+        ovl.append((p, 0.0, gl, y))
+        gancho_ocupa.append((y, y + _alto_png(p)))
     if g.get("foto"):  # la persona/marca que nombra el gancho: lo que más engancha
         from .photo_insert import _search_and_download
         img = _search_and_download(query=g["foto"], dest=str(tmp / "gf.png"),
@@ -578,18 +700,18 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
                         int(H * 0.21)))
             sfx_at.append(("whoosh", 0.15))
     if g.get("dato"):
-        ovl.append((_pill(g["dato"], col["dato"], int(150 * k), int(W * 0.8), cfg,
-                          str(tmp / "g1.png"), 4), 0.35, gl, int(H * 0.47)))
+        p = _pill(g["dato"], col["dato"], int(150 * k), int(W * 0.8), cfg, str(tmp / "g1.png"), 4)
+        ovl.append((p, 0.35, gl, y_para(p, int(H * 0.47), gancho_ocupa)))
     rots = [-3, 3, -2, 0, 2]
     for i, r in enumerate(plan["rotulos"]):
         p = _pill(r["texto"], col[r["rol"]], int(84 * k), int(W * 0.86), cfg,
                   str(tmp / f"r{i}.png"), rots[i % len(rots)])
-        ovl.append((p, r["t0"] + off, r["t1"] + off, y_rot))
+        ovl.append((p, r["t0"] + off, r["t1"] + off, y_para(p, y_rot)))
         sfx_at.append(("pop", r["t0"] + off))
     st = plan.get("stock")
     if st:
-        ovl.append((_stock(st["quedan"], st["agotados"], k, cfg, str(tmp / "stock.png")),
-                    st["t0"] + off, st["t1"] + off, y_rot))
+        p = _stock(st["quedan"], st["agotados"], k, cfg, str(tmp / "stock.png"))
+        ovl.append((p, st["t0"] + off, st["t1"] + off, y_para(p, y_rot)))
         sfx_at.append(("pop", st["t0"] + off))
     if plan["fotos"]:
         from .photo_insert import _search_and_download
@@ -692,6 +814,7 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
     if proc.returncode != 0:
         raise RuntimeError(f"ffmpeg VIP: {proc.stderr[-600:]}")
+    ctx.extras["subs_borde_min"] = 5  # en VIP los subtítulos llevan borde siempre
     if clip:  # el gancho es un trozo repetido: sin subtítulos encima
         ctx.extras.setdefault("sin_subs", []).append((0.0, round(off, 3)))
     ctx.on_log(f"[vip] ✅ {len(ovl)} gráficos · {len(zs)} zooms · gancho "
