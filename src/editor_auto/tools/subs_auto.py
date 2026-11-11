@@ -13,6 +13,7 @@ de cualquier herramienta que recorte el vídeo (silence_cutter, etc.).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from src.editor_auto.config import TOOL_POSITION_WEIGHTS, TOOL_SUBS_AUTO
@@ -249,7 +250,10 @@ class SubsAutoTool:
             if huecos and fuera:
                 ctx.on_log(f"[subs_auto] {len(words) - len(fuera)} palabra(s) sin subtítulo en {huecos}")
                 words = fuera
-            corr = ctx.extras.get("correcciones") or []
+            corr = ctx.extras.get("correcciones")
+            if corr is None and config.get("corregir_nombres", True):
+                # Sin plan VIP: una pasada barata de IA solo para nombres propios.
+                corr = _pedir_correcciones(words, ctx)
             if corr:
                 n = _corregir_nombres(words, corr)
                 if n:
@@ -260,14 +264,12 @@ class SubsAutoTool:
             except OSError:
                 pass
 
-        # Edición VIP: borde obligatorio (sin él, letra fina blanca o amarilla
-        # desaparece sobre caras, fondos claros y el propio producto).
-        borde = int(ctx.extras.get("subs_borde_min") or 0)
-        pildora_sola = config.get("highlight_mode") == "pill" and int(config.get("max_words") or 0) <= 1
-        if borde and not pildora_sola and int(config.get("stroke_width") or 0) < borde:
-            config = {**config, "stroke_width": borde,
-                      "stroke_color": _borde_contraste(config.get("text_color"))}
-            ctx.on_log(f"[subs_auto] borde VIP {borde}px {config['stroke_color']}")
+        # Borde obligatorio en toda edición (básico y VIP): sin él, letra fina
+        # blanca o amarilla desaparece sobre caras, fondos claros y el producto.
+        nuevo = _con_borde(config, ctx.extras.get("subs_borde_min"))
+        if nuevo is not config:
+            config = nuevo
+            ctx.on_log(f"[subs_auto] borde {config['stroke_width']}px {config['stroke_color']}")
 
         ctx.on_progress(0.58, "🎬 Render overlay subtítulos…")
         style = {
@@ -301,6 +303,39 @@ class SubsAutoTool:
         )
         ctx.on_progress(1.0, "✅ Subtítulos aplicados")
         return output_path
+
+
+BORDE_MIN = 5
+_PROMPT_NOMBRES = Path(__file__).resolve().parent.parent / "prompts" / "subs_nombres.md"
+
+
+def _con_borde(config: dict, minimo=None) -> dict:
+    """Sube el borde al mínimo legible (salvo píldora de una palabra, que ya
+    lleva fondo). Devuelve el mismo dict si no hace falta tocarlo."""
+    borde = int(minimo or BORDE_MIN)
+    pildora_sola = config.get("highlight_mode") == "pill" and int(config.get("max_words") or 0) <= 1
+    if pildora_sola or int(config.get("stroke_width") or 0) >= borde:
+        return config
+    return {**config, "stroke_width": borde, "stroke_color": _borde_contraste(config.get("text_color"))}
+
+
+def _pedir_correcciones(words: list[dict], ctx: ToolContext) -> list[dict]:
+    """Pide a la IA los nombres propios mal oídos («zapataki» → «Pataky»).
+    Si falla, sigue sin corregir: los subtítulos no se paran por esto."""
+    texto = " ".join(str(w.get("word", w.get("text", ""))).strip() for w in words)
+    if not texto.strip():
+        return []
+    try:
+        from src.editor_auto.api.openai_client import analyze_transcript_json
+        res = analyze_transcript_json(
+            system_prompt=_PROMPT_NOMBRES.read_text(encoding="utf-8"),
+            user_payload={"transcripcion": texto[:12000]})
+    except Exception as e:  # noqa: BLE001
+        ctx.on_log(f"[subs_auto] ⚠️ sin corrección de nombres ({str(e)[:150]})")
+        return []
+    corr = (res or {}).get("correcciones") if isinstance(res, dict) else None
+    return [{"oido": str(c.get("oido"))[:40], "bien": str(c.get("bien"))[:40]}
+            for c in (corr or [])[:8] if isinstance(c, dict) and c.get("oido") and c.get("bien")]
 
 
 def _corregir_nombres(words: list[dict], correcciones: list[dict]) -> int:

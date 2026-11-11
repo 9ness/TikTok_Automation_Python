@@ -1086,6 +1086,74 @@ class TestPass2Grounded:
         assert g({"kind": "redundant_restatement", "first_attempt": "te lo dejo en el carrito",
                   "kept_version": "te lo dejo en el carrito naranja"}, 0, 5, w)
 
+    def test_reinicio_de_la_misma_frase_se_corta(self):
+        # Cintia 11/11/2026: arranque repetido que se quedaba en el básico.
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("chicas cómo son estos shorts pantaloncitos así chicas cómo son "
+                    "estos pantaloncitos cortos así con caída con el lacito")
+        assert g({"kind": "redundant_restatement",
+                  "first_attempt": "chicas cómo son estos shorts pantaloncitos así",
+                  "kept_version": "chicas cómo son estos pantaloncitos cortos así con caída"}, 0, 6, w)
+
+    def test_misma_frase_repetida_mas_adelante(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("bueno no me lo creía pero están solo por 8 euros os los dejo aquí en el "
+                    "cuadrito naranja bueno no me lo creía es tan solo por 8 euros os voy")
+        assert g({"kind": "redundant_restatement",
+                  "first_attempt": "bueno no me lo creía pero están solo por 8 euros",
+                  "kept_version": "bueno no me lo creía es tan solo por 8 euros"}, 0, 10, w)
+
+    def test_reinicio_sin_sus_primeras_palabras_se_amplia(self):
+        # Cintia v4: la IA corta [2-5] y deja «chicas cómo» colgando.
+        from src.editor_auto.tools.silence_cutter import _pass2_extender_reinicio as ext
+        w = self._w("chicas cómo son estos shorts pantaloncitos chicas cómo son "
+                    "estos pantaloncitos cortos así con caída")
+        cut = {"kind": "redundant_restatement",
+               "first_attempt": "son estos shorts pantaloncitos",
+               "kept_version": "chicas cómo son estos pantaloncitos cortos"}
+        i0, nuevo = ext(cut, 2, 5, w)
+        assert i0 == 0
+        assert nuevo["first_attempt"].startswith("chicas")
+
+    def test_reinicio_con_rango_corrido(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_extender_reinicio as ext
+        w = self._w("chicas cómo son estos shorts pantaloncitos así chicas cómo son "
+                    "estos pantaloncitos cortos así con caída")
+        cut = {"kind": "redundant_restatement",
+               "first_attempt": "cómo son estos shorts pantaloncitos así chicas",
+               "kept_version": "chicas cómo son estos pantaloncitos cortos así con caída"}
+        i0, nuevo = ext(cut, 1, 7, w)
+        assert (i0, nuevo["_i1"]) == (0, 6)
+
+    def test_no_amplia_si_la_buena_no_va_detras(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_extender_reinicio as ext
+        w = self._w("chicas cómo son estos shorts pantaloncitos y ahora el precio")
+        cut = {"kind": "redundant_restatement",
+               "first_attempt": "son estos shorts pantaloncitos",
+               "kept_version": "chicas cómo son estos pantaloncitos cortos"}
+        assert ext(cut, 2, 5, w)[0] == 2
+
+    def test_arranque_corto_misma_palabra(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
+        w = self._w("no dejes pasar la oferta porque yo lo que yo la noto muchísimo")
+        assert g({"kind": "abandoned_phrase", "first_attempt": "yo lo que",
+                  "kept_version": "yo la noto muchísimo"}, 6, 8, w)
+        # «yo lo compré» → «yo la noto»: no es retoma si no va pegada.
+        w2 = self._w("yo lo compré ayer y además yo la noto muchísimo")
+        assert not g({"kind": "abandoned_phrase", "first_attempt": "yo lo compré",
+                      "kept_version": "yo la noto muchísimo"}, 0, 2, w2)
+
+    def test_no_cortar_las_dos_copias(self):
+        from src.editor_auto.tools.silence_cutter import _kept_ya_cortado
+        w = self._w("chicas cómo son estos shorts pantaloncitos así chicas cómo son "
+                    "estos pantaloncitos cortos así con caída")
+        raw = {"start_word_idx": 0, "end_word_idx": 6,
+               "kept_version": "chicas cómo son estos pantaloncitos cortos así"}
+        segunda = (w[7]["start"], w[10]["end"])  # el holístico quitó «chicas cómo son estos» de la 2ª
+        assert _kept_ya_cortado(raw, w, [segunda])
+        assert not _kept_ya_cortado(raw, w, [])
+        assert not _kept_ya_cortado(raw, w, [(w[14]["start"], w[15]["end"])])
+
     def test_repeticion_de_palabra_corta_no_basta(self):
         from src.editor_auto.tools.silence_cutter import _pass2_cut_grounded as g
         w = self._w("una pasta no pues no te creas 20 euros te lo dejo")
@@ -1160,3 +1228,197 @@ class TestDeepgramRachasUniformes:
         assert r(normal + uni) == [(3, 10)]
         assert r(normal) == []
         assert r(uni[:5]) == []
+
+
+class TestRepeticionesDeterministas:
+    @staticmethod
+    def _w(texto, paso=0.3):
+        return [{"word": t, "start": i * paso, "end": i * paso + 0.25}
+                for i, t in enumerate(texto.split())]
+
+    def test_palabra_doble(self):
+        from src.editor_auto.tools.silence_cutter import _palabra_doble
+        cuts = _palabra_doble(self._w("es es un tejido muy muy elástico que que hay"))
+        assert [c["start_word_idx"] for c in cuts] == [0, 7]
+
+    def test_toma_larga_repetida_con_frase_en_medio(self):
+        from src.editor_auto.tools.silence_cutter import _detect_repeated_ngrams
+        w = self._w("bueno no me lo creía pero están solo por 8 euros os los dejo aquí "
+                    "bueno no me lo creía porque están solo por 8 euros")
+        cuts = _detect_repeated_ngrams(w, min_n=2, max_n=12)
+        assert any(c["start_word_idx"] == 0 and c["end_word_idx"] == 14 for c in cuts)
+
+    def test_frase_corta_lejana_no_se_corta(self):
+        from src.editor_auto.tools.silence_cutter import _detect_repeated_ngrams
+        w = self._w("me encanta el color y además el tejido es suave y me encanta el precio")
+        assert _detect_repeated_ngrams(w, min_n=2, max_n=12) == []
+
+
+class TestDoblesTrasCortes:
+    def test_doble_que_nace_al_cortar(self):
+        from src.editor_auto.tools.silence_cutter import _quitar_dobles_tras_cortes
+        ws = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4}
+              for i, w in enumerate("porque yo lo porque yo la noto".split())]
+        cortes = [(ws[1]["start"], ws[2]["end"], {}), (ws[1]["start"], ws[2]["end"], {})]
+        out = _quitar_dobles_tras_cortes(ws, cortes)
+        assert len(out) == 2  # duplicado fuera + «porque» primero
+        assert out[-1][0] == ws[0]["start"]
+
+    def test_sin_doble_no_anade(self):
+        from src.editor_auto.tools.silence_cutter import _quitar_dobles_tras_cortes
+        ws = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4}
+              for i, w in enumerate("hola que tal estas".split())]
+        assert _quitar_dobles_tras_cortes(ws, []) == []
+
+
+class TestFiltroBarrido:
+    def _ws(self, txt):
+        return [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, w in enumerate(txt.split())]
+
+    def test_no_corta_enfasis(self):
+        from src.editor_auto.tools.silence_cutter import _filtrar_cortes_barrido
+        ws = self._ws("es muy muy elástica")
+        assert _filtrar_cortes_barrido(ws, [(ws[1]["start"], ws[2]["end"], {})]) == []
+
+    def test_no_corta_eco_de_dialogo(self):
+        from src.editor_auto.tools.silence_cutter import _filtrar_cortes_barrido
+        ws = self._ws("creas 20 euros ¿20 euros? Sí")
+        assert _filtrar_cortes_barrido(ws, [(ws[1]["start"], ws[2]["end"], {})]) == []
+
+    def test_toma_repetida_si(self):
+        from src.editor_auto.tools.silence_cutter import _filtrar_cortes_barrido
+        ws = self._ws("este con este con florecitas")
+        c = [(ws[0]["start"], ws[1]["end"], {})]
+        assert _filtrar_cortes_barrido(ws, c) == c
+
+
+def test_eco_parcial_de_dialogo_no_se_corta():
+    from src.editor_auto.tools.silence_cutter import _filtrar_cortes_barrido
+    ws = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4}
+          for i, w in enumerate("creas 20 euros ¿20 euros? Sí".split())]
+    assert _filtrar_cortes_barrido(ws, [(ws[2]["start"], ws[2]["end"], {})]) == []
+
+
+class TestGuardPalabraPegada:
+    """nueveness 11/11: «oferta porque yo la | porque yo la noto». El guard de
+    0,15 s tras «oferta» dejaba «porq-» y sonaba «porque porque»."""
+
+    def test_corte_pegado_empieza_en_fin_de_la_buena(self):
+        from src.editor_auto.tools.silence_cutter import _protect_word_boundaries
+        words = [
+            {"word": "oferta", "start": 37.12, "end": 37.52},
+            {"word": "porque", "start": 37.52, "end": 37.60},
+            {"word": "yo", "start": 37.60, "end": 37.76},
+            {"word": "la", "start": 37.76, "end": 38.72},
+            {"word": "porque", "start": 39.81, "end": 40.13},
+        ]
+        out = _protect_word_boundaries([(37.52, 39.81)], words, 0.15)
+        assert out and abs(out[0][0] - 37.52) < 1e-6
+
+    def test_corte_de_silencio_conserva_guard(self):
+        from src.editor_auto.tools.silence_cutter import _protect_word_boundaries
+        words = [
+            {"word": "hola", "start": 1.0, "end": 1.5},
+            {"word": "adios", "start": 3.0, "end": 3.5},
+        ]
+        out = _protect_word_boundaries([(1.5, 3.0)], words, 0.15)
+        assert abs(out[0][0] - 1.65) < 1e-6 and abs(out[0][1] - 2.85) < 1e-6
+
+
+class TestRecortarInicioPass2:
+    def _w(self, txt):
+        return [{"word": t, "start": i * 0.3, "end": i * 0.3 + 0.25} for i, t in enumerate(txt.split())]
+
+    def test_solo_se_retoma_el_final(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_recortar_inicio
+        w = self._w("ojo y no dejes pasar la oferta porque yo la porque yo la noto muchísimo")
+        # corte IA [1-9] = «y no dejes pasar la oferta porque yo la»
+        assert _pass2_recortar_inicio(1, 9, w) == 7
+
+    def test_retoma_completa_no_se_toca(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_recortar_inicio
+        w = self._w("este con florecitas este con florecitas blancas")
+        assert _pass2_recortar_inicio(0, 2, w) == 0
+
+    def test_sin_coincidencia_no_se_toca(self):
+        from src.editor_auto.tools.silence_cutter import _pass2_recortar_inicio
+        w = self._w("es un tejido muy bonito la tela es suave")
+        assert _pass2_recortar_inicio(0, 4, w) == 0
+
+
+class TestEncajarCorteEnPalabras:
+    def test_borde_desplazado_vuelve_al_inicio_de_la_palabra(self):
+        from src.editor_auto.tools.silence_cutter import _encajar_corte_en_palabras
+        out_w = [{"word": "porque", "start": 26.05, "end": 26.21},
+                 {"word": "yo", "start": 26.21, "end": 26.30},
+                 {"word": "lo", "start": 26.30, "end": 26.45}]
+        in_w = [{"word": "oferta", "start": 37.12, "end": 37.52},
+                {"word": "porque", "start": 37.52, "end": 37.62},
+                {"word": "yo", "start": 37.62, "end": 37.76},
+                {"word": "la", "start": 37.76, "end": 38.00}]
+        n0, n1 = _encajar_corte_en_palabras(37.67, 38.00, 26.05, 26.45, out_w, in_w)
+        assert abs(n0 - 37.52) < 1e-6 and abs(n1 - 38.00) < 1e-6
+
+    def test_sin_palabra_igual_no_mueve(self):
+        from src.editor_auto.tools.silence_cutter import _encajar_corte_en_palabras
+        out_w = [{"word": "hola", "start": 1.0, "end": 1.3}]
+        in_w = [{"word": "adios", "start": 5.0, "end": 5.3}]
+        assert _encajar_corte_en_palabras(5.1, 5.4, 1.0, 1.3, out_w, in_w) == (5.1, 5.4)
+
+
+import src.editor_auto.tools.silence_cutter as sc  # noqa: E402
+
+
+class TestBarridoGuardas:
+    """11/11: corte de 30 s en clienta_2 (arranque en la costura) y palabras
+    sueltas que rompían la frase en cintia («Mirad cómo | tejido»)."""
+
+    def test_arranque_en_costura_va_al_tramo_siguiente(self):
+        keeps = [(10.0, 12.0), (40.0, 45.0)]
+        assert sc._map_output_to_input(2.0, keeps) == 12.0
+        assert sc._map_output_to_input(2.0, keeps, al_siguiente=True) == 40.0
+        assert sc._map_output_to_input(7.0, keeps, al_siguiente=True) == 45.0
+
+    @staticmethod
+    def _w(txt):
+        out, t = [], 0.0
+        for x in txt.split():
+            out.append({"word": x, "start": t, "end": t + 0.3})
+            t += 0.4
+        return out
+
+    def test_palabra_suelta_que_no_se_repite_no_se_corta(self):
+        w = self._w("mirad cómo son un tejido")
+        assert sc._filtrar_cortes_barrido(w, [(0.8, 1.1, {})]) == []
+
+    def test_palabra_doble_si_se_corta(self):
+        w = self._w("mirad cómo es es un tejido")
+        assert sc._filtrar_cortes_barrido(w, [(0.8, 1.1, {})]) == [(0.8, 1.1, {})]
+
+    def test_retomada_truncada_si_se_corta(self):
+        w = self._w("estos pantal pantalones cortos")
+        assert sc._filtrar_cortes_barrido(w, [(0.4, 0.7, {})]) == [(0.4, 0.7, {})]
+
+
+class TestPass2CortesQueSePisan:
+    def test_no_se_come_lo_que_otro_corte_conserva(self):
+        txt = "la oferta porque yo lo noto porque yo la noto muchísimo".split()
+        words = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, w in enumerate(txt)]
+        a = {"kind": "redundant_restatement", "first_attempt": "porque yo lo noto",
+             "kept_version": "porque yo la noto muchísimo", "_i0": 2, "_i1": 5}
+        b = {"kind": "stuttered_word", "first_attempt": "porque yo la",
+             "kept_version": "noto muchísimo", "_i0": 6, "_i1": 8}
+        out = sc._pass2_sin_comerse_lo_que_queda(
+            [(1.0, 2.9, a), (3.0, 4.4, b)], words, lambda _: None, "test")
+        assert [c for _, _, c in out] == [a]
+
+    def test_cortes_independientes_se_quedan(self):
+        txt = "eh hola hola qué tal pues mira mira esto".split()
+        words = [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, w in enumerate(txt)]
+        a = {"kind": "stuttered_word", "first_attempt": "hola", "kept_version": "hola qué tal",
+             "_i0": 1, "_i1": 1}
+        b = {"kind": "stuttered_word", "first_attempt": "mira", "kept_version": "mira esto",
+             "_i0": 6, "_i1": 6}
+        out = sc._pass2_sin_comerse_lo_que_queda(
+            [(0.5, 0.9, a), (3.0, 3.4, b)], words, lambda _: None, "test")
+        assert len(out) == 2

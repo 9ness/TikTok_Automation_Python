@@ -231,3 +231,28 @@ def test_subs_gigantes_y_pildora_con_letra_oscura():
     assert _subs_cfg({"tamano": "gigante"})["font_scale"] == 0.075
     cfg = _subs_cfg({"resaltado": "pildora", "color_texto": "#0F0F0F", "palabras": 3})
     assert cfg["max_words"] == 1
+
+
+def test_borde_minimo_en_basico():
+    from src.editor_auto.tools.subs_auto import BORDE_MIN, _con_borde
+    base = {"text_color": "#FFFFFF", "stroke_color": "#000000", "stroke_width": 2,
+            "highlight_mode": "none", "max_words": 1}
+    out = _con_borde(base)
+    assert out["stroke_width"] == BORDE_MIN and out["stroke_color"] == "#000000"
+    gordo = {**base, "stroke_width": 8}
+    assert _con_borde(gordo) is gordo
+    pill = {**base, "highlight_mode": "pill", "max_words": 1}
+    assert _con_borde(pill) is pill
+
+
+def test_basico_pide_correcciones_si_no_hay_plan(monkeypatch):
+    from src.editor_auto.api import openai_client
+    from src.editor_auto.tools import subs_auto
+    monkeypatch.setattr(openai_client, "analyze_transcript_json",
+                        lambda **k: {"correcciones": [{"oido": "zapataki", "bien": "Pataky"}]})
+
+    class C:
+        def on_log(self, *_):
+            pass
+    corr = subs_auto._pedir_correcciones([{"word": "elsa"}, {"word": "zapataki"}], C())
+    assert corr == [{"oido": "zapataki", "bien": "Pataky"}]

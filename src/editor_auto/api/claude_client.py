@@ -55,9 +55,15 @@ def _client():
     return _cliente
 
 
-def analyze_transcript_json(*, system_prompt: str, user_payload: dict) -> Any:
-    """Llamada a Claude con el prompt del cortador. Lanza si algo falla."""
-    m = modelo()
+def analyze_transcript_json(
+    *, system_prompt: str, user_payload: dict,
+    modelo_forzado: str | None = None, esfuerzo: str | None = None,
+) -> Any:
+    """Llamada a Claude con el prompt del cortador. Lanza si algo falla.
+
+    `modelo_forzado` sube de modelo en una pasada concreta (el barrido final
+    del vídeo ya cortado usa Sonnet: lo que se escapa ahí lo oye el cliente)."""
+    m = modelo_forzado or modelo()
     kwargs: dict[str, Any] = {
         "model": m,
         "max_tokens": _MAX_TOKENS,
@@ -71,7 +77,7 @@ def analyze_transcript_json(*, system_prompt: str, user_payload: dict) -> Any:
     if m.startswith("claude-haiku"):
         kwargs["thinking"] = {"type": "disabled"}
     else:
-        kwargs["output_config"] = {"effort": ESFUERZO}
+        kwargs["output_config"] = {"effort": esfuerzo or ESFUERZO}
 
     with _client().messages.stream(**kwargs) as stream:
         resp = stream.get_final_message()
@@ -99,6 +105,6 @@ def analyze_transcript_json(*, system_prompt: str, user_payload: dict) -> Any:
         i = raw.find("{")
         raw = raw[i:] if i >= 0 else raw
     try:
-        return json.loads(raw)
+        return json.JSONDecoder().raw_decode(raw)[0]
     except json.JSONDecodeError as e:
         raise ValueError(f"Claude devolvió JSON inválido: {e}\nRespuesta: {raw[:500]}")

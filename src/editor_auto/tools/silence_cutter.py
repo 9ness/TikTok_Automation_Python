@@ -895,7 +895,7 @@ class SilenceCutterTool:
         ngram_diag: dict[str, Any] = {"enabled": True}
         if clean_words:
             ngram_cuts_detailed = _detect_repeated_ngrams(
-                clean_words, min_n=2, max_n=6, max_gap_between_grams_s=1.0,
+                clean_words, min_n=2, max_n=12, max_gap_between_grams_s=1.0,
             )
             ngram_diag["n_cuts"] = len(ngram_cuts_detailed)
             ngram_diag["cuts"] = ngram_cuts_detailed[:15]
@@ -905,6 +905,9 @@ class SilenceCutterTool:
                 t0 = float(clean_words[i0]["start"]) if i0 < len(clean_words) else None
                 t1 = float(clean_words[i1]["end"]) if i1 < len(clean_words) else None
                 if t0 is not None and t1 is not None and t1 - t0 > 0.05:
+                    # Eco de diálogo («20 euros. | ¿20 euros?») = otra persona.
+                    if not _filtrar_cortes_barrido(clean_words, [(t0, t1, c)]):
+                        continue
                     cuts_with_source.append((t0, t1, "ngram_repetition"))
             if ngram_cuts_detailed:
                 ctx.on_log(
@@ -945,6 +948,8 @@ class SilenceCutterTool:
                     openai_enabled=bool(config.get("ai_pass2_openai_enabled", False)),
                     gemini_enabled=bool(config.get("ai_pass2_gemini_enabled", True)),
                     log=ctx.on_log,
+                    previos=[(a, b) for a, b, src in cuts_with_source
+                             if src in ("ai_holistic", "ai", "ngram_repetition")],
                 )
                 ai_pass2_diag.update(fs_diag)
                 ai_pass2_diag["n_cuts_applied"] = len(fs_intervals)
@@ -2128,136 +2133,208 @@ class SilenceCutterTool:
             # restart redundante no debe perder contenido ni romper el sentido;
             # si los sube, era contenido real → se descarta solo). Determinista
             # (gpt temp 0+seed). Generaliza: caza cualquier restart que escape.
-            if (
-                bool(config.get("false_start_output_sweep", True))
-                and words and best_audit.get("transcription_ok", True)
-            ):
+            # Ronda 2 (solo reglas, sin IA): lo que deja junto el 1er barrido
+            # («es | es un tejido», «están | están solo»), sobre el output nuevo;
+            # y si el 1º se descartó entero por un corte malo de la IA, salva al
+            # menos las repeticiones literales (cintia v11).
+            _sweep_ok = False
+            def _barrido_ia(_ws):
+                # Revisor del vídeo YA cortado: lo que se escape aquí lo oye el
+                # cliente → modelo fuerte (Sonnet, céntimos por vídeo, 11/11).
+                # Si falla, Haiku como antes.
+                _kw = dict(words=_ws, language=config.get("ai_language", "es"),
+                           model=config.get("ai_model", "gpt-4o"), log=ctx.on_log)
+                _m = (config.get("barrido_claude_model")
+                      or os.getenv("EDITOR_AUTO_BARRIDO_MODEL") or "claude-sonnet-5-5")
                 try:
-                    _ow = ((best_audit.get("deep") or {}).get("out_words")) or []
-                    _ow_words = [
-                        {"idx": i, "word": w.get("word", ""),
-                         "start": float(w.get("start", 0) or 0),
-                         "end": float(w.get("end", 0) or 0)}
-                        for i, w in enumerate(_ow)
-                    ]
-                    _fs_out, _ = (
-                        _ai_false_starts_openai(
-                            words=_ow_words, language=config.get("ai_language", "es"),
-                            model=config.get("ai_model", "gpt-4o"), log=ctx.on_log,
-                        ) if len(_ow_words) >= 4 else ([], None)
-                    )
-                    _in_cuts: list[tuple[float, float, str]] = []
-                    for _o0, _o1, _raw in _fs_out:
-                        _i0 = _map_output_to_input(float(_o0), best_keeps)
-                        _i1 = _map_output_to_input(float(_o1), best_keeps)
-                        if _i0 is not None and _i1 is not None and _i1 > _i0:
-                            _in_cuts.append((_i0, _i1, (_raw or {}).get("first_attempt", "restart")))
-                    if _in_cuts:
-                        ctx.on_log(
-                            f"[silence_cutter] 🧹 Barrido final: {len(_in_cuts)} falso(s) "
-                            f"arranque(s) en el OUTPUT → recorto "
-                            + " · ".join(f"'{w}'" for *_, w in _in_cuts)
-                        )
-                        _cuts = [(s, e) for s, e, _ in _in_cuts]
-                        if voiced_words:
-                            _cuts = _protect_word_boundaries(_cuts, voiced_words, _WORD_GUARD_S)
-                        _sw_keeps = _subtract_intervals(list(best_keeps), _cuts)
-                        _sw_keeps = [(a, b) for a, b in _sw_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S]
-                        _sw_keeps = _snap_keeps_to_words(_sw_keeps, voiced_words or words)
-                        _sw_keeps, _ = _complete_final_phrase(_sw_keeps, voiced_words or words)
-                        if bool(config.get("extend_last_word_tail", True)):
-                            _sw_keeps = _extend_last_keep_to_word_tail(
-                                _sw_keeps, tmp_audio, video_duration,
-                            )
-                        _sw_keeps = _con_demo(_sw_keeps)
-                        _kept_sw = sum(b - a for a, b in _sw_keeps)
-                        _kept_bf = sum(b - a for a, b in best_keeps)
-                        if _sw_keeps and _kept_sw >= max(3.0, 0.5 * _kept_bf):
-                            _tmp_sw = output_path + ".fsweep.mp4"
-                            try:
-                                _apply_cuts_ffmpeg(
-                                    input_path=input_path, output_path=_tmp_sw,
-                                    keep_intervals=_sw_keeps, rotation=video_rotation,
-                                    output_aspect=config.get("output_aspect", "9:16"),
-                                    log=ctx.on_log,
-                                    on_progress=lambda f: ctx.on_progress(
-                                        0.99, "🧹 Barrido falsos arranques…"),
-                                    normalize_audio=normalize_audio,
-                                    content_end_s=_content_end_output_s(_sw_keeps, tmp_audio),
-                                    boost_spans=_boost_spans,
-                                )
-                                _sw_audit = _full_audit(_sw_keeps, audit_path=_tmp_sw)
-                                # Cortar un restart "rephrase" deja sus palabras
-                                # como "missing" en el audit profundo (no recurren).
-                                # NO es pérdida real → no debe vetar el corte. La
-                                # seguridad real es: (1) coherencia (sentido) no
-                                # empeora, y (2) las palabras que ahora "faltan"
-                                # caen DENTRO del trozo que quité (el restart). Si
-                                # faltara algo FUERA del corte = pérdida real →
-                                # rechazo.
-                                def _missing_key(_m: dict) -> tuple:
-                                    return (round(float(_m.get("input_start", 0) or 0), 1),
-                                            round(float(_m.get("input_end", 0) or 0), 1))
-                                _best_miss = {
-                                    _missing_key(_m)
-                                    for _m in ((best_audit.get("deep") or {}).get("missing_blocks") or [])
-                                }
-
-                                def _within_sweep(_m: dict) -> bool:
-                                    _s0, _e0 = _m.get("input_start"), _m.get("input_end")
-                                    if _s0 is None or _e0 is None:
-                                        return False
-                                    return any(
-                                        cs - 0.35 <= float(_s0) and float(_e0) <= ce + 0.35
-                                        for cs, ce, _ in _in_cuts
-                                    )
-                                _unexpected = [
-                                    _m for _m in ((_sw_audit.get("deep") or {}).get("missing_blocks") or [])
-                                    if _missing_key(_m) not in _best_miss and not _within_sweep(_m)
-                                ]
-                                _safe = (
-                                    isinstance(_sw_audit.get("quality_score"), int)
-                                    and not _unexpected
-                                    and _count_coherence_fallos(_sw_audit) <= _count_coherence_fallos(best_audit)
-                                    and bool(_sw_audit.get("transcription_ok", True))
-                                )
-                                if _safe:
-                                    # El "missing" del restart es INTENCIONADO →
-                                    # limpia el needs_requeue/score espurio que vino
-                                    # solo de quitarlo (mantén coherencia como gate).
-                                    _sw_audit["needs_requeue"] = bool(
-                                        _sw_audit.get("coherence_needs_requeue")
-                                    )
-                                    _sw_audit["quality_score"] = max(
-                                        int(_sw_audit.get("quality_score") or 0),
-                                        int(best_score or 0),
-                                    )
-                                    _sw_audit["verdict"] = _verdict_for_score(_sw_audit["quality_score"])
-                                    os.replace(_tmp_sw, output_path)
-                                    best_keeps, best_audit = _sw_keeps, _sw_audit
-                                    best_score = best_audit.get("quality_score")
-                                    diagnostic["false_start_sweep"] = {
-                                        "cut": [w for *_, w in _in_cuts],
-                                    }
-                                    ctx.on_log(
-                                        "[silence_cutter] 🧹✅ Barrido: falso(s) arranque(s) "
-                                        f"eliminado(s) del output ({', '.join(w for *_, w in _in_cuts)}) "
-                                        "— sentido intacto, sin pérdida real."
-                                    )
-                                else:
-                                    os.remove(_tmp_sw)
-                                    ctx.on_log(
-                                        "[silence_cutter] 🧹 Barrido DESCARTADO (rompería "
-                                        "coherencia o perdería contenido fuera del restart)."
-                                    )
-                            except Exception as _e:  # noqa: BLE001
-                                try:
-                                    os.remove(_tmp_sw)
-                                except OSError:
-                                    pass
-                                ctx.on_log(f"[silence_cutter] ⚠️ Barrido re-render falló: {_e}")
+                    return _ai_false_starts_openai(
+                        **_kw, claude_model=_m,
+                        claude_effort=config.get("barrido_claude_effort", "medium"))
                 except Exception as _e:  # noqa: BLE001
-                    ctx.on_log(f"[silence_cutter] ⚠️ Barrido falsos arranques falló: {_e}")
+                    ctx.on_log(f"[silence_cutter] ⚠️ Barrido con {_m} falló ({str(_e)[:120]}) → modelo normal")
+                    return _ai_false_starts_openai(**_kw)
+
+            for _ronda in range(2):
+                _sweep_ok = False
+                if (
+                    bool(config.get("false_start_output_sweep", True))
+                    and words and best_audit.get("transcription_ok", True)
+                ):
+                    try:
+                        _ow = ((best_audit.get("deep") or {}).get("out_words")) or []
+                        _ow_words = [
+                            {"idx": i, "word": w.get("word", ""),
+                             "start": float(w.get("start", 0) or 0),
+                             "end": float(w.get("end", 0) or 0)}
+                            for i, w in enumerate(_ow)
+                        ]
+                        _fs_out, _ = (
+                            _barrido_ia(_ow_words)
+                            if len(_ow_words) >= 4 and not _ronda else ([], None)
+                        )
+                        # Repeticiones LITERALES que nacen al juntar tramos (cintia,
+                        # 11/11/2026: «no me lo creía | no me lo creía» tras cortar lo
+                        # de en medio). Deterministas, sin IA; mínimo 3 palabras.
+                        _fs_out = list(_fs_out)
+                        for _c in _detect_repeated_ngrams(
+                                _ow_words, min_n=2, max_n=12, max_gap_between_grams_s=1.0):
+                            _a, _b = int(_c["start_word_idx"]), int(_c["end_word_idx"])
+                            # Eco de diálogo («20 euros | ¿20 euros? | Sí»): es otra
+                            # persona preguntando, no una toma repetida.
+                            _sig = _ow_words[_b + 1]["word"] if _b + 1 < len(_ow_words) else ""
+                            _eco = _ow_words[_a + (_b - _a + 1):_b + 1 + (_b - _a + 1)]
+                            if str(_sig).startswith("¿") or any("?" in str(w["word"]) for w in _eco):
+                                continue
+                            _fs_out.append((_ow_words[_a]["start"], _ow_words[_b]["end"], _c))
+                        for _c in _palabra_doble(_ow_words):
+                            # Hasta el ARRANQUE de la segunda: cortar solo la 1ª
+                            # por sus tiempos dejaba un trozo («porq-») que sonaba
+                            # igual a «porque porque» (nueveness, 11/11).
+                            _a = int(_c["start_word_idx"])
+                            _fs_out.append((_ow_words[_a]["start"], _ow_words[_a + 1]["start"], _c))
+                        # Lo que queda tras estos cortes puede juntar dos palabras
+                        # iguales («porque | porque yo la noto», nueveness 11/11):
+                        # se repasa sobre las supervivientes. Y sin cortes repetidos.
+                        _fs_out = _filtrar_cortes_barrido(_ow_words, _fs_out)
+                        _fs_out = _quitar_dobles_tras_cortes(_ow_words, _fs_out)
+                        _in_cuts: list[tuple[float, float, str]] = []
+                        for _o0, _o1, _raw in _fs_out:
+                            # El arranque, al tramo SIGUIENTE si cae justo en una
+                            # costura: mapearlo al final del anterior daba un corte
+                            # de 30 s (clienta_2, 11/11).
+                            _i0 = _map_output_to_input(float(_o0), best_keeps, al_siguiente=True)
+                            _i1 = _map_output_to_input(float(_o1), best_keeps)
+                            if _i0 is not None and _i1 is not None and _i1 > _i0:
+                                _i0, _i1 = _encajar_corte_en_palabras(
+                                    _i0, _i1, float(_o0), float(_o1), _ow_words,
+                                    voiced_words or words)
+                                # El eco de diálogo se ve mejor en el Whisper del
+                                # original (puntuación «¿20 euros?», bugalleitor).
+                                if not _filtrar_cortes_barrido(voiced_words or words,
+                                                               [(_i0, _i1, _raw)]):
+                                    continue
+                                _in_cuts.append((_i0, _i1, (_raw or {}).get("first_attempt", "restart")))
+                        if _in_cuts:
+                            ctx.on_log(
+                                f"[silence_cutter] 🧹 Barrido final: {len(_in_cuts)} falso(s) "
+                                f"arranque(s) en el OUTPUT → recorto "
+                                + " · ".join(f"'{w}'" for *_, w in _in_cuts)
+                            )
+                            _cuts = [(s, e) for s, e, _ in _in_cuts]
+                            if voiced_words:
+                                _cuts = _protect_word_boundaries(_cuts, voiced_words, _WORD_GUARD_S)
+                            _sw_keeps = _subtract_intervals(list(best_keeps), _cuts)
+                            _sw_keeps = [(a, b) for a, b in _sw_keeps if (b - a) >= _MIN_KEEP_SEGMENT_S]
+                            _sw_keeps = _snap_keeps_to_words(_sw_keeps, voiced_words or words)
+                            # Bordes al valle de energía: el guard de 0,15 s dejaba
+                            # un «porq-» suelto tras «oferta» (nueveness, 11/11).
+                            try:
+                                _sw_keeps, _ = _refine_keep_edges_to_valley(
+                                    _sw_keeps, voiced_words or words, tmp_audio)
+                            except Exception:  # noqa: BLE001
+                                pass
+                            _sw_keeps, _ = _complete_final_phrase(_sw_keeps, voiced_words or words)
+                            if bool(config.get("extend_last_word_tail", True)):
+                                _sw_keeps = _extend_last_keep_to_word_tail(
+                                    _sw_keeps, tmp_audio, video_duration,
+                                )
+                            _sw_keeps = _con_demo(_sw_keeps)
+                            ctx.on_log(
+                                "[silence_cutter]   barrido cortes(in)="
+                                + ", ".join(f"{a:.2f}-{b:.2f}" for a, b in _cuts)
+                                + " · keeps="
+                                + ", ".join(f"{a:.2f}-{b:.2f}" for a, b in _sw_keeps
+                                            if any(a - 1 <= c <= b + 1 for cc in _cuts for c in cc))
+                            )
+                            _kept_sw = sum(b - a for a, b in _sw_keeps)
+                            _kept_bf = sum(b - a for a, b in best_keeps)
+                            if _sw_keeps and _kept_sw >= max(3.0, 0.5 * _kept_bf):
+                                _tmp_sw = output_path + ".fsweep.mp4"
+                                try:
+                                    _apply_cuts_ffmpeg(
+                                        input_path=input_path, output_path=_tmp_sw,
+                                        keep_intervals=_sw_keeps, rotation=video_rotation,
+                                        output_aspect=config.get("output_aspect", "9:16"),
+                                        log=ctx.on_log,
+                                        on_progress=lambda f: ctx.on_progress(
+                                            0.99, "🧹 Barrido falsos arranques…"),
+                                        normalize_audio=normalize_audio,
+                                        content_end_s=_content_end_output_s(_sw_keeps, tmp_audio),
+                                        boost_spans=_boost_spans,
+                                    )
+                                    _sw_audit = _full_audit(_sw_keeps, audit_path=_tmp_sw)
+                                    # Cortar un restart "rephrase" deja sus palabras
+                                    # como "missing" en el audit profundo (no recurren).
+                                    # NO es pérdida real → no debe vetar el corte. La
+                                    # seguridad real es: (1) coherencia (sentido) no
+                                    # empeora, y (2) las palabras que ahora "faltan"
+                                    # caen DENTRO del trozo que quité (el restart). Si
+                                    # faltara algo FUERA del corte = pérdida real →
+                                    # rechazo.
+                                    def _missing_key(_m: dict) -> tuple:
+                                        return (round(float(_m.get("input_start", 0) or 0), 1),
+                                                round(float(_m.get("input_end", 0) or 0), 1))
+                                    _best_miss = {
+                                        _missing_key(_m)
+                                        for _m in ((best_audit.get("deep") or {}).get("missing_blocks") or [])
+                                    }
+
+                                    def _within_sweep(_m: dict) -> bool:
+                                        _s0, _e0 = _m.get("input_start"), _m.get("input_end")
+                                        if _s0 is None or _e0 is None:
+                                            return False
+                                        return any(
+                                            cs - 0.35 <= float(_s0) and float(_e0) <= ce + 0.35
+                                            for cs, ce, _ in _in_cuts
+                                        )
+                                    _unexpected = [
+                                        _m for _m in ((_sw_audit.get("deep") or {}).get("missing_blocks") or [])
+                                        if _missing_key(_m) not in _best_miss and not _within_sweep(_m)
+                                    ]
+                                    _safe = (
+                                        isinstance(_sw_audit.get("quality_score"), int)
+                                        and not _unexpected
+                                        and _count_coherence_fallos(_sw_audit) <= _count_coherence_fallos(best_audit)
+                                        and bool(_sw_audit.get("transcription_ok", True))
+                                    )
+                                    if _safe:
+                                        # El "missing" del restart es INTENCIONADO →
+                                        # limpia el needs_requeue/score espurio que vino
+                                        # solo de quitarlo (mantén coherencia como gate).
+                                        _sw_audit["needs_requeue"] = bool(
+                                            _sw_audit.get("coherence_needs_requeue")
+                                        )
+                                        _sw_audit["quality_score"] = max(
+                                            int(_sw_audit.get("quality_score") or 0),
+                                            int(best_score or 0),
+                                        )
+                                        _sw_audit["verdict"] = _verdict_for_score(_sw_audit["quality_score"])
+                                        os.replace(_tmp_sw, output_path)
+                                        best_keeps, best_audit = _sw_keeps, _sw_audit
+                                        best_score = best_audit.get("quality_score")
+                                        _sweep_ok = True
+                                        diagnostic["false_start_sweep"] = {
+                                            "cut": [w for *_, w in _in_cuts],
+                                        }
+                                        ctx.on_log(
+                                            "[silence_cutter] 🧹✅ Barrido: falso(s) arranque(s) "
+                                            f"eliminado(s) del output ({', '.join(w for *_, w in _in_cuts)}) "
+                                            "— sentido intacto, sin pérdida real."
+                                        )
+                                    else:
+                                        os.remove(_tmp_sw)
+                                        ctx.on_log(
+                                            "[silence_cutter] 🧹 Barrido DESCARTADO (rompería "
+                                            "coherencia o perdería contenido fuera del restart)."
+                                        )
+                                except Exception as _e:  # noqa: BLE001
+                                    try:
+                                        os.remove(_tmp_sw)
+                                    except OSError:
+                                        pass
+                                    ctx.on_log(f"[silence_cutter] ⚠️ Barrido re-render falló: {_e}")
+                    except Exception as _e:  # noqa: BLE001
+                        ctx.on_log(f"[silence_cutter] ⚠️ Barrido falsos arranques falló: {_e}")
 
             # El mejor render manda: refleja sus keeps/audit aguas abajo.
             keep_intervals = best_keeps
@@ -3107,7 +3184,13 @@ def _detect_repeated_ngrams(
                 i += 1
                 continue
             matched = False
-            for k in range(0, max_interrupt + 1):  # k palabras interpuestas
+            # Toma LARGA repetida (5+ palabras idénticas) con la frase a medias en
+            # medio (cintia 11/11/2026: «bueno no me lo creía pero están… os los
+            # dejo… | bueno no me lo creía porque…»): retoma aunque haya hasta 3n
+            # palabras entre medias y unos segundos de hueco.
+            larga = n >= 5
+            tope_k = 3 * n if larga else max_interrupt
+            for k in range(0, tope_k + 1):  # k palabras interpuestas
                 b0 = i + n + k
                 if b0 + n > len(words):
                     break
@@ -3119,7 +3202,10 @@ def _detect_repeated_ngrams(
                 # (incluye las palabras interpuestas) — pequeño = re-take real.
                 t_a_end = float(words[i + n - 1]["end"])
                 t_b_start = float(words[b0]["start"])
-                if t_b_start - t_a_end > max_gap_between_grams_s:
+                if k > max_interrupt:
+                    if t_b_start - t_a_end > 8.0:
+                        continue
+                elif t_b_start - t_a_end > max_gap_between_grams_s:
                     continue
                 if k in (1, 2) and _is_parallel_enumeration(
                         normalized, gram_a, i + n, b0 + n, mid_end=b0):
@@ -3147,6 +3233,106 @@ def _detect_repeated_ngrams(
     return sorted(cuts, key=lambda c: c["start_word_idx"])
 
 
+# Repetir estas palabras es énfasis («muy muy elástica»), no un tartamudeo.
+_DOBLE_ENFASIS = {"muy", "mas", "más", "ya", "no", "si", "sí", "bien", "poco", "mucho", "tan",
+                  "nada", "todo", "otra", "vale", "venga", "mira", "corre", "ay"}
+
+
+def _palabra_doble(words: list[dict], max_gap_s: float = 0.6) -> list[dict]:
+    """«Es es un tejido», «que que hay»: la misma palabra dos veces seguidas →
+    corta la primera. Determinista; respeta los dobles de énfasis."""
+    out: list[dict] = []
+    norm = [_normalize_word_for_match(w.get("word", "")) for w in words]
+    for i in range(len(words) - 1):
+        a, b = norm[i], norm[i + 1]
+        if not a or a != b or a in _DOBLE_ENFASIS or not a.isalpha():
+            continue
+        if float(words[i + 1]["start"]) - float(words[i]["end"]) > max_gap_s:
+            continue
+        if out and out[-1]["start_word_idx"] == i - 1:
+            continue  # «es es es»: ya cortada la anterior, la siguiente sale en otra pasada
+        out.append({"start_word_idx": i, "end_word_idx": i, "kind": "palabra_doble",
+                    "first_attempt": str(words[i].get("word", "")),
+                    "kept_version": str(words[i + 1].get("word", ""))})
+    return out
+
+
+def _filtrar_cortes_barrido(words: list[dict], cortes: list) -> list:
+    """Quita del barrido final (IA o reglas) lo que no es una toma repetida:
+    - énfasis («muy muy», «no no»): todas las palabras cortadas son de énfasis;
+    - eco de diálogo («20 euros | ¿20 euros? | Sí»): lo que sigue al corte es
+      una pregunta que repite lo cortado (otra persona preguntando)."""
+    out = []
+    for c in cortes:
+        t0, t1 = float(c[0]), float(c[1])
+        dentro = [w for w in words
+                  if t0 - 0.01 <= (float(w["start"]) + float(w["end"])) / 2 <= t1 + 0.01]
+        toks = [_normalize_word_for_match(w.get("word", "")) for w in dentro]
+        toks = [t for t in toks if t]
+        if toks and all(t in _DOBLE_ENFASIS for t in toks):
+            continue
+        # Una palabra suelta solo se quita si se repite o se retoma justo
+        # después («es es», «pantal- pantalones»); si no, rompe la frase
+        # («Mirad cómo | tejido», cintia 11/11).
+        if len(toks) == 1:
+            sig1 = [_normalize_word_for_match(w.get("word", "")) for w in words
+                    if float(w["start"]) >= t1 - 0.05 and w not in dentro][:1]
+            n = sig1[0] if sig1 else ""
+            if not n or not (n.startswith(toks[0]) or toks[0].startswith(n[:3])):
+                continue
+        despues = [w for w in words if float(w["start"]) >= t1 - 0.01][:max(1, len(dentro))]
+        if dentro and despues and any("?" in str(w.get("word", "")) or
+                                      str(w.get("word", "")).startswith("¿") for w in despues):
+            sig = {_normalize_word_for_match(w.get("word", "")) for w in
+                   [x for x in words if float(x["start"]) >= t1 - 0.01][:len(dentro) + 2]}
+            if toks and all(t in sig for t in toks):
+                continue
+        out.append(c)
+    return out
+
+
+def _quitar_dobles_tras_cortes(words: list[dict], cortes: list) -> list:
+    """Quita cortes repetidos y añade los de `_palabra_doble` que nacen al
+    juntar lo que sobrevive a `cortes` [(t0, t1, raw)] (tiempos de `words`)."""
+    vistos: set = set()
+    out: list = []
+    for c in cortes:
+        k = (round(float(c[0]), 2), round(float(c[1]), 2))
+        if k not in vistos:
+            vistos.add(k)
+            out.append(c)
+    for _ in range(2):
+        vivas = [w for w in words
+                 if not any(float(c[0]) - 0.01 <= (float(w["start"]) + float(w["end"])) / 2
+                            <= float(c[1]) + 0.01 for c in out)]
+        # Tiempos como quedarían tras cortar (el hueco cortado no cuenta).
+        juntas = []
+        for w in vivas:
+            quita = sum(max(0.0, min(float(c[1]), float(w["start"])) - float(c[0]))
+                        for c in out)
+            juntas.append({**w, "start": float(w["start"]) - quita,
+                           "end": float(w["end"]) - quita})
+        nuevos = []
+        for d in _palabra_doble(juntas):
+            j = int(d["start_word_idx"])
+            w, w2 = vivas[j], vivas[j + 1]
+            # Del arranque de la 1ª al de la 2ª si están juntas en el original;
+            # si en medio hay un corte, la 1ª entera hasta ese corte.
+            fin = float(w2["start"])
+            for c in out:
+                if float(w["end"]) - 0.01 <= float(c[0]) < fin:
+                    fin = float(c[0])
+            fin = max(fin, float(w["end"]))
+            k = (round(float(w["start"]), 2), round(fin, 2))
+            if k not in vistos:
+                vistos.add(k)
+                nuevos.append((float(w["start"]), fin, d))
+        if not nuevos:
+            break
+        out.extend(nuevos)
+    return out
+
+
 def _build_false_starts_payload(words: list[dict], language: str) -> dict:
     """Payload común para pass 2 (OpenAI/Gemini) — separado para reutilizar."""
     transcript_text = " ".join(str(w.get("word", "")) for w in words)
@@ -3168,6 +3354,43 @@ def _p2tok(t: str) -> str:
     return re.sub(r"[^\w]", "", t)
 
 
+def _pass2_extender_reinicio(cut: dict, i0: int, i1: int,
+                             words: list[dict]) -> tuple[int, dict]:
+    """La IA marca la toma repetida SIN sus primeras palabras (cintia, 11/11/2026:
+    corta [2-5] «son estos shorts pantaloncitos» y deja «Chicas, ¿cómo» delante
+    de «Chicas, ¿cómo son estos pantaloncitos cortos»). Si las 1-3 palabras de
+    antes + lo cortado empiezan como `kept_version` y esa versión arranca justo
+    detrás del corte, el corte se amplía hacia atrás hasta el inicio de la toma."""
+    kept = [t for t in (_p2tok(x) for x in str(cut.get("kept_version") or "").split()) if t]
+    if len(kept) < 3:
+        return i0, cut
+    head = kept[:3]
+    tok = [_p2tok(w.get("word", "")) for w in words]
+    # Rango corrido una palabra («¿cómo son … así? Chicas,»): si la versión
+    # buena ARRANCA dentro de lo cortado, el corte acaba justo antes.
+    for p in range(i0 + 1, i1 + 1):
+        if tok[p:p + 3] == head:
+            i1 = p - 1
+            break
+    toks = [t for t in tok[i0:i1 + 1] if t]
+    if toks[:3] == head:
+        return i0, cut  # ya empieza como la buena (o el rango se queda igual)
+    tras = [t for t in tok[i1 + 1:i1 + 6] if t]
+    if not any(tras[j:j + 3] == head for j in range(min(3, len(tras)))):
+        return i0, cut
+    for m in range(1, 4):
+        if i0 - m < 0:
+            break
+        pre = [t for t in (_p2tok(words[k].get("word", "")) for k in range(i0 - m, i0)) if t]
+        if (pre + toks)[:3] == head:
+            nuevo = dict(cut)
+            nuevo["first_attempt"] = " ".join(
+                str(words[k].get("word", "")) for k in range(i0 - m, i1 + 1))
+            nuevo["_i1"] = i1
+            return i0 - m, nuevo
+    return i0, cut
+
+
 def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
     """¿El corte de la pasada 2 es una retoma REAL? (candado, nov 2026: Haiku
     cortaba 'date' → «mantengo 'prisa'», el único 'la liaba', «He tenido
@@ -3187,7 +3410,22 @@ def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
         if comunes < 0.6 * len(toks) or sobran:
             return False
     kept = [t for t in (_p2tok(x) for x in str(cut.get("kept_version") or "").split()) if t]
-    if str(cut.get("kind") or "") == "redundant_restatement" and kept:
+    # Reinicio de la MISMA frase (cintia, 11/11/2026): «Chicas, ¿cómo son estos
+    # shorts pantaloncitos así? Chicas, ¿cómo son estos pantaloncitos cortos…»:
+    # lo cortado y la versión buena empiezan igual (3+ palabras) y la buena va
+    # justo detrás. «shorts» no es información nueva: es la toma descartada.
+    reinicio = False
+    if len(toks) >= 3 and len(kept) >= 3 and kept[:3] == toks[:3]:
+        tras = [t for t in (_p2tok(w.get("word", "")) for w in words[i1 + 1:i1 + 6]) if t]
+        reinicio = any(tras[j:j + 3] == kept[:3] for j in range(min(3, len(tras))))
+        if not reinicio and len(toks) >= 4:
+            # La misma frase dicha otra vez un poco más adelante («bueno no me lo
+            # creía, pero están solo por 8 €» … «bueno no me lo creía, es tan
+            # solo por 8 €»): casi todas sus palabras están en la versión buena.
+            igual = sum(1 for t in toks if t in kept or any(
+                len(t) >= 4 and len(k) >= 4 and t[:4] == k[:4] for k in kept))
+            reinicio = igual >= 0.7 * len(toks)
+    if str(cut.get("kind") or "") == "redundant_restatement" and kept and not reinicio:
         # «Ahí está activada» → cortar «Otro pitido para ver que está activada»
         # (candado, 4/11/2026): si lo cortado dice algo que la versión que se
         # queda NO dice (una palabra de contenido sin pareja), no es la misma
@@ -3215,6 +3453,13 @@ def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
             despues = [t for t in (_p2tok(w.get("word", "")) for w in words[i1 + 1:i1 + 4 + len(head)]) if t]
             if not any(despues[j:j + len(head)] == head for j in range(min(3, len(despues)))):
                 return False
+    # Arranque corto que se retoma con la MISMA primera palabra justo detrás
+    # (nueveness 11/11/2026: «porque [yo lo que] yo la noto»): falso arranque
+    # aunque sus palabras sean cortas y no salgan repetidas enteras.
+    if kept and 2 <= n <= 4 and toks[0] == kept[0] and len(kept) >= 2:
+        pegado = [t for t in (_p2tok(w.get("word", "")) for w in words[i1 + 1:i1 + 1 + len(kept)]) if t]
+        if pegado[:2] == kept[:2]:
+            return True
     cerca = [
         _p2tok(w.get("word", ""))
         for w in words[max(0, i0 - n - 2):i0] + words[i1 + 1:i1 + 1 + n + 4]
@@ -3229,6 +3474,53 @@ def _pass2_cut_grounded(cut: dict, i0: int, i1: int, words: list[dict]) -> bool:
         t in propios or any(len(t) >= 5 and len(p) >= 5 and t[:4] == p[:4] for p in propios)
         for t in cerca if t
     )
+
+
+def _encajar_corte_en_palabras(
+    i0: float, i1: float, o0: float, o1: float,
+    out_words: list[dict], in_words: list[dict],
+) -> tuple[float, float]:
+    """Los tiempos del Whisper del OUTPUT, llevados al input, bailan ~0,15 s:
+    el corte de «porque yo lo» empezaba en mitad de su «porque» y dejaba
+    «porq-» pegado a «oferta» → «porque porque» (nueveness 11/11/2026). Se
+    encaja cada borde en la palabra del INPUT con el mismo texto más cercana
+    (±0,35 s). Si no hay una que case, el borde no se mueve."""
+    dentro = [w for w in out_words
+              if float(w["start"]) >= o0 - 0.02 and float(w["end"]) <= o1 + 0.02]
+    if not dentro or not in_words:
+        return i0, i1
+    t_ini, t_fin = _p2tok(dentro[0].get("word", "")), _p2tok(dentro[-1].get("word", ""))
+    cand_ini = [float(w["start"]) for w in in_words
+                if t_ini and _p2tok(w.get("word", "")) == t_ini
+                and abs(float(w["start"]) - i0) <= 0.35]
+    cand_fin = [float(w["end"]) for w in in_words
+                if t_fin and _p2tok(w.get("word", "")) == t_fin
+                and abs(float(w["end"]) - i1) <= 0.35]
+    n0 = min(cand_ini, key=lambda t: abs(t - i0)) if cand_ini else i0
+    n1 = min(cand_fin, key=lambda t: abs(t - i1)) if cand_fin else i1
+    return (n0, n1) if n1 > n0 else (i0, i1)
+
+
+def _pass2_recortar_inicio(i0: int, i1: int, words: list[dict]) -> int:
+    """Si lo que va justo DESPUÉS del corte repite solo el FINAL de lo cortado,
+    el corte empieza donde empieza esa parte repetida: lo de antes no se dice
+    otra vez y es contenido (nueveness 11/11/2026: la IA cortaba «y no dejes
+    pasar la oferta, porque yo la» cuando la retoma es «porque yo la noto»).
+    Exige ≥2 palabras iguales seguidas; si no hay coincidencia, no toca nada."""
+    idx = [(k, _p2tok(words[k].get("word", ""))) for k in range(i0, i1 + 1)]
+    idx = [(k, t) for k, t in idx if t]
+    despues = [t for t in (_p2tok(w.get("word", "")) for w in words[i1 + 1:i1 + 1 + len(idx) + 2]) if t]
+    if len(idx) < 3 or len(despues) < 2:
+        return i0
+    toks = [t for _, t in idx]
+    if toks[:2] == despues[:2]:
+        return i0  # ya repite desde el principio
+    for j in range(1, len(toks) - 1):
+        cola = toks[j:]
+        m = min(len(cola), len(despues))
+        if m >= 2 and cola[:m] == despues[:m]:
+            return idx[j][0]
+    return i0
 
 
 def _pass2_realign(cut: dict, i0: int, i1: int, words: list[dict]) -> tuple[int, int]:
@@ -3280,6 +3572,15 @@ def _parse_false_starts_cuts(
         if (r0, r1) != (i0, i1):
             log(f"[silence_cutter]   ↔ {provider} pass2 realineado [{i0}-{i1}] → [{r0}-{r1}]")
             i0, i1 = r0, r1
+        e0, cut = _pass2_extender_reinicio(cut, i0, i1, words)
+        e1 = int(cut.pop("_i1", i1))
+        if (e0, e1) != (i0, i1):
+            log(f"[silence_cutter]   ↤ {provider} pass2 reinicio completado [{i0}-{i1}] → [{e0}-{e1}]")
+            i0, i1 = e0, e1
+        r0 = _pass2_recortar_inicio(i0, i1, words)
+        if r0 != i0:
+            log(f"[silence_cutter]   ⇥ {provider} pass2 solo se retoma el final: [{i0}-{i1}] → [{r0}-{i1}]")
+            i0 = r0
         t0 = float(words[i0]["start"])
         t1 = float(words[i1]["end"])
         if t1 - t0 > 0.05:
@@ -3298,7 +3599,46 @@ def _parse_false_starts_cuts(
                 f"[silence_cutter]   ✂ {provider} {kind} [{i0}-{i1}] "
                 f"'{first}' → mantengo '{kept}'"
             )
-    return intervals
+            cut["_i0"], cut["_i1"] = i0, i1
+    return _pass2_sin_comerse_lo_que_queda(intervals, words, log, provider)
+
+
+def _pass2_sin_comerse_lo_que_queda(
+    intervals: list[tuple[float, float, dict]], words: list[dict], log, provider: str,
+) -> list[tuple[float, float, dict]]:
+    """Dos cortes que se pisan (nueveness, 11/11/2026): «…la oferta, porque yo lo
+    noto, porque yo la noto muchísimo» → corte A quita la 1ª toma y dice
+    «mantengo 'porque yo la noto muchísimo'», y corte B (stuttered_word) quita
+    justo «porque yo la». Juntos dejan «la oferta porque muchísimo». Si un corte
+    se come el ARRANQUE de lo que otro dice conservar, ese corte sobra."""
+    protegidos: list[tuple[int, int, dict]] = []
+    for _t0, _t1, cut in intervals:
+        kept = [t for t in (_p2tok(x) for x in str(cut.get("kept_version") or "").split()) if t]
+        i1 = cut.get("_i1")
+        if not kept or i1 is None:
+            continue
+        cab = kept[:min(3, len(kept))]
+        for j in range(i1 + 1, min(len(words), i1 + 4)):
+            sig = [t for t in (_p2tok(w.get("word", "")) for w in words[j:j + len(cab) + 2]) if t]
+            if sig[:len(cab)] == cab:
+                protegidos.append((j, j + min(4, len(kept)) - 1, cut))
+                break
+    if not protegidos:
+        return intervals
+    out = []
+    for t0, t1, cut in intervals:
+        i0, i1 = cut.get("_i0"), cut.get("_i1")
+        choca = i0 is not None and any(
+            other is not cut and i0 <= p1 and i1 >= p0 for p0, p1, other in protegidos
+        )
+        if choca:
+            log(
+                f"[silence_cutter]   ↩ {provider} {cut.get('kind') or '?'} [{i0}-{i1}] "
+                f"'{cut.get('first_attempt') or ''}' DESCARTADO: se come lo que otro corte conserva"
+            )
+            continue
+        out.append((t0, t1, cut))
+    return out
 
 
 # Modelo + seed de la limpieza holística. gpt-5.4 = el más nuevo que acepta
@@ -3696,8 +4036,9 @@ def _ai_holistic_clean_removes(
 
 def _ai_false_starts_openai(
     *, words: list[dict], language: str, model: str, log,
+    claude_model: str | None = None, claude_effort: str | None = None,
 ) -> tuple[list[tuple[float, float, dict]], dict | None]:
-    """Pasada 2 con OpenAI GPT-4o."""
+    """Pasada 2 con OpenAI GPT-4o (Claude primero si está activo)."""
     from src.editor_auto.api.openai_client import analyze_transcript_json
 
     prompt_path = Path(__file__).resolve().parent.parent / "prompts" / "silence_cutter_false_starts.md"
@@ -3709,6 +4050,8 @@ def _ai_false_starts_openai(
         model=model,
         temperature=0.0,
         seed=_HOLISTIC_SEED,  # determinista: mismo input = mismos cortes
+        claude_model=claude_model,
+        claude_effort=claude_effort,
     )
     intervals = _parse_false_starts_cuts(
         result, words, log, provider="OpenAI",
@@ -3749,6 +4092,7 @@ def _ai_false_starts_consensus(
     openai_enabled: bool = False,
     gemini_enabled: bool = True,
     log,
+    previos: list[tuple[float, float]] | None = None,
 ) -> tuple[list[tuple[float, float]], dict]:
     """Pasada 2 con modelos toggleables independientes (OpenAI / Gemini).
 
@@ -3831,8 +4175,43 @@ def _ai_false_starts_consensus(
         "total_unique": len(seen),
     }
 
-    intervals = [(v["t_start"], v["t_end"]) for v in seen.values()]
+    intervals = []
+    for v in seen.values():
+        if previos and _kept_ya_cortado(v["raw"], words, previos):
+            log(
+                f"[silence_cutter]   ↩ pass2 '{v['raw'].get('first_attempt') or ''}' DESCARTADO: "
+                f"la versión que dice conservar ya la cortó otra fuente (se perderían las dos copias)"
+            )
+            continue
+        intervals.append((v["t_start"], v["t_end"]))
     return intervals, diag
+
+
+def _kept_ya_cortado(raw: dict, words: list[dict],
+                     previos: list[tuple[float, float]]) -> bool:
+    """Cintia 11/11/2026: el holístico quitó «Chicas cómo son estos» de la 2ª
+    toma y la pasada 2 quitó la 1ª entera → no quedaba ninguna. Si alguna
+    palabra de la `kept_version` (la que va justo detrás del corte) ya está
+    dentro de un corte de contenido previo, el corte de la pasada 2 se descarta."""
+    try:
+        i1 = int(raw.get("end_word_idx"))
+    except (TypeError, ValueError):
+        return False
+    kept = [t for t in (_p2tok(x) for x in str(raw.get("kept_version") or "").split()) if t]
+    if not kept or not (0 <= i1 < len(words)):
+        return False
+    head = kept[: min(3, len(kept))]
+    cand = [(k, _p2tok(words[k].get("word", ""))) for k in range(i1 + 1, min(len(words), i1 + 6))]
+    cand = [(k, t) for k, t in cand if t]
+    ini = next((cand[j][0] for j in range(len(cand))
+                if [t for _, t in cand[j:j + len(head)]] == head), None)
+    if ini is None:
+        return False
+    for k in range(ini, min(len(words), ini + len(kept))):
+        m = (float(words[k]["start"]) + float(words[k]["end"])) / 2
+        if any(a <= m <= b for a, b in previos):
+            return True
+    return False
 
 
 def _ai_cleanup_cuts_with_raw(
@@ -3962,6 +4341,16 @@ def _protect_word_boundaries(
         prev_end = max((x for x in ends if x <= s), default=None)
         next_start = min((x for x in starts if x >= e), default=None)
         ns = s if prev_end is None else max(s, prev_end + guard_s)
+        # Simétrico al borde final: si el cut empieza JUSTO en una palabra
+        # eliminada pegada a la buena previa (habla contigua), el guard metía
+        # 0,15 s de esa palabra mala en el keep («oferta porq- | porque yo la
+        # noto», nueveness 11/11). Entonces el cut empieza en el fin de la buena.
+        if prev_end is not None and s - prev_end <= 0.06:
+            removed_word_starts_at_s = any(
+                abs(ws - s) <= 0.06 and we <= e + 0.01 for ws, we in word_spans
+            )
+            if removed_word_starts_at_s:
+                ns = max(s, prev_end)
         # Backoff del borde final: normalmente retrocede `guard_s` antes del
         # inicio de la palabra siguiente (Whisper marca el inicio bien, así que
         # protege su onset). PERO si una palabra ELIMINADA (dentro del cut)
@@ -4821,6 +5210,7 @@ def _compute_inter_word_gap_cuts(
 def _map_output_to_input(
     t_output: float,
     keep_intervals: list[tuple[float, float]],
+    al_siguiente: bool = False,
 ) -> float | None:
     """Convierte un timestamp del MP4 final al timestamp del input original.
 
@@ -4832,9 +5222,11 @@ def _map_output_to_input(
     cursor = 0.0
     for start, end in keep_intervals:
         seg_dur = end - start
-        if cursor + seg_dur >= t_output:
+        if cursor + seg_dur > t_output or (not al_siguiente and cursor + seg_dur >= t_output):
             return start + (t_output - cursor)
         cursor += seg_dur
+    if al_siguiente and keep_intervals and abs(cursor - t_output) < 1e-6:
+        return keep_intervals[-1][1]
     return None
 
 

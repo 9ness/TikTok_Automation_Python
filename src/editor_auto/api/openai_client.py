@@ -31,6 +31,8 @@ def analyze_transcript_json(
     model: str = DEFAULT_MODEL,
     temperature: float = 0.2,
     seed: int | None = None,
+    claude_model: str | None = None,
+    claude_effort: str | None = None,
 ) -> Any:
     """Llama a OpenAI Chat con `response_format=json_object` y devuelve el
     JSON parseado. Registra el coste vía `cost_tracking.record_openai_chat`.
@@ -45,6 +47,7 @@ def analyze_transcript_json(
         try:
             return claude_client.analyze_transcript_json(
                 system_prompt=system_prompt, user_payload=user_payload,
+                modelo_forzado=claude_model, esfuerzo=claude_effort,
             )
         except Exception as e:  # noqa: BLE001
             if not os.getenv("OPENAI_API_KEY"):
