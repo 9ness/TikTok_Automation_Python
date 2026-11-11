@@ -314,6 +314,14 @@ async def sweeper_loop(stop_event: asyncio.Event) -> None:
         except Exception as e:
             logger.warning("[draft_sweeper] pasada falló: %s", e)
         try:
+            # Entrega en el día programado: aviso de «vídeos listos» de los días
+            # que empiezan hoy (se editaron antes y su aviso quedó retenido).
+            from src.api.dependencies import get_queue
+            from src.api.routers.editor_auto import web_upload
+            await asyncio.to_thread(web_upload.notify_released_days, get_queue(), logger.info)
+        except Exception as e:
+            logger.warning("[draft_sweeper] aviso de días programados falló: %s", e)
+        try:
             # Caducidad de vídeos de clientes (cada 6 h; ver retention_sweeper).
             from src.editor_auto.services import retention_sweeper
             await asyncio.to_thread(retention_sweeper.maybe_sweep, None, logger.info)

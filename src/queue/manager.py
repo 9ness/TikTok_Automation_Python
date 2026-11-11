@@ -64,6 +64,34 @@ def _client_priority(job: Job) -> int:
         return 0
 
 
+def _hoy_madrid() -> str:
+    """Hoy en España (YYYY-MM-DD): el día de entrega lo elige el cliente allí."""
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Europe/Madrid")).date().isoformat()
+    except Exception:
+        return datetime.now().date().isoformat()
+
+
+def _client_due(job: Job) -> int:
+    """1 si a la edición ya le corre el plazo (su día de entrega es hoy o ya
+    pasó); 0 si está programada para un día FUTURO. Las programadas se editan
+    cuanto antes, pero DETRÁS de las que se entregan hoy, sea cual sea el plan:
+    tienen días de margen y las de hoy no."""
+    day = str((job.params or {}).get("output_subdir") or "")
+    if len(day) != 10 or day[4] != "-" or day[7] != "-":
+        return 1  # no es una fecha: se trata como siempre
+    return 0 if day > _hoy_madrid() else 1
+
+
+def _client_order(job: Job) -> tuple[int, int]:
+    """Clave de orden entre ediciones de clientes: primero las que se entregan
+    hoy y, dentro de cada grupo, el plan más alto. `max()` devuelve el PRIMERO
+    de los empatados → a igualdad, orden de llegada."""
+    return (_client_due(job), _client_priority(job))
+
+
 _PERSIST_FILENAME = "queue_state.json"
 
 # Cuántos trabajos YA TERMINADOS se conservan. Los pendientes y los que corren
@@ -375,7 +403,8 @@ class JobQueue:
         reparte a cada quien con su job.
 
         El orden replica el de `_worker_loop`: primero los que no son ediciones
-        de cliente (van con prioridad); entre clientes, el plan más alto
+        de cliente (van con prioridad); entre clientes, antes los que se entregan
+        hoy que los programados a futuro, luego el plan más alto
         (`queue_priority`), y a igualdad el de la lista (FIFO + reordenados). Es una ESTIMACIÓN en un caso: si un
         modo exclusivo ya está corriendo, el suyo se salta y el de detrás
         adelanta — dura lo que dure ese job y no compensa complicar el número.
@@ -387,6 +416,7 @@ class JobQueue:
             ]
         pendientes.sort(key=lambda par: (
             _is_client_edit_job(par[1]),
+            -_client_due(par[1]) if _is_client_edit_job(par[1]) else 0,
             -_client_priority(par[1]) if _is_client_edit_job(par[1]) else 0,
             par[0],
         ))
@@ -450,12 +480,14 @@ class JobQueue:
                     # pendientes — así Presidentes/Pronósticos/etc. no esperan
                     # detrás de la cola de clientes. Dentro de cada grupo se
                     # respeta el orden de la lista (FIFO + reorden manual).
-                    # Entre clientes, antes el de plan más alto
-                    # (`queue_priority`); a igual prioridad, orden de llegada.
+                    # Entre clientes, antes los que se entregan HOY que los
+                    # programados para un día futuro (`_client_due`); después
+                    # el de plan más alto (`queue_priority`) y, a igualdad,
+                    # orden de llegada.
                     pending = next(
                         (j for j in eligible if not _is_client_edit_job(j)), None,
                     ) or (
-                        max(eligible, key=_client_priority) if eligible else None
+                        max(eligible, key=_client_order) if eligible else None
                     )
                     if pending is not None:
                         break

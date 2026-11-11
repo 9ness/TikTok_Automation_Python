@@ -215,12 +215,72 @@ def _maybe_notify_ready_email(user: EditorUser, day: str, queue: JobQueue) -> No
 
 def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
     """Avisa de 'videos listos': email (logica original) y, aparte, WhatsApp.
-    Nunca lanza."""
+    Nunca lanza. Si el dia es FUTURO no avisa todavia: lo hara
+    `notify_released_days` (o el propio cliente al abrir su panel) cuando
+    llegue ese dia."""
+    try:
+        if not _day_released(day):
+            return
+    except Exception:
+        return
     _maybe_notify_ready_email(user, day, queue)
     try:
         _avisar_whatsapp_listos(user, day, queue)
     except Exception:
         pass
+
+
+# El aviso de un día programado no sale de madrugada: lo manda el barrido en
+# este tramo (hora de España). Si el cliente abre antes su panel, lo ve igual.
+_RELEASE_NOTIFY_HOURS = (8, 23)
+
+
+def _hora_madrid() -> int:
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Europe/Madrid")).hour
+    except Exception:
+        return datetime.now().hour
+
+
+def notify_released_days(queue: JobQueue, log=None) -> int:
+    """Aviso de 'vídeos listos' de los días PROGRAMADOS que empiezan hoy.
+
+    Esos vídeos se editaron (y revisaron) días antes y su aviso quedó retenido
+    por `_day_released`; nadie vuelve a dispararlo solo, así que lo hace este
+    barrido (loop del draft_sweeper, cada 30 min). Idempotente: el flag
+    `webday_notified` lo guarda `_maybe_notify_ready_email`. Devuelve cuántos
+    días ha repasado. Nunca lanza."""
+    try:
+        desde, hasta = _RELEASE_NOTIFY_HOURS
+        if not (desde <= _hora_madrid() < hasta):
+            return 0
+        hoy = _hoy_madrid()
+        # También ayer: si el box estuvo parado todo el día de la entrega, el
+        # aviso sale al día siguiente en vez de perderse.
+        from datetime import date, timedelta
+        ayer = (date.fromisoformat(hoy) - timedelta(days=1)).isoformat()
+        r = get_editor_redis()
+        repo = UserRepo()
+        n = 0
+        for entry in (r.smembers(_SENT_INDEX_KEY) or []):
+            try:
+                uid, day = entry.rsplit(":", 1)
+            except ValueError:
+                continue
+            if day not in (hoy, ayer) or r.get_str(f"{_NOTIFIED_KEY}{uid}:{day}"):
+                continue
+            user = repo.get(uid)
+            if user is None:
+                continue
+            _maybe_notify_ready(user, day, queue)
+            n += 1
+        if n and log:
+            log(f"[entrega] repasados {n} día(s) de hoy para el aviso de listos")
+        return n
+    except Exception:
+        return 0
 
 
 def _avisar_whatsapp_listos(user: EditorUser, day: str, queue: JobQueue) -> None:
@@ -367,11 +427,39 @@ def _effective_daily_limit(user: EditorUser, plan) -> int:
 
 
 def _day_processing_start(day: str, start_hour: int) -> float:
-    """Epoch (UTC) en que ABRE la ventana de procesamiento de `day`. Los vídeos
-    programados para un día futuro no se editan hasta este momento."""
+    """Epoch (UTC) en que ABRE la ventana de procesamiento de `day` (solo cuenta
+    para el día de HOY; ver `_edit_start_epoch`)."""
     from datetime import datetime, timezone
     y, m, d = (int(x) for x in day.split("-"))
     return datetime(y, m, d, max(0, min(23, start_hour)), 0, 0, tzinfo=timezone.utc).timestamp()
+
+
+def _hoy_madrid() -> str:
+    """Hoy en España (YYYY-MM-DD). El cliente elige su día con esa hora."""
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Europe/Madrid")).date().isoformat()
+    except Exception:
+        return datetime.now().date().isoformat()
+
+
+def _day_released(day: str) -> bool:
+    """ENTREGA EN EL DÍA PROGRAMADO. Un vídeo programado para un día futuro se
+    edita cuanto antes (así hay margen para repetirlo o revisarlo), pero el
+    cliente no lo ve, no lo descarga y no recibe el aviso hasta que EMPIEZA ese
+    día (00:00 de España). Hoy y los días pasados están siempre liberados."""
+    return day <= _hoy_madrid()
+
+
+def _edit_start_epoch(day: str, start_hour: int) -> float | None:
+    """Cuándo puede empezar a editarse un vídeo mandado para `day`. None =
+    cuanto antes. Los días FUTUROS, siempre cuanto antes (la entrega se retiene
+    con `_day_released`); para hoy se respeta la ventana del plan si aún no abrió."""
+    if not _day_released(day):
+        return None
+    sched = _day_processing_start(day, start_hour)
+    return sched if sched > time.time() else None
 
 
 def _get_day_jobs(user_id: str, day: str) -> list[dict]:
@@ -582,9 +670,10 @@ def _enqueue_video(
     del mount). El runner lee on-demand al procesar — sin copia previa que
     descargue bytes durante el send-to-edit.
 
-    `scheduled_for` (epoch UTC) difiere la edición hasta que abra la ventana del
-    día programado: el worker ignora el job hasta esa hora y luego coge los del
-    día por orden de llegada (FIFO). None = editar cuanto antes."""
+    `scheduled_for` (epoch UTC) difiere la edición hasta esa hora (solo se usa
+    para HOY, si la ventana del plan aún no abrió). None = editar cuanto antes,
+    que es lo normal también para los días futuros: su ENTREGA es la que espera
+    al día programado (`_day_released`)."""
     enabled = [s for s in user.tool_flow if s.enabled]
     if not enabled:
         raise APIError(
@@ -695,13 +784,16 @@ def web_send_to_edit(
     if not videos:
         raise ValidationError("No hay vídeos nuevos para mandar a edición.", details={"day": day})
 
-    # Programación diferida: los vídeos de un día se editan cuando ABRE la
-    # ventana de procesamiento de ese día (no al pulsar el botón). Si el día ya
-    # está abierto (hoy, dentro de ventana), `scheduled_for=None` → se editan
-    # cuanto antes, por orden de llegada (FIFO en la cola).
+    # Los vídeos se editan CUANTO ANTES, también los programados para un día
+    # futuro: así queda margen si hay cola o hay que repetir alguno. Lo que se
+    # retiene hasta su día es la ENTREGA (ver `_day_released`): el cliente los
+    # ve, con su aviso, el día que programó. En la cola van detrás de los que
+    # se entregan hoy (`_client_due` del manager).
     start_hour = plan.processing_window_start_hour if plan else 0
-    sched_epoch = _day_processing_start(day, start_hour)
-    scheduled_for = sched_epoch if sched_epoch > time.time() else None
+    scheduled_for = _edit_start_epoch(day, start_hour)
+    # La cuota rolling "de hoy" solo cuenta lo mandado para hoy; lo programado
+    # a futuro cuenta por su propio día (recuento de day_jobs).
+    is_future_day = not _day_released(day)
 
     # Cuota por DÍA del plan (cuenta los ya programados para ese día). Admin =
     # sin tope (0 = ilimitado), para poder mandar a editar tantas veces como
@@ -746,7 +838,7 @@ def web_send_to_edit(
         try:
             job_id = _enqueue_video(
                 queue, user, mount_path, day, plan=plan, scheduled_for=scheduled_for,
-                is_admin=is_admin, priority=priority,
+                is_admin=is_admin, priority=priority, count_quota=not is_future_day,
             )
             enqueued.append({"filename": v["filename"], "job_id": job_id})
         except APIError as e:
@@ -829,6 +921,9 @@ def web_output(
     gate = manual_approval_enabled()
     approved = _approved_set(user.id, day)
     devueltos = _devueltos(user.id, day)
+    # Día FUTURO: los vídeos ya se están editando (o ya lo están), pero no se
+    # entregan hasta que llegue su día.
+    released = _day_released(day)
 
     videos: list[dict] = []
     ready = 0
@@ -859,6 +954,24 @@ def web_output(
         # editará cuando abra la ventana de su día (no está "en cola" todavía).
         sched = getattr(job, "scheduled_for", None) if job else None
         is_scheduled = bool(job and job.status == JobStatus.PENDING and sched and sched > time.time())
+        failed_reason = _razon_fallo(job, m.get("filename"), devueltos)
+        if not released and not failed_reason:
+            # Retenido hasta su día: para el cliente sigue "programado", esté
+            # en cola, editándose, en revisión o ya terminado. Un fallo
+            # definitivo del archivo SÍ se enseña ya, para que pueda subir otro.
+            videos.append({
+                "source": m.get("filename"),
+                "filename": None,
+                "score": None,
+                "ready": False,
+                "in_review": False,
+                "running": False,
+                "queue_position": None,
+                "scheduled": True,
+                "status": JobStatus.PENDING.value,
+                "failed_reason": None,
+            })
+            continue
 
         videos.append({
             "source": m.get("filename"),
@@ -870,8 +983,14 @@ def web_output(
             "queue_position": None if is_scheduled else queue_pos,
             "scheduled": is_scheduled,
             "status": st.value if st else "unknown",
-            "failed_reason": _razon_fallo(job, m.get("filename"), devueltos),
+            "failed_reason": failed_reason,
         })
+
+    if not released:
+        # Nada listo ni "en revisión" de cara al cliente antes de su día.
+        ready = 0
+        review = 0
+        done = 0
 
     # all_done para el cliente = todos terminados Y (sin gate o todos resueltos:
     # aprobados o caídos). Con gate, si hay pendientes de revisión, no es "listo".
@@ -941,6 +1060,9 @@ def web_days_summary(
                 ready += 1
             elif passed and not is_approved:
                 review += 1
+        if not _day_released(day):
+            # Programado a futuro: de cara al cliente aún no hay nada listo.
+            ready = review = done = 0
         all_done = total > 0 and done == total and review == 0
         days[day] = {
             "total": total, "ready": ready, "review": review,
@@ -968,6 +1090,10 @@ def web_download(
     if not is_valid_day(day):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"day": day})
     user = _resolve_user(claims)
+    if not source and not _day_released(day):
+        # Los editados de un día futuro se entregan ese día, no antes.
+        raise APIError("Estos vídeos estarán disponibles el día que los programaste.",
+                       status_code=409, code="not_released")
     folder = user_input_day_folder(user.name, day) if source else user_output_day_folder(user.name, day)
     safe = _safe_name(file)
     path = os.path.join(folder, safe)
