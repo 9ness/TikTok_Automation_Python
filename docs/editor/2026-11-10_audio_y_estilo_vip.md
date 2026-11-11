@@ -101,16 +101,20 @@ Detalle completo en el [anexo de estilo](2026-11-10_anexo_estilo_vip.md). En cor
 
 `$W/muestras/<original>/` con `original.*`, `basico.mp4` (automatización actual: cortador + subtítulos) y `vip_<estilo>.mp4` (cortador + edición VIP + subtítulos + flecha con el estilo de cada creador). Tabla con referencia, ficha, nota honesta y gasto en **`$W/muestras/ESTILOS.md`**.
 
-Hechas en el VPS (sin subir al Drive): `/mnt/HC_Volume_106974679/agentes/trabajo/fable-audio/muestras/` con `ESTILOS.md` (tabla original · versión · referencia · nota · gasto) y las fichas de estilo. 3 originales × (básico + 3 VIP: el elegido + 2), 9 VIP revisados fotograma a fotograma. **Gasto total 0,154 $** (VIP 0,006-0,010 $ por vídeo, elector 0,004 $, corte 0,011-0,019 $).
+Hechas en el VPS (sin subir al Drive): `/mnt/HC_Volume_106974679/agentes/trabajo/fable-audio/muestras/` con `ESTILOS.md` (tabla original · versión · nota · coste) y `notas_revision.md`.
 
-| original | elegido por el elector | mejor en la revisión | notas VIP |
-|---|---|---|---|
-| patrizziaconz (colágeno) | abdaal 5/10 | hormozi 6/10 | 5 · 6 · 6 |
-| nueveness (crema de arroz) | martell 5/10 | **abdaal 8/10** | 5 · 8 · 7 |
-| bugalleitor (botella gym) | abdaal 5/10 | abdaal 5/10 | 5 · 4 · 4 |
+**Ronda 1 (código viejo, 3 originales, 0,154 $):** notas VIP 4-8, media 5. 6 de 9 metían una foto de stock de OTRO producto («producto incoherente» → sanción), 2 una famosa; rótulos cortados a mitad de frase, encima de los subtítulos o de la cara; subtítulos sin borde. Arreglos 1-4 en `7663a2d4`: sin fotos de internet por defecto (`fotos_internet=False`), frases enteras o nada (las largas, en 2 líneas), rótulos fuera de la cara (Haar) y de la banda de subtítulos, borde obligatorio en subtítulos (`subs_borde_min=5`).
 
-**Veredicto honesto: el VIP aún NO está para clientes.** 6 de 9 meten una foto de stock de OTRO producto (en TikTok Shop es «producto incoherente» y trae sanción); 2 ponen una famosa (Elsa Pataky); los rótulos se cortan a mitad de frase, pisan los subtítulos (Martell los pone al 60 %, en la misma banda que los subtítulos) o tapan la cara; los subtítulos sin borde se pierden en fondos claros. Cuando no hay foto falsa (nueveness abdaal) el resultado es bueno: precio comparado en rojo/verde y rótulos con sentido. Arreglos (orden): 1) en nichos de producto, `photo_insert` sin fotos de stock del producto ni de famosos; 2) frases completas en gancho y rótulos; 3) banda de rótulos ≠ banda de subtítulos, sin tapar la cara; 4) borde obligatorio en subtítulos; 5) repetir la comparativa. cintiacbc no se hizo (tiempo).
+**Ronda 2 (11/11, código nuevo, 4 originales con cintiacbc, 0,210 $; 12 VIP revisados por hoja de fotogramas):**
 
+| original | elegido | notas VIP | básico | coste por vídeo (corte incluido) |
+|---|---|---|---|---|
+| patrizziaconz (colágeno) | abdaal 7 | abdaal 7 · **martell 8** · hormozi 7,5 | 6 | VIP 0,020 $ · básico 0,013 $ |
+| nueveness (crema de arroz) | martell 7,5 | abdaal 7 · martell 7,5 · hormozi 7,5 | 6 | VIP 0,016 $ · básico 0,011 $ |
+| bugalleitor (botella gym) | abdaal 7,5 | abdaal 7,5 · martell 7,5 · mrbeast 6,5 | 6 | VIP 0,036 $ · básico 0,029 $ |
+| cintiacbc (haul de shorts) | abdaal 7 | abdaal 7 · hormozi 7 · martell 7,5 | 6 | VIP 0,046 $ · básico 0,038 $ |
+
+0 fotos de stock ni famosos, 0 frases cortadas, 0 rótulos sobre la cara o tapando subtítulos, borde en todos. **Veredicto: el VIP ya es enseñable (7-8/10) y supera al básico en los 4.** Pegas menores: las flechas ↓↓↓ del final tocan la última palabra; MrBeast saca 2 rótulos a la vez en el gancho; algún rótulo queda pegado encima del subtítulo; el elector acierta o empata en 2 de 4 (en los otros dos ganó martell). El original de cintiacbc trae la marca de agua de TikTok.
 
 ## 4. Ideas para ahorrar trabajo
 
