@@ -206,9 +206,9 @@ def hay_envio_gratis(textos: dict) -> bool:
 
 # Las dos CTA. Las dos cumplen lo que pide el curso —carrito naranja y aplicar
 # los cupones—; lo que cambia es si además se nombra el envío gratis.
-CTA_CUPONES = "Ve al carrito naranja y aplica tus cupones."
+CTA_CUPONES = "Ve al carrito naranja y revisa si tienes cupones."
 CTA_CUPONES_ENVIO = (
-    "Ve al carrito naranja, aplica tus cupones y revisa el envío gratis."
+    "Ve al carrito naranja, revisa si tienes cupones y el envío gratis."
 )
 # A partir de qué tamaño de guion cabe la CTA larga. En un guion de 284
 # caracteres los 67 de la CTA con envío son el 24% del vídeo: casi cuatro
@@ -250,24 +250,26 @@ def cta_final(plazos: bool, envio: bool, caracteres: int = 0) -> str:
 # cuadra la duración del vídeo: el cuerpo lo escribe Gemini y no se toca, pero
 # la CTA es un literal nuestro y cambiarla no cuesta una llamada.
 #
-# Todas dicen lo obligatorio —carrito naranja y aplicar los cupones—; lo que
+# Todas dicen lo obligatorio —carrito naranja y revisar los cupones, SIN
+# afirmar que los haya (Néstor: «revisa si tienes cupones», nunca «aplica tus
+# cupones»)—; lo que
 # sube por la escalera son las promesas de más y la coletilla del curso. Solo
 # se ofrece lo que el producto CUMPLE (`plazos` / `envio`): prometer un envío
 # gratis que el comprador no se encuentra es lo que trae infracciones.
-CTA_CUPONES = "Ve al carrito naranja y aplica tus cupones."
+CTA_CUPONES = "Ve al carrito naranja y revisa si tienes cupones."
 CTA_CUPONES_BARATO = (
-    "Ve al carrito naranja y aplica tus cupones para llevártelo aún más barato."
+    "Ve al carrito naranja y revisa si tienes cupones para llevártelo aún más barato."
 )
-CTA_ENVIO = "Ve al carrito naranja, aplica tus cupones y revisa el envío gratis."
+CTA_ENVIO = "Ve al carrito naranja, revisa si tienes cupones y el envío gratis."
 CTA_PLAZOS = (
-    "Ve al carrito naranja, aplica tus cupones y revisa el pago a plazos."
+    "Ve al carrito naranja, revisa si tienes cupones y el pago a plazos."
 )
 CTA_ENVIO_BARATO = (
-    "Haz click en el carrito naranja y aplica tus cupones para llevártelo aún "
+    "Haz click en el carrito naranja y revisa si tienes cupones para llevártelo aún "
     "más barato y con envío gratis."
 )
 CTA_TODO = (
-    "Haz click en el carrito naranja y aplica tus cupones para llevártelo aún "
+    "Haz click en el carrito naranja y revisa si tienes cupones para llevártelo aún "
     "más barato, con envío gratis y pudiendo pagarlo en cómodos plazos."
 )
 
@@ -309,7 +311,7 @@ CTA_INVERSA = (
 CTAS_INVERSA = (
     "Te lo dejo en el carrito naranja, pero no te aseguro que siga disponible.",
     CTA_INVERSA,
-    "Te lo voy a intentar dejar en el carrito naranja con tus cupones, pero no "
+    "Te lo voy a intentar dejar en el carrito naranja, mira si tienes cupones, pero no "
     "puedo asegurarte que siga disponible cuando veas el vídeo.",
     "Así que te lo voy a intentar dejar en el carrito naranja por esta zona del "
     "vídeo, pero no puedo asegurarte que cuando veas este vídeo siga disponible.",

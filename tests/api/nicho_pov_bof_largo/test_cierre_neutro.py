@@ -28,3 +28,16 @@ def test_sorteo_mitad_y_mitad():
     rng = random.Random(7)
     n = sum(config.toca_cierre_neutro(rng) for _ in range(2000))
     assert 850 < n < 1150
+
+
+def test_ningun_cierre_afirma_cupones():
+    """«aplica tus cupones» promete un cupón que la ficha puede no tener (11/11)."""
+    import itertools
+
+    from src.nicho_pov_bof_largo import config as cfg
+
+    for plazos, envio, inversa, neutro in itertools.product([False, True], repeat=4):
+        for cta in cfg.ctas_posibles(plazos, envio, inversa=inversa, neutro=neutro):
+            assert "aplica tus cupones" not in cta.lower(), cta
+            assert "tus cupones" not in cta.lower(), cta
+    assert "aplica" not in cfg.cta_final(True, True).lower()
