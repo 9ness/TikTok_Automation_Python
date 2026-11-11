@@ -2862,7 +2862,10 @@ def borrar_cuenta_echotik(
 
 
 @router.get("/hashtags", response_model=HashtagsResponse)
-def get_hashtags(nicho: Annotated[str, Query()] = "") -> HashtagsResponse:
+def get_hashtags(
+    nicho: Annotated[str, Query()] = "",
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> HashtagsResponse:
     """Hashtags que se pegan al final de los captions de ESE nicho.
 
     Sin `nicho` van solo los generales: los que llevan nicho propio (`#moda`
@@ -2870,28 +2873,34 @@ def get_hashtags(nicho: Annotated[str, Query()] = "") -> HashtagsResponse:
     """
     from src.nicho_pov_bof.repos import product_repo
 
-    return HashtagsResponse(ok=True, tags=product_repo.get_hashtags(nicho))
+    # Cada cuenta su lista (11/11/2026); sin la suya, la común.
+    return HashtagsResponse(ok=True, tags=product_repo.get_hashtags(nicho, usuario))
 
 
 @router.get("/hashtags/config", response_model=HashtagsConfigResponse)
-def get_hashtags_config() -> HashtagsConfigResponse:
+def get_hashtags_config(
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> HashtagsConfigResponse:
     """Todos los hashtags con su alcance, para la pantalla de Configuración."""
     from src.nicho_pov_bof.repos import product_repo
 
     return HashtagsConfigResponse(
         ok=True,
-        items=[HashtagItem(**x) for x in product_repo.get_hashtags_config()],
+        items=[HashtagItem(**x) for x in product_repo.get_hashtags_config(usuario)],
     )
 
 
 @router.post("/hashtags/config", response_model=HashtagsConfigResponse)
-def set_hashtags_config(body: HashtagsConfigRequest) -> HashtagsConfigResponse:
+def set_hashtags_config(
+    body: HashtagsConfigRequest,
+    usuario: Annotated[str, Depends(get_web_user)] = "",
+) -> HashtagsConfigResponse:
     """Guarda la lista entera (la UI manda siempre el conjunto)."""
     from src.nicho_pov_bof.repos import product_repo
 
     try:
         items = product_repo.save_hashtags_config(
-            [x.model_dump() for x in body.items]
+            [x.model_dump() for x in body.items], usuario,
         )
     except RuntimeError as e:
         raise APIError(str(e), status_code=503) from e

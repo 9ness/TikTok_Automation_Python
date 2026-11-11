@@ -1,9 +1,10 @@
-"""Hashtags del Black Friday de la agencia (Miture) para Viva Shop (11/11/2026).
+"""Hashtags del Black Friday de la agencia (Miture), para todas las cuentas (11/11/2026).
 
 Se AÑADEN a los de siempre en la descripción de vídeos y carruseles (Mis tandas y la subida del móvil):
-  - #TikTokShopBlackFriday del 11 al 22/11 (calentamiento; ~/relevos/black-friday-agencia-2026.md),
-  - el de la categoría del producto del 11 al 17/11 (#BlackFridayBeauty/Fashion/Home/Tech/Essentials).
+  - #TikTokShopBlackFriday del 11 al 30/11 (calentamiento 11-22; ~/relevos/black-friday-agencia-2026.md),
+  - el de la categoría del PRODUCTO del 11 al 17/11 (#BlackFridayBeauty/Fashion/Home/Tech/Essentials).
 La categoría sale del título del producto por palabras clave; lo que no encaja va a Essentials.
+#OfertasenLIVE (solo directos) y #blackfriday2026 (fuera de la lista) NO van en vídeos.
 """
 
 from __future__ import annotations
@@ -12,8 +13,8 @@ import datetime as dt
 import re
 import unicodedata
 
-USUARIOS = {"ness"}   # Viva Shop: la campaña es de su agencia
-PRINCIPAL = ("#TikTokShopBlackFriday", dt.date(2026, 11, 11), dt.date(2026, 11, 22))
+# Desde el 11/11 para TODAS las cuentas (Néstor), no solo Viva Shop.
+PRINCIPAL = ("#TikTokShopBlackFriday", dt.date(2026, 11, 11), dt.date(2026, 11, 30))
 CATEGORIA = (dt.date(2026, 11, 11), dt.date(2026, 11, 17))
 
 # Orden = prioridad (una crema «para manos» es Beauty, no Fashion).
@@ -57,8 +58,6 @@ def categoria(titulo: str) -> str:
 
 def hashtags(usuario: str, pieza: dict, hoy: dt.date | None = None) -> list[str]:
     """Los hashtags de campaña que tocan hoy para esta pieza (vídeo o carrusel); [] fuera de fechas."""
-    if (usuario or "") not in USUARIOS:
-        return []
     hoy = hoy or dt.date.today()
     tag, ini, fin = PRINCIPAL
     if not ini <= hoy <= fin:

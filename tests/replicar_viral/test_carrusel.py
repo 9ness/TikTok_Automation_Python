@@ -424,7 +424,7 @@ def test_hashtags_tiktok_los_de_videos_y_moda_si_es_ropa(monkeypatch):
     from src.replicar_viral import carrusel
 
     monkeypatch.setattr(product_repo, "get_hashtags",
-                        lambda nicho="": ["#Ofertasparati"] + (["#moda"] if nicho else []))
+                        lambda nicho="", usuario="": ["#Ofertasparati"] + (["#moda"] if nicho else []))
     ropa = {"producto": {"titulo": "ÜTOPYA Gabardina oversize"}, "hashtags": ["#gabardina"]}
     casa = {"producto": {"titulo": "Paraguas automático"}, "hashtags": ["#paraguas"]}
     assert carrusel.hashtags_tiktok(ropa) == ["#Ofertasparati", "#moda"]

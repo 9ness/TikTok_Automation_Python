@@ -400,14 +400,24 @@ def hashtags_tiktok(doc: dict) -> list[str]:
     moda. Los que propuso la IA (`hashtags`) se quedan para Meta."""
     if doc.get("pais") == "AR":
         propios = [t for t in (doc.get("hashtags") or []) if t not in HASHTAGS_ARABE]
-        return HASHTAGS_ARABE + propios[:3]
+        # Más la lista fija de la cuenta (11/11/2026; nes_bugallo: #tiktokshop #ofertas).
+        try:
+            from src.nicho_pov_bof.repos import product_repo
+
+            cuenta = product_repo.get_hashtags("", str(doc.get("usuario") or ""))
+        except Exception:  # noqa: BLE001
+            cuenta = []
+        base = HASHTAGS_ARABE + [t for t in cuenta if t.lower() not in {x.lower() for x in HASHTAGS_ARABE}]
+        return base + [t for t in propios if t.lower() not in {x.lower() for x in base}][:3]
     if (doc.get("pais") or "ES") != "ES":
         # Réplica de otro país: los generales del POV BOF están en español.
         return list(doc.get("hashtags") or [])
     try:
         from src.nicho_pov_bof.repos import product_repo
 
-        tags = product_repo.get_hashtags("nicho-ropa-mujer" if es_ropa(doc) else "")
+        tags = product_repo.get_hashtags(
+            "nicho-ropa-mujer" if es_ropa(doc) else "", str(doc.get("usuario") or ""),
+        )
     except Exception:  # noqa: BLE001 — sin Redis: los de la IA
         tags = []
     return tags or list(doc.get("hashtags") or [])

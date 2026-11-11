@@ -625,15 +625,26 @@ def _normaliza(tag: str) -> str:
     return f"#{tag}" if tag else ""
 
 
-def _items_guardados() -> list[dict]:
+# Desde el 11/11/2026 cada CUENTA (usuario web/MCP) tiene su lista: Ama
+# (#modamujer) no lleva lo mismo que Casca (#hogar #navidad). Se guarda en
+# `hashtags:<usuario>`; quien no tenga la suya usa la común (`hashtags`).
+def _clave_hashtags(usuario: str = "") -> str:
+    usuario = str(usuario or "").strip()
+    return f"{_HASHTAGS_KEY}:{usuario}" if usuario else _HASHTAGS_KEY
+
+
+def _items_guardados(usuario: str = "") -> list[dict]:
     """Los hashtags tal y como están guardados, con su alcance.
 
     Migra al vuelo lo de antes (`{"tags": [...]}`), que eran todos generales.
+    Con `usuario`, su lista; si no tiene, la común.
     """
     r = get_nicho_pov_bof_redis()
     if not r.is_available():
         return [{"tag": t, "nichos": []} for t in HASHTAGS_DEFECTO]
-    doc = r.get_json(_HASHTAGS_KEY)
+    doc = r.get_json(_clave_hashtags(usuario)) if usuario else None
+    if not isinstance(doc, dict):
+        doc = r.get_json(_HASHTAGS_KEY)
     if not isinstance(doc, dict):
         return [{"tag": t, "nichos": []} for t in HASHTAGS_DEFECTO]
     if isinstance(doc.get("items"), list):
@@ -654,12 +665,12 @@ def _items_guardados() -> list[dict]:
     ]
 
 
-def get_hashtags_config() -> list[dict]:
+def get_hashtags_config(usuario: str = "") -> list[dict]:
     """Todos los hashtags con su alcance, para la pantalla de configuración."""
-    return _items_guardados()
+    return _items_guardados(usuario)
 
 
-def get_hashtags(nicho: str = "") -> list[str]:
+def get_hashtags(nicho: str = "", usuario: str = "") -> list[str]:
     """Los que le tocan a ese nicho: los generales más los suyos.
 
     Sin `nicho` van SOLO los generales: es lo que pide quien no sabe desde
@@ -668,12 +679,12 @@ def get_hashtags(nicho: str = "") -> list[str]:
     """
     nicho = str(nicho or "").strip()
     return [
-        x["tag"] for x in _items_guardados()
+        x["tag"] for x in _items_guardados(usuario)
         if not x["nichos"] or (nicho and nicho in x["nichos"])
     ]
 
 
-def save_hashtags_config(items: list[dict]) -> list[dict]:
+def save_hashtags_config(items: list[dict], usuario: str = "") -> list[dict]:
     """Guarda la lista entera con su alcance y la devuelve.
 
     Una lista VACÍA es un estado válido: significa "no quiero hashtags", y hay
@@ -693,18 +704,18 @@ def save_hashtags_config(items: list[dict]) -> list[dict]:
             ],
         })
     r = _require_redis()
-    r.set_json(_HASHTAGS_KEY, {"items": limpios, "updated_at": _now()})
+    r.set_json(_clave_hashtags(usuario), {"items": limpios, "updated_at": _now()})
     return limpios
 
 
-def save_hashtags(tags: list[str]) -> list[str]:
+def save_hashtags(tags: list[str], usuario: str = "") -> list[str]:
     """Guarda los GENERALES, respetando los que tienen nicho propio.
 
     Se mantiene para los clientes que solo saben de una lista plana.
     """
-    especificos = [x for x in _items_guardados() if x["nichos"]]
+    especificos = [x for x in _items_guardados(usuario) if x["nichos"]]
     generales = [{"tag": _normaliza(t), "nichos": []} for t in tags if _normaliza(t)]
-    guardados = save_hashtags_config(generales + especificos)
+    guardados = save_hashtags_config(generales + especificos, usuario)
     return [x["tag"] for x in guardados if not x["nichos"]]
 
 

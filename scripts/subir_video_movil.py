@@ -38,6 +38,36 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 
+USUARIO_CUENTA = "nes_bugallo"   # Hmizat (cuenta árabe): su lista fija de hashtags en la app
+HASHTAGS_RESERVA = ["#tiktokshop", "#ofertas"]
+
+
+def caption_con_hashtags(it: dict) -> str:
+    """El caption del SUBIDA.json + la lista fija de la cuenta + los de campaña (Black Friday
+    de la agencia, con sus fechas), sin repetir los que ya lleve (11/11/2026)."""
+    caption = str(it.get("caption") or "").strip()
+    raiz = str(Path(__file__).resolve().parent.parent)
+    if raiz not in sys.path:
+        sys.path.insert(0, raiz)
+    try:
+        from src.nicho_pov_bof.repos import product_repo
+
+        fijos = product_repo.get_hashtags("", USUARIO_CUENTA) or HASHTAGS_RESERVA
+    except Exception:  # noqa: BLE001 — sin Redis/entorno: la lista de siempre
+        fijos = HASHTAGS_RESERVA
+    try:
+        from src.mis_tandas import campana_bf
+
+        campana = campana_bf.hashtags(USUARIO_CUENTA, {"titulo": it.get("nombre_enlace") or ""})
+    except Exception:  # noqa: BLE001
+        campana = []
+    tiene = caption.lower()
+    extra = []
+    for t in fijos + campana:
+        if t.lower() not in tiene and t.lower() not in {x.lower() for x in extra}:
+            extra.append(t)
+    return (caption + " " + " ".join(extra)).strip() if caption else caption
+
 SERIAL = os.environ.get("MOVIL_ADB", "100.115.12.26:5555")
 PAQUETE = "com.zhiliaoapp.musically"
 KEEP = "com.google.android.keep"
@@ -311,6 +341,7 @@ def editor(ronda: str, n: str) -> None:
     if not buscar(r"^Publicar$", 4):
         raise SystemExit("No se abrió la pantalla de publicar")
 
+    it["caption"] = caption_con_hashtags(it)
     if it["caption"].strip():
         al_portapapeles(it["caption"])
         campo = next((x for x in nodos() if x["clase"].endswith("EditText")), None)
