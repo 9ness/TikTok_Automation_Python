@@ -159,9 +159,46 @@ _FEMENINOS = ("juventus", "roma", "lazio", "fiorentina", "atalanta", "sampdoria"
               "salernitana", "spal", "reggiana")
 
 
+# Selecciones: API-Sports las da en inglés («Spain», «England»); en la voz y el marcador van
+# en español y SIN artículo («Francia no pierde», «más de uno coma cinco goles de Inglaterra») (11-nov).
+_SELECCIONES = {
+    "Spain": "España", "England": "Inglaterra", "France": "Francia", "Italy": "Italia", "Germany": "Alemania",
+    "Portugal": "Portugal", "Netherlands": "Países Bajos", "Belgium": "Bélgica", "Croatia": "Croacia",
+    "Czechia": "Chequia", "Czech Republic": "Chequia", "Türkiye": "Turquía", "Turkey": "Turquía",
+    "Switzerland": "Suiza", "Austria": "Austria", "Denmark": "Dinamarca", "Sweden": "Suecia", "Norway": "Noruega",
+    "Poland": "Polonia", "Scotland": "Escocia", "Wales": "Gales", "Ireland": "Irlanda",
+    "Northern Ireland": "Irlanda del Norte", "Serbia": "Serbia", "Hungary": "Hungría", "Greece": "Grecia",
+    "Ukraine": "Ucrania", "Romania": "Rumanía", "Slovakia": "Eslovaquia", "Slovenia": "Eslovenia",
+    "Bosnia & Herzegovina": "Bosnia", "Bosnia and Herzegovina": "Bosnia", "Albania": "Albania",
+    "Georgia": "Georgia", "Iceland": "Islandia", "Finland": "Finlandia", "Israel": "Israel",
+    "North Macedonia": "Macedonia del Norte", "Montenegro": "Montenegro", "Bulgaria": "Bulgaria",
+    "Mexico": "México", "Brazil": "Brasil", "Argentina": "Argentina", "Colombia": "Colombia", "Uruguay": "Uruguay",
+    "Chile": "Chile", "Peru": "Perú", "Ecuador": "Ecuador", "Paraguay": "Paraguay", "Venezuela": "Venezuela",
+    "USA": "Estados Unidos", "United States": "Estados Unidos", "Canada": "Canadá", "Japan": "Japón",
+    "South Korea": "Corea del Sur", "Morocco": "Marruecos",
+}
+_SELECCIONES_ES = set(_SELECCIONES.values())
+
+
+def _es_seleccion(nombre: str) -> str:
+    return _SELECCIONES.get(nombre.strip(), nombre.strip())
+
+
+def _picks_en_es(picks: list) -> list:
+    out = []
+    for s in picks:
+        txt = s.get("pick", "")
+        for en, es in sorted(_SELECCIONES.items(), key=lambda kv: -len(kv[0])):
+            txt = re.sub(rf"(?<!\w){re.escape(en)}(?!\w)", es, txt)
+        out.append({**s, "pick": txt})
+    return out
+
+
 def _con_articulo(equipo: str, prep: str = "") -> str:
     """«el Milan» / «la Juventus»; con prep="de": «del Milan» / «de la Juventus»."""
     nombre = _clave_equipo(equipo)
+    if nombre in _SELECCIONES_ES or equipo.strip() in _SELECCIONES_ES:
+        return f"de {equipo.strip()}" if prep == "de" else equipo.strip()
     fem = any(f in nombre.lower() for f in _FEMENINOS)
     if prep == "de":
         return f"de la {nombre}" if fem else f"del {nombre}"
@@ -176,6 +213,14 @@ def pick_hablado(pick: str, local: str, visitante: str) -> str:
     if low.startswith("doble oportunidad"):
         resto = re.sub(r"\s+", " ", re.sub(r"(?i)doble oportunidad|empate|\so\s", " ", p)).strip()
         return f"{_con_articulo(resto)} no pierde"
+    # «Gana 1ª Parte Alaves» se leía «Gana unoª Parte» y «Gana a Cero X» tal cual (9-nov).
+    m = re.match(r"(?i)^gana\s+(1[ªa]?|primera|2[ªa]?|segunda)\s+parte\s+(.+)$", p)
+    if m:
+        cual = "primera" if m.group(1).lower().startswith(("1", "p")) else "segunda"
+        return f"{_con_articulo(m.group(2).strip())} gana la {cual} parte"
+    m = re.match(r"(?i)^gana a cero\s+(.+)$", p)
+    if m:
+        return f"{_con_articulo(m.group(1).strip())} gana sin recibir gol"
     if low.startswith("ambos"):
         return "no marcan los dos equipos" if re.search(r"-\s*no\b|\bno$", low) else "marcan los dos equipos"
     m = re.match(r"(?i)^(?:([+-])|(más|menos) de)\s*(\d+(?:\.\d+)?)\s+(.+)$", p)
@@ -238,7 +283,7 @@ def candidatos(fecha: str, r: UpstashRedis | None = None) -> list[dict]:
         for b in d.get("bets", []):
             for s in b.get("selections") or []:
                 if s.get("fixture_id"):
-                    extra.setdefault(int(s["fixture_id"]), []).append(s)
+                    extra.setdefault(int(str(s["fixture_id"]).split("_")[0]), []).append(s)
     out = []
     for b in tk.get("bets", []):
         sels = [s for s in (b.get("selections") or []) if s.get("fixture_id")]
@@ -255,8 +300,9 @@ def candidatos(fecha: str, r: UpstashRedis | None = None) -> list[dict]:
                 picks.append(s)
         picks = picks[:2]
         local, _, visitante = sels[0]["match"].partition(" vs ")
+        picks = _picks_en_es(picks)
         out.append({
-            "fixture_id": fid, "local": local.strip(), "visitante": visitante.strip(),
+            "fixture_id": fid, "local": _es_seleccion(local), "visitante": _es_seleccion(visitante),
             "liga": sels[0].get("league", ""), "hora_es": (sels[0].get("time") or "")[11:16],
             **_horas_publico(sels[0].get("time") or ""),
             "logo_local": sels[0].get("home_logo"), "logo_visitante": sels[0].get("away_logo"),
@@ -274,14 +320,16 @@ def _slug_equipo(s: str) -> str:
 
 
 def fotos_de(equipo: str, todas: list[str]) -> list[str]:
-    slug = _slug_equipo(equipo)
+    # Las fotos de selecciones se llaman como en API-Sports («Spain»): busca también ese nombre.
+    slugs = {_slug_equipo(equipo)} | {_slug_equipo(en) for en, es in _SELECCIONES.items() if es == equipo.strip()}
+    slugs = {x for x in slugs if len(x) >= 3}
     res = []
     for url in todas:
         nombre = url.split("/")[-1]
         partes = nombre.split("-")
         if not nombre.startswith("bg-futbol-") or len(partes) < 4 or "comodin" in nombre or "portada" in nombre:
             continue
-        if len(slug) >= 3 and _slug_equipo(partes[2]) == slug:
+        if _slug_equipo(partes[2]) in slugs:
             res.append(url)
     return res
 
@@ -636,8 +684,14 @@ def main() -> None:
     out = Path(a.salida)
     out.mkdir(parents=True, exist_ok=True)
     cands = candidatos(fecha)
-    todas = [u if u.startswith("http") else "https://masterpicksai.com" + u
-             for u in requests.get(FONDOS_URL, timeout=30).json().get("files", [])]
+    try:
+        files = requests.get(FONDOS_URL, timeout=30).json().get("files", [])
+    except ValueError:  # 403/HTML (antibots de Vercel): con --foto se puede seguir sin galería
+        if not a.foto:
+            raise
+        print("[aviso] /api/backgrounds no devolvió JSON; sigo con --foto")
+        files = []
+    todas = [u if u.startswith("http") else "https://masterpicksai.com" + u for u in files]
     if a.listar:
         for k in cands:
             fs = fotos_de(k["local"], todas) + fotos_de(k["visitante"], todas)
