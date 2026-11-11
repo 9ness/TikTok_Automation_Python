@@ -333,6 +333,18 @@ def _segundos_pov(prod: dict) -> tuple[float, float]:
     )
 
 
+def _hashtags_campana(usuario: str, prod: dict) -> list[str]:
+    """Hashtags del Black Friday de la agencia para este producto (categoría
+    11-17/11), como en Mis tandas. El front quita los que ya estén en la lista
+    fija. Nunca rompe el listado."""
+    try:
+        from src.mis_tandas import campana_bf
+
+        return campana_bf.hashtags(usuario, {"titulo": prod.get("titulo", "")})
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def _producto_info(
     producto: str, prod: dict, source: str = "", folder: str = "",
     queue: JobQueue | None = None, usuario: str = "",
@@ -367,6 +379,7 @@ def _producto_info(
             producto, prod.get("titulo", ""), prod.get("caption", ""),
         ),
         caption_riesgo=caption_arriesgado(prod.get("caption", "")) or "",
+        hashtags_campana=_hashtags_campana(usuario, prod),
         gancho=textos_fijos(f"{producto} {folder}")["gancho"],
         cta=textos_fijos(f"{producto} {folder}")["cta"],
         sexo_sugerido=audience.sexo_sugerido(
@@ -568,6 +581,7 @@ def _list_productos(
                 caption_riesgo=caption_arriesgado(
                     guardado.get("caption", "")
                 ) or "",
+                hashtags_campana=_hashtags_campana(usuario, guardado),
                 # Gancho y CTA son FIJOS (los dicta el mentor); lo único que
                 # cambia por producto es el emoji. Se devuelven calculados, no
                 # leídos de Redis, para que lo que copias sea exactamente lo

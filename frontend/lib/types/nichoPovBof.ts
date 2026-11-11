@@ -231,6 +231,8 @@ export interface ProductoItem {
   emojis?: string;
   /** Promesa detectada en el caption; vacío/null si es seguro publicarlo. */
   caption_riesgo: string | null;
+  /** Hashtags de campaña de hoy (Black Friday de la agencia); se pegan tras los fijos sin repetir. */
+  hashtags_campana?: string[];
   gancho: string | null;
   cta: string | null;
   /** Ya metido en el escaparate de TikTok. Es el paso que MÁS tiempo cuesta

@@ -2272,7 +2272,17 @@ function ProductoCard({
           label="✍️ Caption"
           text={
             producto.caption
-              ? [producto.caption, producto.emojis, hashtags.join(" ")]
+              ? [
+                  producto.caption,
+                  producto.emojis,
+                  // Los fijos y, detrás, los de campaña que no estén ya (BF 11-17/11).
+                  [
+                    ...hashtags,
+                    ...(producto.hashtags_campana ?? []).filter(
+                      (h) => !hashtags.some((x) => x.toLowerCase() === h.toLowerCase()),
+                    ),
+                  ].join(" "),
+                ]
                   .filter(Boolean)
                   .join(" ")
               : ""

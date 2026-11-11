@@ -249,6 +249,9 @@ class ProductoInfo(BaseModel):
     # seguro. Solo se AVISA: el caption lo copia el operador al publicar, no
     # se quema en el vídeo, así que no se sustituye por él.
     caption_riesgo: str = ""
+    # Hashtags de campaña (Black Friday de la agencia, `mis_tandas/campana_bf`)
+    # que tocan hoy a este producto; se pegan detrás de los fijos sin repetir.
+    hashtags_campana: list[str] = []
     # Gancho y CTA son FIJOS por decisión de cumplimiento (los dicta el
     # mentor del curso): solo rota el emoji. Ya no hay `*_riesgo` para ellos
     # porque no pueden ser arriesgados.
