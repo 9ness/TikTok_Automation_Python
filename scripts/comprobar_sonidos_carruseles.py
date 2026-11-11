@@ -71,8 +71,38 @@ def candidatos_reserva(datos: dict) -> dict[str, list[dict]]:
     return {e: [por_id[i] for i, _ in n.most_common(8)] for e, n in cuenta.items()}
 
 
+def encender_chrome(espera_s: int = 90) -> None:
+    """El Chrome del 9222 se apaga solo si nadie lo usa (navegador auto): se pide encender y se espera al CDP."""
+    import subprocess
+    import urllib.request
+
+    def responde() -> bool:
+        try:
+            urllib.request.urlopen("http://127.0.0.1:9222/json/version", timeout=3).read()
+            return True
+        except Exception:
+            return False
+
+    if responde():
+        return
+    print("Chrome 9222 apagado: navegador on", flush=True)
+    for cmd in (["navegador", "on"], ["sudo", "-n", "navegador", "on"]):
+        try:
+            if subprocess.run(cmd, timeout=60, capture_output=True).returncode != 0:
+                continue   # sin permisos: se prueba con sudo -n
+        except Exception:
+            continue
+        fin = time.time() + espera_s
+        while time.time() < fin:
+            if responde():
+                return
+            time.sleep(3)
+    raise SystemExit("Chrome 9222 no responde tras navegador on")
+
+
 class Comprobador:
     def __init__(self, pw):
+        encender_chrome()
         self.b = pw.chromium.connect_over_cdp("http://127.0.0.1:9222")
         self.pg = self.b.contexts[0].new_page()
         self.estado = json.loads(ESTADO.read_text()) if ESTADO.exists() else {}
