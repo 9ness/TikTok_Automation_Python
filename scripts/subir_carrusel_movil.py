@@ -482,8 +482,9 @@ def al_escaparate(pid: str) -> bool:
 
 def nombre_enlace(c: dict) -> str:
     """≤30 caracteres, sin la tienda y sin tildes (ADB no las escribe)."""
-    t = " ".join(c["titulo"].split())
-    for marca in (c.get("tienda", ""), (c.get("tienda") or " ").split()[0]):
+    sin_tilde = lambda x: unicodedata.normalize("NFKD", x or "").encode("ascii", "ignore").decode()
+    t = sin_tilde(" ".join(c["titulo"].split()))   # «ÜTOPYA…» con tienda «Utopya Shop»: comparar sin tildes
+    for marca in (sin_tilde(c.get("tienda", "")), sin_tilde((c.get("tienda") or " ").split()[0])):
         if marca and t.lower().startswith(marca.lower() + " "):
             t = t[len(marca):].strip()
             break
