@@ -139,7 +139,7 @@ def test_bugallo_pasa_el_corte_de_rol_sin_abrirlo_a_otros_pro():
     assert "/api/v1/subidas" in extra and "/api/v1/estadisticas" in extra
     assert not any(p.startswith(("/api/v1/subidas", "/api/v1/estadisticas"))
                    for p in main._PREFIJOS_PRO)
-    assert set(main._PREFIJOS_POR_USUARIO) == {"nes_bugallo"}
+    assert set(main._PREFIJOS_POR_USUARIO) == {"nes_bugallo", "nestor2"}
 
 
 def test_mcp_registrar_y_ver_subidas_con_el_token_de_bugallo(app_client, fake):

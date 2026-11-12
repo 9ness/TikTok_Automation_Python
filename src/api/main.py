@@ -592,6 +592,8 @@ _PREFIJOS_PRO = (
 # cada router comprueba además que el usuario esté en su lista.
 _PREFIJOS_POR_USUARIO: dict[str, tuple[str, ...]] = {
     "nes_bugallo": ("/api/v1/subidas", "/api/v1/estadisticas"),
+    # Casca Chollos (@vistoyfichado): su rutina del Mi 8 apunta subidas y ventas con su MCP (12/11).
+    "nestor2": ("/api/v1/subidas", "/api/v1/estadisticas"),
 }
 
 

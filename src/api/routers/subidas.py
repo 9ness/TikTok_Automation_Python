@@ -25,7 +25,7 @@ router = APIRouter(
 )
 
 # Quién tiene contador de subidas: la cuenta árabe de Bugallo y Néstor.
-USUARIOS = {"nes_bugallo", "ness"}
+USUARIOS = {"nes_bugallo", "ness", "nestor2"}
 
 
 def _de_quien(usuario: str, otro: str) -> str:

@@ -44,6 +44,7 @@ def num(s):
     if s is None:
         return None
     s = s.replace("€", "").replace(" ", "").replace("O", "0").replace("o", "0")
+    s = re.sub(r"(?<=\d)(k|mil)\b", "K", s, flags=re.I)  # «9,1k» / «9,1 mil» = «9,1K» (12/11: salía 9)
     s = re.sub(r"(?<=\d)/(?=\d)", ",", s)               # «1/1K»: el OCR lee la coma como barra
     m = re.search(r"\d[\d.,]*K?", s)
     if not m:
@@ -82,9 +83,15 @@ def cabecera_resumen(pal):
 def cifra(pal, e):
     """La cifra grande (alto ≥ 35 px) debajo de la etiqueta e=(x, y), en su misma mitad de pantalla."""
     lado = (lambda x: x < 540) if e[0] < 540 else (lambda x: x >= 540)
-    c = sorted((y, t) for x, y, w, h, t in pal if lado(x) and e[1] + 30 < y < e[1] + 220
+    c = sorted((y, x, w, t) for x, y, w, h, t in pal if lado(x) and e[1] + 30 < y < e[1] + 220
                and h >= 35 and re.search(r"\d", t))
-    return num(c[0][1]) if c else None
+    if not c:
+        return None
+    y0, x0, w0, t0 = c[0]
+    # el OCR a veces separa la «K» en otra palabra («9,1» + «K»): sin ella salía 9
+    suf = next((t for x, y, w, h, t in pal if abs(y - y0) < 30 and 0 <= x - (x0 + w0) < 80
+                and re.fullmatch(r"(?i)k|mil", t.strip())), "")
+    return num(t0 + suf)
 
 
 def pestanas_comision(pal):

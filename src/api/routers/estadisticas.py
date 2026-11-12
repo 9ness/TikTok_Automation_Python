@@ -27,9 +27,9 @@ router = APIRouter(
 
 # Quién tiene estadísticas: cada uno ve y guarda las de SU cuenta (Néstor y la
 # cuenta árabe de Bugallo, docs/CUENTA_ARABE.md §6).
-USUARIOS = {"ness", "nes_bugallo"}
+USUARIOS = {"ness", "nes_bugallo", "nestor2"}
 # Cuentas que solo ve un admin con `usuario=` (selector de la pantalla de ness).
-OTRAS_CUENTAS = {"ana", "nestor2"}
+OTRAS_CUENTAS = {"ana"}
 
 
 def _permitido(usuario: str, otro: str = "") -> str:
