@@ -141,6 +141,38 @@ def _json_opcional(valor: str, campo: str, tipo: type):
     return v
 
 
+def _de_bandeja(web_user: str, ruta: str) -> Path:
+    from src.replicar_viral import video as rv_video
+
+    try:
+        p = rv_video.ruta_bandeja(web_user, ruta)
+    except Exception as e:  # noqa: BLE001 — ErrorReplica u OSError
+        raise ValidationError(str(e)) from e
+    if not p.is_file():
+        raise ValidationError(f"No existe {ruta!r} en tu bandeja (¿aún sincronizando el Drive?).")
+    return p
+
+
+def _quitar_marca(origen: Path, destino: Path, modo: str) -> str | None:
+    from src.editor_auto.services import marca_agua
+
+    try:
+        return marca_agua.quitar(origen, destino, modo)
+    except Exception as e:  # noqa: BLE001
+        raise APIError(f"No se pudo quitar la marca de agua: {str(e)[-300:]}", status_code=500) from e
+
+
+def _unir(clips: list[Path], destino: Path, voz: Path | None) -> None:
+    from src.editor_auto.services.unir_clips import ErrorClips, unir
+
+    try:
+        unir(clips, destino, voz)
+    except ErrorClips as e:
+        raise ValidationError(str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise APIError(f"No se pudieron pegar los clips: {str(e)[-300:]}", status_code=500) from e
+
+
 @router.post("/enviar")
 def enviar(
     queue: Annotated[JobQueue, Depends(get_queue)],
@@ -156,6 +188,11 @@ def enviar(
     referencia_url: Annotated[str, Form()] = "",
     referencia_ruta_bandeja: Annotated[str, Form()] = "",
     quitar_marca: Annotated[str, Form()] = "auto",
+    clips: Annotated[str, Form()] = "",
+    voz_ruta_bandeja: Annotated[str, Form()] = "",
+    texto_voz: Annotated[str, Form()] = "",
+    nombre_producto: Annotated[str, Form()] = "",
+    solo_rotulos: Annotated[bool, Form()] = False,
 ) -> dict:
     """Un agente manda UN vídeo a editar (multipart `file` o `ruta_bandeja` de
     su bandeja). `estilo`: vip | normal | pasos; `pasos` y `config_vip` en
@@ -166,7 +203,13 @@ def enviar(
     zooms, gancho, rótulos) — fichero `referencia`, enlace de TikTok
     `referencia_url` o `referencia_ruta_bandeja`. Lo sacado se mezcla en
     `config_vip` (lo explícito gana) y vuelve en `referencia`.
-    `quitar_marca`: auto (quita la estrella de Omni si la ve) | omni | veo | no."""
+    `quitar_marca`: auto (quita la estrella de Omni si la ve) | omni | veo | no.
+
+    Lo normal: el vídeo EN CRUDO (sin subtítulos, texto, flecha ni nombre), o
+    `clips` = JSON con las rutas de bandeja EN ORDEN (se quita la marca de cada
+    uno y se pegan). `voz_ruta_bandeja`: locución aparte que sustituye al audio.
+    Con `vip` sale entero (gancho y rótulos que nombran `nombre_producto`, flecha,
+    subtítulos con `texto_voz`); `solo_rotulos=true` si ya trae subtítulos."""
     from src.api.routers.editor_auto.web_upload import encolar_para_agente
     from src.editor_auto.config import is_valid_day
 
@@ -174,8 +217,17 @@ def enviar(
     dia = (dia or "").strip() or datetime.now(ZoneInfo("Europe/Madrid")).strftime("%Y-%m-%d")
     if not is_valid_day(dia):
         raise ValidationError("Día inválido (YYYY-MM-DD).", details={"dia": dia})
-    if (file is not None) == bool((ruta_bandeja or "").strip()):
-        raise ValidationError("Manda UNA fuente: `file` o `ruta_bandeja`.")
+    lista_clips = _json_opcional(clips, "clips", list)
+    fuentes = [file is not None, bool((ruta_bandeja or "").strip()), bool(lista_clips)]
+    if sum(fuentes) != 1:
+        raise ValidationError("Manda UNA fuente: `file`, `ruta_bandeja` o `clips`.")
+    if lista_clips is not None:
+        from src.editor_auto.services.unir_clips import MAX_CLIPS
+
+        if not all(isinstance(c, str) and c.strip() for c in lista_clips):
+            raise ValidationError("`clips` es una lista de rutas de tu bandeja, en orden.")
+        if len(lista_clips) > MAX_CLIPS:
+            raise ValidationError(f"Como mucho {MAX_CLIPS} clips por vídeo.")
     lista_pasos = _json_opcional(pasos, "pasos", list)
     cfg_vip = _json_opcional(config_vip, "config_vip", dict)
     estilo = (estilo or "vip").strip().lower()
@@ -212,7 +264,9 @@ def enviar(
                                "Prueba otra vez o manda sin referencia.", status_code=502)
             cfg_vip = {**{k: v for k, v in sacado.items() if k != "_flujo"}, **(cfg_vip or {})}
         try:
-            flujo = ef.flujo_para(estilo, style_config=style_config, pasos=lista_pasos, config_vip=cfg_vip)
+            flujo = ef.flujo_para(estilo, style_config=style_config, pasos=lista_pasos, config_vip=cfg_vip,
+                                  flujo_ref=(sacado or {}).get("_flujo"), texto_voz=texto_voz,
+                                  nombre_producto=nombre_producto, solo_rotulos=solo_rotulos)
         except ValueError as e:
             raise ValidationError(str(e)) from e
         if file is not None:
@@ -222,23 +276,29 @@ def enviar(
             temporal = temporal or tempfile.mkdtemp(prefix="ed_agente_")
             origen = Path(temporal) / (Path(file.filename or "").name or f"video{ext}")
             _copiar_subida(file, origen)
-        else:
-            from src.replicar_viral import video as rv_video
-
-            try:
-                origen = rv_video.ruta_bandeja(web_user, ruta_bandeja)
-            except Exception as e:  # noqa: BLE001 — ErrorReplica u OSError
-                raise ValidationError(str(e)) from e
-            if not origen.is_file():
-                raise ValidationError(f"No existe {ruta_bandeja!r} en tu bandeja (¿aún sincronizando el Drive?).")
+        elif lista_clips is None:
+            origen = _de_bandeja(web_user, ruta_bandeja)
         temporal = temporal or tempfile.mkdtemp(prefix="ed_agente_")
-        limpio = Path(temporal) / ("sinmarca_" + origen.name)
-        try:
-            marca = marca_agua.quitar(origen, limpio, quitar_marca)
-        except Exception as e:  # noqa: BLE001
-            raise APIError(f"No se pudo quitar la marca de agua: {str(e)[-300:]}", status_code=500) from e
-        if marca:  # mismo nombre que el original: así sale en la web y en `filename`
-            origen = limpio.replace(Path(temporal) / ("m_" + origen.name))
+        voz = _de_bandeja(web_user, voz_ruta_bandeja) if (voz_ruta_bandeja or "").strip() else None
+        marca: str | None | list
+        if lista_clips is not None:
+            marca, limpios = [], []
+            for i, c in enumerate(lista_clips):
+                o = _de_bandeja(web_user, c)
+                m = _quitar_marca(o, Path(temporal) / f"clip{i:02d}_{o.name}", quitar_marca)
+                marca.append(m)
+                limpios.append(o if m is None else Path(temporal) / f"clip{i:02d}_{o.name}")
+            origen = Path(temporal) / f"{Path(lista_clips[0]).stem}_x{len(lista_clips)}.mp4"
+            _unir(limpios, origen, voz)
+        else:
+            limpio = Path(temporal) / ("sinmarca_" + origen.name)
+            marca = _quitar_marca(origen, limpio, quitar_marca)
+            if marca:  # mismo nombre que el original: así sale en la web y en `filename`
+                origen = limpio.replace(Path(temporal) / ("m_" + origen.name))
+            if voz is not None:
+                con_voz = Path(temporal) / f"{origen.stem}_voz.mp4"
+                _unir([origen], con_voz, voz)
+                origen = con_voz
         res = encolar_para_agente(queue, editor_user, origen, day=dia, para=u, tool_flow=flujo,
                                   estilo=estilo, referencia=nombre_ref)
         res["marca_quitada"] = marca

@@ -408,7 +408,7 @@ class StickerArrowTool:
                         )
                 else:  # auto_contrast
                     lum = _region_luminance(
-                        input_path,
+                        input_path=input_path,
                         t=windows[0][0] + 0.1,
                         px_pct=float(config.get("position_x_pct", 50.0)),
                         py_pct=float(config.get("position_y_pct", 80.0)),

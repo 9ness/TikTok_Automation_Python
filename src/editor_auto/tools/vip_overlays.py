@@ -689,12 +689,29 @@ def _franja_subs(cfg: dict, ctx: ToolContext, H: int) -> tuple[int, int] | None:
     return int(c - 0.07 * H), int(c + 0.07 * H)
 
 
+def _franja_reservada(cfg: dict, H: int) -> tuple[int, int] | None:
+    """Franja [y0, y1] (fracción del alto) que otra herramienta usa después,
+    p. ej. el nombre del producto de `texto_fijo` arriba."""
+    f = cfg.get("franja_reservada")
+    try:
+        y0, y1 = float(f[0]), float(f[1])
+    except (TypeError, ValueError, IndexError, KeyError):
+        return None
+    return (int(y0 * H), int(y1 * H)) if 0 <= y0 < y1 <= 1 else None
+
+
+_SEGURA_ARRIBA = 0.09
+_SEGURA_ABAJO = 0.80
+
+
 def _y_libre(alto: int, pref: int, ocupado: list[tuple[int, int]], H: int) -> int:
     """La y más cercana a la del estilo que no pisa nada de `ocupado`.
     Si no cabe en ningún sitio, la que menos pisa (lo primero, los subtítulos, pesa más)."""
     paso, mg = max(1, H // 100), int(0.01 * H)
     mejor = None
-    for y in range(int(0.04 * H), int(0.86 * H) - alto, paso):
+    # Zona segura de TikTok: arriba van las pestañas (≈9 %) y abajo la
+    # descripción y el carrito (desde ≈80 %).
+    for y in range(int(_SEGURA_ARRIBA * H), int(_SEGURA_ABAJO * H) - alto, paso):
         pisa = sum(max(0, min(y + alto, b + mg) - max(y, a - mg)) * (3 if i == 0 else 1)
                    for i, (a, b) in enumerate(ocupado))
         clave = (pisa, abs(y - pref))
@@ -722,7 +739,8 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
     total = dur + off
     y_rot = int(H * float(cfg.get("rotulo_y_pct", 16.0)) / 100)
     # Lo que no se puede tapar: subtítulos (primero, pesan más) y la cara.
-    prohibido = [b for b in (_franja_subs(cfg, ctx, H), _franja_cara(src, info, ctx)) if b]
+    prohibido = [b for b in (_franja_subs(cfg, ctx, H), _franja_cara(src, info, ctx),
+                             _franja_reservada(cfg, H)) if b]
 
     def y_para(png: str, pref: int, extra: list | None = None) -> int:
         return _y_libre(_alto_png(png), pref, prohibido + (extra or []), H)

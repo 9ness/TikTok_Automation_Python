@@ -21,6 +21,7 @@ from .silence_cutter import SilenceCutterTool
 from .silence_cutter_scripted import SilenceCutterScriptedTool
 from .sticker_arrow import StickerArrowTool
 from .subs_auto import SubsAutoTool
+from .texto_fijo import TextoFijoTool
 from .vip_overlays import VipOverlaysTool
 
 
@@ -32,6 +33,7 @@ REGISTRY: dict[str, BaseTool] = {
     PhotoInsertTool.tool_id: PhotoInsertTool(),
     VipOverlaysTool.tool_id: VipOverlaysTool(),
     AudioCleanTool.tool_id: AudioCleanTool(),
+    TextoFijoTool.tool_id: TextoFijoTool(),
 }
 
 

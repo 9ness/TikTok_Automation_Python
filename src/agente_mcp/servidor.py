@@ -1095,11 +1095,20 @@ async def editar_en_editor(
     estilo: str = "vip", pasos: list[dict] | None = None, config_vip: dict | None = None,
     dia: str = "", referencia_url: str = "", referencia_ruta_bandeja: str = "",
     referencia_archivo_id: str = "", quitar_marca: str = "",
+    clips: list[str] | None = None, voz_ruta_bandeja: str = "", texto_voz: str = "",
+    nombre_producto: str = "", solo_rotulos: bool = False,
 ) -> str:
     """Manda UN vídeo a editar al Editor Auto (lo edita la cuenta de agentes del
-    editor). UNA fuente: `ruta_bandeja` (relativa a tu bandeja, lo recomendable),
-    `archivo_id` o `url`. `estilo`: `vip` (solo rótulos VIP; `config_vip` cambia
-    su config), `normal` (el estilo de la web de esa cuenta: cortes, subtítulos,
+    editor). Mándalo EN CRUDO: sin subtítulos, textos, flecha ni nombre (eso lo
+    pone el editor). UNA fuente: `ruta_bandeja` (relativa a tu bandeja, lo
+    recomendable), `archivo_id`, `url` o `clips` = rutas de tu bandeja EN ORDEN
+    (máx. 10; se quita la marca de cada uno y se pegan a 1080x1920).
+    `voz_ruta_bandeja`: locución aparte (Fish…) que sustituye al audio de los
+    clips; no puede durar más que ellos. `texto_voz`: el guion locutado (los
+    subtítulos salen con ese texto y los tiempos de Whisper). `nombre_producto`:
+    el gancho o un rótulo lo nombra (sin título fijo arriba). `estilo`: `vip` (edición
+    completa: gancho y rótulos VIP, flecha y subtítulos; `solo_rotulos=True` si el
+    vídeo YA trae subtítulos; `config_vip` cambia su config), `normal` (el estilo de la web de esa cuenta: cortes, subtítulos,
     flecha) o `pasos` (tu lista `[{tool_id, config}]`). Whisper siempre en small.
     `para` = usuario de la fábrica (otro solo si eres admin); `dia` YYYY-MM-DD
     (hoy por defecto). Devuelve `job_id`: recógelo con `ediciones_editor` y,
@@ -1111,8 +1120,9 @@ async def editar_en_editor(
     rótulos y lo mezcla en `config_vip` (lo que pases en `config_vip` gana). La
     respuesta trae `referencia` con la config sacada.
     `quitar_marca`: `auto` (quita la estrella de Omni con el zoom de AI Pro),
-    `omni`, `veo` o `no`; vacío = lo que decida el editor. La respuesta trae
-    `marca_quitada`."""
+    `omni`, `veo` o `no`; vacío = lo que decida el editor. Con clips de Omni pasa
+    `omni`: `auto` no ve la estrella sobre fondos con textura. La respuesta trae
+    `marca_quitada` (una por clip si mandas `clips`)."""
     u = _usuario(ctx)
     refs = [x for x in (referencia_url, referencia_ruta_bandeja, referencia_archivo_id) if x]
     if len(refs) > 1:
@@ -1126,6 +1136,14 @@ async def editar_en_editor(
         if quitar_marca.strip().lower() not in ("auto", "omni", "veo", "no"):
             raise ErrorApp("`quitar_marca`: auto | omni | veo | no.")
         datos["quitar_marca"] = quitar_marca.strip().lower()
+    if sum(bool(x) for x in (ruta_bandeja, archivo_id, url, clips)) != 1:
+        raise ErrorApp("Pasa UNA fuente: `ruta_bandeja`, `archivo_id`, `url` o `clips`.")
+    for k, v in (("voz_ruta_bandeja", voz_ruta_bandeja), ("texto_voz", texto_voz),
+                 ("nombre_producto", nombre_producto)):
+        if v:
+            datos[k] = v
+    if solo_rotulos:
+        datos["solo_rotulos"] = "true"
     if referencia_url:
         datos["referencia_url"] = referencia_url
     if referencia_ruta_bandeja:
@@ -1137,7 +1155,10 @@ async def editar_en_editor(
             raise ErrorApp("La referencia no es un vídeo.")
         otros = {"referencia": (nombre_ref or "referencia.mp4", ref, "video/mp4")}
     ruta = "/api/v1/editor-auto/ediciones-fabrica/enviar"
-    if ruta_bandeja and not (archivo_id or url):
+    if clips:
+        r = await Interno(u).post_form(ruta, {**datos, "clips": json.dumps(clips, ensure_ascii=False)},
+                                       None, otros)
+    elif ruta_bandeja:
         r = await Interno(u).post_form(ruta, {**datos, "ruta_bandeja": ruta_bandeja}, None, otros)
     else:
         contenido, nombre = await archivos.leer_origen(u, url=url, archivo_id=archivo_id,

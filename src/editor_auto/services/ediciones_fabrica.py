@@ -52,11 +52,24 @@ def _rebajar_whisper(paso) -> None:
     paso.config = cfg
 
 
+# Subtítulos del VIP completo: altura (fracción del alto) y franja del nombre del producto.
+_SUBS_Y_VIP = 0.70
+# Flecha al carrito: la que más contrasta con el fondo (la tool falla sin `sticker_file`).
+_FLECHA_VIP = {"sticker_file": "flecha_3d_roja.mov", "color_mode": "fixed",
+               "scale_width_pct": 30.0, "position_y_pct": 84.0}
+
+
 def flujo_para(estilo: str, *, style_config: dict | None = None,
-               pasos: list | None = None, config_vip: dict | None = None) -> list:
+               pasos: list | None = None, config_vip: dict | None = None,
+               flujo_ref: dict | None = None, texto_voz: str = "",
+               nombre_producto: str = "", solo_rotulos: bool = False) -> list:
     """Flujo (lista de ToolStep) de UN trabajo mandado por un agente.
 
-    - `vip`: solo `vip_overlays` (+ `config_vip`), Whisper small y sin fotos de internet.
+    - `vip`: el vídeo llega EN CRUDO y sale entero: `vip_overlays` (+ `config_vip`,
+      sin fotos de internet) → flecha → subtítulos (estilo del vídeo de referencia
+      `flujo_ref["subs_auto"]` si lo hay; texto exacto `texto_voz`); sin título fijo arriba: el
+      gancho o un rótulo nombra el producto. `solo_rotulos=True`: solo `vip_overlays` (para un
+      vídeo que ya trae subtítulos).
     - `normal`: el estilo de la web de la cuenta (`build_tool_flow`), sin guardarlo.
     - `pasos`: la lista dada ({tool_id, config, enabled?}), validada contra el registry.
     Lanza ValueError si algo no vale."""
@@ -70,7 +83,10 @@ def flujo_para(estilo: str, *, style_config: dict | None = None,
         cfg = dict(config_vip or {})
         cfg["whisper_model_size"] = _WHISPER_AGENTES
         cfg["fotos_internet"] = False
-        flujo = [ToolStep(tool_id="vip_overlays", config=cfg)]
+        if solo_rotulos:
+            flujo = [ToolStep(tool_id="vip_overlays", config=cfg)]
+        else:
+            flujo = _vip_completo(cfg, flujo_ref or {}, texto_voz, nombre_producto)
     elif estilo == "normal":
         from src.editor_auto.services.style_mapper import build_tool_flow
 
@@ -96,6 +112,35 @@ def flujo_para(estilo: str, *, style_config: dict | None = None,
         _rebajar_whisper(paso)
     if not any(s.enabled for s in flujo):
         raise ValueError("El flujo no tiene ninguna herramienta activa.")
+    return flujo
+
+
+def _vip_completo(cfg_vip: dict, flujo_ref: dict, texto_voz: str, nombre: str) -> list:
+    from src.editor_auto.models.editor_user import ToolStep
+    from src.editor_auto.tools import get_tool
+
+    subs = dict(get_tool("subs_auto").default_config())
+    ref_subs = flujo_ref.get("subs_auto") or {}
+    subs.update(ref_subs)
+    # Su defecto (0.78) choca con la flecha: si la referencia no dice nada, 0.70.
+    subs["y_position"] = ref_subs.get("y_position", _SUBS_Y_VIP)
+    subs.update(language="es", model_size=_WHISPER_AGENTES)
+    if (texto_voz or "").strip():
+        subs["reference_text"] = texto_voz.strip()
+    # El VIP no pone rótulos encima de los subtítulos ni del nombre.
+    cfg = dict(cfg_vip)
+    cfg["_flujo"] = {"subs_auto": {"y_position": subs["y_position"]}}
+    if (nombre or "").strip():
+        # Sin título fijo arriba (12/11, Néstor: los VIP llevan gancho y ya); el
+        # nombre va a las notas para que el gancho o un rótulo lo diga (anti-sanción).
+        cfg["notas_estilo"] = (f"{cfg.get('notas_estilo') or ''} Producto: {nombre.strip()}. "
+                               "Que el gancho o un rótulo nombre el producto.").strip()
+    flecha = dict(get_tool("sticker_arrow").default_config())
+    flecha.update(_FLECHA_VIP)
+    flecha.update(flujo_ref.get("sticker_arrow") or {})
+    flujo = [ToolStep(tool_id="vip_overlays", config=cfg),
+             ToolStep(tool_id="sticker_arrow", config=flecha),
+             ToolStep(tool_id="subs_auto", config=subs)]
     return flujo
 
 

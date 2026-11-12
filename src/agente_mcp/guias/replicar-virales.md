@@ -282,12 +282,19 @@ falta producto y enlace):
 
 **Mandarlo tú (agente):** `editar_en_editor(ruta_bandeja=…, estilo=…)` sube UN vídeo
 al editor y devuelve su `job_id`; luego, los pasos 1-3 de arriba.
-- `estilo="vip"` (por defecto): solo rótulos VIP; `config_vip={...}` cambia su config.
+- **Mándalo EN CRUDO** (12/11/2026): los clips tal cual salen de Omni/Veo, sin subtítulos,
+  textos, flecha ni nombre. Varios clips: `clips=["c1.mp4", "c2.mp4", …]` (rutas de tu
+  bandeja, EN ORDEN, máx. 10); el editor quita la marca de cada uno y los pega.
+  Locución aparte (Fish): `voz_ruta_bandeja=…` (no más larga que los clips) y
+  `texto_voz=` el guion locutado (los subtítulos salen con ese texto).
+  `nombre_producto=`: el gancho o un rótulo nombra el producto (el VIP no lleva título fijo arriba).
+- `estilo="vip"` (por defecto): edición completa (gancho y rótulos VIP, flecha y subtítulos abajo); `solo_rotulos=True` si el vídeo ya trae subtítulos; `config_vip={...}` cambia su config.
   **Vídeo de referencia** (para copiar cortes, gancho, zooms y rótulos de un viral):
   UNO de `referencia_url` (TikTok), `referencia_ruta_bandeja` o `referencia_archivo_id`.
   Se mezcla en `config_vip` (lo tuyo gana); la respuesta trae `referencia` con lo sacado.
 - `quitar_marca`: `auto` (quita la estrella de Omni con el zoom de AI Pro), `omni`, `veo` o `no`;
-  la respuesta trae `marca_quitada`.
+  la respuesta trae `marca_quitada`. **Con clips de Omni pasa `omni`**: `auto` no ve la estrella
+  sobre fondos con textura (adoquines, césped).
 - `estilo="normal"`: el estilo de la web de la cuenta del editor (cortes, subtítulos, flecha).
 - `estilo="pasos"`: tu flujo, `pasos=[{"tool_id": "subs_auto", "config": {...}}, …]`
   (herramientas del editor; `silence_cutter_scripted` no vale).

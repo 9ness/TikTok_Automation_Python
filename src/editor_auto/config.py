@@ -466,6 +466,7 @@ TOOL_SILENCE_CUTTER_SCRIPTED = "silence_cutter_scripted"
 TOOL_STICKER_ARROW = "sticker_arrow"
 TOOL_PHOTO_INSERT = "photo_insert"
 TOOL_VIP_OVERLAYS = "vip_overlays"
+TOOL_TEXTO_FIJO = "texto_fijo"
 TOOL_AUDIO_CLEAN = "audio_clean"
 
 # Grupos de herramientas mutuamente excluyentes — el validador del repo
@@ -505,6 +506,8 @@ TOOL_POSITION_WEIGHTS: dict[str, int] = {
     TOOL_PHOTO_INSERT: 70,
     TOOL_STICKER_ARROW: 80,
     TOOL_SUBS_AUTO: 90,
+    # 95: texto fijo (nombre del producto) encima de todo, ya sin zooms que lo corten.
+    TOOL_TEXTO_FIJO: 95,
 }
 DEFAULT_TOOL_WEIGHT = 50
 

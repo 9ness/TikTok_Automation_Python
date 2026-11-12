@@ -182,8 +182,8 @@ def test_rotulo_fuera_de_cara_y_subtitulos():
     for a, b in (subs, cara):
         assert y + 180 <= a or y >= b
     # sin sitio libre, antes la cara que los subtítulos
-    y = _y_libre(900, int(0.16 * H), [subs, (0, H)], H)
-    assert y + 900 <= subs[0] or y >= subs[1]
+    y = _y_libre(500, int(0.16 * H), [subs, (0, H)], H)
+    assert y + 500 <= subs[0] or y >= subs[1]
 
 
 def test_borde_vip_en_subtitulos():

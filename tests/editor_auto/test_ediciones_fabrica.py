@@ -96,9 +96,9 @@ class _QueueEnc:
         return self.jobs
 
 
-def test_vip_solo_vip_overlays_con_whisper_small():
+def test_vip_solo_rotulos_con_whisper_small():
     flujo = ef.flujo_para("vip", config_vip={"whisper_model_size": "large-v3",
-                                             "fotos_internet": True, "max_fotos": 2})
+                                             "fotos_internet": True, "max_fotos": 2}, solo_rotulos=True)
     assert [s.tool_id for s in flujo] == ["vip_overlays"]
     cfg = flujo[0].config
     assert cfg["whisper_model_size"] == "small" and cfg["fotos_internet"] is False
@@ -147,7 +147,7 @@ def test_enviar_flujo_en_el_job_sin_tocar_el_usuario(monkeypatch, tmp_path):
                            pasos="", config_vip='{"max_fotos": 1}', dia="2026-11-12")
     assert res["para"] == "ness" and res["estilo"] == "vip" and res["job_id"] == "j1"
     params = q.jobs[0].params
-    assert [s["tool_id"] for s in params["tool_flow"]] == ["vip_overlays"]
+    assert [s["tool_id"] for s in params["tool_flow"]] == ["vip_overlays", "sticker_arrow", "subs_auto"]
     assert params["tool_flow"][0]["config"]["whisper_model_size"] == "small"
     assert (tmp_path / "entrada" / "2026-11-12" / res["filename"]).read_bytes() == b"video"
     # El flujo guardado de la cuenta no cambia ni se guarda.
@@ -283,7 +283,7 @@ def test_enviar_con_referencia_url(monkeypatch, tmp_path):
     assert bajados == ["https://www.tiktok.com/@x/video/1"]
     assert res["referencia"]["ritmo_ref"] == {"zooms_min": 3.0} and res["marca_quitada"] is None
     cfg = q.jobs[0].params["tool_flow"][0]["config"]
-    assert cfg["preset"] == "neon" and cfg["zooms"] is False and "_flujo" not in cfg  # lo explícito gana
+    assert cfg["preset"] == "neon" and cfg["zooms"] is False and cfg["_flujo"] == {"subs_auto": {"y_position": 0.70}}  # lo explícito gana
     e = r.d["ediciones_fabrica:ness"][-1]
     assert e["estilo"] == "vip" and e["referencia"] == "https://www.tiktok.com/@x/video/1"
     with pytest.raises(ValidationError):  # referencia solo con vip
@@ -314,3 +314,96 @@ def test_cuenta_de_agentes_sin_avisos(monkeypatch):
     assert not w._es_cuenta_agentes(SimpleNamespace(account_email="cliente@x.es"))
     monkeypatch.delenv("EDITOR_CUENTA_AGENTES_EMAIL")
     assert not w._es_cuenta_agentes(SimpleNamespace(account_email=""))
+
+
+# --- Clips en crudo (12/11/2026) ---------------------------------------------
+
+import subprocess
+
+from src.editor_auto.services import unir_clips
+
+
+def test_vip_completo_con_referencia_y_nombre():
+    flujo = ef.flujo_para("vip", config_vip={"preset": "neon"},
+                          flujo_ref={"subs_auto": {"font_size": 99, "model_size": "large-v3"}},
+                          texto_voz="Hola mundo", nombre_producto="Bici X")
+    ids = [s.tool_id for s in flujo]
+    assert ids == ["vip_overlays", "sticker_arrow", "subs_auto"]  # sin título fijo arriba
+    vip, flecha, subs = (s.config for s in flujo)
+    assert subs["font_size"] == 99 and subs["model_size"] == "small"
+    assert subs["reference_text"] == "Hola mundo" and subs["y_position"] == 0.70
+    assert vip["_flujo"]["subs_auto"]["y_position"] == 0.70 and "Bici X" in vip["notas_estilo"]
+    assert flecha["sticker_file"].endswith(".mov")
+    sin_nombre = ef.flujo_para("vip", config_vip={})
+    assert [s.tool_id for s in sin_nombre] == ["vip_overlays", "sticker_arrow", "subs_auto"]
+
+
+def test_franja_reservada_vip():
+    assert V._franja_reservada({"franja_reservada": [0.095, 0.15]}, 1920) == (182, 288)
+    assert V._franja_reservada({}, 1920) is None
+
+
+def _clip(ruta, seg, audio=True, size="720x1280"):
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"testsrc=size={size}:rate=25:duration={seg}"]
+    if audio:
+        cmd += ["-f", "lavfi", "-i", f"sine=frequency=440:duration={seg}"]
+    subprocess.run([*cmd, "-shortest" if audio else "-an", str(ruta)], check=True)
+    return ruta
+
+
+def _dur(r):
+    return unir_clips._probe(r)[0]
+
+
+def test_unir_clips_en_orden_y_sin_audio(tmp_path):
+    a = _clip(tmp_path / "a.mp4", 1)
+    b = _clip(tmp_path / "b.mp4", 2, audio=False, size="1080x1080")
+    out = unir_clips.unir([a, b], tmp_path / "o.mp4")
+    dur, tipos = unir_clips._probe(out)
+    assert abs(dur - 3) < 0.2 and tipos == {"video", "audio"}
+    wh = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries",
+                         "stream=width,height", "-of", "csv=p=0", str(out)],
+                        capture_output=True, text=True).stdout.strip()
+    assert wh == "1080,1920"
+
+
+def test_unir_clips_voz(tmp_path):
+    a = _clip(tmp_path / "a.mp4", 2)
+    voz = tmp_path / "v.mp3"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=duration=1", str(voz)], check=True)
+    out = unir_clips.unir([a], tmp_path / "o.mp4", voz)
+    assert abs(_dur(out) - 2) < 0.2
+    larga = tmp_path / "l.mp3"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=duration=4", str(larga)], check=True)
+    with pytest.raises(unir_clips.ErrorClips):
+        unir_clips.unir([a], tmp_path / "o2.mp4", larga)
+    with pytest.raises(unir_clips.ErrorClips):
+        unir_clips.unir([], tmp_path / "o3.mp4")
+
+
+def test_enviar_clips_de_bandeja(monkeypatch, tmp_path):
+    import src.replicar_viral.video as rvv
+
+    editor_user = EditorUser(name="nueveness")
+    router_ef, _r, _ = _montar_envio(monkeypatch, tmp_path, editor_user)
+    band = tmp_path / "bandeja"
+    band.mkdir()
+    _clip(band / "c1.mp4", 1)
+    _clip(band / "c2.mp4", 1)
+    monkeypatch.setattr(rvv, "ruta_bandeja", lambda u, r: band / r)
+    monkeypatch.setattr(marca_agua, "quitar", lambda o, d, m="auto": None)
+    q = _QueueEnc()
+    res = router_ef.enviar(q, web_user="ness", file=None, ruta_bandeja="", para="", estilo="vip",
+                           pasos="", config_vip="", dia="2026-11-12", referencia=None, referencia_url="",
+                           referencia_ruta_bandeja="", quitar_marca="omni", clips='["c1.mp4", "c2.mp4"]',
+                           voz_ruta_bandeja="", texto_voz="hola", nombre_producto="Bici", solo_rotulos=False)
+    assert res["marca_quitada"] == [None, None] and "c1_x2" in res["filename"]
+    assert "Bici" in q.jobs[0].params["tool_flow"][0]["config"]["notas_estilo"]
+    with pytest.raises(ValidationError):  # dos fuentes
+        router_ef.enviar(q, web_user="ness", file=None, ruta_bandeja="c1.mp4", para="", estilo="vip",
+                         pasos="", config_vip="", dia="2026-11-12", referencia=None, referencia_url="",
+                         referencia_ruta_bandeja="", quitar_marca="auto", clips='["c1.mp4"]')
+    with pytest.raises(ValidationError):  # no existe
+        router_ef.enviar(q, web_user="ness", file=None, ruta_bandeja="", para="", estilo="vip",
+                         pasos="", config_vip="", dia="2026-11-12", referencia=None, referencia_url="",
+                         referencia_ruta_bandeja="", quitar_marca="auto", clips='["nada.mp4"]')
