@@ -304,7 +304,7 @@ para la temporada de Black Friday y Navidad, tareas incluidas.
   Friday ni destinatarios niños. Si lo trae, se rehace.
 - Escena (prompt de Flow, lo escribes tú): fondo navideño o papel/bolsa de
   regalo al lado, con el producto idéntico a la foto.
-- Acabado de texto `estilo_texto="regalo"` (el de serie con este gancho): rótulo
+- Acabado de texto: desde el 12/11 el de serie es `blanco` en TODOS los ganchos (el clásico y el de regalo quemaban «CUPÓN DESCUENTO» / rótulo navideño; prohibido sin esa oferta en la ficha y nada navideño en Viva). `estilo_texto="regalo"` solo si se pide a propósito y nunca en Viva: rótulo
   «idea de regalo» + nombre + «revisa si tienes cupón», y al final una animación
   (caja, copos o lazo con confeti) que acaba con la flecha en el carrito, con su
   sonido. Forma (caja, solo texto con borde, cinta o etiqueta), colores, letra,

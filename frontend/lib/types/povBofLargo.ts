@@ -84,7 +84,7 @@ export interface ProductoLargo {
    *  cuántos pide el mismo guion (20 s son 3 de 8 s o 2 de 10 s). */
   clip_s?: number;
   /** Acabado del texto quemado: "blanco", "clasico" o "" (no elegido, y
-   *  entonces manda el gancho: dolor → blanco liso, precio → clásico). */
+   *  entonces manda el gancho: desde 12/11 todos los ganchos → blanco liso). */
   estilo_texto?: string;
   /** Con cuántos segundos se escribió el guion que hay guardado. Si no es el
    *  que está pedido, hay que rehacerlo para que sirva. */

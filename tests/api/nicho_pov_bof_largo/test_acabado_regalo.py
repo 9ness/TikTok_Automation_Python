@@ -50,7 +50,7 @@ def test_el_cupon_se_sugiere():
 
 def test_estilo_texto_regalo_en_el_largo():
     assert "regalo" in config.ESTILOS_TEXTO
-    assert config.estilo_texto_valido("", "regalo") == "regalo"
+    assert config.estilo_texto_valido("", "regalo") == "blanco"  # 12/11: todos a blanco
     assert config.estilo_texto_valido("regalo", "dolor") == "regalo"
     # Los demás no cambian.
     assert config.estilo_texto_valido("", "dolor") == "blanco"

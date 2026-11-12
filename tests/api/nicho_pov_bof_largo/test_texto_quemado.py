@@ -72,7 +72,7 @@ class TestQueAcabadoLeToca:
 
         assert config.estilo_texto_valido("", "dolor") == "blanco"
         # "" ES el clásico para el montador: no es que falte el dato.
-        assert config.estilo_texto_valido("", "precio") == ""
+        assert config.estilo_texto_valido("", "precio") == "blanco"  # 12/11: todos a blanco
 
     def test_lo_que_elige_el_operador_manda_sobre_el_gancho(self):
         from src.nicho_pov_bof_largo import config
