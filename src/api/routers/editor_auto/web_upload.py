@@ -659,6 +659,10 @@ def web_delete_file(
 
 class SendToEditRequest(BaseModel):
     day: str
+    # Solo ADMIN: usuario de la fábrica (ness, ana…) para el que se edita este
+    # envío. Se apunta en `ediciones_fabrica:<usuario>` y lo ven sus agentes
+    # con `ediciones_editor` del MCP. Ver services/ediciones_fabrica.py.
+    fabrica_usuario: str | None = None
 
 
 def _enqueue_video(
@@ -731,6 +735,19 @@ def _enqueue_video(
     return job.id
 
 
+@router.get("/fabrica-usuarios")
+def web_fabrica_usuarios(
+    claims: Annotated[TicketClaims, Depends(require_web_ticket)],
+) -> dict:
+    """Usuarios de la fábrica para los que un ADMIN puede editar (selector del
+    envío). A quien no es admin le devuelve la lista vacía."""
+    user = _resolve_user(claims)
+    if not _is_admin(user):
+        return {"usuarios": []}
+    from src.editor_auto.services import ediciones_fabrica
+    return {"usuarios": ediciones_fabrica.usuarios_validos()}
+
+
 @router.post("/send-to-edit")
 def web_send_to_edit(
     claims: Annotated[TicketClaims, Depends(require_web_ticket)],
@@ -743,6 +760,13 @@ def web_send_to_edit(
     _require_drive()
     user = _resolve_user(claims)
     is_admin = _is_admin(user)
+    fabrica_usuario = (payload.fabrica_usuario or "").strip()
+    if fabrica_usuario:
+        from src.editor_auto.services import ediciones_fabrica
+        if not is_admin:
+            raise APIError("Solo un admin puede editar para un usuario de la fábrica.", status_code=403)
+        if fabrica_usuario not in ediciones_fabrica.usuarios_validos():
+            raise ValidationError("Usuario de fábrica desconocido.", details={"fabrica_usuario": fabrica_usuario})
     # Tope de 1 envío/día — NO aplica a admin (puede mandar a editar varias veces).
     if _get_day_jobs(user.id, day) and not is_admin:
         raise APIError("Este día ya se mandó a edición.", status_code=409)
@@ -847,6 +871,14 @@ def web_send_to_edit(
 
     if enqueued:
         _lock_day(user.id, day)  # indexa el día para el panel admin / summary
+        if fabrica_usuario:
+            for e in enqueued:
+                e["fabrica"] = fabrica_usuario
+            try:
+                from src.editor_auto.services import ediciones_fabrica
+                ediciones_fabrica.apuntar(fabrica_usuario, user, day, enqueued)
+            except Exception:
+                logger.exception("No se pudo apuntar la edición para %s", fabrica_usuario)
         _append_day_jobs(user.id, day, enqueued)
         names = [e["filename"] for e in enqueued]
         _mark_files_sent(user.id, day, names)

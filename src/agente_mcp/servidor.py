@@ -1004,14 +1004,15 @@ async def registrar_replica_video(
     url: str = "", url_viral: str = "", product_id: str = "", product_url: str = "",
     tienda: str = "", caption: str = "", hashtags: list[str] | None = None,
     prompts: list[str] | None = None, notas: str = "", replica_id: str = "", para: str = "",
-    catalogo: str = "", carpeta: str = "", producto_ref: str = "",
+    catalogo: str = "", carpeta: str = "", producto_ref: str = "", edicion: str = "",
 ) -> str:
     """Registra el MP4 YA MONTADO de un viral replicado («Replicar virales»):
     sale solo en `mis_tandas` (id `rv|<id>`) con descargar, subido, sin stock,
     rehacer, semáforo y época. `modo`: `con_ia` (clips de Omni/GenAI Pro), `genjutsu`
     (el viral rehecho con Genjutsu de Higgsfield) o `sin_ia` (vídeo real o montaje sin IA). UNA fuente del vídeo:
     `ruta_bandeja` (relativa a tu bandeja `Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/`,
-    lo recomendable: no se sube nada), `archivo_id` (subido a /subir) o `url`.
+    lo recomendable: no se sube nada), `archivo_id` (subido a /subir), `url` o
+    `edicion` (el `job_id` de un vídeo del Editor Auto que sale en `ediciones_editor`).
     `titulo` = nombre del producto (obligatorio, el mismo que va quemado en el
     vídeo) y `product_id` o `product_url` de TikTok Shop (con uno basta).
     Opcionales: `url_viral` (el TikTok original), `tienda`, `caption`,
@@ -1029,6 +1030,16 @@ async def registrar_replica_video(
               "product_url": product_url, "tienda": tienda, "caption": caption, "notas": notas,
               "replica_id": replica_id, "para": para,
               "catalogo": catalogo, "carpeta": carpeta, "producto_ref": producto_ref}
+    if edicion:
+        if ruta_bandeja or archivo_id or url:
+            raise ErrorApp("Con `edicion` no pases otra fuente.")
+        contenido, _tipo, nombre = await Interno(u).get_bytes(
+            f"/api/v1/editor-auto/ediciones-fabrica/{edicion}/mp4", usuario=para or u)
+        datos = {**campos, "hashtags": json.dumps(hashtags or [], ensure_ascii=False),
+                 "prompts": json.dumps(prompts or [], ensure_ascii=False)}
+        r = await Interno(u).post_form("/api/v1/replicar-viral/video", datos,
+                                       (nombre or "edicion.mp4", contenido, "video/mp4"))
+        return _json(_enlaces_replica_video(u, r))
     if ruta_bandeja and not (archivo_id or url):
         r = await Interno(u).post("/api/v1/replicar-viral/video/bandeja",
                                   {"ruta": ruta_bandeja, **campos, "hashtags": hashtags or [],
@@ -1043,6 +1054,29 @@ async def registrar_replica_video(
     r = await Interno(u).post_form("/api/v1/replicar-viral/video", datos,
                                    (nombre or "replica.mp4", contenido, "video/mp4"))
     return _json(_enlaces_replica_video(u, r))
+
+
+@_herramienta(structured_output=False)
+async def ediciones_editor(ctx: Context, usuario: str = "", limite: int = 30) -> str:
+    """Vídeos que un admin del Editor Auto (la web de edición) mandó a editar
+    PARA tu usuario de la fábrica (o para `usuario`, solo admin): nombre del
+    original, día, `estado` (pending/running/completed/failed), `listo` y
+    `descargar` del MP4 editado. Para llevarlo a Mis tandas: revísalo y
+    `registrar_replica_video(modo="sin_ia", edicion=<job_id>, titulo=…,
+    product_id=…)` (con `para` si es de otro usuario). Ver
+    `guia("replicar-virales")` › «Vídeos del Editor Auto»."""
+    from urllib.parse import quote
+
+    u = _usuario(ctx)
+    d = await Interno(u).get("/api/v1/editor-auto/ediciones-fabrica", usuario=usuario or u,
+                             limite=max(1, min(int(limite or 30), 500)))
+    quien = d.get("usuario") or u
+    for e in d.get("ediciones", []):
+        if e.get("listo"):
+            e["descargar"] = archivos.enlace_interno(
+                u, f"/api/v1/editor-auto/ediciones-fabrica/{quote(str(e.get('job_id', '')), safe='')}"
+                   f"/mp4?usuario={quote(quien, safe='')}")
+    return _json(d)
 
 
 @_herramienta(structured_output=False)

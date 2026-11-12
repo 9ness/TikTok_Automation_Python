@@ -28,6 +28,7 @@ from .editor_auto import (
     tools_router as editor_auto_tools_router,
     users_router as editor_auto_users_router,
     web_upload_router as editor_auto_web_upload_router,
+    ediciones_fabrica_router as editor_auto_ediciones_fabrica_router,
     whatsapp_router as editor_auto_whatsapp_router,
 )
 from .tiktok_shop import (
@@ -119,6 +120,7 @@ __all__ = [
     "editor_auto_subscriptions_router",
     "editor_auto_referrals_router",
     "editor_auto_web_upload_router",
+    "editor_auto_ediciones_fabrica_router",
     "editor_auto_whatsapp_router",
     "tiktok_shop_discovery_router",
     "tiktok_shop_radar_router",

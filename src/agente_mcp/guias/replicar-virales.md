@@ -266,6 +266,18 @@ Para verlas: `listar_replicas_video(modo="")`. Con `id`, la réplica entera con
 sus prompts. `borrar_replica_video(id, confirmar=True)` solo se usa si el
 operador lo pide.
 
+## 3b. Vídeos del Editor Auto (12/11/2026)
+
+Un admin de la web del editor (Néstor o «nueveness») puede mandar un envío a
+editar **para** un usuario de la fábrica (ness, ana, nestor2…): en «Mandar a
+edición» elige el usuario. Esos vídeos NO entran solos en Mis tandas (allí hace
+falta producto y enlace):
+
+1. `ediciones_editor()` lista los tuyos (admin: `usuario=`), con `estado`, `listo` y `descargar`.
+2. Revisa el MP4 como cualquier vídeo (2 fps, producto idéntico, subtítulos, nombre quemado).
+3. `registrar_replica_video(modo="sin_ia", edicion=<job_id>, titulo=…, product_id=…)`
+   (con `para=` si es de otro usuario) → sale en `mis_tandas` como `rv|<id>` → `semaforo_tanda`.
+
 ## 4. Variantes sin créditos (Casca Chollos, 10/11/2026)
 
 De una réplica **ya en verde** salen hasta **tres** variantes sin generar nada

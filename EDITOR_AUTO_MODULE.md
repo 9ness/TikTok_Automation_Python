@@ -213,6 +213,15 @@ Para añadir una herramienta nueva:
   `settings:retention_enabled` (0 = apagado). Env: `EDITOR_RETENTION_DAYS`, `EDITOR_RETENTION_SOURCE_DAYS`.
 - A mano: `scripts/caducidad_clientes.sh simular|ejecutar` (POST `/web/admin/retention?dry_run=`).
 
+## Ediciones para la fábrica (12/11/2026)
+
+Un ADMIN de la web puede mandar un envío a editar **para** un usuario de la fábrica (`ness`, `ana`…):
+`POST /web/send-to-edit {day, fabrica_usuario}` (la web lo ofrece con `GET /web/fabrica-usuarios`, vacío si
+no es admin). Se apunta en `ediciones_fabrica:<usuario>` (Redis del editor, últimos 500) y se lee en
+`GET /api/v1/editor-auto/ediciones-fabrica?usuario=` y `.../{job_id}/mp4`
+(`services/ediciones_fabrica.py`). MCP: `ediciones_editor` y `registrar_replica_video(edicion=<job_id>)`
+para llevarlo a Mis tandas con su producto. No entra solo en Mis tandas.
+
 ## Variables de entorno
 
 ```env
