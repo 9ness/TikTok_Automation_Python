@@ -2874,7 +2874,21 @@ def get_hashtags(
     from src.nicho_pov_bof.repos import product_repo
 
     # Cada cuenta su lista (11/11/2026); sin la suya, la común.
-    return HashtagsResponse(ok=True, tags=product_repo.get_hashtags(nicho, usuario))
+    tags = product_repo.get_hashtags(nicho, usuario)
+    # Y detrás los de campaña POR FECHA (Black Friday: #TikTokShopBlackFriday
+    # del 11 al 30/11), para que TODAS las pantallas los lleven al copiar el
+    # caption, no solo las que conocen el producto (12/11/2026, Néstor).
+    try:
+        from src.mis_tandas import campana_bf
+
+        tag, ini, fin = campana_bf.PRINCIPAL
+        import datetime as _dt
+
+        if ini <= _dt.date.today() <= fin and tag.lower() not in {t.lower() for t in tags}:
+            tags = [*tags, tag]
+    except Exception:  # noqa: BLE001 — sin campaña, la lista de la cuenta
+        pass
+    return HashtagsResponse(ok=True, tags=tags)
 
 
 @router.get("/hashtags/config", response_model=HashtagsConfigResponse)
