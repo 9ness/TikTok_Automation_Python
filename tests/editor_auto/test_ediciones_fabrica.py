@@ -407,3 +407,27 @@ def test_enviar_clips_de_bandeja(monkeypatch, tmp_path):
         router_ef.enviar(q, web_user="ness", file=None, ruta_bandeja="", para="", estilo="vip",
                          pasos="", config_vip="", dia="2026-11-12", referencia=None, referencia_url="",
                          referencia_ruta_bandeja="", quitar_marca="auto", clips='["nada.mp4"]')
+
+
+# ─── Gancho: literal con referencia y base de ganchos sin ella ──────────────
+def test_gancho_literal_de_la_referencia():
+    cfg = {**V.VipOverlaysTool().default_config(),
+           "ritmo_ref": {"gancho_tipo": "pregunta", "gancho_texto": "¿POR QUÉ NADIE HABLA DE ESTO?"}}
+    nota = V._nota_referencia(cfg, 20.0)
+    assert "LITERAL" in nota and "¿POR QUÉ NADIE HABLA DE ESTO?" in nota
+    cfg["ritmo_ref"] = {"gancho_tipo": "ninguno"}
+    assert "no pongas gancho" in V._nota_referencia(cfg, 20.0)
+
+
+def test_banco_ganchos_guarda_sin_repetir_y_varia_tipos(monkeypatch):
+    from src.editor_auto.services import banco_ganchos as B
+    r = _Redis()
+    monkeypatch.setattr(B, "_redis", lambda: r)
+    assert B.guardar({"gancho_texto": "ESTO NO LO SABÍAS", "gancho_tipo": "sorpresa"}, "a.mp4")
+    assert not B.guardar({"gancho_texto": "esto no lo sabías", "gancho_tipo": "sorpresa"})
+    assert not B.guardar({"gancho_texto": "", "gancho_tipo": "dato"})
+    assert not B.guardar({"gancho_texto": "X", "gancho_tipo": "ninguno"})
+    B.guardar({"gancho_texto": "OTRA SORPRESA", "gancho_tipo": "sorpresa"})
+    B.guardar({"gancho_texto": "80 KM", "gancho_tipo": "dato"})
+    tipos = [g["tipo"] for g in B.ejemplos(2)]
+    assert sorted(tipos) == ["dato", "sorpresa"]

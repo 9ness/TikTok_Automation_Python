@@ -312,6 +312,14 @@ def _plan(words: list[dict], dur: float, eventos: list[dict], cfg: dict,
     }
     if isinstance(cfg.get("ritmo_ref"), dict):
         payload["estilo_cliente"]["referencia"] = cfg["ritmo_ref"]
+    elif cfg.get("gancho"):
+        # Sin referencia: ganchos reales de virales (base que se llena con cada
+        # referencia leída) como inspiración, para no inventar uno genérico.
+        from src.editor_auto.services.banco_ganchos import ejemplos
+        ej = [f"«{g['texto']}» ({g.get('tipo') or '?'})" for g in ejemplos(8)]
+        if ej:
+            payload["estilo_cliente"]["notas"] += (
+                " Ganchos de virales que funcionan (copia su forma, no sus datos): " + "; ".join(ej) + ".")
     try:
         res = analyze_transcript_json(
             system_prompt=_PROMPT.read_text(encoding="utf-8"), user_payload=payload)
@@ -339,10 +347,14 @@ def _nota_referencia(cfg: dict, dur: float) -> str:
     partes = [f" COPIA EL RITMO DEL VÍDEO DE REFERENCIA (campo `referencia`): unos {n_z} zooms en este vídeo, de nivel ~{r.get('zoom_nivel')}"
               f"{', alguno con temblor' if r.get('temblor') else ', sin temblor'}; "
               f"unos {_max_rotulos(dur, cfg)} rótulos."]
-    if r.get("gancho_texto") or r.get("gancho_tipo"):
-        partes.append(f" Gancho del mismo tipo ({r.get('gancho_tipo') or '?'}) que «{r.get('gancho_texto')}»"
-                      f"{' con dato aparte' if r.get('gancho_dato') else ''}, ADAPTADO a lo que dice "
-                      "este vídeo, sin inventar datos.")
+    if r.get("gancho_tipo") == "ninguno":
+        partes.append(" La referencia NO lleva gancho de texto: no pongas gancho.")
+    elif r.get("gancho_texto"):
+        # Replicar un viral = su gancho TAL CUAL (12/11, Néstor): solo se cambia la
+        # palabra que nombra otro producto o una cifra que este vídeo no diga.
+        partes.append(f" GANCHO: copia LITERAL el de la referencia, «{r.get('gancho_texto')}»"
+                      f"{' (dato aparte: «' + str(r.get('gancho_dato')) + '»)' if r.get('gancho_dato') else ''}"
+                      "; cambia SOLO la palabra que nombre otro producto o una cifra que este vídeo no diga.")
     if r.get("notas"):
         partes.append(" Así edita la referencia: " + str(r["notas"])[:400])
     return "".join(partes)
@@ -411,7 +423,8 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
         return a, min(b, a + mx)
 
     g = plan.get("gancho") or {}
-    gancho = {"texto": _clean_text(g.get("texto"), 44, entera=True) if cfg.get("gancho") else "",
+    largo = 70 if (cfg.get("ritmo_ref") or {}).get("gancho_texto") else 44  # el literal puede ser largo
+    gancho = {"texto": _clean_text(g.get("texto"), largo, entera=True) if cfg.get("gancho") else "",
               "dato": _clean_text(g.get("dato"), 12, entera=True) if cfg.get("gancho") else "",
               "clip": None,
               "foto": str(g.get("foto") or "").strip()[:80]
@@ -750,11 +763,15 @@ def _render(src: str, dst: str, plan: dict, info: dict, cfg: dict, tmp: Path,
     # (png, t0, t1, y) en tiempos de SALIDA
     ovl: list[tuple[str, float, float, int]] = []
     sfx_at: list[tuple[str, float]] = []
-    gl = clip["t1"] - clip["t0"] if clip else 2.0
+    ref = cfg.get("ritmo_ref") if isinstance(cfg.get("ritmo_ref"), dict) else {}
+    # Con referencia: cuánto dura y a qué altura va su gancho (dentro de la zona segura).
+    gl = clip["t1"] - clip["t0"] if clip else max(1.5, min(5.0, _num(ref.get("gancho_dur")) or 2.0))
     gancho_ocupa: list[tuple[int, int]] = []
     if g.get("texto"):
         p = _pill(g["texto"], col["alerta"], int(82 * k), int(W * 0.9), cfg, str(tmp / "g0.png"), -3)
-        y = y_para(p, int(H * 0.135))
+        yc = _num(ref.get("gancho_y_pct")) / 100
+        pref = int(H * yc) - _alto_png(p) // 2 if yc else int(H * 0.135)
+        y = y_para(p, pref)
         ovl.append((p, 0.0, gl, y))
         gancho_ocupa.append((y, y + _alto_png(p)))
     if g.get("foto"):  # la persona/marca que nombra el gancho: lo que más engancha

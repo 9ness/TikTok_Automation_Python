@@ -7,7 +7,7 @@ Medido con ffmpeg (sin IA): {cortes} cortes de plano, {cortes_min} cortes por mi
 Fíjate en:
 - Zooms: entre fotogramas seguidos del MISMO plano, el sujeto se ve de golpe más grande (acercamiento) y luego vuelve. Cuenta cuántos hay en todo el vídeo y lo fuerte que son (1.05 apenas se nota, 1.15 claro, 1.25 muy fuerte). Un cambio de plano NO es un zoom.
 - Rótulos: textos sobreimpresos que NO son los subtítulos de la voz (palabras sueltas, cifras, píldoras de color). Cuenta cuántos distintos salen en todo el vídeo.
-- Gancho: qué pasa en los primeros segundos. Copia el texto grande que se lee (si lo hay) y di de qué tipo es.
+- Gancho: qué pasa en los primeros segundos. Copia el texto grande que se lee (si lo hay) LETRA A LETRA, y di de qué tipo es, a qué altura está y cuánto dura en pantalla.
 
 Responde SOLO con JSON:
 {"zooms": 0, "zoom_nivel": 1.12, "zoom_pct": 0.3, "temblor": false,
@@ -15,8 +15,10 @@ Responde SOLO con JSON:
  "gancho_texto": "texto tal cual o vacío",
  "gancho_tipo": "pregunta|problema|promesa|dato|resultado|sorpresa|ninguno",
  "gancho_dato": "cifra grande aparte o vacío",
+ "gancho_y_pct": 15, "gancho_dur": 2.5,
  "gancho_clip": false,
  "notas": "1-2 frases con lo que define el ritmo de esta edición (velocidad, cuándo pone zoom, cómo entra el texto)"}
 - `zoom_pct`: fracción del vídeo (0-1) que está con zoom.
 - `temblor`: si algún zoom va con sacudida.
+- `gancho_y_pct`: altura del CENTRO del texto del gancho, en % desde arriba (0-100). `gancho_dur`: segundos que se ve.
 - `gancho_clip`: true si el vídeo empieza con un momento llamativo sacado de más adelante (el resultado, el producto funcionando) antes de la explicación.

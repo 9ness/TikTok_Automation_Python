@@ -292,6 +292,9 @@ al editor y devuelve su `job_id`; luego, los pasos 1-3 de arriba.
   **Vídeo de referencia** (para copiar cortes, gancho, zooms y rótulos de un viral):
   UNO de `referencia_url` (TikTok), `referencia_ruta_bandeja` o `referencia_archivo_id`.
   Se mezcla en `config_vip` (lo tuyo gana); la respuesta trae `referencia` con lo sacado.
+  El GANCHO del viral se copia LITERAL (mismo texto, altura y duración; solo cambia la palabra
+  del producto) y, si el viral no lleva gancho de texto, no se pone. Cada referencia leída
+  alimenta la base de ganchos (`editor_auto:vip:ganchos`) que usa el VIP sin referencia.
 - `quitar_marca`: `auto` (quita la estrella de Omni con el zoom de AI Pro), `omni`, `veo` o `no`;
   la respuesta trae `marca_quitada`. **Con clips de Omni pasa `omni`**: `auto` no ve la estrella
   sobre fondos con textura (adoquines, césped).

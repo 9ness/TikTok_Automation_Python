@@ -143,6 +143,8 @@ def ritmo_desde_json(d: dict, dur: float, cortes: list[float]) -> dict:
         "gancho_tipo": tipo if tipo in _TIPOS_GANCHO else "",
         "gancho_dato": str(d.get("gancho_dato") or "").strip()[:20],
         "gancho_clip": bool(d.get("gancho_clip")),
+        "gancho_y_pct": round(_num(d.get("gancho_y_pct"), 0, 100, 0), 1) or None,
+        "gancho_dur": round(_num(d.get("gancho_dur"), 0, 8, 0), 1) or None,
         "notas": str(d.get("notas") or "").strip()[:400],
     }
 
@@ -171,7 +173,11 @@ def analizar(video: str, log=lambda _m: None) -> dict:
     except Exception as e:  # noqa: BLE001
         log(f"[vip] ⚠️ Estilo de la referencia no leído ({str(e)[:200]}).")
     try:
-        cfg.update(config_desde_ritmo(ritmo_desde_video(video)))  # el ritmo manda en densidad/zooms
+        ritmo = ritmo_desde_video(video)
+        cfg.update(config_desde_ritmo(ritmo))  # el ritmo manda en densidad/zooms
+        from .banco_ganchos import guardar
+        if guardar(ritmo, Path(video).name):
+            log(f"[vip] 🪝 Gancho guardado en la base: «{ritmo.get('gancho_texto')}».")
     except Exception as e:  # noqa: BLE001
         log(f"[vip] ⚠️ Ritmo de la referencia no leído ({str(e)[:200]}).")
     return cfg
