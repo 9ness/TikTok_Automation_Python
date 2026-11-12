@@ -22,6 +22,7 @@ const MODOS: { clave: ModoReplicaVideo; label: string; hint: string }[] = [
   { clave: "con_ia", label: "🤖 Con IA (Omni)", hint: "Clips de 10 s en Omni (GenAI Pro) con la foto del producto como ingrediente." },
   { clave: "genjutsu", label: "🌀 Con IA (Genjutsu)", hint: "El viral entero rehecho con Genjutsu de Higgsfield, cambiando su producto por el nuestro." },
   { clave: "sin_ia", label: "🎥 Sin IA (real)", hint: "Vídeo grabado o montaje sin IA del viral con nuestro producto." },
+  { clave: "editor_vip", label: "👑 Editor VIP", hint: "Editado con el estilo VIP del Editor Auto (sale dorado en Mis tandas)." },
 ];
 
 const INPUT = "w-full min-w-0 rounded-lg border border-border/60 bg-background px-3 py-2 text-xs";

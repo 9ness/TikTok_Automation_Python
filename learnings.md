@@ -1555,3 +1555,4 @@
 - 2026-11-12 · Omni 10 s: descarga con prefijo parcial = copia de otro clip; clip 2 deriva a otra mujer si la escena cambia → baja1 exige match completo y clip 2 con f1+ficha+peinado explícito (precio real 0,45 cr/clip)
 - 2026-11-12 · POV BOF Largo: preparar_carpeta(estilo_guion=X) cambia el modo de guion de TODO el catálogo y oculta (montado/guion) lo hecho en otro modo → un único modo por tanda; prep sin estilo + productos='N' solo fija clip_s (y reescribe el guion IA de N: volver a guardar_guion).
 - 2026-11-12 · carruseles Ütopya fallaban: nombre_enlace no quitaba la tienda si el título traía «ÜTOPYA» (tilde) → comparar tienda y título sin tildes (los «–|» ya se filtraban)
+- 2026-11-12 · La web pública sale del tiktok-web de vps-webs: tras un deploy con cambios de frontend hay que pasar la imagen con ~/rutinas/publicar-web.nuevo (su chequeo de /login da 404 aunque esté bien: mira / ).

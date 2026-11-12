@@ -69,6 +69,8 @@ export const MODOS_RV: Record<string, string> = {
   con_ia: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300",
   genjutsu: "bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300",
   sin_ia: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  // Dorado con borde: que el VIP se distinga del ámbar de «Sin IA».
+  editor_vip: "bg-yellow-400/25 text-yellow-800 ring-1 ring-yellow-500/60 dark:text-yellow-300",
 };
 
 const NEUTRO = "bg-muted text-muted-foreground";

@@ -138,6 +138,7 @@ def test_formato_de_clasifica():
     assert marcas.formato_de("largo", "viral") == "viral"
     assert marcas.formato_de("rv", "con_ia") == "viral"
     assert marcas.formato_de("rv", "sin_ia") == "fisico"
+    assert marcas.formato_de("rv", "editor_vip") == "fisico"
     assert marcas.formato_de("rv", "") is None
 
 

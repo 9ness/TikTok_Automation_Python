@@ -27,13 +27,14 @@ No es `replicar_viral` (guía [`replicar-viral.md`](replicar-viral.md)): esa
 herramienta solo escribe el guion de voz y los prompts de dos clips mudos, y el
 vídeo se monta en el POV BOF Largo. Si el encargo encaja ahí, hazlo ahí.
 
-Hay tres modos (`modo`):
+Hay cuatro modos (`modo`):
 
 | Modo | Qué es |
 |---|---|
 | `con_ia` | Clips generados con **Omni** (GenAI Pro · Omni 1.1, 10 s), con la foto del producto como ingrediente |
 | `genjutsu` | El viral entero rehecho con **Genjutsu de Higgsfield** (se cambia su producto por el nuestro). Sale con su color propio en Mis tandas |
 | `sin_ia` | Vídeo **real** (grabado) o montaje sin IA del viral con nuestro producto |
+| `editor_vip` | Editado con el estilo **VIP del Editor Auto** (§3b). Sale **dorado** («👑 Editor VIP») en Mis tandas y cuenta como Físico |
 
 Antes de empezar, confirma con el operador lo de siempre: que el viral sigue
 con carrito naranja, **qué producto nuestro** va (mismo estilo que el del
@@ -275,12 +276,16 @@ falta producto y enlace):
 
 1. `ediciones_editor()` lista los tuyos (admin: `usuario=`), con `estado`, `listo` y `descargar`.
 2. Revisa el MP4 como cualquier vídeo (2 fps, producto idéntico, subtítulos, nombre quemado).
-3. `registrar_replica_video(modo="sin_ia", edicion=<job_id>, titulo=…, product_id=…)`
-   (con `para=` si es de otro usuario) → sale en `mis_tandas` como `rv|<id>` → `semaforo_tanda`.
+3. `registrar_replica_video(edicion=<job_id>, titulo=…, product_id=…)`
+   (con `para=` si es de otro usuario) → sale en `mis_tandas` como `rv|<id>`, modo
+   `editor_vip` (dorado) → `semaforo_tanda`. Si la edición NO fue VIP, pasa `modo=` (p. ej. `sin_ia`).
 
 **Mandarlo tú (agente):** `editar_en_editor(ruta_bandeja=…, estilo=…)` sube UN vídeo
 al editor y devuelve su `job_id`; luego, los pasos 1-3 de arriba.
 - `estilo="vip"` (por defecto): solo rótulos VIP; `config_vip={...}` cambia su config.
+  **Vídeo de referencia** (para copiar cortes, gancho, zooms y rótulos de un viral):
+  UNO de `referencia_url` (TikTok), `referencia_ruta_bandeja` o `referencia_archivo_id`.
+  Se mezcla en `config_vip` (lo tuyo gana); la respuesta trae `referencia` con lo sacado.
 - `estilo="normal"`: el estilo de la web de la cuenta del editor (cortes, subtítulos, flecha).
 - `estilo="pasos"`: tu flujo, `pasos=[{"tool_id": "subs_auto", "config": {...}}, …]`
   (herramientas del editor; `silence_cutter_scripted` no vale).

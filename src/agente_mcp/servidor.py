@@ -1000,7 +1000,7 @@ def _enlaces_replica_video(u: str, r: dict) -> dict:
 
 @_herramienta(structured_output=False)
 async def registrar_replica_video(
-    ctx: Context, modo: str, titulo: str = "", ruta_bandeja: str = "", archivo_id: str = "",
+    ctx: Context, modo: str = "", titulo: str = "", ruta_bandeja: str = "", archivo_id: str = "",
     url: str = "", url_viral: str = "", product_id: str = "", product_url: str = "",
     tienda: str = "", caption: str = "", hashtags: list[str] | None = None,
     prompts: list[str] | None = None, notas: str = "", replica_id: str = "", para: str = "",
@@ -1009,7 +1009,9 @@ async def registrar_replica_video(
     """Registra el MP4 YA MONTADO de un viral replicado («Replicar virales»):
     sale solo en `mis_tandas` (id `rv|<id>`) con descargar, subido, sin stock,
     rehacer, semáforo y época. `modo`: `con_ia` (clips de Omni/GenAI Pro), `genjutsu`
-    (el viral rehecho con Genjutsu de Higgsfield) o `sin_ia` (vídeo real o montaje sin IA). UNA fuente del vídeo:
+    (el viral rehecho con Genjutsu de Higgsfield), `sin_ia` (vídeo real o montaje sin IA) o
+    `editor_vip` (editado con el estilo VIP del Editor Auto: sale DORADO en Mis tandas y
+    cuenta como Físico; con `edicion` y sin `modo` es el que se usa). UNA fuente del vídeo:
     `ruta_bandeja` (relativa a tu bandeja `Nebulabs/TikTok/TikTok Shop/_agente/<usuario>/`,
     lo recomendable: no se sube nada), `archivo_id` (subido a /subir), `url` o
     `edicion` (el `job_id` de un vídeo del Editor Auto que sale en `ediciones_editor`).
@@ -1026,6 +1028,10 @@ async def registrar_replica_video(
     Antes: el MP4 cumple la guía (`guia("replicar-virales")`): encuadre
     anti-marca, rótulo con gancho + nombre del producto, metadatos limpios."""
     u = _usuario(ctx)
+    if not modo and not replica_id:
+        if not edicion:
+            raise ErrorApp("Falta `modo`: con_ia | genjutsu | sin_ia | editor_vip.")
+        modo = "editor_vip"
     campos = {"modo": modo, "titulo": titulo, "url_viral": url_viral, "product_id": product_id,
               "product_url": product_url, "tienda": tienda, "caption": caption, "notas": notas,
               "replica_id": replica_id, "para": para,
@@ -1062,8 +1068,9 @@ async def ediciones_editor(ctx: Context, usuario: str = "", limite: int = 30) ->
     PARA tu usuario de la fábrica (o para `usuario`, solo admin): nombre del
     original, día, `estado` (pending/running/completed/failed), `listo` y
     `descargar` del MP4 editado. Para llevarlo a Mis tandas: revísalo y
-    `registrar_replica_video(modo="sin_ia", edicion=<job_id>, titulo=…,
-    product_id=…)` (con `para` si es de otro usuario). Ver
+    `registrar_replica_video(edicion=<job_id>, titulo=…,
+    product_id=…)` (sale como `editor_vip`, dorado; pasa `modo` si no fue VIP;
+    con `para` si es de otro usuario). Ver
     `guia("replicar-virales")` › «Vídeos del Editor Auto»."""
     from urllib.parse import quote
 
@@ -1083,7 +1090,8 @@ async def ediciones_editor(ctx: Context, usuario: str = "", limite: int = 30) ->
 async def editar_en_editor(
     ctx: Context, ruta_bandeja: str = "", archivo_id: str = "", url: str = "", para: str = "",
     estilo: str = "vip", pasos: list[dict] | None = None, config_vip: dict | None = None,
-    dia: str = "",
+    dia: str = "", referencia_url: str = "", referencia_ruta_bandeja: str = "",
+    referencia_archivo_id: str = "",
 ) -> str:
     """Manda UN vídeo a editar al Editor Auto (lo edita la cuenta de agentes del
     editor). UNA fuente: `ruta_bandeja` (relativa a tu bandeja, lo recomendable),
@@ -1092,18 +1100,39 @@ async def editar_en_editor(
     flecha) o `pasos` (tu lista `[{tool_id, config}]`). Whisper siempre en small.
     `para` = usuario de la fábrica (otro solo si eres admin); `dia` YYYY-MM-DD
     (hoy por defecto). Devuelve `job_id`: recógelo con `ediciones_editor` y,
-    revisado, a Mis tandas con `registrar_replica_video(edicion=job_id, …)`."""
+    revisado, a Mis tandas con `registrar_replica_video(edicion=job_id, …)`
+    (sale como «👑 Editor VIP», dorado).
+    VÍDEO DE REFERENCIA (solo `estilo="vip"`): UNO de `referencia_url` (un
+    TikTok; lo baja el editor), `referencia_ruta_bandeja` o
+    `referencia_archivo_id`. El editor copia de él cortes, gancho, zooms y
+    rótulos y lo mezcla en `config_vip` (lo que pases en `config_vip` gana). La
+    respuesta trae `referencia` con la config sacada."""
     u = _usuario(ctx)
+    refs = [x for x in (referencia_url, referencia_ruta_bandeja, referencia_archivo_id) if x]
+    if len(refs) > 1:
+        raise ErrorApp("Pasa UNA referencia: `referencia_url`, `referencia_ruta_bandeja` o `referencia_archivo_id`.")
+    if refs and (estilo or "vip").strip().lower() != "vip":
+        raise ErrorApp("El vídeo de referencia solo vale con estilo «vip».")
     datos = {"para": para or u, "estilo": estilo or "vip", "dia": dia,
              "pasos": json.dumps(pasos, ensure_ascii=False) if pasos else "",
              "config_vip": json.dumps(config_vip, ensure_ascii=False) if config_vip else ""}
+    if referencia_url:
+        datos["referencia_url"] = referencia_url
+    if referencia_ruta_bandeja:
+        datos["referencia_ruta_bandeja"] = referencia_ruta_bandeja
+    otros = None
+    if referencia_archivo_id:
+        ref, nombre_ref = await archivos.leer_origen(u, archivo_id=referencia_archivo_id)
+        if not archivos.es_video(nombre_ref, ref):
+            raise ErrorApp("La referencia no es un vídeo.")
+        otros = {"referencia": (nombre_ref or "referencia.mp4", ref, "video/mp4")}
     ruta = "/api/v1/editor-auto/ediciones-fabrica/enviar"
     if ruta_bandeja and not (archivo_id or url):
-        r = await Interno(u).post_form(ruta, {**datos, "ruta_bandeja": ruta_bandeja}, None)
+        r = await Interno(u).post_form(ruta, {**datos, "ruta_bandeja": ruta_bandeja}, None, otros)
     else:
         contenido, nombre = await archivos.leer_origen(u, url=url, archivo_id=archivo_id,
                                                        ruta_bandeja=ruta_bandeja)
-        r = await Interno(u).post_form(ruta, datos, (nombre or "video.mp4", contenido, "video/mp4"))
+        r = await Interno(u).post_form(ruta, datos, (nombre or "video.mp4", contenido, "video/mp4"), otros)
     return _json(r)
 
 
@@ -1132,7 +1161,7 @@ async def listar_replicas_video(ctx: Context, modo: str = "", id: str = "") -> s
     para `semaforo_tanda`/`marcar_tanda`/`epoca_video`) y `descargar`. Las
     variantes sin créditos traen `variante` (de qué original) y todas `espera`
     (por qué hoy no se puede subir; vacío = se puede).
-    `modo`: con_ia | genjutsu | sin_ia. Con `id`: esa réplica entera, con sus `prompts`."""
+    `modo`: con_ia | genjutsu | sin_ia | editor_vip. Con `id`: esa réplica entera, con sus `prompts`."""
     u = _usuario(ctx)
     api = Interno(u)
     if id:

@@ -48,6 +48,8 @@ MODOS: dict[str, str] = {
     "con_ia": "🤖 Con IA (Omni)",
     "genjutsu": "🌀 Con IA (Genjutsu)",
     "sin_ia": "🎥 Sin IA (real)",
+    # Editado con el estilo VIP del Editor Auto (`editar_en_editor` → `edicion`).
+    "editor_vip": "👑 Editor VIP",
 }
 EXT_VIDEO = (".mp4", ".mov", ".m4v")
 MAX_INDICE = 2000

@@ -30,7 +30,7 @@ Contadores por FORMATO (siempre, esté o no activo `contenido`):
 
 `formato_de(nicho, modo)` clasifica un vídeo de Mis tandas: pov/mm/alea y largo
 (salvo estilo «viral») = `ia`; largo «viral» y rv `con_ia`/`genjutsu` = `viral`; rv
-`sin_ia` = `fisico`. La tarjeta enseña «IA 0/5 · Viral 0/1 · Físico 0/2».
+`sin_ia`/`editor_vip` = `fisico`. La tarjeta enseña «IA 0/5 · Viral 0/1 · Físico 0/2».
 También son ids (idempotente), y `registrar_subido(formato=...)` los apunta
 en la misma escritura que `contenido`.
 
@@ -66,7 +66,7 @@ def formato_de(nicho: str, modo: str = "") -> str | None:
     if nicho == "rv":
         if modo in ("con_ia", "genjutsu"):
             return "viral"
-        if modo == "sin_ia":
+        if modo in ("sin_ia", "editor_vip"):
             return "fisico"
     return None
 

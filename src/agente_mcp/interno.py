@@ -113,9 +113,12 @@ class Interno:
 
     async def post_form(
         self, ruta: str, datos: dict[str, Any], fichero: tuple[str, bytes, str] | None,
+        otros: dict[str, tuple[str, bytes, str]] | None = None,
     ) -> Any:
-        """POST de formulario; `fichero` va como campo `file` (None = sin fichero)."""
+        """POST de formulario; `fichero` va como campo `file` (None = sin fichero)
+        y `otros` son más ficheros con su nombre de campo (p. ej. `referencia`)."""
         form = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in datos.items()}
-        kw: dict[str, Any] = {"files": {"file": fichero}} if fichero is not None else {}
+        ficheros = {**({"file": fichero} if fichero is not None else {}), **(otros or {})}
+        kw: dict[str, Any] = {"files": ficheros} if ficheros else {}
         r = await self._pedir("POST", ruta, data=form, **kw)
         return r.json() if r.content else {}
