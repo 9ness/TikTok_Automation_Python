@@ -55,6 +55,10 @@ export interface VideoTanda {
   tareas?: string[];
   /** Su tienda o producto inyecta GMV Max: se sube primero en el Black Friday. */
   gmv_max?: boolean;
+  /** Su producto es de «Muestras gratuitas» (pide vídeo). */
+  muestra_gratis?: boolean;
+  /** Su producto tiene un reembolso en curso. */
+  reembolsable?: boolean;
   /** Hashtags de campaña (Black Friday de la agencia) que se añaden al caption. */
   hashtags_campana?: string[];
 }
@@ -104,6 +108,8 @@ export interface Tanda {
   sin_revisar?: number;
   /** Pendientes de subir marcados GMV Max. */
   gmv_max?: number;
+  muestra_gratis?: number;
+  reembolsable?: number;
   items: VideoTanda[];
 }
 

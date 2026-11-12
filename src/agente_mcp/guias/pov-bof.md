@@ -121,6 +121,9 @@ Un producto de «Muestras productos», «Tareas Productos», «Productos físico
   Largo) descuenta uno; al llegar a 0 sale «✅ contenido hecho» y pierde la
   prioridad. Desmarcar el subido lo devuelve.
 - **🎄 Q4** (`q4`): funciona ahora en Q4 (desempata el resto).
+- **🎁 Muestra gratis** (`muestra_gratis=True`): el producto está en «Muestras
+  gratuitas» del móvil y la tienda pide vídeo a cambio. Solo es una marca: en
+  Mis tandas sus vídeos salen con 🎁 y el chip «Muestra gratis» los filtra.
 - **📁 Clips reales** (`clips_reales`): la carpeta del Drive con las tomas
   grabadas de ese producto (ruta del mount o enlace). Antes de montar un vídeo
   real, mira ahí.
@@ -134,7 +137,7 @@ Si el operador te da la ficha de TikTok Shop de un producto, guárdala con
 `poner_url_producto(carpeta, producto, url, catalogo=...)` (no gasta EchoTik).
 Se marcan al darlo de alta en «Subir productos», en la fila «🏷️ Marcas» de la
 tarjeta (POV BOF y Largo) o con `marcar_producto(carpeta, producto,
-catalogo=..., fisico=, contenido_videos=, q4=, clips_reales=)`.
+catalogo=..., fisico=, contenido_videos=, q4=, muestra_gratis=, clips_reales=)`.
 
 **Qué hacer primero:** `prioridades(catalogo="", solo_fisicos=False,
 incluir_resto=False)` (y la caja «🎯 Prioridades» de «Subir productos»):

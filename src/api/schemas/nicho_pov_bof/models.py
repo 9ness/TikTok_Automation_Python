@@ -206,6 +206,8 @@ class MarcasInfo(BaseModel):
     # Físico porque está en «Productos físicos» (no se puede desmarcar).
     fisico_por_catalogo: bool = False
     q4: bool = False
+    # Producto de «Muestras gratuitas» que pide vídeo (filtro en Mis tandas).
+    muestra_gratis: bool = False
     # Carpeta del Drive con las tomas reales de ese producto.
     clips_reales: str = ""
     contenido: ContenidoInfo | None = None
@@ -708,6 +710,7 @@ class MarcarProductoRequest(BaseModel):
     producto: str
     fisico: bool | None = None
     q4: bool | None = None
+    muestra_gratis: bool | None = None
     clips_reales: str | None = None
     contenido: bool | None = None
     contenido_videos: int | None = Field(default=None, ge=1, le=20)

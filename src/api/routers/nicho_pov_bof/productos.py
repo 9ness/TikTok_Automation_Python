@@ -3165,7 +3165,7 @@ def marcar_producto(
     try:
         return MarcasItem(**marcas.marcar(
             body.folder, body.producto, source=body.source,
-            fisico=body.fisico, q4=body.q4, clips_reales=body.clips_reales,
+            fisico=body.fisico, q4=body.q4, muestra_gratis=body.muestra_gratis, clips_reales=body.clips_reales,
             contenido=body.contenido, contenido_videos=body.contenido_videos,
             contenido_notas=body.contenido_notas,
             objetivo_ia=body.objetivo_ia, objetivo_viral=body.objetivo_viral,

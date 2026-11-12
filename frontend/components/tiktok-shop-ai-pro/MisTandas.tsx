@@ -222,14 +222,20 @@ export function MisTandas() {
   const [filtro, setFiltro] = useState("");
   // Black Friday: solo lo de productos/tiendas que inyectan GMV Max.
   const [soloGmv, setSoloGmv] = useState(false);
+  const [soloMuestra, setSoloMuestra] = useState(false);
+  const [soloReembolso, setSoloReembolso] = useState(false);
 
   const datos = tandas.data;
   const tareasActivas = datos?.tareas_activas ?? [];
   const filtroReal = filtro === SIN_TAREA || tareasActivas.some((x) => x.id === filtro) ? filtro : "";
-  const hayFiltro = !!filtroReal || soloGmv;
+  const hayFiltro = !!filtroReal || soloGmv || soloMuestra || soloReembolso;
   const totalGmv = (datos?.tandas ?? []).reduce((n, t) => n + (t.gmv_max ?? 0), 0);
+  const totalMuestra = (datos?.tandas ?? []).reduce((n, t) => n + (t.muestra_gratis ?? 0), 0);
+  const totalReembolso = (datos?.tandas ?? []).reduce((n, t) => n + (t.reembolsable ?? 0), 0);
   const pasa = (v: VideoTanda) =>
     (!soloGmv || !!v.gmv_max) &&
+    (!soloMuestra || !!v.muestra_gratis) &&
+    (!soloReembolso || !!v.reembolsable) &&
     (!filtroReal || (filtroReal === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(filtroReal)));
   // Vídeos por subir (sin «Subido» y con stock) de las tandas abiertas, según la tarea elegida.
   const porSubir = (id: string) =>
@@ -360,6 +366,30 @@ export function MisTandas() {
           }`}
         >
           🚀 GMV Max · {totalGmv} por subir
+        </button>
+        <button
+          type="button"
+          onClick={() => setSoloMuestra((x) => !x)}
+          title="Solo los vídeos de productos de «Muestras gratuitas» (la tienda pide vídeo a cambio)"
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${
+            soloMuestra
+              ? "border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+              : "border-border/60 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          🎁 Muestra gratis {totalMuestra}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSoloReembolso((x) => !x)}
+          title="Solo los vídeos de productos con una muestra reembolsable en curso"
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${
+            soloReembolso
+              ? "border-sky-500 bg-sky-500/20 text-sky-600 dark:text-sky-400"
+              : "border-border/60 text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          💶 Reembolsable {totalReembolso}
         </button>
       </div>
 
@@ -736,6 +766,22 @@ export function MisTandas() {
                               ))}
                               <SelectorEpoca v={v} />
                               <BotonGmvMax v={v} />
+                              {v.muestra_gratis ? (
+                                <span
+                                  title="Producto de Muestras gratuitas"
+                                  className="rounded bg-emerald-500/15 px-1.5 py-px text-[9px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                >
+                                  🎁 Muestra
+                                </span>
+                              ) : null}
+                              {v.reembolsable ? (
+                                <span
+                                  title="Muestra reembolsable en curso"
+                                  className="rounded bg-sky-500/15 px-1.5 py-px text-[9px] font-semibold text-sky-600 dark:text-sky-400"
+                                >
+                                  💶 Reembolsable
+                                </span>
+                              ) : null}
                               {v.desde ? (
                                 <span
                                   title="Su carpeta no se publica antes de este día"

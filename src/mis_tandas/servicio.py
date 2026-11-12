@@ -733,8 +733,11 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
         v["tareas"] = tareas_de.get(v["id"], [])
         v["gmv_max"] = gmv_max.es_gmv_max(v, marcas_gmv)
         v["hashtags_campana"] = campana_bf.hashtags(usuario, v)
+    _marcas_catalogo(usuario, [v for t in salida for v in t.get("items", [])])
     for t in salida:
         t["gmv_max"] = sum(1 for v in t.get("items", []) if v["gmv_max"] and not v["uploaded"])
+        t["muestra_gratis"] = sum(1 for v in t.get("items", []) if v["muestra_gratis"] and not v["uploaded"])
+        t["reembolsable"] = sum(1 for v in t.get("items", []) if v["reembolsable"] and not v["uploaded"])
     for t in salida:
         for v in t.get("items", []):
             v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
@@ -810,6 +813,40 @@ def _partes(id_: str) -> list[str]:
     if p[0] == "rv" and len(p) == 2:
         return p
     raise ErrorTanda(f"Vídeo desconocido: {id_!r}")
+
+
+def _marcas_catalogo(usuario: str, videos: list[dict]) -> None:
+    """Pone `reembolsable` (reembolso en curso) y `muestra_gratis` en cada vídeo
+    según las marcas de SU producto del catálogo. Una lectura por carpeta."""
+    try:
+        from src.nicho_pov_bof.repos import product_repo
+        from src.nicho_pov_bof.services import marcas, reembolsables
+    except Exception:  # noqa: BLE001
+        for v in videos:
+            v["reembolsable"] = v["muestra_gratis"] = False
+        return
+    refs: dict[int, tuple[str, str, str]] = {}
+    for i, v in enumerate(videos):
+        if v.get("nicho") == "rv":
+            ref = _ref_rv(usuario, str(v["id"]).split(fuentes.SEP)[-1])
+            if ref:
+                refs[i] = ref[:3]
+        elif v.get("source") in marcas.FUENTES_MARCAS and v.get("carpeta") and v.get("producto"):
+            refs[i] = (str(v["source"]), str(v["carpeta"]), str(v["producto"]))
+    carpetas = sorted({(s, c) for s, c, _ in refs.values() if s in marcas.FUENTES_MARCAS})
+    try:
+        docs = dict(zip(carpetas, product_repo.load_folders(carpetas)))
+    except Exception:  # noqa: BLE001
+        docs = {}
+    for i, v in enumerate(videos):
+        v["reembolsable"] = v["muestra_gratis"] = False
+        if i not in refs:
+            continue
+        s, c, pr = refs[i]
+        prod = ((docs.get((s, c)) or {}).get("productos") or {}).get(pr) or {}
+        r = reembolsables.info(prod.get("reembolso"))
+        v["reembolsable"] = bool(r and r.get("estado") == "en_curso")
+        v["muestra_gratis"] = bool(prod.get("muestra_gratis"))
 
 
 def _cuota(ref: str, usuario: str, subido: bool) -> None:

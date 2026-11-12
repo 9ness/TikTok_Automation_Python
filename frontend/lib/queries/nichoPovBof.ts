@@ -1398,6 +1398,7 @@ export interface MarcarProductoReq {
   producto: string;
   fisico?: boolean;
   q4?: boolean;
+  muestra_gratis?: boolean;
   clips_reales?: string;
   /** false lo quita; contenido_videos lo activa. */
   contenido?: boolean;

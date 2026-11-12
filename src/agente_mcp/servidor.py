@@ -1540,6 +1540,7 @@ async def marcar_producto(ctx: Context, carpeta: str, producto: str,
                           contenido_videos: int | None = None,
                           contenido: bool | None = None,
                           q4: bool | None = None,
+                          muestra_gratis: bool | None = None,
                           clips_reales: str | None = None,
                           contenido_notas: str | None = None,
                           objetivo_ia: int | None = None,
@@ -1552,14 +1553,15 @@ async def marcar_producto(ctx: Context, carpeta: str, producto: str,
     la tienda pide N vídeos (1 normalmente, 3 si lo piden) — cada vídeo de ese
     producto marcado como subido en Mis tandas descuenta uno y al llegar a cero
     pierde la prioridad; `contenido=False` lo quita; `q4=True` = funciona ahora
-    en Q4; `clips_reales` = carpeta del Drive con sus tomas reales (ruta del
+    en Q4; `muestra_gratis=True` = producto de «Muestras gratuitas» del móvil que
+    pide vídeo (Mis tandas lo filtra con 🎁; `False` lo quita); `clips_reales` = carpeta del Drive con sus tomas reales (ruta del
     mount o enlace). `objetivo_ia`/`objetivo_viral`/`objetivo_fisico` (0..20) =
     cuántos vídeos de cada formato se quieren subir (por defecto 5/1/0); la
     tarjeta cuenta los subidos «IA 0/5 · Viral 0/1 · Físico 0/2» (`marcas.formatos`).
     La muestra reembolsable va aparte (`marcar_reembolsable`)."""
     return _json(await Interno(_usuario(ctx)).post(f"{_POV}/marcas", {
         "source": catalogo, "folder": carpeta, "producto": producto, "fisico": fisico,
-        "contenido_videos": contenido_videos, "contenido": contenido, "q4": q4,
+        "contenido_videos": contenido_videos, "contenido": contenido, "q4": q4, "muestra_gratis": muestra_gratis,
         "clips_reales": clips_reales, "contenido_notas": contenido_notas,
         "objetivo_ia": objetivo_ia, "objetivo_viral": objetivo_viral,
         "objetivo_fisico": objetivo_fisico}))

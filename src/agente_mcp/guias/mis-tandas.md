@@ -248,6 +248,15 @@ también nuestros vídeos de afiliado, así que en el Black Friday **se suben pr
 - Marca solo lo que hayas VISTO inyectando (Social1 › anuncios de la tienda/producto). No cambia el
   semáforo: un GMV Max sin verde sigue sin poder subirse.
 
+## Muestra gratis y reembolsable (filtros)
+
+En `mis_tandas` cada vídeo trae `muestra_gratis` y `reembolsable` (bool, según su producto del
+catálogo) y cada tanda sus pendientes contados en `muestra_gratis` y `reembolsable`. La web tiene
+los chips «🎁 Muestra gratis» y «💶 Reembolsable» junto al de GMV Max (combinables).
+- `reembolsable` sale solo del reembolso en curso del producto (`marcar_reembolsable`).
+- `muestra_gratis` se pone con `marcar_producto(carpeta, producto, catalogo=..., muestra_gratis=True)`
+  (`False` lo quita): productos de «Muestras gratuitas» del móvil que piden vídeo.
+
 ## Replicar virales (id `rv|<id>`)
 
 Los MP4 de virales replicados y montados fuera de la app (con IA en Omni o sin

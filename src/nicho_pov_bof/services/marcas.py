@@ -124,6 +124,7 @@ def info(source: str, prod: dict | None) -> dict:
         "fisico": bool(prod.get("fisico")) or source in FUENTES_FISICAS,
         "fisico_por_catalogo": source in FUENTES_FISICAS,
         "q4": bool(prod.get("q4")),
+        "muestra_gratis": bool(prod.get("muestra_gratis")),
         "clips_reales": str(prod.get("clips_reales") or ""),
         "contenido": contenido_info(prod.get("contenido")),
         "formatos": formatos_info(prod),
@@ -164,6 +165,7 @@ def _item(source: str, folder: str, producto: str, prod: dict) -> dict:
 def marcar(
     folder: str, producto: str, *, source: str,
     fisico: bool | None = None, q4: bool | None = None,
+    muestra_gratis: bool | None = None,
     clips_reales: str | None = None,
     contenido: bool | None = None, contenido_videos=None, contenido_notas: str | None = None,
     objetivo_ia: int | None = None, objetivo_viral: int | None = None,
@@ -202,6 +204,8 @@ def marcar(
             campos["fisico"] = bool(fisico)
         if q4 is not None:
             campos["q4"] = bool(q4)
+        if muestra_gratis is not None:
+            campos["muestra_gratis"] = bool(muestra_gratis)
         if clips_reales is not None:
             campos["clips_reales"] = str(clips_reales).strip()[:500]
         if contenido is not None:
