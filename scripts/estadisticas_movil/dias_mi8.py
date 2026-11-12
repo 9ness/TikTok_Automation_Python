@@ -111,8 +111,16 @@ def a_datos():
         adb("shell", "am", "force-stop", PKG); time.sleep(1)
     adb("shell", "monkey", "-p", PKG, "1"); time.sleep(9)
     vigilar_puzle()
+    # 12/11: TikTok se reabre donde se quedó, a menudo DENTRO del centro de creadores (pestañas
+    # Inicio/Productos/Vídeos/Crecimiento): ahí (972, 2006) es «Crecimiento», no «Perfil». Se sale con su X.
+    for _ in range(3):
+        pal = palabras()
+        if not (hay("Crecimiento", pal) or hay("Personalizado", pal) or hay("beneficios", pal)):
+            break
+        tap(75, 160, 3)                                 # X / flecha atrás de arriba a la izquierda
     tap(972, 2006, 4)                                   # Perfil
-    p = next(((x, y) for x, y, t in volcado() if t == "TikTok Studio"), (228, 843))
+    swipe(600, 1800, ms=300, s=1); swipe(600, 1800, ms=300, s=2)   # perfil arriba del todo (si no, Studio no se ve)
+    p = next(((x, y) for x, y, t in volcado() if t == "TikTok Studio"), (228, 884))
     tap(*p, 7)
     p = None
     for i in range(4):
