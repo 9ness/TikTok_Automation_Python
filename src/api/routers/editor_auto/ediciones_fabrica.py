@@ -88,6 +88,47 @@ def _cuenta_agentes():
     return user
 
 
+def _copiar_subida(f: UploadFile, destino: Path) -> None:
+    tope, total = _MAX_MB * 1024 * 1024, 0
+    with open(destino, "wb") as out:
+        while trozo := f.file.read(1024 * 1024):
+            total += len(trozo)
+            if total > tope:
+                raise ValidationError(f"El vídeo pasa de {_MAX_MB} MB.")
+            out.write(trozo)
+
+
+def _guardar_referencia(carpeta: Path, web_user: str, fichero: UploadFile | None,
+                        url: str, ruta_bandeja: str) -> tuple[Path, str]:
+    """Deja el vídeo de referencia en `carpeta`. Devuelve (ruta, cómo apuntarlo)."""
+    if fichero is not None:
+        ext = Path(fichero.filename or "").suffix.lower()
+        if ext not in _EXT_VIDEO:
+            raise ValidationError(f"Referencia: formato no admitido ({ext or 'sin extensión'}).")
+        destino = carpeta / f"referencia{ext}"
+        _copiar_subida(fichero, destino)
+        return destino, Path(fichero.filename or "").name
+    if (url or "").strip():
+        # tikwm: TikTok bloquea yt-dlp desde la IP del VPS (lo mismo que Replicar viral).
+        from src.replicar_viral.servicio import ErrorReplica, descargar_tiktok
+
+        destino = carpeta / "referencia.mp4"
+        try:
+            descargar_tiktok(url.strip(), destino)
+        except ErrorReplica as e:
+            raise APIError(f"Referencia: {e}", status_code=getattr(e, "status", 422) or 422) from e
+        return destino, url.strip()
+    from src.replicar_viral import video as rv_video
+
+    try:
+        destino = rv_video.ruta_bandeja(web_user, ruta_bandeja)
+    except Exception as e:  # noqa: BLE001
+        raise ValidationError(f"Referencia: {e}") from e
+    if not destino.is_file():
+        raise ValidationError(f"Referencia: no existe {ruta_bandeja!r} en tu bandeja.")
+    return destino, ruta_bandeja.strip()
+
+
 def _json_opcional(valor: str, campo: str, tipo: type):
     if not (valor or "").strip():
         return None
@@ -111,11 +152,21 @@ def enviar(
     pasos: Annotated[str, Form()] = "",
     config_vip: Annotated[str, Form()] = "",
     dia: Annotated[str, Form()] = "",
+    referencia: Annotated[UploadFile | None, File()] = None,
+    referencia_url: Annotated[str, Form()] = "",
+    referencia_ruta_bandeja: Annotated[str, Form()] = "",
+    quitar_marca: Annotated[str, Form()] = "auto",
 ) -> dict:
     """Un agente manda UN vídeo a editar (multipart `file` o `ruta_bandeja` de
     su bandeja). `estilo`: vip | normal | pasos; `pasos` y `config_vip` en
     JSON. El flujo va en el trabajo, no en la cuenta. Se recoge con
-    `GET /ediciones-fabrica` y `/{job_id}/mp4`."""
+    `GET /ediciones-fabrica` y `/{job_id}/mp4`.
+
+    Solo con `vip`: un vídeo de REFERENCIA cuya edición se copia (estilo + ritmo:
+    zooms, gancho, rótulos) — fichero `referencia`, enlace de TikTok
+    `referencia_url` o `referencia_ruta_bandeja`. Lo sacado se mezcla en
+    `config_vip` (lo explícito gana) y vuelve en `referencia`.
+    `quitar_marca`: auto (quita la estrella de Omni si la ve) | omni | veo | no."""
     from src.api.routers.editor_auto.web_upload import encolar_para_agente
     from src.editor_auto.config import is_valid_day
 
@@ -127,33 +178,50 @@ def enviar(
         raise ValidationError("Manda UNA fuente: `file` o `ruta_bandeja`.")
     lista_pasos = _json_opcional(pasos, "pasos", list)
     cfg_vip = _json_opcional(config_vip, "config_vip", dict)
-    editor_user = _cuenta_agentes()
     estilo = (estilo or "vip").strip().lower()
+    fuentes_ref = [x for x in (referencia is not None, bool((referencia_url or "").strip()),
+                               bool((referencia_ruta_bandeja or "").strip())) if x]
+    if len(fuentes_ref) > 1:
+        raise ValidationError("Manda UNA referencia: `referencia`, `referencia_url` o `referencia_ruta_bandeja`.")
+    if fuentes_ref and estilo != "vip":
+        raise ValidationError("El vídeo de referencia solo vale con estilo «vip».")
+    from src.editor_auto.services import marca_agua
+
+    if (quitar_marca or "auto").strip().lower() not in marca_agua.MODOS:
+        raise ValidationError(f"quitar_marca debe ser uno de {', '.join(marca_agua.MODOS)}.")
+    editor_user = _cuenta_agentes()
     style_config = None
     if estilo == "normal":
         from src.editor_auto.repos.web_account_repo import get_web_account_repo
 
         style_config = (get_web_account_repo().get(editor_user.account_email) or {}).get("styleConfig")
-    try:
-        flujo = ef.flujo_para(estilo, style_config=style_config, pasos=lista_pasos, config_vip=cfg_vip)
-    except ValueError as e:
-        raise ValidationError(str(e)) from e
 
     temporal: str | None = None
     try:
+        sacado: dict | None = None
+        nombre_ref = ""
+        if fuentes_ref:
+            temporal = tempfile.mkdtemp(prefix="ed_agente_")
+            ref_path, nombre_ref = _guardar_referencia(
+                Path(temporal), web_user, referencia, referencia_url, referencia_ruta_bandeja)
+            from src.editor_auto.services.referencia_vip import analizar
+
+            sacado = analizar(str(ref_path))
+            if not sacado.get("ritmo_ref") and not sacado.get("preset"):
+                raise APIError("No se pudo leer el vídeo de referencia (IA sin respuesta). "
+                               "Prueba otra vez o manda sin referencia.", status_code=502)
+            cfg_vip = {**{k: v for k, v in sacado.items() if k != "_flujo"}, **(cfg_vip or {})}
+        try:
+            flujo = ef.flujo_para(estilo, style_config=style_config, pasos=lista_pasos, config_vip=cfg_vip)
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
         if file is not None:
             ext = Path(file.filename or "").suffix.lower()
             if ext not in _EXT_VIDEO:
                 raise ValidationError(f"Formato no admitido ({ext or 'sin extensión'}).")
-            temporal = tempfile.mkdtemp(prefix="ed_agente_")
+            temporal = temporal or tempfile.mkdtemp(prefix="ed_agente_")
             origen = Path(temporal) / (Path(file.filename or "").name or f"video{ext}")
-            tope, total = _MAX_MB * 1024 * 1024, 0
-            with open(origen, "wb") as out:
-                while trozo := file.file.read(1024 * 1024):
-                    total += len(trozo)
-                    if total > tope:
-                        raise ValidationError(f"El vídeo pasa de {_MAX_MB} MB.")
-                    out.write(trozo)
+            _copiar_subida(file, origen)
         else:
             from src.replicar_viral import video as rv_video
 
@@ -163,8 +231,20 @@ def enviar(
                 raise ValidationError(str(e)) from e
             if not origen.is_file():
                 raise ValidationError(f"No existe {ruta_bandeja!r} en tu bandeja (¿aún sincronizando el Drive?).")
-        return encolar_para_agente(queue, editor_user, origen, day=dia, para=u,
-                                   tool_flow=flujo, estilo=estilo)
+        temporal = temporal or tempfile.mkdtemp(prefix="ed_agente_")
+        limpio = Path(temporal) / ("sinmarca_" + origen.name)
+        try:
+            marca = marca_agua.quitar(origen, limpio, quitar_marca)
+        except Exception as e:  # noqa: BLE001
+            raise APIError(f"No se pudo quitar la marca de agua: {str(e)[-300:]}", status_code=500) from e
+        if marca:  # mismo nombre que el original: así sale en la web y en `filename`
+            origen = limpio.replace(Path(temporal) / ("m_" + origen.name))
+        res = encolar_para_agente(queue, editor_user, origen, day=dia, para=u, tool_flow=flujo,
+                                  estilo=estilo, referencia=nombre_ref)
+        res["marca_quitada"] = marca
+        if sacado is not None:
+            res["referencia"] = sacado
+        return res
     finally:
         if temporal is not None:
             shutil.rmtree(temporal, ignore_errors=True)

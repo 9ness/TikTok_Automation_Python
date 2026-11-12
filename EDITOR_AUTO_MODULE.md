@@ -317,3 +317,12 @@ el siguiente job sin redeploy.
    (snap/trim/valley/guardarraíles) — lo que no depende del LLM no falla.
 2. SIEMPRE → añadir la lección a `editor_lessons.md` (para que la IA tenga el
    contexto del fallo) y el detalle técnico a `learnings.md` (para el dev).
+
+## Envíos de agentes: vídeo de referencia y marca de agua (12/11/2026)
+`POST /api/v1/editor-auto/ediciones-fabrica/enviar` (MCP `editar_en_editor`) acepta, solo con estilo `vip`,
+UNA referencia (`referencia` fichero, `referencia_url` de TikTok vía tikwm o `referencia_ruta_bandeja`):
+`services/referencia_vip.analizar` copia estilo (`estilo_vip`) y ritmo (cortes ffmpeg + zooms/rótulos/gancho
+leídos con Claude Haiku, Gemini de reserva; prompt `prompts/vip_ritmo_referencia.md`) a la config del VIP;
+lo explícito gana. `vip_overlays` también acepta `video_referencia` (ruta). `quitar_marca` (auto|omni|veo|no,
+`services/marca_agua.py`) quita la marca con el MISMO zoom/recorte que AI Pro (`nicho_pov_bof.config`).
+La cuenta `EDITOR_CUENTA_AGENTES_EMAIL` no manda avisos por email ni WhatsApp.

@@ -192,3 +192,125 @@ def test_pipeline_usa_el_flujo_del_job(monkeypatch, tmp_path):
         )
     assert vistos == ["vip_overlays"]
     assert [s.tool_id for s in user.tool_flow] == ["subs_auto"]  # el usuario no cambia
+
+
+# ─── Vídeo de referencia (copiar estilo + ritmo) y marca de agua ─────────────
+from src.api.exceptions import ValidationError
+from src.editor_auto.services import marca_agua, referencia_vip
+from src.editor_auto.tools import vip_overlays as V
+
+
+def test_ritmo_desde_json_sanea_y_pasa_a_config():
+    r = referencia_vip.ritmo_desde_json(
+        {"zooms": 6, "zoom_nivel": 1.5, "zoom_pct": 0.9, "rotulos": 5, "gancho_tipo": "Pregunta",
+         "gancho_texto": "¿SABÍAS ESTO?", "gancho_clip": True}, 30.0, [1.0, 2.0, 3.0])
+    assert r["zooms_min"] == 12.0 and r["zoom_nivel"] == 1.22 and r["zoom_pct"] == 0.5
+    assert r["cortes_min"] == 6.0 and r["rotulos_min"] == 10.0 and r["gancho_tipo"] == "pregunta"
+    cfg = referencia_vip.config_desde_ritmo(r)
+    assert cfg["densidad_rotulos"] == "alta" and cfg["zooms"] and cfg["gancho_clip"]
+    assert cfg["ritmo_ref"] is r
+    sin = referencia_vip.config_desde_ritmo(referencia_vip.ritmo_desde_json({"gancho_tipo": "ninguno"}, 30, []))
+    assert sin["zooms"] is False and sin["gancho"] is False and sin["densidad_rotulos"] == "baja"
+
+
+def test_analizar_nunca_lanza(monkeypatch):
+    import src.editor_auto.services.estilo_vip as ev
+
+    monkeypatch.setattr(ev, "estilo_desde_video", lambda v: {"preset": "neon", "zooms": False})
+    monkeypatch.setattr(referencia_vip, "ritmo_desde_video", lambda v: (_ for _ in ()).throw(RuntimeError("x")))
+    logs = []
+    assert referencia_vip.analizar("v.mp4", logs.append) == {"preset": "neon", "zooms": False}
+    assert logs and "Ritmo" in logs[0]
+
+
+def test_vision_cae_a_gemini(monkeypatch):
+    monkeypatch.setattr(referencia_vip, "_vision_claude", lambda j, i: (_ for _ in ()).throw(RuntimeError("sin clave")))
+    monkeypatch.setattr(referencia_vip, "_vision_gemini", lambda j, i: {"zooms": 2})
+    assert referencia_vip._vision([b"x"], "p") == {"zooms": 2}
+
+
+def test_vip_usa_el_ritmo_de_la_referencia():
+    ref = {"zooms_min": 4.0, "zoom_nivel": 1.18, "zoom_pct": 0.2, "rotulos_min": 12.0,
+           "gancho_tipo": "dato", "gancho_texto": "110 dB", "notas": "zoom en cada dato"}
+    cfg = {**V.VipOverlaysTool().default_config(), "ritmo_ref": ref}
+    assert V._max_rotulos(30.0, cfg) == 6  # 12/min en 30 s
+    assert "110 dB" in V._nota_referencia(cfg, 30.0)
+    plan = {"zooms": [{"t0": t, "t1": t + 2.0} for t in (1, 5, 9, 13, 17)]}
+    zs = V._sanitize(plan, 30.0, cfg)["zooms"]
+    # 4/min en 30 s → máx 3; y como mucho el 30 % (20 % + margen) del vídeo con zoom.
+    assert len(zs) == 3 and all(z["nivel"] == 1.18 for z in zs)
+    assert V._max_rotulos(30.0, V.VipOverlaysTool().default_config()) == 4  # sin referencia: densidad media
+
+
+def test_vip_run_analiza_la_referencia_y_gana_lo_explicito(monkeypatch, tmp_path):
+    import src.editor_auto.services.referencia_vip as rv
+
+    ref = tmp_path / "ref.mp4"
+    ref.write_bytes(b"x")
+    entrada = tmp_path / "in.mp4"
+    entrada.write_bytes(b"v")
+    monkeypatch.setattr(rv, "analizar", lambda v, log=None: {
+        "preset": "neon", "densidad_rotulos": "alta", "ritmo_ref": {"zooms_min": 2.0}, "_flujo": {"x": 1}})
+    monkeypatch.setattr(V, "_probe", lambda p: {"audio": True, "dur": 10.0, "w": 1080, "h": 1920})
+    vistos = []
+    monkeypatch.setattr(V, "_transcribe", lambda v, w, cfg, ctx: vistos.append(cfg) or [])
+    ctx = SimpleNamespace(temp_folder=str(tmp_path), job_id="j", on_log=lambda m: None,
+                          on_progress=lambda f, m: None, extras={})
+    V.VipOverlaysTool().run(input_path=str(entrada), output_path=str(tmp_path / "out.mp4"),
+                            config={"video_referencia": str(ref), "densidad_rotulos": "baja"}, ctx=ctx)
+    cfg = vistos[0]
+    assert cfg["preset"] == "neon" and cfg["ritmo_ref"] == {"zooms_min": 2.0}
+    assert cfg["densidad_rotulos"] == "baja" and "_flujo" not in cfg
+
+
+def test_enviar_con_referencia_url(monkeypatch, tmp_path):
+    import src.editor_auto.services.referencia_vip as rv
+    import src.replicar_viral.servicio as rs
+
+    editor_user = EditorUser(name="nueveness")
+    router_ef, r, _ = _montar_envio(monkeypatch, tmp_path, editor_user)
+    bajados = []
+    monkeypatch.setattr(rs, "descargar_tiktok", lambda url, d: bajados.append(url) or d.write_bytes(b"r") or {})
+    monkeypatch.setattr(rv, "analizar", lambda v, log=None: {
+        "preset": "neon", "zooms": True, "ritmo_ref": {"zooms_min": 3.0}, "_flujo": {"subs_auto": {}}})
+    monkeypatch.setattr(marca_agua, "quitar", lambda o, d, m="auto": None)
+    q = _QueueEnc()
+    up = SimpleNamespace(filename="clip.mp4", file=io.BytesIO(b"video"))
+    res = router_ef.enviar(q, web_user="ness", file=up, ruta_bandeja="", para="", estilo="vip",
+                           pasos="", config_vip='{"zooms": false}', dia="2026-11-12",
+                           referencia=None, referencia_url="https://www.tiktok.com/@x/video/1",
+                           referencia_ruta_bandeja="", quitar_marca="auto")
+    assert bajados == ["https://www.tiktok.com/@x/video/1"]
+    assert res["referencia"]["ritmo_ref"] == {"zooms_min": 3.0} and res["marca_quitada"] is None
+    cfg = q.jobs[0].params["tool_flow"][0]["config"]
+    assert cfg["preset"] == "neon" and cfg["zooms"] is False and "_flujo" not in cfg  # lo explícito gana
+    e = r.d["ediciones_fabrica:ness"][-1]
+    assert e["estilo"] == "vip" and e["referencia"] == "https://www.tiktok.com/@x/video/1"
+    with pytest.raises(ValidationError):  # referencia solo con vip
+        router_ef.enviar(q, web_user="ness", file=SimpleNamespace(filename="c.mp4", file=io.BytesIO(b"v")),
+                         ruta_bandeja="", para="", estilo="normal", pasos="", config_vip="", dia="2026-11-12",
+                         referencia=None, referencia_url="https://t/1", referencia_ruta_bandeja="",
+                         quitar_marca="auto")
+
+
+def test_marca_agua_mismo_metodo_que_ai_pro(monkeypatch):
+    from src.nicho_pov_bof import config as pov
+
+    monkeypatch.setattr(pov, "es_clip_omni", lambda p: True)
+    assert marca_agua.decidir("x.mp4", "auto") == (pov.ZOOM_MARCA_OMNI, pov.ESQUINA_MARCA_OMNI)
+    monkeypatch.setattr(pov, "es_clip_omni", lambda p: False)
+    assert marca_agua.decidir("x.mp4", "auto") is None
+    assert marca_agua.decidir("x.mp4", "veo") == (pov.ZOOM_MARCA_AGUA, pov.ESQUINA_MARCA_AGUA)
+    assert marca_agua.decidir("x.mp4", "no") is None
+    with pytest.raises(ValueError):
+        marca_agua.decidir("x.mp4", "raro")
+
+
+def test_cuenta_de_agentes_sin_avisos(monkeypatch):
+    import src.api.routers.editor_auto.web_upload as w
+
+    monkeypatch.setenv("EDITOR_CUENTA_AGENTES_EMAIL", "Agentes@X.es")
+    assert w._es_cuenta_agentes(SimpleNamespace(account_email="agentes@x.es"))
+    assert not w._es_cuenta_agentes(SimpleNamespace(account_email="cliente@x.es"))
+    monkeypatch.delenv("EDITOR_CUENTA_AGENTES_EMAIL")
+    assert not w._es_cuenta_agentes(SimpleNamespace(account_email=""))

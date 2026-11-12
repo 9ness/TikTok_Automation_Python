@@ -213,13 +213,21 @@ def _maybe_notify_ready_email(user: EditorUser, day: str, queue: JobQueue) -> No
         pass
 
 
+def _es_cuenta_agentes(user) -> bool:
+    """La cuenta con la que editan los agentes (`EDITOR_CUENTA_AGENTES_EMAIL`):
+    sus vídeos los recoge el agente por el MCP, así que no se avisa por email
+    ni WhatsApp (Néstor, 12/11/2026)."""
+    cuenta = os.getenv("EDITOR_CUENTA_AGENTES_EMAIL", "").strip().lower()
+    return bool(cuenta) and (getattr(user, "account_email", "") or "").strip().lower() == cuenta
+
+
 def _maybe_notify_ready(user: EditorUser, day: str, queue: JobQueue) -> None:
     """Avisa de 'videos listos': email (logica original) y, aparte, WhatsApp.
     Nunca lanza. Si el dia es FUTURO no avisa todavia: lo hara
     `notify_released_days` (o el propio cliente al abrir su panel) cuando
     llegue ese dia."""
     try:
-        if not _day_released(day):
+        if not _day_released(day) or _es_cuenta_agentes(user):
             return
     except Exception:
         return
@@ -906,7 +914,7 @@ def web_send_to_edit(
 
 def encolar_para_agente(
     queue: JobQueue, editor_user: EditorUser, origen: Path, *, day: str,
-    para: str, tool_flow: list, estilo: str,
+    para: str, tool_flow: list, estilo: str, referencia: str = "",
 ) -> dict:
     """Envío de un AGENTE (`POST /ediciones-fabrica/enviar`): copia el vídeo a
     `entrada/<día>/` de la cuenta del editor y lo encola con SU flujo
@@ -934,7 +942,8 @@ def encolar_para_agente(
         except OSError:
             pass
         raise
-    enqueued = [{"filename": nombre, "job_id": job_id, "fabrica": para, "agente": estilo}]
+    enqueued = [{"filename": nombre, "job_id": job_id, "fabrica": para, "agente": estilo,
+                 "referencia": referencia}]
     _lock_day(editor_user.id, day)
     try:
         ediciones_fabrica.apuntar(para, editor_user, day, enqueued)
@@ -1623,7 +1632,7 @@ def _retener_y_avisar(user, day: str, source: str, motivo: str, estado: str, ret
         _devolver_prueba(user, day, source)
     try:
         from src.editor_auto.services import email_notify
-        if email_notify.is_configured():
+        if email_notify.is_configured() and not _es_cuenta_agentes(user):
             email_notify.send_operator_alert(
                 f"[Editor] Revisar vídeo de {user.name} ({day})",
                 [

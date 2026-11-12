@@ -122,6 +122,9 @@ def apuntar(usuario: str, editor_user, day: str, enqueued: list[dict]) -> None:
             "editor_user": editor_user.name,
             "editor_user_id": editor_user.id,
             "ts": ahora,
+            # Envíos de agentes: estilo (vip/normal/pasos) y la referencia copiada (url o nombre).
+            "estilo": e.get("agente") or "",
+            "referencia": e.get("referencia") or "",
         })
     r.set_json(clave, lista[-_MAX:])
 

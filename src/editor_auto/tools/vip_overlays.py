@@ -83,6 +83,9 @@ class VipOverlaysTool:
             "loudnorm": True,
             "rotulo_y_pct": 16.0,
             "notas_estilo": "",
+            # Vídeo cuya edición se copia (estilo + ritmo, ver services/referencia_vip).
+            # Se analiza al empezar si aún no trae `ritmo_ref`; lo puesto a mano gana.
+            "video_referencia": "",
             "whisper_model_size": "large-v3",
             "ai_language": "es",
         }
@@ -117,6 +120,8 @@ class VipOverlaysTool:
              "type": "float", "min": 5.0, "max": 60.0, "step": 1.0},
             {"key": "notas_estilo", "label": "Cómo le gusta al cliente (lo lee la IA)",
              "type": "text"},
+            {"key": "video_referencia", "label": "Vídeo de referencia (ruta): copia su estilo y ritmo",
+             "type": "string"},
             {"key": "whisper_model_size", "label": "Modelo Whisper", "type": "select",
              "options": ["small", "medium", "large-v3"]},
             {"key": "ai_language", "label": "Idioma audio (ISO 639-1)", "type": "string"},
@@ -133,6 +138,15 @@ class VipOverlaysTool:
     def run(self, *, input_path: str, output_path: str, config: dict[str, Any],
             ctx: ToolContext) -> str:
         cfg = {**self.default_config(), **(config or {})}
+        ref = str(cfg.get("video_referencia") or "").strip()
+        if ref and not cfg.get("ritmo_ref"):
+            if os.path.isfile(ref):
+                from src.editor_auto.services.referencia_vip import analizar
+                ctx.on_progress(0.02, "🎞️ Leyendo el vídeo de referencia…")
+                sacado = {k: v for k, v in analizar(ref, ctx.on_log).items() if k != "_flujo"}
+                cfg = {**self.default_config(), **sacado, **(config or {})}
+            else:
+                ctx.on_log(f"[vip] ⚠️ No encuentro el vídeo de referencia {ref!r} — sigo sin él.")
         if cfg.get("preset") in _PRESETS:  # los 4 colores solo cuentan en "personalizado"
             cfg.update(_PRESETS[cfg["preset"]])
         tmp = Path(ctx.temp_folder) / f"vip_{ctx.job_id}_{int(time.time())}"
@@ -287,15 +301,17 @@ def _plan(words: list[dict], dur: float, eventos: list[dict], cfg: dict,
         "palabras": [[round(float(w.get("start", 0)), 2), _wtext(w)] for w in words],
         "sonidos_sin_voz": eventos,
         "estilo_cliente": {
-            "max_rotulos": max(2, int(dur / _DENSIDAD.get(cfg.get("densidad_rotulos"), 7.0))),
+            "max_rotulos": _max_rotulos(dur, cfg),
             "gancho": bool(cfg.get("gancho")),
             "clip_de_gancho": bool(cfg.get("gancho_clip")),
             "fotos": _fotos_ok(cfg),
             "max_fotos": int(cfg.get("max_fotos") or 0),
             "zooms": bool(cfg.get("zooms")),
-            "notas": str(cfg.get("notas_estilo") or "")[:1500],
+            "notas": (str(cfg.get("notas_estilo") or "")[:1500] + _nota_referencia(cfg, dur)).strip(),
         },
     }
+    if isinstance(cfg.get("ritmo_ref"), dict):
+        payload["estilo_cliente"]["referencia"] = cfg["ritmo_ref"]
     try:
         res = analyze_transcript_json(
             system_prompt=_PROMPT.read_text(encoding="utf-8"), user_payload=payload)
@@ -303,6 +319,33 @@ def _plan(words: list[dict], dur: float, eventos: list[dict], cfg: dict,
     except Exception as e:  # noqa: BLE001
         ctx.on_log(f"[vip] ⚠️ La IA no devolvió plan ({str(e)[:200]}).")
         return None
+
+
+def _max_rotulos(dur: float, cfg: dict) -> int:
+    """Rótulos permitidos: los de la referencia por minuto si la hay; si no, la densidad."""
+    ref = cfg.get("ritmo_ref")
+    if isinstance(ref, dict) and _num(ref.get("rotulos_min")) > 0:
+        return max(2, round(dur * _num(ref.get("rotulos_min")) / 60))
+    return max(2, int(dur / _DENSIDAD.get(cfg.get("densidad_rotulos"), 7.0)))
+
+
+def _nota_referencia(cfg: dict, dur: float) -> str:
+    """Frase para la IA del plan con el ritmo a copiar (el prompt calibrado no se toca:
+    las notas del cliente mandan sobre su ejemplo)."""
+    r = cfg.get("ritmo_ref")
+    if not isinstance(r, dict):
+        return ""
+    n_z = round(dur * _num(r.get("zooms_min")) / 60)
+    partes = [f" COPIA EL RITMO DEL VÍDEO DE REFERENCIA (campo `referencia`): unos {n_z} zooms en este vídeo, de nivel ~{r.get('zoom_nivel')}"
+              f"{', alguno con temblor' if r.get('temblor') else ', sin temblor'}; "
+              f"unos {_max_rotulos(dur, cfg)} rótulos."]
+    if r.get("gancho_texto") or r.get("gancho_tipo"):
+        partes.append(f" Gancho del mismo tipo ({r.get('gancho_tipo') or '?'}) que «{r.get('gancho_texto')}»"
+                      f"{' con dato aparte' if r.get('gancho_dato') else ''}, ADAPTADO a lo que dice "
+                      "este vídeo, sin inventar datos.")
+    if r.get("notas"):
+        partes.append(" Así edita la referencia: " + str(r["notas"])[:400])
+    return "".join(partes)
 
 
 def _num(v, default=0.0) -> float:
@@ -380,7 +423,7 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
             gancho["clip"] = {"t0": s[0], "t1": s[1]}
 
     top = []  # rótulos y fotos comparten la franja de arriba: nunca a la vez
-    max_rot = max(2, int(dur / _DENSIDAD.get(cfg.get("densidad_rotulos"), 7.0)))
+    max_rot = _max_rotulos(dur, cfg)
     for r in (plan.get("rotulos") or [])[: max_rot + 3]:
         s, txt = span(r, 0.5, 3.5), _clean_text(r.get("texto"), 30, entera=True)
         if s and txt:
@@ -416,17 +459,22 @@ def _sanitize(plan: dict, dur: float, cfg: dict) -> dict:
         limpio = [x for x in limpio if x["t0"] >= 2.1]
 
     zooms = []
+    ref = cfg.get("ritmo_ref") if isinstance(cfg.get("ritmo_ref"), dict) else {}
+    nivel_def = _num(ref.get("zoom_nivel"), 1.12) if ref else 1.12
+    # Con referencia: su proporción de zoom (+ margen) y su número por minuto (+1).
+    tope_pct = min(0.5, _num(ref.get("zoom_pct"), 0.5) + 0.1) if ref else 0.5
+    tope_n = int(dur * _num(ref.get("zooms_min"), 0) / 60) + 1 if ref.get("zooms_min") else 99
     if cfg.get("zooms"):
         for z in sorted(plan.get("zooms") or [], key=lambda z: _num(z.get("t0"))):
             s = span(z, 0.8, 4.0)
             if not s or (zooms and s[0] < zooms[-1]["t1"] + 0.3):
                 continue
             zooms.append({"t0": s[0], "t1": s[1],
-                          "nivel": max(1.06, min(1.22, _num(z.get("nivel"), 1.12))),
+                          "nivel": max(1.06, min(1.22, _num(z.get("nivel"), nivel_def))),
                           "temblor": bool(z.get("temblor"))})
         tot, kept = 0.0, []
         for z in zooms:  # nunca más de la mitad del vídeo con zoom
-            if tot + z["t1"] - z["t0"] <= dur * 0.5:
+            if len(kept) < tope_n and tot + z["t1"] - z["t0"] <= dur * tope_pct:
                 kept.append(z)
                 tot += z["t1"] - z["t0"]
         zooms = kept
