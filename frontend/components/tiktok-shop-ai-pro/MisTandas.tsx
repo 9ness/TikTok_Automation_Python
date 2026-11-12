@@ -231,6 +231,17 @@ export function MisTandas() {
   const pasa = (v: VideoTanda) =>
     (!soloGmv || !!v.gmv_max) &&
     (!filtroReal || (filtroReal === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(filtroReal)));
+  // Vídeos por subir (sin «Subido» y con stock) de las tandas abiertas, según la tarea elegida.
+  const porSubir = (id: string) =>
+    (datos?.tandas ?? [])
+      .filter((t) => t.abierta)
+      .flatMap((t) => t.items ?? [])
+      .filter(
+        (v) =>
+          !v.uploaded &&
+          !v.sin_stock &&
+          (!id || (id === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(id))),
+      ).length;
   const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
   const primeraPendiente = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
   const abiertaReal = abierta ?? primeraPendiente;
@@ -292,7 +303,7 @@ export function MisTandas() {
       hint="Todo lo montado en tus nichos, en el orden en que toca publicarlo. Baja la tanda, copia el caption de cada vídeo, ábrelo en la tienda y pulsa «Subido» al publicarlo. Lo que marques aquí queda marcado en la pantalla de su nicho."
       extra={
         datos
-          ? `${datos.abiertas} por subir` +
+          ? `${porSubir("")} vídeos por subir` +
             (datos.subidos_hoy ? ` · hoy ${datos.subidos_hoy}` : "") +
             (datos.sin_stock ? ` · 🚫 ${datos.sin_stock}` : "")
           : undefined
@@ -352,10 +363,12 @@ export function MisTandas() {
         </button>
       </div>
 
-      {tareasActivas.length ? (
+      {datos ? (
         <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2">
           <p className="mb-1 text-[10px] text-muted-foreground">
-            🎯 Tareas de Campañas de creadores: toca una para ver solo sus vídeos (de todas las tandas).
+            {tareasActivas.length
+              ? "🎯 Tareas de Campañas de creadores: toca una para ver solo sus vídeos. El número grande = vídeos por subir."
+              : "El número grande = vídeos por subir (sin marcar «Subido»)."}
           </p>
           <div className="flex flex-wrap gap-1">
             {[
@@ -370,20 +383,23 @@ export function MisTandas() {
                   .filter(Boolean)
                   .join(" · "),
               })),
-              { id: SIN_TAREA, etiqueta: "Sin tarea" },
+              ...(tareasActivas.length ? [{ id: SIN_TAREA, etiqueta: "Sin tarea" }] : []),
             ].map((c) => (
               <button
                 key={c.id || "todas"}
                 type="button"
                 onClick={() => setFiltro(c.id)}
                 title={"titulo" in c ? c.titulo : undefined}
-                className={`max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-[11px] ${
+                className={`flex max-w-full items-center gap-1.5 whitespace-normal break-words rounded-xl border px-2 py-1 text-left text-[10px] font-semibold sm:text-[11px] ${
                   filtroReal === c.id
                     ? "border-amber-500 bg-amber-500/20 text-amber-600 dark:text-amber-400"
                     : "border-border/60 text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {c.etiqueta}
+                <span className="shrink-0 rounded-md bg-amber-500 px-1.5 py-px text-xs font-bold tabular-nums text-white sm:text-sm">
+                  {porSubir(c.id)}
+                </span>
+                <span className="min-w-0">{c.etiqueta}</span>
               </button>
             ))}
           </div>
