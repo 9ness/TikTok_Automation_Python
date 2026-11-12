@@ -1556,3 +1556,5 @@
 - 2026-11-12 · POV BOF Largo: preparar_carpeta(estilo_guion=X) cambia el modo de guion de TODO el catálogo y oculta (montado/guion) lo hecho en otro modo → un único modo por tanda; prep sin estilo + productos='N' solo fija clip_s (y reescribe el guion IA de N: volver a guardar_guion).
 - 2026-11-12 · carruseles Ütopya fallaban: nombre_enlace no quitaba la tienda si el título traía «ÜTOPYA» (tilde) → comparar tienda y título sin tildes (los «–|» ya se filtraban)
 - 2026-11-12 · La web pública sale del tiktok-web de vps-webs: tras un deploy con cambios de frontend hay que pasar la imagen con ~/rutinas/publicar-web.nuevo (su chequeo de /login da 404 aunque esté bien: mira / ).
+- 2026-11-12 · carruseles por MCP: descargar_carrusel/replicar_carrusel aguantan ~1 req/s; KeyError o JSON vacío = límite → sleep 1-3 s y reintentar. texto_y mínimo 0.05 (0.04 da HTTP 400)
+- 2026-11-12 · carruseles con serif (virales alemanes): editorial_negra; la editorial blanca no se lee en fondo claro ni con textura. Sin foto del producto en la ficha (perfume solo con notas) → rojo
