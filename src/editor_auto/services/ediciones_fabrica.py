@@ -9,6 +9,11 @@ qué estado está y el MP4, para registrarlo en Mis tandas con su producto
 
 No mete nada en Mis tandas por sí solo: allí cada fila necesita producto y
 enlace, y eso lo pone el agente.
+
+Los agentes también pueden MANDAR a editar (`POST .../ediciones-fabrica/enviar`,
+MCP `editar_en_editor`): lo hace la cuenta del editor `EDITOR_CUENTA_AGENTES_EMAIL`
+y el flujo de ESE trabajo va en el job (`params["tool_flow"]`, ver `flujo_para`),
+sin tocar el flujo guardado de la cuenta.
 """
 
 from __future__ import annotations
@@ -21,6 +26,77 @@ from src.editor_auto.repos.redis_base import get_editor_redis
 
 _CLAVE = "ediciones_fabrica:{usuario}"
 _MAX = 500
+
+ESTILOS = ("vip", "normal", "pasos")
+# Claves de modelo Whisper de las herramientas (subs_auto usa `model_size`).
+_CLAVES_WHISPER = ("whisper_model_size", "model_size")
+# Whisper large tumbó el VPS por RAM (22/10/2026): los trabajos de agentes van en small.
+_WHISPER_AGENTES = "small"
+# Necesita guion: no vale para un vídeo suelto.
+_TOOLS_PROHIBIDAS = {"silence_cutter_scripted"}
+
+
+def _rebajar_whisper(paso) -> None:
+    """Pone `small` en cualquier modelo Whisper large del paso (también el de
+    la config por defecto de la herramienta, que suele ser large-v3)."""
+    from src.editor_auto.tools import get_tool
+
+    tool = get_tool(paso.tool_id)
+    base = tool.default_config() if tool is not None else {}
+    cfg = dict(paso.config or {})
+    for k in _CLAVES_WHISPER:
+        if k in base or k in cfg:
+            valor = str(cfg.get(k, base.get(k)) or "")
+            if valor.startswith("large"):
+                cfg[k] = _WHISPER_AGENTES
+    paso.config = cfg
+
+
+def flujo_para(estilo: str, *, style_config: dict | None = None,
+               pasos: list | None = None, config_vip: dict | None = None) -> list:
+    """Flujo (lista de ToolStep) de UN trabajo mandado por un agente.
+
+    - `vip`: solo `vip_overlays` (+ `config_vip`), Whisper small y sin fotos de internet.
+    - `normal`: el estilo de la web de la cuenta (`build_tool_flow`), sin guardarlo.
+    - `pasos`: la lista dada ({tool_id, config, enabled?}), validada contra el registry.
+    Lanza ValueError si algo no vale."""
+    from src.editor_auto.models.editor_user import ToolStep
+    from src.editor_auto.tools import REGISTRY
+
+    estilo = (estilo or "vip").strip().lower()
+    if estilo not in ESTILOS:
+        raise ValueError(f"estilo debe ser uno de {', '.join(ESTILOS)}.")
+    if estilo == "vip":
+        cfg = dict(config_vip or {})
+        cfg["whisper_model_size"] = _WHISPER_AGENTES
+        cfg["fotos_internet"] = False
+        flujo = [ToolStep(tool_id="vip_overlays", config=cfg)]
+    elif estilo == "normal":
+        from src.editor_auto.services.style_mapper import build_tool_flow
+
+        flujo = [s.model_copy(deep=True) for s in build_tool_flow(style_config)]
+    else:
+        if not pasos:
+            raise ValueError("Con estilo «pasos» hay que dar la lista `pasos`.")
+        flujo = []
+        for i, p in enumerate(pasos):
+            if not isinstance(p, dict) or not isinstance(p.get("tool_id"), str):
+                raise ValueError(f"Paso {i + 1}: cada paso es {{tool_id, config}}.")
+            tid = p["tool_id"].strip()
+            if tid not in REGISTRY:
+                raise ValueError(f"Paso {i + 1}: herramienta desconocida {tid!r} "
+                                 f"(valen: {', '.join(sorted(REGISTRY))}).")
+            if tid in _TOOLS_PROHIBIDAS:
+                raise ValueError(f"Paso {i + 1}: {tid} necesita guion; no vale aquí.")
+            cfg = p.get("config") or {}
+            if not isinstance(cfg, dict):
+                raise ValueError(f"Paso {i + 1}: `config` tiene que ser un objeto.")
+            flujo.append(ToolStep(tool_id=tid, enabled=bool(p.get("enabled", True)), config=dict(cfg)))
+    for paso in flujo:
+        _rebajar_whisper(paso)
+    if not any(s.enabled for s in flujo):
+        raise ValueError("El flujo no tiene ninguna herramienta activa.")
+    return flujo
 
 
 def usuarios_validos() -> list[str]:

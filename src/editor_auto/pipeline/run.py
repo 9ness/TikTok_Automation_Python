@@ -262,8 +262,13 @@ def run_editor_auto_pipeline(
     manual_keep_intervals: list | None = None,
     output_override: str | None = None,
     output_subdir: str | None = None,
+    tool_flow_override: list | None = None,
 ) -> str:
     """Pipeline completo. Devuelve la ruta absoluta del MP4 final en Drive.
+
+    `tool_flow_override` (lista de dicts ToolStep, de `params["tool_flow"]`):
+    flujo SOLO de este trabajo (envíos de agentes). Manda sobre el del usuario,
+    que se usa en una copia en memoria y nunca se guarda.
 
     `source_filename`: si está presente (caso workflow entrada→cola), el
     output toma el mismo nombre base con sufijo `_editado`. Ej:
@@ -276,6 +281,12 @@ def run_editor_auto_pipeline(
         raise RuntimeError(f"Usuario Editor Auto no encontrado: {user_id}")
     if user.deleted:
         raise RuntimeError(f"Usuario marcado como eliminado: {user.name}")
+    if tool_flow_override is not None:
+        from src.editor_auto.models.editor_user import ToolStep
+        user = user.model_copy(update={
+            "tool_flow": [ToolStep.model_validate(s) for s in tool_flow_override]})
+        on_log(f"[editor_auto] flujo propio del trabajo: "
+               f"{', '.join(s.tool_id for s in user.tool_flow if s.enabled)}")
 
     enabled_steps = [s for s in user.tool_flow if s.enabled]
     if not enabled_steps:

@@ -1565,6 +1565,8 @@ def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
             manual_keep_intervals=manual_keep_intervals,
             output_override=output_override,
             output_subdir=output_subdir,
+            # Flujo propio del trabajo (envíos de agentes); None = el del usuario.
+            tool_flow_override=p.get("tool_flow"),
         )
     except Exception:
         # Fallo del pipeline: devolver el input a `entrada/` para que el

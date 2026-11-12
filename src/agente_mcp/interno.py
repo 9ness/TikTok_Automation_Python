@@ -112,8 +112,10 @@ class Interno:
         return r.json() if r.content else {}
 
     async def post_form(
-        self, ruta: str, datos: dict[str, Any], fichero: tuple[str, bytes, str],
+        self, ruta: str, datos: dict[str, Any], fichero: tuple[str, bytes, str] | None,
     ) -> Any:
+        """POST de formulario; `fichero` va como campo `file` (None = sin fichero)."""
         form = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in datos.items()}
-        r = await self._pedir("POST", ruta, data=form, files={"file": fichero})
+        kw: dict[str, Any] = {"files": {"file": fichero}} if fichero is not None else {}
+        r = await self._pedir("POST", ruta, data=form, **kw)
         return r.json() if r.content else {}

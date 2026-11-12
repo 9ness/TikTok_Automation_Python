@@ -669,16 +669,21 @@ def _enqueue_video(
     queue: JobQueue, user: EditorUser, mount_path: Path, day: str,
     *, plan=None, scheduled_for: float | None = None, is_admin: bool = False,
     priority: int = 0, auto_retry: int = 0, count_quota: bool = True,
+    tool_flow: list | None = None,
 ) -> str:
     """Encola un vídeo leyéndolo DIRECTO del rclone-mount (input_path = ruta
     del mount). El runner lee on-demand al procesar — sin copia previa que
     descargue bytes durante el send-to-edit.
 
+    `tool_flow` (lista de ToolStep): flujo SOLO de este trabajo (envíos de
+    agentes); va en `params["tool_flow"]` y manda sobre `user.tool_flow`, que
+    no se toca. None = el flujo guardado del usuario, como siempre.
+
     `scheduled_for` (epoch UTC) difiere la edición hasta esa hora (solo se usa
     para HOY, si la ventana del plan aún no abrió). None = editar cuanto antes,
     que es lo normal también para los días futuros: su ENTREGA es la que espera
     al día programado (`_day_released`)."""
-    enabled = [s for s in user.tool_flow if s.enabled]
+    enabled = [s for s in (user.tool_flow if tool_flow is None else tool_flow) if s.enabled]
     if not enabled:
         raise APIError(
             "Tu cuenta aún no tiene un flujo de edición configurado. Configura tu estilo.",
@@ -722,6 +727,8 @@ def _enqueue_video(
         "queue_priority": int(priority),
         "auto_retry": int(auto_retry),
     }
+    if tool_flow is not None:
+        params["tool_flow"] = [s.model_dump() for s in enabled]
     job = queue.enqueue(
         JobMode.EDITOR_AUTO, title=title, params=params, scheduled_for=scheduled_for,
     )
@@ -895,6 +902,47 @@ def web_send_to_edit(
         _apuntar_envio(user, len(enqueued), prueba=trial_left is not None)
 
     return {"day": day, "enqueued": enqueued, "errors": errors, "locked": bool(enqueued)}
+
+
+def encolar_para_agente(
+    queue: JobQueue, editor_user: EditorUser, origen: Path, *, day: str,
+    para: str, tool_flow: list, estilo: str,
+) -> dict:
+    """Envío de un AGENTE (`POST /ediciones-fabrica/enviar`): copia el vídeo a
+    `entrada/<día>/` de la cuenta del editor y lo encola con SU flujo
+    (`tool_flow`, va en el job; el usuario no se guarda). Lo apunta en el día
+    (para que la web no lo vuelva a mandar) y en `ediciones_fabrica:<para>`."""
+    import shutil
+
+    from src.editor_auto.services import ediciones_fabrica
+
+    if not is_valid_day(day):
+        raise ValidationError("Día inválido (YYYY-MM-DD).", details={"dia": day})
+    carpeta = Path(user_input_day_folder(editor_user.name, day))
+    carpeta.mkdir(parents=True, exist_ok=True)
+    nombre = f"ag{int(time.time() * 1000) % 10**10}_{_safe_name(origen.name)}"
+    destino = carpeta / nombre
+    shutil.copyfile(origen, destino)
+    try:
+        job_id = _enqueue_video(
+            queue, editor_user, destino, day, is_admin=True,
+            priority=web_priority(editor_user), count_quota=False, tool_flow=tool_flow,
+        )
+    except Exception:
+        try:
+            destino.unlink()
+        except OSError:
+            pass
+        raise
+    enqueued = [{"filename": nombre, "job_id": job_id, "fabrica": para, "agente": estilo}]
+    _lock_day(editor_user.id, day)
+    try:
+        ediciones_fabrica.apuntar(para, editor_user, day, enqueued)
+    except Exception:
+        logger.exception("No se pudo apuntar la edición del agente para %s", para)
+    _append_day_jobs(editor_user.id, day, enqueued)
+    _mark_files_sent(editor_user.id, day, [nombre])
+    return {"job_id": job_id, "filename": nombre, "dia": day, "para": para, "estilo": estilo}
 
 
 def _apuntar_envio(user: EditorUser, n: int, *, prueba: bool) -> None:
@@ -1444,6 +1492,10 @@ def _auto_review(queue: JobQueue, job) -> None:
 
     params = job.params or {}
     if job.mode != JobMode.EDITOR_AUTO or not params.get("output_subdir") or not params.get("user_id"):
+        return
+    # Envíos de agentes (flujo propio en el job): los revisa el agente con
+    # `ediciones_editor`; aquí ni se aprueban ni se re-editan con otro flujo.
+    if params.get("tool_flow") is not None:
         return
     if job.status not in (JobStatus.COMPLETED, JobStatus.FAILED):
         return

@@ -222,6 +222,13 @@ no es admin). Se apunta en `ediciones_fabrica:<usuario>` (Redis del editor, últ
 (`services/ediciones_fabrica.py`). MCP: `ediciones_editor` y `registrar_replica_video(edicion=<job_id>)`
 para llevarlo a Mis tandas con su producto. No entra solo en Mis tandas.
 
+**Envíos de agentes:** `POST /api/v1/editor-auto/ediciones-fabrica/enviar` (multipart `file` o
+`ruta_bandeja`, `para`, `estilo`=vip|normal|pasos, `pasos`/`config_vip` en JSON, `dia`); MCP
+`editar_en_editor`. Lo edita la cuenta `EDITOR_CUENTA_AGENTES_EMAIL` (sin ella → 503): el vídeo se copia a
+su `entrada/<día>/` con prefijo `ag…_` y el flujo va en el JOB (`params["tool_flow"]`, lo aplica
+`run_editor_auto_pipeline(tool_flow_override=)`), sin guardar nada en la cuenta. Whisper large → small
+siempre. Estos trabajos se saltan el revisor automático (los revisa el agente).
+
 ## Variables de entorno
 
 ```env

@@ -1080,6 +1080,34 @@ async def ediciones_editor(ctx: Context, usuario: str = "", limite: int = 30) ->
 
 
 @_herramienta(structured_output=False)
+async def editar_en_editor(
+    ctx: Context, ruta_bandeja: str = "", archivo_id: str = "", url: str = "", para: str = "",
+    estilo: str = "vip", pasos: list[dict] | None = None, config_vip: dict | None = None,
+    dia: str = "",
+) -> str:
+    """Manda UN vídeo a editar al Editor Auto (lo edita la cuenta de agentes del
+    editor). UNA fuente: `ruta_bandeja` (relativa a tu bandeja, lo recomendable),
+    `archivo_id` o `url`. `estilo`: `vip` (solo rótulos VIP; `config_vip` cambia
+    su config), `normal` (el estilo de la web de esa cuenta: cortes, subtítulos,
+    flecha) o `pasos` (tu lista `[{tool_id, config}]`). Whisper siempre en small.
+    `para` = usuario de la fábrica (otro solo si eres admin); `dia` YYYY-MM-DD
+    (hoy por defecto). Devuelve `job_id`: recógelo con `ediciones_editor` y,
+    revisado, a Mis tandas con `registrar_replica_video(edicion=job_id, …)`."""
+    u = _usuario(ctx)
+    datos = {"para": para or u, "estilo": estilo or "vip", "dia": dia,
+             "pasos": json.dumps(pasos, ensure_ascii=False) if pasos else "",
+             "config_vip": json.dumps(config_vip, ensure_ascii=False) if config_vip else ""}
+    ruta = "/api/v1/editor-auto/ediciones-fabrica/enviar"
+    if ruta_bandeja and not (archivo_id or url):
+        r = await Interno(u).post_form(ruta, {**datos, "ruta_bandeja": ruta_bandeja}, None)
+    else:
+        contenido, nombre = await archivos.leer_origen(u, url=url, archivo_id=archivo_id,
+                                                       ruta_bandeja=ruta_bandeja)
+        r = await Interno(u).post_form(ruta, datos, (nombre or "video.mp4", contenido, "video/mp4"))
+    return _json(r)
+
+
+@_herramienta(structured_output=False)
 async def registrar_variante_video(ctx: Context, origen_id: str, ruta_bandeja: str, n: int, gancho: str) -> str:
     """Registra una VARIANTE sin créditos de un vídeo tuyo que ya está en VERDE
     (el mismo vídeo con otro gancho, otro orden de planos, otro movimiento y otra

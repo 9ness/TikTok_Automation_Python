@@ -278,6 +278,15 @@ falta producto y enlace):
 3. `registrar_replica_video(modo="sin_ia", edicion=<job_id>, titulo=…, product_id=…)`
    (con `para=` si es de otro usuario) → sale en `mis_tandas` como `rv|<id>` → `semaforo_tanda`.
 
+**Mandarlo tú (agente):** `editar_en_editor(ruta_bandeja=…, estilo=…)` sube UN vídeo
+al editor y devuelve su `job_id`; luego, los pasos 1-3 de arriba.
+- `estilo="vip"` (por defecto): solo rótulos VIP; `config_vip={...}` cambia su config.
+- `estilo="normal"`: el estilo de la web de la cuenta del editor (cortes, subtítulos, flecha).
+- `estilo="pasos"`: tu flujo, `pasos=[{"tool_id": "subs_auto", "config": {...}}, …]`
+  (herramientas del editor; `silence_cutter_scripted` no vale).
+- Whisper va siempre en `small` (large tumbó el VPS). Admin: `para=` otro usuario; `dia=` YYYY-MM-DD.
+- Tarda lo que la cola del editor: consulta `ediciones_editor` cada pocos minutos, no en bucle.
+
 ## 4. Variantes sin créditos (Casca Chollos, 10/11/2026)
 
 De una réplica **ya en verde** salen hasta **tres** variantes sin generar nada
