@@ -477,6 +477,18 @@ if [[ "$NEEDS_API_REBUILD" == "true" || "$NEEDS_WEB_REBUILD" == "true" ]]; then
     echo "[deploy_safe] 🧹 recortando caché de build a ${BUILD_CACHE_KEEP_GB} GB…"
     docker builder prune -f \
         --max-used-space "${BUILD_CACHE_KEEP_GB}GB" >/dev/null 2>&1 || true
+    # El 12/11/2026 el recorte dejó 7,6 GB (no se sabe por qué; el error iba a
+    # /dev/null) y el disco bajó a 9 GB libres. Si la caché sigue por encima
+    # del tope, se borra entera (Néstor, 12/11): el siguiente build tarda más,
+    # pero el disco no se llena.
+    CACHE_GB=$(docker system df --format '{{.Type}}|{{.Size}}' 2>/dev/null \
+        | awk -F'|' '$1=="Build Cache"{s=$2; n=s+0;
+            if (s ~ /TB$/) n*=1000; else if (s ~ /MB$/) n/=1000;
+            else if (s ~ /kB$/ || s ~ /[0-9]B$/) n=0; printf "%d", n}')
+    if [[ "${CACHE_GB:-0}" -gt "$BUILD_CACHE_KEEP_GB" ]]; then
+        echo "[deploy_safe]   la caché sigue en ~${CACHE_GB} GB → docker builder prune -af"
+        docker builder prune -af >/dev/null 2>&1 || true
+    fi
     # Solo las huérfanas (sin `-a`): las imágenes con etiqueta son las que
     # están corriendo o la anterior, que es a la que se vuelve si algo falla.
     docker image prune -f >/dev/null 2>&1 || true
