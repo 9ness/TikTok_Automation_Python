@@ -943,6 +943,10 @@ VOCES: dict[str, list[dict[str, str]]] = {
         {"id": "712fb96185f646fda4849288e7f93585", "label": "Amigo con Humor"},
         {"id": "292a1a41081342988b816d8d7d79dbf8", "label": "Hombre Relajado"},
         {"id": "f2f858d51e8e4422acf0a4d838d85aa3", "label": "Chico"},
+        # Aprobadas por el operador el 12/11/2026 (alternan con las de antes).
+        {"id": "b8623413606443d5b15cdb4c35ad3c9a", "label": "Cuarenton Calido"},
+        {"id": "e0ed253f38d34d0f99ce166ac2723626", "label": "Joven Relajado 2"},
+        {"id": "1568b09811e64a8cb7081c20b584fe1f", "label": "Grave Aspero"},
     ],
     "mujer": [
         {"id": "049dbfa772814ec88d030b6a4b9cc578", "label": "Voz Dulce y Cercana"},
@@ -950,6 +954,9 @@ VOCES: dict[str, list[dict[str, str]]] = {
         {"id": "1b3aceb9964445f1883b9a71eb335766", "label": "Amiga Cercana"},
         {"id": "039303edce924eb08c35580705d9bfcf", "label": "Compania Suave"},
         {"id": "86151fb1bf8b4dc4a2f35e79e6c2ffd5", "label": "Voz Joven Natural"},
+        # Aprobadas por el operador el 12/11/2026 (alternan con las de antes).
+        {"id": "7b1e1e64e78340eea1e02d140780eb6a", "label": "Calmada Clara"},
+        {"id": "8aa066fd0ae64bcfa7ad905f0e4f362f", "label": "Madura Serena"},
     ],
 }
 
