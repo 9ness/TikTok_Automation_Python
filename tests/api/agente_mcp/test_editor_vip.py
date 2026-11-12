@@ -28,6 +28,10 @@ class _Interno:
         _Interno.llamadas.append(("get_bytes", ruta, kw))
         return MP4, "video/mp4", "edicion.mp4"
 
+    async def post(self, ruta, datos):
+        _Interno.llamadas.append(("post", ruta, dict(datos)))
+        return {"ok": True}
+
     async def post_form(self, ruta, datos, fichero, otros=None):
         _Interno.llamadas.append(("post_form", ruta, dict(datos), fichero, otros))
         return {"id": "abc123abc123", "ok": True}
@@ -119,3 +123,40 @@ def test_post_form_manda_los_dos_ficheros(monkeypatch):
     asyncio.run(Interno("ness").post_form("/r", {"a": True}, ("v.mp4", b"1", "video/mp4"),
                                           {"referencia": ("r.mp4", b"2", "video/mp4")}))
     assert set(vistos["files"]) == {"file", "referencia"} and vistos["data"] == {"a": "true"}
+
+
+def test_editar_quitar_marca_va_en_el_form_y_valida(fake):
+    _correr(servidor.editar_en_editor, ruta_bandeja="a.mp4", quitar_marca="Omni")
+    assert fake.llamadas[-1][2]["quitar_marca"] == "omni"
+    _correr(servidor.editar_en_editor, ruta_bandeja="a.mp4")
+    assert "quitar_marca" not in fake.llamadas[-1][2]
+    with pytest.raises(ErrorApp):
+        _correr(servidor.editar_en_editor, ruta_bandeja="a.mp4", quitar_marca="todo")
+
+
+def test_semaforo_con_para(fake):
+    _correr(servidor.semaforo_tanda, id="rv|x", color="verde", motivo="ok", para="ana")
+    assert fake.llamadas[-1][2]["para"] == "ana"
+    _correr(servidor.semaforo_tanda, id="rv|x", color="verde", motivo="ok")
+    assert "para" not in fake.llamadas[-1][2]
+
+
+def test_bandeja_de_para_si_no_esta_en_la_mia(monkeypatch, tmp_path):
+    from src.api.routers import replicar_viral as r
+    from src.replicar_viral import carrusel
+
+    rutas = []
+
+    def ruta_bandeja(u, rel):
+        rutas.append(u)
+        if u == "ness":
+            raise video.ErrorReplica("No está", status=404)
+        return tmp_path / rel
+
+    monkeypatch.setattr(video, "ruta_bandeja", ruta_bandeja)
+    monkeypatch.setattr(carrusel, "destino", lambda u, p="": p or u)
+    monkeypatch.setattr(video, "registrar", lambda quien, **kw: {"quien": quien, "origen": str(kw["origen"])})
+    monkeypatch.setattr(video, "resumen", lambda d: d)
+    body = r.VideoBandejaRequest(ruta="v.mp4", modo="sin_ia", titulo="t", para="ana")
+    out = r.video_bandeja(body, usuario="ness")
+    assert rutas == ["ness", "ana"] and out["quien"] == "ana"

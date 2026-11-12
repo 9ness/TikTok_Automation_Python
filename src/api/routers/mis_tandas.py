@@ -85,6 +85,7 @@ class SemaforoRequest(BaseModel):
     color: str = ""
     motivo: str = ""
     por: str = ""
+    para: str = ""
 
 
 @router.get("/motivos")
@@ -109,7 +110,10 @@ def set_semaforo(
 ) -> dict:
     """Semáforo de revisión antes de subir. Rojo marca también «rehacer»."""
     try:
-        return servicio.poner_semaforo(usuario, body.id, body.color, body.motivo, body.por)
+        from src.replicar_viral import carrusel
+
+        quien = carrusel.destino(usuario, body.para)
+        return servicio.poner_semaforo(quien, body.id, body.color, body.motivo, body.por)
     except Exception as e:  # noqa: BLE001
         raise _error(e) from e
 

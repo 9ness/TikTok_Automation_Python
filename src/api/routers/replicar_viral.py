@@ -151,11 +151,19 @@ class VideoBandejaRequest(BaseModel):
 @router.post("/video/bandeja")
 def video_bandeja(body: VideoBandejaRequest, usuario: Annotated[str, Depends(get_web_user)] = "") -> dict:
     """Como `POST /video` pero el MP4 lo coge de la bandeja del agente
-    (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<ruta>`) de quien llama, sin subirlo."""
+    (`TIKTOK_SHOP_AI_PRO/_agente/<usuario>/<ruta>`) de quien llama, sin subirlo.
+    Con `para` (admin) y si no está en la bandeja de quien llama, se busca en
+    la de `para`."""
     try:
-        origen = video.ruta_bandeja(usuario, body.ruta)
+        quien = carrusel.destino(usuario, body.para)
+        try:
+            origen = video.ruta_bandeja(usuario, body.ruta)
+        except video.ErrorReplica as e:
+            if quien == usuario or getattr(e, "status", 0) != 404:
+                raise
+            origen = video.ruta_bandeja(quien, body.ruta)
         doc = video.registrar(
-            carrusel.destino(usuario, body.para), modo=body.modo, origen=origen, titulo=body.titulo,
+            quien, modo=body.modo, origen=origen, titulo=body.titulo,
             url_viral=body.url_viral, product_id=body.product_id, product_url=body.product_url,
             tienda=body.tienda, caption=body.caption, hashtags=body.hashtags, prompts=body.prompts,
             notas=body.notas, replica_id=body.replica_id,

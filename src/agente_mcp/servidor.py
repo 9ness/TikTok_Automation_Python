@@ -810,7 +810,7 @@ async def completar_tanda(ctx: Context, ids: list[str], fotos: bool = False) -> 
 
 
 @_herramienta(structured_output=False)
-async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") -> str:
+async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "", para: str = "") -> str:
     """Semáforo de revisión de un vídeo de «Mis tandas» (`id` sale de `mis_tandas`),
     para que el operador sepa qué se puede subir sin riesgo de sanción:
     `verde` = producto sencillo y vídeo sin ninguna duda (el producto se ve igual
@@ -821,9 +821,12 @@ async def semaforo_tanda(ctx: Context, id: str, color: str, motivo: str = "") ->
     Pon SIEMPRE el `motivo` (una frase). Criterios: guía `mis-tandas.md` › Semáforo.
     El color vale solo para ese montaje: si el vídeo se rehace, vuelve a «sin revisar».
     Carruseles (Mis tandas › Fotos): `id="car|<id del carrusel>"`; vuelve a «sin
-    revisar» si se resube una diapositiva, y el rojo no marca «rehacer»."""
-    return _json(await Interno(_usuario(ctx)).post(
-        "/api/v1/mis-tandas/semaforo", {"id": id, "color": color, "motivo": motivo, "por": "agente"}))
+    revisar» si se resube una diapositiva, y el rojo no marca «rehacer».
+    `para`: el vídeo es de otro usuario (solo admin)."""
+    datos = {"id": id, "color": color, "motivo": motivo, "por": "agente"}
+    if para:
+        datos["para"] = para
+    return _json(await Interno(_usuario(ctx)).post("/api/v1/mis-tandas/semaforo", datos))
 
 
 @_herramienta(structured_output=False)
@@ -1091,7 +1094,7 @@ async def editar_en_editor(
     ctx: Context, ruta_bandeja: str = "", archivo_id: str = "", url: str = "", para: str = "",
     estilo: str = "vip", pasos: list[dict] | None = None, config_vip: dict | None = None,
     dia: str = "", referencia_url: str = "", referencia_ruta_bandeja: str = "",
-    referencia_archivo_id: str = "",
+    referencia_archivo_id: str = "", quitar_marca: str = "",
 ) -> str:
     """Manda UN vídeo a editar al Editor Auto (lo edita la cuenta de agentes del
     editor). UNA fuente: `ruta_bandeja` (relativa a tu bandeja, lo recomendable),
@@ -1106,7 +1109,10 @@ async def editar_en_editor(
     TikTok; lo baja el editor), `referencia_ruta_bandeja` o
     `referencia_archivo_id`. El editor copia de él cortes, gancho, zooms y
     rótulos y lo mezcla en `config_vip` (lo que pases en `config_vip` gana). La
-    respuesta trae `referencia` con la config sacada."""
+    respuesta trae `referencia` con la config sacada.
+    `quitar_marca`: `auto` (quita la estrella de Omni con el zoom de AI Pro),
+    `omni`, `veo` o `no`; vacío = lo que decida el editor. La respuesta trae
+    `marca_quitada`."""
     u = _usuario(ctx)
     refs = [x for x in (referencia_url, referencia_ruta_bandeja, referencia_archivo_id) if x]
     if len(refs) > 1:
@@ -1116,6 +1122,10 @@ async def editar_en_editor(
     datos = {"para": para or u, "estilo": estilo or "vip", "dia": dia,
              "pasos": json.dumps(pasos, ensure_ascii=False) if pasos else "",
              "config_vip": json.dumps(config_vip, ensure_ascii=False) if config_vip else ""}
+    if quitar_marca:
+        if quitar_marca.strip().lower() not in ("auto", "omni", "veo", "no"):
+            raise ErrorApp("`quitar_marca`: auto | omni | veo | no.")
+        datos["quitar_marca"] = quitar_marca.strip().lower()
     if referencia_url:
         datos["referencia_url"] = referencia_url
     if referencia_ruta_bandeja:

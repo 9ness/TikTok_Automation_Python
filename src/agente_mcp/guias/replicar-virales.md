@@ -278,7 +278,7 @@ falta producto y enlace):
 2. Revisa el MP4 como cualquier vídeo (2 fps, producto idéntico, subtítulos, nombre quemado).
 3. `registrar_replica_video(edicion=<job_id>, titulo=…, product_id=…)`
    (con `para=` si es de otro usuario) → sale en `mis_tandas` como `rv|<id>`, modo
-   `editor_vip` (dorado) → `semaforo_tanda`. Si la edición NO fue VIP, pasa `modo=` (p. ej. `sin_ia`).
+   `editor_vip` (dorado) → `semaforo_tanda` (con `para=` si es de otro usuario). Si la edición NO fue VIP, pasa `modo=` (p. ej. `sin_ia`).
 
 **Mandarlo tú (agente):** `editar_en_editor(ruta_bandeja=…, estilo=…)` sube UN vídeo
 al editor y devuelve su `job_id`; luego, los pasos 1-3 de arriba.
@@ -286,6 +286,8 @@ al editor y devuelve su `job_id`; luego, los pasos 1-3 de arriba.
   **Vídeo de referencia** (para copiar cortes, gancho, zooms y rótulos de un viral):
   UNO de `referencia_url` (TikTok), `referencia_ruta_bandeja` o `referencia_archivo_id`.
   Se mezcla en `config_vip` (lo tuyo gana); la respuesta trae `referencia` con lo sacado.
+- `quitar_marca`: `auto` (quita la estrella de Omni con el zoom de AI Pro), `omni`, `veo` o `no`;
+  la respuesta trae `marca_quitada`.
 - `estilo="normal"`: el estilo de la web de la cuenta del editor (cortes, subtítulos, flecha).
 - `estilo="pasos"`: tu flujo, `pasos=[{"tool_id": "subs_auto", "config": {...}}, …]`
   (herramientas del editor; `silence_cutter_scripted` no vale).
