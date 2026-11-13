@@ -1569,3 +1569,4 @@
 - 2026-11-12 · Rutina FC se colgó con `until ! pgrep -f "adb … push"` (pgrep se encuentra a sí mismo) y no publicó → push en primer plano con timeout; nunca esperar con pgrep -f sin [a]
 - 2026-11-13 · Carruseles: la hoja cmp reducida a 1000 px hace que el estilo anuncio_azul parezca blanco y la API rechaza estilos con y<0,05 → mirar el color en la imagen grande y usar y≥0,05.
 - 2026-11-13 · subida de carruseles: KeyError 'titulo' cuando el sonido TikTok del carrusel no trae título (6 caídos en la noche) → .get() en los print y en consulta_comercial
+- 2026-11-13 · El filtro de Mis tandas estaba desplegado pero no se veía: factory.nebulabsmedia.com sirve el tiktok-web de vps-webs y deploy_safe solo reconstruye el de vps-trabajo → copiar la imagen (`docker save tiktok-web:latest | gzip | ssh nebulabsai@100.83.196.101 'gunzip | docker load'`) y recrear allí el contenedor (127.0.0.1:3000, -m 1g); se comprueba con el hash de mis-tandas/page-*.js público
