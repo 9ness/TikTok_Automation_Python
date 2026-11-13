@@ -608,7 +608,7 @@ def preparar(cid: str) -> None:
     if not any(d.glob("0*")):
         bajar_fotos(c, d)
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
-    print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']}")
+    print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok'].get('titulo') or c['musica']['tiktok'].get('enlace', '?')}")
     # La ficha del escaparate solo se abre si el producto ya falló al buscarlo por ID (marca de producto()):
     # el producto se añade en el propio vídeo por su ID (Néstor, 2/11), y abrir la ficha costaba 1-2 min.
     pid = pid_de(c)
@@ -748,7 +748,7 @@ def rapido(cid: str) -> None:
     if (TMP / f"escaparate_{pid}").exists() and not al_escaparate(pid):   # ya falló al buscarlo por ID
         print("AVISO: no vi «Añadir al escaparate» ni que ya estuviera (mira 6_ficha); sigo")
     locales = sorted(p for p in d.iterdir() if p.suffix in (".jpg", ".jpeg", ".png"))
-    print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok']['titulo']} (vía rápida)")
+    print(f"{c['titulo']!r}: {len(locales)} fotos · sonido {c['musica']['tiktok'].get('titulo') or c['musica']['tiktok'].get('enlace', '?')} (vía rápida)")
     fase("datos_fotos")
     adb("shell", "am", "force-stop", PAQUETE)
     limpiar()
@@ -825,9 +825,9 @@ def abrir_enlace() -> None:
 def consulta_comercial(c: dict) -> str:
     """Qué buscar en «Sonidos comerciales»: el título si es una canción; si es un
     «original sound», el estilo de la música elegida para Meta (lofi, chill…)."""
-    t = c["musica"]["tiktok"]
-    if not re.search(r"original|sonido original", t["titulo"], re.I):
-        return t["titulo"]
+    titulo = c["musica"]["tiktok"].get("titulo") or ""
+    if titulo and not re.search(r"original|sonido original", titulo, re.I):
+        return titulo
     estilo = (c["musica"].get("meta") or {}).get("estilo", "chill")
     return {"navidad": "christmas"}.get(estilo.split("_")[0], estilo.split("_")[0])
 

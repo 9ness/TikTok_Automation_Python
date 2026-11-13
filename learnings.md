@@ -1568,3 +1568,4 @@
 - 2026-11-12 · deploy_safe: el recorte con --max-used-space 3GB dejó 7,6 GB de caché de build (disco a 9 GB libres) → si tras el recorte sigue por encima del tope, docker builder prune -af
 - 2026-11-12 · Rutina FC se colgó con `until ! pgrep -f "adb … push"` (pgrep se encuentra a sí mismo) y no publicó → push en primer plano con timeout; nunca esperar con pgrep -f sin [a]
 - 2026-11-13 · Carruseles: la hoja cmp reducida a 1000 px hace que el estilo anuncio_azul parezca blanco y la API rechaza estilos con y<0,05 → mirar el color en la imagen grande y usar y≥0,05.
+- 2026-11-13 · subida de carruseles: KeyError 'titulo' cuando el sonido TikTok del carrusel no trae título (6 caídos en la noche) → .get() en los print y en consulta_comercial
