@@ -42,13 +42,13 @@ if DESDE != 'video':
         time.sleep(14); m.sin_guia_proximidad()
         if ve(r'artículo está agotado', 1): falla('producto AGOTADO: no se sube')   # sin «Crear ahora», el botón queda en «Añadido al escaparate» (6/11)
         for _ in range(4):
-            if m.buscar(r'^\s*(Crear ahora|Añadir al escaparate)$', 1): return
+            if ve(r'^\s*Crear ahora$', 1) or ve(r'^\s*Añadir al escaparate$', 1): return   # volcado + OCR: con vídeo de fondo el volcado falla (13/11)
             if m.pulsar(r'Gana .*€', 4, 1): continue
             m.adb("shell","input","swipe","540","1700","540","900"); time.sleep(2)
         falla('no se abre el panel «Gana X €»')
     for _ in range(2):
         abrir_panel()
-        if m.buscar(r'^\s*Crear ahora$', 2): break
+        if ve(r'^\s*Crear ahora$', 2): break
         if m.pulsar(r'^\s*Añadir al escaparate$', 4, 2):
             print('añadido al escaparate'); continue
         falla('ni «Crear ahora» ni «Añadir al escaparate»')
