@@ -1575,3 +1575,6 @@
 - 2026-11-13 · semaforo_tanda/marcar_gmv_max daban 404 con id «largo|…|P|precio» → para POV BOF Largo el id de mis_tandas acaba en «|» SIN modo (`largo|mis_productos|Mis Productos NN|P|`); marcar_gmv_max exige que el vídeo ya esté montado.
 - 2026-11-13 · cropdetect da 1072:1920:4:0 en montados 1080x1920 sin bandas (redondeo a 16) → usar `cropdetect=round=2`. GenAI Pro: un «Failed · refunded» deja el clip en pend para siempre en gpo.py → buscar el tag en la página y relanzar.
 - 2026-11-13 · gpt-imagen (carruseles) da rc=3 «sin imagen» cuando OpenAI bloquea la salida por moderation «sexual» (viral con pareja en la cama, hombre sin camiseta); reintentar igual no sirve → reescribir el prompt con la persona sola, vestida y sentada, mismo fondo y luz
+- 2026-11-13 · Frutinovelas: Omni a veces quema el diálogo como texto blanco o humaniza una cabeza de fruta → revisar a 2 fps; un texto corto se tapa con `delogo` (enable=gte(t,X)) y si no, rehacer el clip con «absolutely NO captions» y la cabeza descrita entera.
+- 2026-11-13 · Chrome 9222 se apaga solo tras 45 min sin uso (ECONNREFUSED en lote.py) → `sudo -n /usr/local/bin/navegador on`; usar siempre `ffmpeg -nostdin` en bucles.
+- 2026-11-13 · FrutiChismes: Hielo P6 (605K) cortado a 60,0 s queda fuera de Creator Rewards (>60 s) → montar FC a 61-63 s, premio en la 1.ª frase.
