@@ -122,6 +122,8 @@ for _ in range(3):                            # a veces queda abierto el despleg
     m.adb("shell","input","swipe","540","1400","540","800"); time.sleep(2)
 if not prod: falla('producto vinculado no coincide')
 foto(f'antes_{int(n):02d}')
+import os
+if os.environ.get('PARAR_ANTES_DE_COMPROBAR'): raise SystemExit('parado antes de «Comprobar» (PARAR_ANTES_DE_COMPROBAR)')
 debe(r'^\s*Comprobar$', 4)
 p = ve(r'Entendido', 6)
 if p: m.tap(*p, 3)
