@@ -1574,3 +1574,4 @@
 - 2026-11-13 · Omni cambia la cara de la chica en el clip 2 (Ama tote) → clip 2 en plano detalle barbilla-cintura con voz en off; 5/5 verdes
 - 2026-11-13 · semaforo_tanda/marcar_gmv_max daban 404 con id «largo|…|P|precio» → para POV BOF Largo el id de mis_tandas acaba en «|» SIN modo (`largo|mis_productos|Mis Productos NN|P|`); marcar_gmv_max exige que el vídeo ya esté montado.
 - 2026-11-13 · cropdetect da 1072:1920:4:0 en montados 1080x1920 sin bandas (redondeo a 16) → usar `cropdetect=round=2`. GenAI Pro: un «Failed · refunded» deja el clip en pend para siempre en gpo.py → buscar el tag en la página y relanzar.
+- 2026-11-13 · gpt-imagen (carruseles) da rc=3 «sin imagen» cuando OpenAI bloquea la salida por moderation «sexual» (viral con pareja en la cama, hombre sin camiseta); reintentar igual no sirve → reescribir el prompt con la persona sola, vestida y sentada, mismo fondo y luz
