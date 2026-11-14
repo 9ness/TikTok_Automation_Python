@@ -1506,6 +1506,12 @@ def _iso_now() -> str:
 # ============================================================
 # RUNNER: EDITOR AUTO (Programa 3)
 # ============================================================
+def run_editor_rapido(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
+    """Editor rápido: corta un vídeo hablado (ver `src/editor_auto/rapido`)."""
+    from src.editor_auto.rapido.servicio import ejecutar
+    return ejecutar(job, on_log, on_progress)
+
+
 def run_editor_auto(job: Job, on_log: OnLog, on_progress: OnProgress) -> str:
     """Pipeline Editor Auto: ejecuta el flujo de herramientas del usuario
     sobre un vídeo input subido manualmente.
@@ -5374,6 +5380,7 @@ _RUNNERS: dict[JobMode, Callable[[Job, OnLog, OnProgress], str]] = {
     JobMode.TIKTOK_SHOP_AUTO_DAY: run_tiktok_shop_auto_day,
     JobMode.TIKTOK_SHOP_READY_VIDEO: run_tiktok_shop_ready_video,
     JobMode.EDITOR_AUTO: run_editor_auto,
+    JobMode.EDITOR_RAPIDO: run_editor_rapido,
     JobMode.VIRALIZACION_BATCH: run_viralizacion_batch,
     JobMode.VIRALIZACION_CLIPS: run_viralizacion_clips,
     JobMode.NICHO_POV_BOF_BACKUP: run_nicho_pov_bof_backup,
@@ -5413,6 +5420,7 @@ _MODE_TO_PROGRAM: dict[JobMode, str] = {
     JobMode.TIKTOK_SHOP_AUTO_DAY: "tiktok_shop",
     JobMode.TIKTOK_SHOP_READY_VIDEO: "tiktok_shop",
     JobMode.EDITOR_AUTO: "editor_auto",
+    JobMode.EDITOR_RAPIDO: "editor_auto",
     JobMode.VIRALIZACION_BATCH: "viralizacion",
     JobMode.VIRALIZACION_CLIPS: "viralizacion",
     JobMode.NICHO_POV_BOF_BACKUP: "viralizacion",

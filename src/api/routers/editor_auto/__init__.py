@@ -2,6 +2,7 @@ from .ediciones_fabrica import router as ediciones_fabrica_router
 from .enqueue import router as enqueue_router
 from .folders import router as folders_router
 from .plans import router as plans_router
+from .rapido import router as rapido_router
 from .referrals import router as referrals_router
 from .sharing import router as sharing_router
 from .stickers import router as stickers_router
@@ -23,5 +24,6 @@ __all__ = [
     "subscriptions_router",
     "referrals_router",
     "web_upload_router",
+    "rapido_router",
     "whatsapp_router",
 ]
