@@ -1578,3 +1578,4 @@
 - 2026-11-13 · Frutinovelas: Omni a veces quema el diálogo como texto blanco o humaniza una cabeza de fruta → revisar a 2 fps; un texto corto se tapa con `delogo` (enable=gte(t,X)) y si no, rehacer el clip con «absolutely NO captions» y la cabeza descrita entera.
 - 2026-11-13 · Chrome 9222 se apaga solo tras 45 min sin uso (ECONNREFUSED en lote.py) → `sudo -n /usr/local/bin/navegador on`; usar siempre `ffmpeg -nostdin` en bucles.
 - 2026-11-13 · FrutiChismes: Hielo P6 (605K) cortado a 60,0 s queda fuera de Creator Rewards (>60 s) → montar FC a 61-63 s, premio en la 1.ª frase.
+- 2026-11-14 · Carruseles Ama: gpt-imagen pone cremallera a abrigos que solo llevan botones → «NO zipper» en el prompt y comparar con la ficha; el emoji 🦌 no se pinta en el estilo `tiktok` (usar otro); si Social1 ES no da moda, los referentes de ayoubbshop sirven de fuente de virales.
