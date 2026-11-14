@@ -333,6 +333,12 @@ Comprobar referencia, foto de ficha y resultado lado a lado. Revisar el vídeo e
 
 Si falla, señalar segundo y defecto, proponer el cambio mínimo (referencia/ángulo/prompt/escenario/audio) y usar solo el reintento autorizado. Si agotó el máximo, apartar y dejar motivo. No «arreglar» deformaciones del producto con un filtro ni aprobarlo porque el gancho sea viral.
 
+**Lo aprendido con la bici HillMiles (14/11/2026, réplica `rv|4345755ba484` de ness):**
+- Si el viral es de NUESTRO mismo producto, el **guion es el del original** (también el gancho: «Te va a flipar lo que tengo aquí») y el acabado imita el suyo: subtítulos en mayúsculas, sin título arriba y el nombre en una ficha de datos como la del original.
+- Las piezas pequeñas (mando del manillar) salen inventadas: pásalas recortadas como **@Imagen extra** («debe ser exactamente el de @Imagen 3»).
+- Genjutsu **copia los subtítulos quemados del original, deformados**. Borrarlos con delogo antes de subir tampoco sirve: copia la mancha como una franja de barras. Elige tramos sin texto o recórtalos. Si un tramo sale mal, **quítalo del montaje** antes de pagar otro intento.
+- Trozos ≤12 s a 480p: unos 3 cr/s y de 12 a 25 min cada uno. Normaliza cada pieza antes de concatenarla (`-r 24 -video_track_timescale 12288`).
+
 ## 10. Dossier, entrega y relevo
 
 **RECETA de organización**, dentro de una bandeja del usuario real ya conocido. Si todavía no existe, preparar el plan en el repo/local y confirmar dónde se guardará antes de subir assets a otra cuenta. No crear por su cuenta un usuario Redis para la nueva cuenta.
