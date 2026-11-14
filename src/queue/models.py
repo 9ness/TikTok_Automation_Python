@@ -27,6 +27,8 @@ class JobMode(str, Enum):
     TIKTOK_SHOP_READY_VIDEO = "tiktok_shop_ready_video"  # subir vídeo → listo TikTok
     TIKTOK_SHOP_AUTO_DAY = "tiktok_shop_auto_day"  # Radar v2: llenar 1 día solo
     EDITOR_AUTO = "editor_auto"
+    # Editor rápido (editor.nebulabsmedia.com): cortar un vídeo hablado, 1 clic.
+    EDITOR_RAPIDO = "editor_rapido"
     VIRALIZACION_BATCH = "viralizacion_batch"
     VIRALIZACION_CLIPS = "viralizacion_clips"  # trocear audio largo en clips
     NICHO_POV_BOF_BACKUP = "nicho_pov_bof_backup"  # copia/diff del Drive compartido
@@ -92,6 +94,7 @@ MODE_LABELS = {
     JobMode.TIKTOK_SHOP_READY_VIDEO: "🎬 Vídeo listo (TikTok Shop)",
     JobMode.TIKTOK_SHOP_AUTO_DAY: "🎯 Día automático (ADS frescos)",
     JobMode.EDITOR_AUTO: "✂️ Editor Auto",
+    JobMode.EDITOR_RAPIDO: "⚡ Editor rápido",
     JobMode.VIRALIZACION_BATCH: "🚀 Viralización 1K",
     JobMode.VIRALIZACION_CLIPS: "✂️ Cortar audio largo",
     JobMode.NICHO_POV_BOF_BACKUP: "💾 Backup Productos España",

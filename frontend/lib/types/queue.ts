@@ -17,6 +17,7 @@ export type JobMode =
   | "tiktok_shop_auto_day"
   | "tiktok_shop_ready_video"
   | "editor_auto"
+  | "editor_rapido"
   | "viralizacion_batch"
   | "viralizacion_clips"
   | "nicho_pov_bof_backup"

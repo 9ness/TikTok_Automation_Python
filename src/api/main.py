@@ -61,6 +61,7 @@ from src.api.routers import (
     editor_auto_enqueue_router,
     editor_auto_folders_router,
     editor_auto_plans_router,
+    editor_auto_rapido_router,
     editor_auto_referrals_router,
     editor_auto_web_upload_router,
     editor_auto_ediciones_fabrica_router,
@@ -475,6 +476,7 @@ def create_app() -> FastAPI:
     app.include_router(editor_auto_subscriptions_router)
     app.include_router(editor_auto_referrals_router)
     app.include_router(editor_auto_web_upload_router)
+    app.include_router(editor_auto_rapido_router)
     app.include_router(editor_auto_ediciones_fabrica_router)
     app.include_router(editor_auto_whatsapp_router)
     app.include_router(tiktok_shop_discovery_router)
