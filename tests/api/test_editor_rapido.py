@@ -732,3 +732,12 @@ def test_subs_auto_con_palabras_dadas_no_transcribe(tmp_path, monkeypatch):
                       extras={"palabras": [{"word": "Hola", "start": 0, "end": 1}, {"word": " ", "start": 1, "end": 2}]})
     t.run(input_path="in.mp4", output_path=str(tmp_path / "o.mp4"), config=t.default_config(), ctx=ctx)
     assert [w["word"] for w in vistos["words"]] == ["Hola"]
+
+
+def test_ajustes_color_vacio_y_flecha_inteligente():
+    from src.api.routers.editor_auto.rapido import Ajustes
+    from src.editor_auto.rapido import servicio as s
+    a = Ajustes(subtitulos={"activo": True, "color": "", "fuente": "", "estilo": ""}, flecha={"activo": True, "id": "auto"})
+    assert a.subtitulos.color is None and a.subtitulos.fuente is None
+    assert s.validar_flecha({"activo": True, "id": "auto"}) == {"activo": True, "id": "auto"}
+    assert s.validar_flecha({"activo": True})["id"] == "auto"

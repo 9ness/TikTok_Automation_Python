@@ -351,6 +351,7 @@ API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapi
 - `POST /videos/{id}/valorar {nota: 1-5|"bien"|"mal", comentario?≤500}` → `{ok, nota, voto}` (409 si no está listo). `GET /historial` → `{dias[{fecha,videos,minutos_gastados}] (30 días con actividad, recientes primero), creditos_gastados_total}`.
   `GET /videos` y la vista del vídeo traen `fecha` (ISO) y `nota`.
 - **Calidad interna** (`servicio.calidad`, 0-100, solo «listo»): `80 − 60·(devueltos/n_cortes) + {1:−30, 2:−20, 3:0, 4:+5, 5:+10}[nota] + 15 si descargó sin devolver cortes`.
+- Flecha `id:"auto"` = Inteligente (por defecto; elige forma+color por contraste con el fondo, `color_mode=smart`). Campos de subs vacíos ("") cuentan como sin elegir.
 - Admin (rol admin del ticket): `GET /admin/actividad?dias=7` → `{dias[{fecha,videos,minutos,usuarios}] (con ceros, antiguo→reciente), videos[{id,email,nombre,fecha,duracion_s,estado,cortes,devueltos,descargado,nota,calidad}] (100), totales{videos,listos,errores,minutos_subidos,minutos_quitados,descargados,con_cortes_devueltos,valorados,nota_media,calidad_media,proceso_medio_s,usuarios}, usuarios[{email,ultimo,creditos,…mismo bloque}] (por nº de vídeos)}`;
   `GET /admin/videos/{id}` → `{ficha, eventos, cortes, original_url, resultado_url}`; `GET /admin/videos/{id}/archivo?tipo=original|resultado` (ticket en cabecera o `?t=`).
 - **Dataset de entrenamiento:** `<EDITOR_RAPIDO_DATASET_DIR | raíz de datos/_dataset>/<vid>/` con `original.*` (hardlink; copia si es otro disco y quedan ≥ `EDITOR_RAPIDO_DATASET_MIN_GB`=8 GB libres),

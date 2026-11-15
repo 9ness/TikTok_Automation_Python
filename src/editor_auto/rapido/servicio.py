@@ -187,15 +187,17 @@ def validar_subtitulos(d: dict | None) -> dict:
             "fuente": fuente or None, "posicion": pos}
 
 
+FLECHA_AUTO = "auto"  # modo Inteligente: el motor elige forma+color por contraste con el fondo
+
+
 def validar_flecha(d: dict | None) -> dict:
     d = dict(d or {})
     activo = bool(d.get("activo", False))
     fid = d.get("id")
-    if fid and not fichero_flecha(fid):
+    if fid and fid != FLECHA_AUTO and not fichero_flecha(fid):
         raise ValueError(f"Flecha desconocida: {fid}")
     if activo and not fid:
-        disp = flechas_disponibles()
-        fid = disp[0]["id"] if disp else None
+        fid = FLECHA_AUTO  # por defecto la inteligente (se ajusta al fondo de cada vídeo)
     return {"activo": activo, "id": fid or None}
 
 
@@ -852,7 +854,8 @@ def config_subtitulos(sub: dict, idioma: str) -> dict[str, Any]:
 
 def config_flecha(fl: dict, idioma: str) -> dict[str, Any]:
     from src.editor_auto.services.style_mapper import build_tool_flow
-    fichero = fichero_flecha(fl.get("id") or "") or "flecha_roja.mov"
+    fid = fl.get("id") or ""
+    fichero = "auto" if fid == FLECHA_AUTO else (fichero_flecha(fid) or "flecha_roja.mov")
     estilo = {"cuts": {"enabled": False}, "subtitle": {"enabled": False},
               "arrow": {"enabled": True, "shapeId": fichero, "x": 0.5, "y": 0.62, "scale": 0.8}}
     cfg = next(st.config for st in build_tool_flow(estilo) if st.tool_id == "sticker_arrow")

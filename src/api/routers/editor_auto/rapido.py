@@ -17,7 +17,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Header, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import APIError, ValidationError
@@ -72,10 +72,15 @@ class SubsAjustes(BaseModel):
     fuente: str | None = Field(None, description="id de GET /opciones → fuentes")
     posicion: str = Field("abajo", description="abajo | centro | arriba")
 
+    @field_validator("color", "estilo", "fuente", mode="before")
+    @classmethod
+    def _vacio_es_none(cls, v):  # la web manda "" cuando no se elige nada
+        return v or None
+
 
 class FlechaAjustes(BaseModel):
     activo: bool = False
-    id: str | None = Field(None, description="id de GET /opciones → flechas")
+    id: str | None = Field(None, description="id de GET /opciones → flechas, o «auto» = Inteligente (por defecto)")
 
 
 class Ajustes(BaseModel):
