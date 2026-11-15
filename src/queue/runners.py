@@ -2584,7 +2584,13 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
     # Un guion guardado en el OTRO modo no vale: si el producto es de plazos y
     # el guion se escribió sin la frase de financiación (o al revés, porque se
     # corrigió el precio), reutilizarlo daría un vídeo que no dice lo que toca.
-    if escrito.get("guion") and bool(guardado.get("guion_plazos")) != plazos:
+    # El escrito a mano (`guardar_guion`) se locuta TAL CUAL: ni se reescribe
+    # por el modo ni se le cambia el cierre. Antes el encaje le ponía la CTA
+    # de plazos o de envío gratis que el operador había quitado (15/11).
+    manual = bool(guardado.get("guion_manual")) and bool(escrito.get("guion"))
+    if manual:
+        on_log("[pov_bof_largo] guion escrito a mano: se locuta tal cual")
+    elif escrito.get("guion") and bool(guardado.get("guion_plazos")) != plazos:
         on_log("[pov_bof_largo] el guion guardado es del otro modo; lo reescribo")
         escrito = {}
     # La foto limpia se busca SIEMPRE, no solo cuando hay que escribir el
@@ -2644,6 +2650,7 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         product_repo.update_product(
             source, folder, producto, usuario=operator, estilo=estilo,
             guion=largo_config.cerrar_guion(escrito["guion"], modo),
+            guion_manual=False,
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=modo, guion_segundos=segundos,
@@ -2653,7 +2660,8 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
         on_log("[pov_bof_largo] reutilizando el guion ya escrito")
     # Lo mismo que en el corto: fuera el mínimo de pedido de los guiones
     # viejos antes de que la voz lo diga.
-    escrito["guion"] = largo_config.sin_minimo_plazos(escrito["guion"])
+    if not manual:
+        escrito["guion"] = largo_config.sin_minimo_plazos(escrito["guion"])
     on_log(f"[pov_bof_largo] guion ({len(escrito['guion'])} car.): {escrito['guion']}")
 
     on_progress(0.22, f"🔊 Locutando ({sexo})…")
@@ -2684,7 +2692,9 @@ def run_nicho_pov_bof_largo_video(job: Job, on_log: OnLog, on_progress: OnProgre
             # duración es el cierre, que es un literal nuestro: corto si el
             # guion viene largo, y con las promesas que el producto cumple si
             # viene corto. Lo que no llegue a cuadrar, el acelerón.
-            ctas=largo_config.ctas_posibles(
+            # Sin escalera (sin encaje) si el guion es manual: su cierre es el
+            # que escribió el operador.
+            ctas=() if manual else largo_config.ctas_posibles(
                 plazos, envio_gratis,
                 inversa=largo_config.es_cierre_inverso(escrito["guion"]),
                 # Mitad de los vídeos sin «aplica tus cupones» (Néstor, 9/11).
@@ -3521,7 +3531,8 @@ def _con_guion_desfasado(
         )
         for pid in sorted(textos, key=lambda x: (len(x), x)):
             guion = str((mios.get(pid) or {}).get("guion") or "").strip()
-            if not guion:
+            # El escrito a mano no se «corrige»: su CTA la decidió el operador.
+            if not guion or (mios.get(pid) or {}).get("guion_manual"):
                 continue
             t = textos[pid]
             plazos = pov_config.hay_plazos(t)
@@ -3604,7 +3615,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             # puede haber dos según el nicho desde el que se grabe.
             plazos = pov_config.hay_plazos(t)
             guardado = mios.get(pid) or {}
-            ya = (
+            ya = bool(guardado.get("guion")) and bool(guardado.get("guion_manual")) or (
                 bool(guardado.get("guion"))
                 and bool(guardado.get("guion_plazos")) == plazos
                 # Y del modo que se está haciendo: un guion de precio no vale
@@ -3690,6 +3701,7 @@ def run_nicho_pov_bof_largo_guiones(job: Job, on_log: OnLog, on_progress: OnProg
             guion=largo_config.recortar_cta(
                 largo_config.cerrar_guion(escrito["guion"], estilo), plazos=plazos, envio=envio,
             ),
+            guion_manual=False,
             subliminal=escrito["subliminal"],
             nombre_guion=escrito["nombre"], guion_plazos=plazos,
             guion_estilo=estilo, guion_segundos=segundos,
