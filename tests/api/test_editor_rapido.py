@@ -416,3 +416,198 @@ def test_admin_cuentas_y_dar(rapido):
     assert c.post(f"{BASE}/admin/dar", headers=adm, json={"email": "nuevo@example.com", "creditos": -2}).json()["creditos"] == 5
     assert any(x["email"] == "nuevo@example.com" for x in c.get(f"{BASE}/admin/cuentas", headers=adm).json()["cuentas"])
     assert c.post(f"{BASE}/admin/dar", headers=adm, json={"email": "mal", "creditos": 1}).status_code in (400, 422)
+
+
+# ───────────────────────── Actividad, valoración, dataset ─────────────────────────
+
+def _listo(c, q, hdr, monkeypatch, tmp_path, vid=None):
+    """Sube, corta y ejecuta el runner con herramientas falsas. Devuelve vid."""
+    vid = vid or _subir(c, hdr).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={})
+    job = q.get_all()[-1]
+    sc = _falsas_estilo(monkeypatch, [], [])
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+    svc.ejecutar(job, lambda m: None, lambda f, m="": None)
+    return vid
+
+
+def _adm():
+    return {"Authorization": "Bearer " + make_ticket("jefe@example.com", "", scope="rapido", extra={"rol": "admin"})}
+
+
+def test_eventos_flujo_completo_y_ttl(rapido, monkeypatch, tmp_path):
+    c, q, hdr = rapido
+    ttls = []
+    r = svc.get_editor_redis()
+    r.expire = lambda k, s: ttls.append((k, s)) or True
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    tipos = [e["tipo"] for e in svc.leer_eventos(vid)]
+    assert tipos == ["subido", "cortar", "listo"]
+    listo = svc.leer_eventos(vid)[-1]
+    assert listo["n_cortes"] == 2 and listo["segundos_quitados"] == 4.0 and listo["duracion_final_s"] == 70.0
+    assert listo["proceso_s"] >= 0 and listo["email"] == EMAIL
+    assert any(k.startswith("rapido:eventos:") and s == 180 * 86400 for k, s in ttls)
+    # retocar: devolver el corte 0 → evento con lo devuelto
+    assert c.post(f"{BASE}/videos/{vid}/retocar", headers=hdr, json={"devueltos": [0]}).status_code == 202
+    ev = svc.leer_eventos(vid)[-1]
+    assert ev["tipo"] == "retocar" and ev["nuevos_devueltos"] == [0] and ev["re_aplicados"] == []
+    # estilo
+    f = svc.cargar_ficha(vid); f["estado"] = "listo"; svc.guardar_ficha(f)
+    c.post(f"{BASE}/videos/{vid}/estilo", headers=hdr, json={"flecha": {"activo": False}})
+    assert svc.leer_eventos(vid)[-1]["tipo"] == "estilo"
+
+
+def test_registrar_evento_nunca_lanza(rapido, monkeypatch):
+    monkeypatch.setattr(svc, "get_editor_redis", lambda: (_ for _ in ()).throw(RuntimeError("redis caído")))
+    assert svc.registrar_evento("abc", EMAIL, "subido") is None
+
+
+def test_valorar_y_calidad(rapido, monkeypatch, tmp_path):
+    c, q, hdr = rapido
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    assert c.post(f"{BASE}/videos/{vid}/valorar", headers=hdr, json={"nota": 9}).status_code in (400, 422)
+    assert c.post(f"{BASE}/videos/{vid}/valorar", headers=hdr, json={"nota": "meh"}).status_code in (400, 422)
+    assert c.post(f"{BASE}/videos/{vid}/valorar", headers=hdr,
+                  json={"nota": 4, "comentario": "x" * 501}).status_code in (400, 422)
+    r = c.post(f"{BASE}/videos/{vid}/valorar", headers=hdr, json={"nota": "mal", "comentario": " cortó mal "})
+    assert r.json() == {"ok": True, "nota": 1, "voto": "mal"}
+    f = svc.cargar_ficha(vid)
+    assert f["nota"] == 1 and f["comentario"] == "cortó mal"
+    assert svc.leer_eventos(vid)[-1]["tipo"] == "valoracion"
+    assert c.get(f"{BASE}/videos/{vid}", headers=hdr).json()["nota"] == 1
+    # otro usuario no puede valorar; vídeo no listo tampoco
+    otro = {"Authorization": "Bearer " + make_ticket("otro@example.com", "", scope="rapido")}
+    assert c.post(f"{BASE}/videos/{vid}/valorar", headers=otro, json={"nota": 5}).status_code == 404
+    nuevo = _subir(c, hdr).json()["id"]
+    assert c.post(f"{BASE}/videos/{nuevo}/valorar", headers=hdr, json={"nota": 5}).status_code == 409
+
+
+def test_formula_calidad():
+    base = {"estado": "listo", "n_cortes": 4}
+    assert svc.calidad({**base}) == 80
+    assert svc.calidad({**base, "devueltos": [0]}) == 65            # -60·1/4
+    assert svc.calidad({**base, "devueltos": [0, 1, 2, 3]}) == 20   # -60
+    assert svc.calidad({**base, "nota": 1}) == 50
+    assert svc.calidad({**base, "nota": 5, "descarga_sin_retocar": True}) == 100  # 80+10+15 → 100
+    assert svc.calidad({**base, "descarga_sin_retocar": True}) == 95
+    assert svc.calidad({**base, "descarga_sin_retocar": True, "devueltos": [1]}) == 65  # sin bonus si retocó
+    assert svc.calidad({"estado": "listo", "n_cortes": 0}) == 80
+    assert svc.calidad({"estado": "error"}) is None
+    assert svc.nota_valor("bien") == 5 and svc.nota_valor("3") == 3 and svc.nota_valor(True) is None
+
+
+def test_descarga_registra_y_puntua(rapido, monkeypatch, tmp_path):
+    c, q, hdr = rapido
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    c.get(f"{BASE}/videos/{vid}/archivo", headers=hdr)  # reproducir no cuenta
+    assert svc.cargar_ficha(vid).get("descargas", 0) == 0
+    assert c.get(f"{BASE}/videos/{vid}/archivo?descargar=true", headers=hdr).status_code == 200
+    f = svc.cargar_ficha(vid)
+    assert f["descargas"] == 1 and f["descarga_sin_retocar"] is True
+    ev = svc.leer_eventos(vid)[-1]
+    assert ev["tipo"] == "descarga" and ev["sin_retocar"] is True
+    assert svc.calidad(f) == 95
+
+
+def test_historial_usuario_y_fecha(rapido, monkeypatch, tmp_path):
+    c, q, hdr = rapido
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    lista = c.get(f"{BASE}/videos", headers=hdr).json()["videos"]
+    assert lista[0]["fecha"][:10] == svc.fecha_dia() and "T" in lista[0]["fecha"]
+    h = c.get(f"{BASE}/historial", headers=hdr).json()
+    assert h == {"dias": [{"fecha": svc.fecha_dia(), "videos": 1, "minutos_gastados": 2}],
+                 "creditos_gastados_total": 2}
+    # un fallo devuelve créditos y se descuenta del historial
+    v2 = _subir(c, hdr).json()["id"]
+    svc.ajustar_creditos(EMAIL, 0)
+    c.post(f"{BASE}/videos/{v2}/cortar", headers=hdr, json={})
+    q.set_status(q.get_all()[-1].id, "failed")
+    c.get(f"{BASE}/videos/{v2}", headers=hdr)
+    assert c.get(f"{BASE}/historial", headers=hdr).json()["creditos_gastados_total"] == 2
+    # solo cuenta el propio usuario
+    otro = {"Authorization": "Bearer " + make_ticket("otro@example.com", "", scope="rapido")}
+    assert c.get(f"{BASE}/historial", headers=otro).json() == {"dias": [], "creditos_gastados_total": 0}
+
+
+def test_admin_actividad_y_video(rapido, monkeypatch, tmp_path):
+    c, q, hdr = rapido
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    c.post(f"{BASE}/videos/{vid}/valorar", headers=hdr, json={"nota": 5})
+    assert c.get(f"{BASE}/admin/actividad", headers=hdr).status_code == 403
+    assert c.get(f"{BASE}/admin/videos/{vid}", headers=hdr).status_code == 403
+    a = c.get(f"{BASE}/admin/actividad?dias=3", headers=_adm()).json()
+    assert len(a["dias"]) == 3 and a["dias"][-1] == {"fecha": svc.fecha_dia(), "videos": 1, "minutos": 1.6, "usuarios": 1}
+    assert a["dias"][0]["videos"] == 0
+    v = a["videos"][0]
+    assert v["id"] == vid and v["email"] == EMAIL and v["estado"] == "listo" and v["cortes"] == 2
+    assert v["devueltos"] == 0 and v["descargado"] is False and v["nota"] == 5 and v["calidad"] == 90
+    assert set(v) == {"id", "email", "nombre", "fecha", "duracion_s", "estado", "cortes", "devueltos",
+                      "descargado", "nota", "calidad"}
+    d = c.get(f"{BASE}/admin/videos/{vid}", headers=_adm()).json()
+    assert d["ficha"]["id"] == vid and d["ficha"]["calidad"] == 90
+    assert [e["tipo"] for e in d["eventos"]] == ["subido", "cortar", "listo", "valoracion"]
+    assert d["original_url"].endswith(f"/admin/videos/{vid}/archivo?tipo=original")
+    # archivos con ticket admin en query
+    t = make_ticket("jefe@example.com", "", scope="rapido", extra={"rol": "admin"})
+    assert c.get(f"{BASE}/admin/videos/{vid}/archivo?tipo=original&t={t}").content == b"datos"
+    assert c.get(f"{BASE}/admin/videos/{vid}/archivo?tipo=resultado&t={t}").status_code == 200
+    assert c.get(f"{BASE}/admin/videos/{vid}/archivo?tipo=original", headers=hdr).status_code == 403
+    assert c.get(f"{BASE}/admin/videos/zzz", headers=_adm()).status_code == 404
+
+
+def test_dataset_hardlink_cortes_finales_y_optout(rapido, monkeypatch, tmp_path):
+    c, q, hdr = rapido
+    ds = tmp_path / "ds"
+    monkeypatch.setenv("EDITOR_RAPIDO_DATASET_DIR", str(ds))
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    d = ds / vid
+    assert (d / "original.mp4").read_bytes() == b"datos"
+    assert (d / "original.mp4").stat().st_ino == svc.ruta_original(vid).stat().st_ino  # hardlink
+    assert len(json.loads((d / "cortes.json").read_text())) == 2
+    assert json.loads((d / "eventos.json").read_text())[-1]["tipo"] == "listo"
+    # tras devolver un corte, cortes_finales lo excluye
+    f = svc.cargar_ficha(vid); f["devueltos"] = [0]; svc.guardar_ficha(f)
+    svc.guardar_dataset(f)
+    assert [x["id"] for x in json.loads((d / "cortes_finales.json").read_text())] == [1]
+    # borrar el vídeo conserva el original en el dataset
+    assert c.delete(f"{BASE}/videos/{vid}", headers=hdr).status_code == 200
+    assert (d / "original.mp4").exists() and json.loads((d / "eventos.json").read_text())[-1]["tipo"] == "borrado"
+    # opt-out: el ticket lleva no_dataset
+    optout = {"Authorization": "Bearer " + make_ticket("opt@example.com", "", scope="rapido", extra={"no_dataset": True})}
+    v2 = _subir(c, optout).json()["id"]
+    c.post(f"{BASE}/videos/{v2}/cortar", headers=optout, json={})
+    job = q.get_all()[-1]
+    sc = _falsas_estilo(monkeypatch, [], [])
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(v2))
+    svc.ejecutar(job, lambda m: None, lambda f, m="": None)
+    assert not (ds / v2).exists()
+
+
+def test_dataset_poco_disco_no_copia(rapido, monkeypatch, tmp_path, caplog):
+    c, q, hdr = rapido
+    ds = tmp_path / "ds"
+    monkeypatch.setenv("EDITOR_RAPIDO_DATASET_DIR", str(ds))
+    monkeypatch.setattr(svc.os, "link", lambda a, b: (_ for _ in ()).throw(OSError("otro disco")))
+    monkeypatch.setattr(svc.shutil, "disk_usage", lambda p: type("U", (), {"free": 2 * 1024 ** 3})())
+    vid = _listo(c, q, hdr, monkeypatch, tmp_path)
+    assert not (ds / vid / "original.mp4").exists()
+    assert "no se copia" in caplog.text
+    # con disco de sobra, copia
+    monkeypatch.setattr(svc.shutil, "disk_usage", lambda p: type("U", (), {"free": 50 * 1024 ** 3})())
+    svc.guardar_dataset(svc.cargar_ficha(vid))
+    assert (ds / vid / "original.mp4").read_bytes() == b"datos"
+
+
+def test_limpieza_global_no_toca_editor_rapido(rapido, monkeypatch, tmp_path):
+    import os
+    from src.api import temp_storage as ts
+    monkeypatch.setenv("API_TEMP_ROOT", str(tmp_path / "raiz"))
+    sub = ts.upload_subdir("editor_rapido") / "abc"
+    sub.mkdir()
+    f = sub / "original.mp4"; f.write_bytes(b"x")
+    otro = ts.upload_subdir("copyright") / "viejo.mp4"; otro.write_bytes(b"x")
+    viejo = 1_000_000
+    os.utime(f, (viejo, viejo)); os.utime(otro, (viejo, viejo))
+    ts.cleanup_expired()
+    assert f.exists() and not otro.exists()

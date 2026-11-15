@@ -110,6 +110,9 @@ def cleanup_expired(ttl_seconds: int = DEFAULT_TTL_SECONDS) -> tuple[int, int]:
     for path in uploads.rglob("*"):
         if not path.is_file():
             continue
+        # El editor rápido gestiona sus propios ficheros (originales, dataset): no se limpian aquí.
+        if path.relative_to(uploads).parts[:1] == ("editor_rapido",):
+            continue
         try:
             stat = path.stat()
         except OSError:

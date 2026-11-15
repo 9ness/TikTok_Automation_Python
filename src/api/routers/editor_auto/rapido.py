@@ -113,9 +113,19 @@ class Retoque(BaseModel):
     devueltos: list[int] = Field(default_factory=list, description="Ids de cortes que se devuelven al vídeo")
 
 
+class Valoracion(BaseModel):
+    nota: int | str = Field(..., description="1-5, o «bien» (=5) / «mal» (=1)")
+    comentario: str | None = Field(None, max_length=500)
+
+
 class AjusteCreditos(BaseModel):
     email: str
     delta: int
+
+
+def _optout(ficha: dict, claims: TicketClaims) -> None:
+    """Si el ticket lleva `no_dataset: true`, la ficha no entra en el dataset de entrenamiento."""
+    ficha["no_dataset"] = bool((claims.raw or {}).get("no_dataset"))
 
 
 def _ficha_o_404(vid: str, email: str) -> dict:
@@ -151,6 +161,7 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
         "creditos": ficha["creditos"], "creado": ficha["creado"], "error": ficha.get("error"),
         "ajustes": ficha.get("ajustes"), "version": ficha.get("version", 0),
         "aviso": ficha.get("aviso"), "resumen": svc.resumen(ficha),
+        "fecha": svc.fecha_iso(ficha["creado"]), "nota": ficha.get("nota"),
         "progreso": None,
     }
     if ficha["estado"] == "cola" and job is not None:
@@ -234,6 +245,10 @@ async def subir(claims: Claims, file: Annotated[UploadFile, File(...)]) -> dict:
     ficha_prov["bytes"] = total
     ficha_prov["creditos"] = svc.creditos_de(dur)
     svc.guardar_ficha(ficha_prov)
+    svc.indexar(vid)
+    svc.registrar_evento(vid, claims.email, "subido", {
+        "nombre": nombre[:120], "duracion_s": ficha_prov["duracion_s"], "bytes": total,
+        "creditos": ficha_prov["creditos"], "via": "multipart"})
     return {
         "id": vid, "duracion_s": ficha_prov["duracion_s"], "creditos": ficha_prov["creditos"],
         "saldo": int(svc.saldo(claims.email)["creditos"]),
@@ -313,6 +328,10 @@ def subida_fin(vid: str, claims: Claims) -> dict:
         raise ValidationError(f"Máximo {svc.MAX_MINUTOS} minutos por vídeo.")
     f.update(estado="subido", duracion_s=round(dur, 2), bytes=tam, creditos=svc.creditos_de(dur))
     svc.guardar_ficha(f)
+    svc.indexar(vid)
+    svc.registrar_evento(vid, claims.email, "subido", {
+        "nombre": f["nombre"], "duracion_s": f["duracion_s"], "bytes": tam,
+        "creditos": f["creditos"], "via": "trozos"})
     return {"id": vid, "duracion_s": f["duracion_s"], "creditos": f["creditos"],
             "saldo": int(svc.saldo(claims.email)["creditos"])}
 
@@ -338,7 +357,12 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
         enqueued_by=claims.email,
     )
     ficha["job_id"] = job.id
+    _optout(ficha, claims)
+    ficha["cobrado_fecha"] = svc.contar_uso(claims.email, int(ficha["creditos"]) if not admin else 0, ficha["duracion_s"])
     svc.guardar_ficha(ficha)
+    svc.registrar_evento(vid, claims.email, "cortar", {
+        "ajustes": ficha["ajustes"], "creditos": int(ficha["creditos"]) if not admin else 0,
+        "duracion_s": ficha["duracion_s"]})
     return {"ok": True, "job_id": job.id, "saldo": int(svc.saldo(claims.email)["creditos"])}
 
 
@@ -368,8 +392,13 @@ def retocar(vid: str, body: Retoque, claims: Claims, queue: Annotated[JobQueue, 
         params={"video_id": vid, "modo": "retoque", "devueltos": sorted(pedidos), "user_name": claims.email},
         enqueued_by=claims.email,
     )
+    previos = set(ficha.get("devueltos") or [])
     ficha.update(estado="cola", job_id=job.id, error=None)
+    _optout(ficha, claims)
     svc.guardar_ficha(ficha)
+    svc.registrar_evento(vid, claims.email, "retocar", {
+        "devueltos": sorted(pedidos), "nuevos_devueltos": sorted(pedidos - previos),
+        "re_aplicados": sorted(previos - pedidos), "n_cortes": len(validos)})
     return {"ok": True, "job_id": job.id}
 
 
@@ -396,7 +425,31 @@ def cambiar_estilo(vid: str, body: Estilo, claims: Claims, queue: Annotated[JobQ
     )
     ficha.update(ajustes=aj, estado="cola", job_id=job.id, error=None, aviso=None)
     svc.guardar_ficha(ficha)
+    svc.registrar_evento(vid, claims.email, "estilo", {"subtitulos": sub, "flecha": fl})
     return {"ok": True, "job_id": job.id}
+
+
+@router.post("/videos/{vid}/valorar")
+def valorar(vid: str, body: Valoracion, claims: Claims) -> dict:
+    """«¿Qué tal el corte?»: `nota` 1-5 (o «bien»/«mal») y comentario opcional. Se puede repetir (gana la última)."""
+    nota = svc.nota_valor(body.nota)
+    if nota is None:
+        raise ValidationError("La nota debe ser 1-5, «bien» o «mal».")
+    ficha = _ficha_o_404(vid, claims.email)
+    if ficha["estado"] != "listo":
+        raise APIError("El vídeo aún no está listo para valorar.", status_code=409)
+    ficha.update(nota=nota, comentario=(body.comentario or "").strip() or None, valorado=time.time())
+    _optout(ficha, claims)
+    svc.guardar_ficha(ficha)
+    svc.registrar_evento(vid, claims.email, "valoracion", {"nota": nota, "comentario": ficha["comentario"]})
+    svc.guardar_dataset(ficha)
+    return {"ok": True, "nota": nota, "voto": "bien" if nota >= 4 else "mal" if nota <= 2 else "regular"}
+
+
+@router.get("/historial")
+def historial(claims: Claims) -> dict:
+    """Días con actividad de los últimos 30 (más reciente primero) y créditos gastados en total."""
+    return svc.historial(claims.email, 30)
 
 
 @router.get("/videos/{vid}/archivo")
@@ -414,6 +467,16 @@ def archivo(
     ruta = svc.ruta_resultado(vid) if tipo == "resultado" else svc.ruta_original(vid)
     if ruta is None or not ruta.exists():
         raise APIError("Todavía no hay archivo.", status_code=404)
+    if tipo == "resultado" and descargar:
+        sin_retocar = not (ficha.get("devueltos") or [])
+        ficha["descargas"] = int(ficha.get("descargas", 0)) + 1
+        if sin_retocar:
+            ficha["descarga_sin_retocar"] = True
+        _optout(ficha, claims)
+        svc.guardar_ficha(ficha)
+        svc.registrar_evento(vid, claims.email, "descarga", {
+            "version": ficha.get("version", 0), "sin_retocar": sin_retocar})
+        svc.guardar_dataset(ficha)
     base = re.sub(r"[^A-Za-z0-9._-]+", "_", ficha["nombre"].rsplit(".", 1)[0]) or "video"
     return FileResponse(
         ruta, media_type="video/mp4" if tipo == "resultado" else None,
@@ -427,6 +490,8 @@ def borrar(vid: str, claims: Claims) -> dict:
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] == "cola":
         raise APIError("Espera a que termine el corte.", status_code=409)
+    svc.registrar_evento(vid, claims.email, "borrado", {"estado": ficha["estado"]})
+    svc.guardar_dataset(ficha)  # el original se conserva (hardlink) salvo opt-out
     svc.borrar_ficha(ficha)
     return {"ok": True}
 
@@ -457,3 +522,43 @@ def admin_dar(body: DarCreditos, claims: Claims) -> dict:
         raise ValidationError("Email no válido.")
     svc.saldo(email)
     return {"email": email, "creditos": svc.ajustar_creditos(email, body.creditos)}
+
+
+@router.get("/admin/actividad")
+def admin_actividad(claims: Claims, dias: Annotated[int, Query(ge=1, le=90)] = 7) -> dict:
+    """Uso por día (con ceros) y los últimos 100 vídeos con su puntuación (solo rol admin)."""
+    _admin_o_403(claims)
+    return svc.actividad(dias, 100)
+
+
+@router.get("/admin/videos/{vid}")
+def admin_video(vid: str, claims: Claims) -> dict:
+    """Ficha completa + eventos + calidad + enlaces a original y resultado (añade `?t=<ticket>`)."""
+    _admin_o_403(claims)
+    f = svc.cargar_ficha(vid)
+    if f is None:
+        raise APIError("Vídeo no encontrado.", status_code=404)
+    n = f.get("n_cortes")
+    ficha = {**f, "fecha": svc.fecha_iso(f.get("creado", 0)), "calidad": svc.calidad(f),
+             "n_cortes": n if n is not None else (len(svc.leer_cortes(vid)) if f.get("estado") == "listo" else None)}
+    base = f"{router.prefix}/admin/videos/{vid}/archivo"
+    return {
+        "ficha": ficha, "eventos": svc.leer_eventos(vid),
+        "cortes": svc.leer_cortes(vid) if f.get("estado") == "listo" else [],
+        "original_url": f"{base}?tipo=original", "resultado_url": f"{base}?tipo=resultado",
+    }
+
+
+@router.get("/admin/videos/{vid}/archivo")
+def admin_video_archivo(
+    vid: str, claims: Claims,
+    tipo: Annotated[str, Query(pattern="^(resultado|original)$")] = "resultado",
+):
+    """Original o resultado de cualquier usuario (ticket admin en cabecera o `?t=`)."""
+    _admin_o_403(claims)
+    if svc.cargar_ficha(vid) is None:
+        raise APIError("Vídeo no encontrado.", status_code=404)
+    ruta = svc.ruta_resultado(vid) if tipo == "resultado" else svc.ruta_original(vid)
+    if ruta is None or not ruta.exists():
+        raise APIError("Todavía no hay archivo.", status_code=404)
+    return FileResponse(ruta, media_type="video/mp4" if tipo == "resultado" else None)

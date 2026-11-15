@@ -341,3 +341,17 @@ API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapi
 - La vista del vídeo trae `aviso` y `resumen {pausas, repeticiones(0: no se distingue), segundos_quitados, duracion_original_s, duracion_final_s}`.
 - Admin: `GET /admin/cuentas` → `{cuentas[{email,creditos,n_videos}]}` y `POST /admin/dar {email, creditos(+/-)}` → `{email, creditos}` (ticket con rol admin, 403 si no;
   set Redis `editor_rapido:cuentas`, que se rellena con KEYS si está vacío). `POST /admin/creditos` (API key) sigue igual.
+- **Actividad y puntuación (15/11/2026).** `registrar_evento(vid, email, tipo, datos)` (servicio.py) guarda la lista de eventos del vídeo en Redis `rapido:eventos:<vid>`
+  (máx. 300, TTL 180 días, `EDITOR_RAPIDO_EVENTOS_DIAS`; nunca lanza): `subido`, `cortar` (ajustes), `listo` (duraciones, n_cortes, n_aplicados, segundos_quitados, proceso_s),
+  `aviso`, `error`, `retocar` (devueltos / nuevos_devueltos / re_aplicados), `estilo`, `descarga` (solo `GET /archivo?descargar=true`), `valoracion`, `borrado`.
+  Agregados con el mismo TTL: `rapido:dia:<fecha>` (vídeos, segundos, usuarios), `rapido:hist:<email>` (por día y créditos totales), índice `rapido:indice` (últimos 500). Días en hora de Madrid.
+- `POST /videos/{id}/valorar {nota: 1-5|"bien"|"mal", comentario?≤500}` → `{ok, nota, voto}` (409 si no está listo). `GET /historial` → `{dias[{fecha,videos,minutos_gastados}] (30 días con actividad, recientes primero), creditos_gastados_total}`.
+  `GET /videos` y la vista del vídeo traen `fecha` (ISO) y `nota`.
+- **Calidad interna** (`servicio.calidad`, 0-100, solo «listo»): `80 − 60·(devueltos/n_cortes) + {1:−30, 2:−20, 3:0, 4:+5, 5:+10}[nota] + 15 si descargó sin devolver cortes`.
+- Admin (rol admin del ticket): `GET /admin/actividad?dias=7` → `{dias[{fecha,videos,minutos,usuarios}] (con ceros, antiguo→reciente), videos[{id,email,nombre,fecha,duracion_s,estado,cortes,devueltos,descargado,nota,calidad}] (100)}`;
+  `GET /admin/videos/{id}` → `{ficha, eventos, cortes, original_url, resultado_url}`; `GET /admin/videos/{id}/archivo?tipo=original|resultado` (ticket en cabecera o `?t=`).
+- **Dataset de entrenamiento:** `<EDITOR_RAPIDO_DATASET_DIR | raíz de datos/_dataset>/<vid>/` con `original.*` (hardlink; copia si es otro disco y quedan ≥ `EDITOR_RAPIDO_DATASET_MIN_GB`=8 GB libres),
+  `cortes.json`, `cortes_finales.json` (sin los devueltos), `eventos.json`, `ficha.json`. Se refresca al quedar listo, valorar, descargar y borrar (borrar el vídeo NO borra el dataset). Sin caducidad automática.
+  Opt-out: ticket con `"no_dataset": true`. Sin él, la privacidad/términos de la web deben avisar de que se conservan los vídeos.
+- `temp_storage.cleanup_expired` (arranque de la API, TTL 24 h sobre `api_uploads/`) ahora SALTA `editor_rapido/`: antes borraba originales y resultados de más de un día en cada reinicio/deploy.
+  El editor rápido aún no tiene caducidad propia para los vídeos de los usuarios (crece el disco).

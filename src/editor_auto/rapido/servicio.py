@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import shutil
@@ -17,8 +18,10 @@ import subprocess
 import threading
 import time
 import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
+from zoneinfo import ZoneInfo
 
 from src.editor_auto.repos.redis_base import get_editor_redis
 
@@ -37,6 +40,12 @@ FUENTES = (
     ("caveat", "Manuscrita"), ("fredoka", "Fredoka"),
 )
 _K_CUENTAS = "editor_rapido:cuentas"
+logger = logging.getLogger("editor_auto.rapido")
+TZ = ZoneInfo("Europe/Madrid")
+# Eventos y agregados por día: 180 días por defecto.
+EVENTOS_TTL_S = int(os.getenv("EDITOR_RAPIDO_EVENTOS_DIAS", "180")) * 86400
+MAX_EVENTOS = 300  # por vídeo
+MAX_INDICE = 500   # vídeos del índice global (admin)
 
 MAX_MINUTOS = int(os.getenv("EDITOR_RAPIDO_MAX_MINUTOS", "30"))
 MAX_BYTES = int(os.getenv("EDITOR_RAPIDO_MAX_MB", "1024")) * 1024 * 1024
@@ -302,6 +311,257 @@ def devolver_creditos(ficha: dict) -> None:
         f["devuelto"] = True
         guardar_ficha(f)
     ajustar_creditos(f["email"], int(f.get("creditos", 0)))
+    descontar_historial(f["email"], f.get("cobrado_fecha"), int(f.get("creditos", 0)))
+
+
+# ───────────────────────── Eventos, historial y puntuación ─────────────────────────
+
+def fecha_dia(ts: float | None = None) -> str:
+    return datetime.fromtimestamp(ts if ts is not None else time.time(), TZ).strftime("%Y-%m-%d")
+
+
+def fecha_iso(ts: float) -> str:
+    return datetime.fromtimestamp(ts, TZ).isoformat(timespec="seconds")
+
+
+def _k_eventos(vid: str) -> str:
+    return f"rapido:eventos:{vid}"
+
+
+def _k_dia(dia: str) -> str:
+    return f"rapido:dia:{dia}"
+
+
+def _k_hist(email: str) -> str:
+    return f"rapido:hist:{email}"
+
+
+_K_INDICE = "rapido:indice"
+
+
+def _ttl(key: str) -> None:
+    exp = getattr(get_editor_redis(), "expire", None)
+    if exp:
+        try:
+            exp(key, EVENTOS_TTL_S)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _mget(keys: list[str]) -> list:
+    r = get_editor_redis()
+    f = getattr(r, "mget_json", None)
+    return f(keys) if f else [r.get_json(k) for k in keys]
+
+
+def registrar_evento(vid: str, email: str, tipo: str, datos: dict | None = None) -> dict | None:
+    """Añade un evento a la lista del vídeo (`rapido:eventos:<vid>`, TTL 180 días, máx. 300).
+
+    Nunca lanza: registrar no puede romper el flujo del usuario. Tipos usados: subido, cortar,
+    listo, aviso, error, retocar, estilo, descarga, valoracion, borrado.
+    """
+    try:
+        ahora = time.time()
+        ev = {"t": round(ahora, 2), "fecha": fecha_iso(ahora), "tipo": tipo, "email": email, **(datos or {})}
+        r = get_editor_redis()
+        with _LOCK:
+            lst = r.get_json(_k_eventos(vid))
+            lst = lst if isinstance(lst, list) else []
+            lst.append(ev)
+            r.set_json(_k_eventos(vid), lst[-MAX_EVENTOS:])
+            _ttl(_k_eventos(vid))
+        return ev
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[rapido] no se pudo registrar el evento %s de %s: %s", tipo, vid, e)
+        return None
+
+
+def leer_eventos(vid: str) -> list[dict]:
+    lst = get_editor_redis().get_json(_k_eventos(vid))
+    return lst if isinstance(lst, list) else []
+
+
+def indexar(vid: str) -> None:
+    """Pone el vídeo al principio del índice global (para el listado del admin)."""
+    try:
+        r = get_editor_redis()
+        with _LOCK:
+            idx = r.get_json(_K_INDICE)
+            idx = [i for i in (idx if isinstance(idx, list) else []) if i != vid]
+            r.set_json(_K_INDICE, [vid, *idx][:MAX_INDICE])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[rapido] no se pudo indexar %s: %s", vid, e)
+
+
+def contar_uso(email: str, creditos: int, duracion_s: float) -> str:
+    """Suma un vídeo cortado al agregado del día (global y del usuario). Devuelve la fecha."""
+    dia = fecha_dia()
+    try:
+        r = get_editor_redis()
+        with _LOCK:
+            d = r.get_json(_k_dia(dia)) or {}
+            usuarios = set(d.get("usuarios") or [])
+            usuarios.add(email)
+            d = {"videos": int(d.get("videos", 0)) + 1,
+                 "segundos": round(float(d.get("segundos", 0.0)) + float(duracion_s), 1),
+                 "usuarios": sorted(usuarios)}
+            r.set_json(_k_dia(dia), d)
+            _ttl(_k_dia(dia))
+            h = r.get_json(_k_hist(email)) or {}
+            dias = dict(h.get("dias") or {})
+            x = dict(dias.get(dia) or {"videos": 0, "creditos": 0})
+            x["videos"] = int(x.get("videos", 0)) + 1
+            x["creditos"] = int(x.get("creditos", 0)) + int(creditos)
+            dias[dia] = x
+            for viejo in sorted(dias)[:-180]:
+                dias.pop(viejo, None)
+            r.set_json(_k_hist(email), {"dias": dias,
+                                        "creditos_total": int(h.get("creditos_total", 0)) + int(creditos)})
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[rapido] no se pudo contar el uso de %s: %s", email, e)
+    return dia
+
+
+def descontar_historial(email: str, dia: str | None, creditos: int) -> None:
+    """Resta del historial los créditos devueltos tras un fallo."""
+    if not creditos:
+        return
+    try:
+        r = get_editor_redis()
+        with _LOCK:
+            h = r.get_json(_k_hist(email)) or {}
+            dias = dict(h.get("dias") or {})
+            if dia and dia in dias:
+                dias[dia] = {**dias[dia], "creditos": max(0, int(dias[dia].get("creditos", 0)) - creditos)}
+            r.set_json(_k_hist(email), {"dias": dias,
+                                        "creditos_total": max(0, int(h.get("creditos_total", 0)) - creditos)})
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[rapido] no se pudo descontar el historial de %s: %s", email, e)
+
+
+def historial(email: str, dias: int = 30) -> dict:
+    """Días con actividad del usuario (más reciente primero) y créditos gastados en total."""
+    h = get_editor_redis().get_json(_k_hist(email)) or {}
+    desde = fecha_dia(time.time() - (dias - 1) * 86400)
+    out = [{"fecha": f, "videos": int(x.get("videos", 0)), "minutos_gastados": int(x.get("creditos", 0))}
+           for f, x in sorted((h.get("dias") or {}).items(), reverse=True) if f >= desde]
+    return {"dias": out, "creditos_gastados_total": int(h.get("creditos_total", 0))}
+
+
+def actividad(dias: int = 7, limite_videos: int = 100) -> dict:
+    """Admin: agregado por día (con ceros, de más antiguo a más reciente) + últimos vídeos."""
+    ahora = time.time()
+    fechas = [fecha_dia(ahora - i * 86400) for i in range(dias - 1, -1, -1)]
+    datos = _mget([_k_dia(f) for f in fechas])
+    lista = [{"fecha": f, "videos": int((d or {}).get("videos", 0)),
+              "minutos": round(float((d or {}).get("segundos", 0.0)) / 60.0, 1),
+              "usuarios": len((d or {}).get("usuarios") or [])} for f, d in zip(fechas, datos)]
+    idx = get_editor_redis().get_json(_K_INDICE)
+    ids = (idx if isinstance(idx, list) else [])[: limite_videos * 2]
+    fichas = [f for f in _mget([_k_ficha(i) for i in ids]) if f and f.get("estado") != "subiendo"][:limite_videos]
+    return {"dias": lista, "videos": [resumen_admin(f) for f in fichas]}
+
+
+def resumen_admin(f: dict) -> dict:
+    return {
+        "id": f["id"], "email": f.get("email"), "nombre": f.get("nombre"),
+        "fecha": fecha_iso(f.get("creado", 0)), "duracion_s": f.get("duracion_s"),
+        "estado": f.get("estado"), "cortes": f.get("n_cortes"),
+        "devueltos": len(f.get("devueltos") or []),
+        "descargado": int(f.get("descargas", 0)) > 0, "nota": f.get("nota"), "calidad": calidad(f),
+    }
+
+
+_BONUS_NOTA = {1: -30, 2: -20, 3: 0, 4: 5, 5: 10}
+
+
+def nota_valor(nota: Any) -> int | None:
+    """1-5, «bien» (=5) o «mal» (=1). None si no es válida."""
+    if isinstance(nota, bool):
+        return None
+    if isinstance(nota, str):
+        t = nota.strip().lower()
+        if t in ("bien", "mal"):
+            return 5 if t == "bien" else 1
+        nota = int(t) if t.isdigit() else None
+    return nota if isinstance(nota, int) and 1 <= nota <= 5 else None
+
+
+def calidad(f: dict) -> int | None:
+    """Puntuación interna 0-100 de un corte (solo vídeos «listo»; None si aún no vale).
+
+        calidad = 80
+                  − 60 · (cortes devueltos / cortes totales)      el usuario deshizo cortes
+                  + {1: −30, 2: −20, 3: 0, 4: +5, 5: +10}[nota]  valoración «¿Qué tal el corte?»
+                  + 15 si descargó SIN devolver ningún corte
+        (limitada a 0-100). Base 80 y no 100 para que el «descargó sin tocar» tenga recorrido.
+    """
+    if f.get("estado") != "listo":
+        return None
+    n = int(f.get("n_cortes") or 0)
+    dev = len(f.get("devueltos") or [])
+    c = 80.0
+    if n > 0:
+        c -= 60.0 * min(1.0, dev / n)
+    if f.get("nota") in _BONUS_NOTA:
+        c += _BONUS_NOTA[f["nota"]]
+    if f.get("descarga_sin_retocar") and not dev:
+        c += 15
+    return int(round(max(0.0, min(100.0, c))))
+
+
+# ───────────────────────── Dataset de entrenamiento ─────────────────────────
+
+def dataset_dir() -> Path:
+    """`EDITOR_RAPIDO_DATASET_DIR` o `<raíz de datos>/_dataset` (en el volumen del disco ampliado
+    vía `API_TEMP_PATH`). La limpieza global de `api_uploads` no toca `editor_rapido`."""
+    e = os.getenv("EDITOR_RAPIDO_DATASET_DIR")
+    return Path(e) if e else raiz_datos() / "_dataset"
+
+
+def guardar_dataset(ficha: dict) -> Path | None:
+    """Deja en `<dataset>/<vid>/` el original (hardlink; copia si es otro disco), `cortes.json`,
+    `cortes_finales.json` (los que siguen aplicados tras el retoque), `eventos.json` y `ficha.json`.
+
+    Idempotente (se refresca en cada hito). No hace nada si el ticket llevaba `no_dataset`
+    (ficha.no_dataset) ni si hay que COPIAR y quedan menos de `EDITOR_RAPIDO_DATASET_MIN_GB`
+    (8 por defecto) libres: entonces avisa en el log. Nunca lanza. Sin caducidad automática.
+    """
+    if ficha.get("no_dataset"):
+        return None
+    vid = ficha["id"]
+    try:
+        orig = ruta_original(vid)
+        if orig is None:
+            return None
+        destino = dataset_dir() / vid
+        destino.mkdir(parents=True, exist_ok=True)
+        dst = destino / orig.name
+        if not dst.exists():
+            try:
+                os.link(orig, dst)
+            except OSError:
+                minimo = float(os.getenv("EDITOR_RAPIDO_DATASET_MIN_GB", "8")) * 1024 ** 3
+                if shutil.disk_usage(destino).free < minimo:
+                    logger.warning("[rapido] dataset: menos de %s GB libres, no se copia %s",
+                                   os.getenv("EDITOR_RAPIDO_DATASET_MIN_GB", "8"), vid)
+                    return None
+                shutil.copy2(orig, dst)
+        cortes = leer_cortes(vid)
+        devueltos = set(ficha.get("devueltos") or [])
+        (destino / "cortes.json").write_text(json.dumps(cortes, ensure_ascii=False), encoding="utf-8")
+        (destino / "cortes_finales.json").write_text(
+            json.dumps([c for c in cortes if c["id"] not in devueltos], ensure_ascii=False), encoding="utf-8")
+        (destino / "eventos.json").write_text(json.dumps(leer_eventos(vid), ensure_ascii=False), encoding="utf-8")
+        meta = {k: ficha.get(k) for k in ("id", "email", "nombre", "duracion_s", "duracion_final_s", "ajustes",
+                                          "estado", "devueltos", "nota", "comentario", "n_cortes", "proceso_s",
+                                          "descargas", "creado")}
+        meta["calidad"] = calidad(ficha)
+        (destino / "ficha.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        return destino
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[rapido] dataset: no se pudo guardar %s: %s", vid, e)
+        return None
 
 
 # ───────────────────────── Ficheros ─────────────────────────
@@ -553,6 +813,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
     from src.editor_auto.tools.base import ToolContext
     from src.editor_auto.tools.silence_cutter import SilenceCutterTool
 
+    t_ini = time.time()
     vid = job.params["video_id"]
     modo = job.params.get("modo", "auto")
     ficha = cargar_ficha(vid)
@@ -561,6 +822,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
     carp = carpeta(vid)
     salida = carp / f"render_{job.id}.mp4"
     cortado = ruta_cortado(vid)
+    n_cortes = None
     try:
         if modo == "estilo":
             if not cortado.exists():  # vídeos cortados antes de existir el estilo: su resultado no lleva subs
@@ -595,6 +857,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                 if proyecto.exists():
                     cortes = calcular_cortes(json.loads(proyecto.read_text(encoding="utf-8")))
                 (carp / "cortes.json").write_text(json.dumps(cortes, ensure_ascii=False), encoding="utf-8")
+                n_cortes = len(cortes)
                 proyecto.unlink(missing_ok=True)
             os.replace(salida, cortado)
             tramos = (0.6, 0.9, 1.0)
@@ -619,12 +882,27 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
         ficha["aviso"] = " ".join(avisos) or None
         if modo == "retoque":
             ficha["devueltos"] = sorted(set(job.params.get("devueltos") or []))
+        if n_cortes is not None:
+            ficha["n_cortes"] = n_cortes
+        ficha["proceso_s"] = round(time.time() - t_ini, 1)
         guardar_ficha(ficha)
+        res = resumen(ficha) or {}
+        registrar_evento(vid, ficha["email"], "listo", {
+            "modo": modo, "duracion_original_s": res.get("duracion_original_s"),
+            "duracion_final_s": ficha["duracion_final_s"], "n_cortes": ficha.get("n_cortes"),
+            "n_aplicados": res.get("pausas"), "segundos_quitados": res.get("segundos_quitados"),
+            "proceso_s": ficha["proceso_s"],
+        })
+        if avisos:
+            registrar_evento(vid, ficha["email"], "aviso", {"modo": modo, "avisos": avisos})
+        guardar_dataset(ficha)
         on_progress(1.0, "Listo")
         return str(final)
     except Exception as e:  # noqa: BLE001
         salida.unlink(missing_ok=True)
         ficha = cargar_ficha(vid) or ficha
+        registrar_evento(vid, ficha["email"], "error", {"modo": modo, "error": str(e)[:300],
+                                                        "proceso_s": round(time.time() - t_ini, 1)})
         if modo == "auto":
             ficha["estado"] = "error"
             ficha["error"] = str(e)[:300]
