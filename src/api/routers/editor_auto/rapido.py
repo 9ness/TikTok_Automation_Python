@@ -55,6 +55,16 @@ def ticket_rapido(
 Claims = Annotated[TicketClaims, Depends(ticket_rapido)]
 
 
+def _nivel(claims: TicketClaims) -> str:
+    """Rol de la cuenta en la web (va firmado en el ticket). Sin rol = «standard»."""
+    rol = str((claims.raw or {}).get("rol") or "standard")
+    return rol if rol in ("standard", "plus", "pro", "admin") else "standard"
+
+
+def _es_admin(claims: TicketClaims) -> bool:
+    return _nivel(claims) == "admin"
+
+
 class Ajustes(BaseModel):
     ritmo: str = Field("natural", description="natural | sin_pausas")
     formato: str = Field("9:16", description="9:16 | original")
@@ -125,7 +135,10 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
 @router.get("/saldo")
 def saldo(claims: Claims) -> dict:
     s = svc.saldo(claims.email)
-    return {"creditos": int(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0))}
+    return {
+        "creditos": int(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0)),
+        "nivel": _nivel(claims), "ilimitado": _es_admin(claims),
+    }
 
 
 @router.get("/videos")
@@ -257,12 +270,13 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] not in ("subido", "error"):
         raise APIError("Este vídeo ya se ha cortado o está en marcha.", status_code=409)
-    if not svc.cobrar(claims.email, int(ficha["creditos"])):
+    admin = _es_admin(claims)  # el admin no gasta créditos
+    if not admin and not svc.cobrar(claims.email, int(ficha["creditos"])):
         raise APIError(
             f"Necesitas {ficha['creditos']} crédito(s) y no te alcanzan.", status_code=402,
             details={"necesarios": ficha["creditos"], "saldo": int(svc.saldo(claims.email)["creditos"])},
         )
-    ficha.update(ajustes=ajustes.model_dump(), cobrado=True, devuelto=False, error=None, estado="cola")
+    ficha.update(ajustes=ajustes.model_dump(), cobrado=not admin, devuelto=False, error=None, estado="cola")
     job = queue.enqueue(
         JobMode.EDITOR_RAPIDO, title=f"Rápido · {ficha['nombre'][:40]}",
         params={"video_id": vid, "modo": "auto", "user_name": claims.email},

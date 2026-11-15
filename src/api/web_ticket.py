@@ -88,12 +88,12 @@ def verify_ticket(token: str) -> TicketClaims:
     )
 
 
-def make_ticket(email: str, day: str, *, scope: str = "upload", ttl_s: int = 1800) -> str:
+def make_ticket(email: str, day: str, *, scope: str = "upload", ttl_s: int = 1800, extra: dict | None = None) -> str:
     """Emite un ticket (para tests locales / scripts). En prod lo firma la web."""
     secret = _secret()
     header = {"alg": "HS256", "typ": "JWT"}
     now = int(time.time())
-    payload = {"email": email.strip().lower(), "day": day, "scope": scope, "iat": now, "exp": now + ttl_s}
+    payload = {"email": email.strip().lower(), "day": day, "scope": scope, "iat": now, "exp": now + ttl_s, **(extra or {})}
     h = _b64url_encode(json.dumps(header, separators=(",", ":")).encode())
     p = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode())
     sig = hmac.new(secret.encode("utf-8"), f"{h}.{p}".encode("ascii"), hashlib.sha256).digest()

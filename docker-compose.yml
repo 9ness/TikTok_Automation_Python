@@ -41,7 +41,7 @@ services:
       # sobrevivan a cada deploy aunque el webhook no propague API_CORS_ORIGINS
       # del .env — sin esto el navegador recibe respuestas sin ACAO y la web
       # falla con "Failed to fetch".
-      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000,http://localhost,https://${DOMAIN:-localhost},https://nebulabsmedia.com,https://www.nebulabsmedia.com,https://nebulabs-media.vercel.app}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000,http://localhost,https://${DOMAIN:-localhost},https://nebulabsmedia.com,https://www.nebulabsmedia.com,https://editor.nebulabsmedia.com,https://nebulabs-media.vercel.app}
       # temp_work y api_uploads viven dentro del volumen persistido.
       API_TEMP_ROOT: "/app/temp_work"
       # Paths de assets DENTRO del container — el `.env` del host puede tener

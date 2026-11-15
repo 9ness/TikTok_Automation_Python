@@ -222,3 +222,20 @@ def test_subida_trozos_formato_y_listado(rapido):
     vid = c.post(f"{BASE}/subidas", headers=hdr, json={"nombre": "a.mov", "bytes": 5}).json()["id"]
     assert c.get(f"{BASE}/videos", headers=hdr).json()["videos"] == []  # a medias no sale
     assert c.put(f"{BASE}/subidas/{vid}?offset=0", headers=hdr, content=b"123456789").status_code in (400, 422)
+
+
+def test_admin_no_gasta_y_nivel(rapido):
+    c, _, _ = rapido
+    adm = {"Authorization": "Bearer " + make_ticket("jefe@example.com", "", scope="rapido", extra={"rol": "admin"})}
+    s = c.get(f"{BASE}/saldo", headers=adm).json()
+    assert s["nivel"] == "admin" and s["ilimitado"] is True
+    svc.ajustar_creditos("jefe@example.com", -3)  # sin saldo
+    vid = _subir(c, adm).json()["id"]
+    assert c.post(f"{BASE}/videos/{vid}/cortar", headers=adm, json={}).status_code == 202
+    assert c.get(f"{BASE}/saldo", headers=adm).json()["creditos"] == 0
+
+
+def test_rol_desconocido_es_standard(rapido):
+    c, _, _ = rapido
+    h = {"Authorization": "Bearer " + make_ticket(EMAIL, "", scope="rapido", extra={"rol": "dios"})}
+    assert c.get(f"{BASE}/saldo", headers=h).json()["nivel"] == "standard"
