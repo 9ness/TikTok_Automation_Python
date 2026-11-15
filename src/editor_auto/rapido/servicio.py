@@ -62,9 +62,19 @@ def gratis_inicial() -> int:
         return 5
 
 
-def creditos_de(duracion_s: float) -> int:
-    """Minutos del original redondeados hacia arriba (mínimo 1)."""
-    return max(1, math.ceil(float(duracion_s) / 60.0 - 1e-9))
+def cr(x) -> float | int:
+    """Créditos en pasos de medio (0,5 = 30 s). Entero si es redondo, para que el JSON
+    siga diciendo 105 y no 105.0."""
+    try:
+        v = round(float(x or 0) * 2) / 2
+    except (TypeError, ValueError):
+        v = 0.0
+    return int(v) if v == int(v) else v
+
+
+def creditos_de(duracion_s: float) -> float | int:
+    """Medios minutos del original redondeados hacia arriba (mínimo 0,5): 30 s = 0,5 créditos."""
+    return cr(max(1, math.ceil(float(duracion_s) / 30.0 - 1e-9)) / 2)
 
 
 def raiz_datos() -> Path:
@@ -208,25 +218,26 @@ def _guardar_saldo(email: str, s: dict) -> None:
     get_editor_redis().set_json(_k_saldo(email), s)
 
 
-def ajustar_creditos(email: str, delta: int) -> int:
+def ajustar_creditos(email: str, delta: float) -> float | int:
     """Suma (o resta) créditos. Devuelve el saldo nuevo (nunca < 0)."""
     saldo(email)
     with _LOCK:
         s = get_editor_redis().get_json(_k_saldo(email)) or {"creditos": 0}
-        s["creditos"] = max(0, int(s.get("creditos", 0)) + int(delta))
+        s["creditos"] = cr(max(0, cr(s.get("creditos", 0)) + cr(delta)))
         _guardar_saldo(email, s)
         get_editor_redis().sadd(_K_CUENTAS, email)
         return s["creditos"]
 
 
-def cobrar(email: str, n: int) -> bool:
+def cobrar(email: str, n: float) -> bool:
     """Descuenta `n` créditos si alcanzan. False si no hay saldo."""
     saldo(email)
     with _LOCK:
         s = get_editor_redis().get_json(_k_saldo(email)) or {"creditos": 0}
-        if int(s.get("creditos", 0)) < n:
+        n = cr(n)
+        if cr(s.get("creditos", 0)) < n:
             return False
-        s["creditos"] = int(s["creditos"]) - n
+        s["creditos"] = cr(cr(s["creditos"]) - n)
         _guardar_saldo(email, s)
         return True
 
@@ -253,7 +264,7 @@ def listar_cuentas() -> list[dict]:
     out = []
     for e in sorted(set(emails)):
         s = r.get_json(_k_saldo(e)) or {}
-        out.append({"email": e, "creditos": int(s.get("creditos", 0)),
+        out.append({"email": e, "creditos": cr(s.get("creditos", 0)),
                     "n_videos": len(r.smembers(_k_lista(e)) or [])})
     return out
 
@@ -310,8 +321,8 @@ def devolver_creditos(ficha: dict) -> None:
             return
         f["devuelto"] = True
         guardar_ficha(f)
-    ajustar_creditos(f["email"], int(f.get("creditos", 0)))
-    descontar_historial(f["email"], f.get("cobrado_fecha"), int(f.get("creditos", 0)))
+    ajustar_creditos(f["email"], cr(f.get("creditos", 0)))
+    descontar_historial(f["email"], f.get("cobrado_fecha"), cr(f.get("creditos", 0)))
 
 
 # ───────────────────────── Eventos, historial y puntuación ─────────────────────────
@@ -393,7 +404,7 @@ def indexar(vid: str) -> None:
         logger.warning("[rapido] no se pudo indexar %s: %s", vid, e)
 
 
-def contar_uso(email: str, creditos: int, duracion_s: float) -> str:
+def contar_uso(email: str, creditos: float, duracion_s: float) -> str:
     """Suma un vídeo cortado al agregado del día (global y del usuario). Devuelve la fecha."""
     dia = fecha_dia()
     try:
@@ -411,18 +422,18 @@ def contar_uso(email: str, creditos: int, duracion_s: float) -> str:
             dias = dict(h.get("dias") or {})
             x = dict(dias.get(dia) or {"videos": 0, "creditos": 0})
             x["videos"] = int(x.get("videos", 0)) + 1
-            x["creditos"] = int(x.get("creditos", 0)) + int(creditos)
+            x["creditos"] = cr(cr(x.get("creditos", 0)) + cr(creditos))
             dias[dia] = x
             for viejo in sorted(dias)[:-180]:
                 dias.pop(viejo, None)
             r.set_json(_k_hist(email), {"dias": dias,
-                                        "creditos_total": int(h.get("creditos_total", 0)) + int(creditos)})
+                                        "creditos_total": cr(cr(h.get("creditos_total", 0)) + cr(creditos))})
     except Exception as e:  # noqa: BLE001
         logger.warning("[rapido] no se pudo contar el uso de %s: %s", email, e)
     return dia
 
 
-def descontar_historial(email: str, dia: str | None, creditos: int) -> None:
+def descontar_historial(email: str, dia: str | None, creditos: float) -> None:
     """Resta del historial los créditos devueltos tras un fallo."""
     if not creditos:
         return
@@ -432,9 +443,9 @@ def descontar_historial(email: str, dia: str | None, creditos: int) -> None:
             h = r.get_json(_k_hist(email)) or {}
             dias = dict(h.get("dias") or {})
             if dia and dia in dias:
-                dias[dia] = {**dias[dia], "creditos": max(0, int(dias[dia].get("creditos", 0)) - creditos)}
+                dias[dia] = {**dias[dia], "creditos": cr(max(0, cr(dias[dia].get("creditos", 0)) - cr(creditos)))}
             r.set_json(_k_hist(email), {"dias": dias,
-                                        "creditos_total": max(0, int(h.get("creditos_total", 0)) - creditos)})
+                                        "creditos_total": cr(max(0, cr(h.get("creditos_total", 0)) - cr(creditos)))})
     except Exception as e:  # noqa: BLE001
         logger.warning("[rapido] no se pudo descontar el historial de %s: %s", email, e)
 
@@ -443,9 +454,9 @@ def historial(email: str, dias: int = 30) -> dict:
     """Días con actividad del usuario (más reciente primero) y créditos gastados en total."""
     h = get_editor_redis().get_json(_k_hist(email)) or {}
     desde = fecha_dia(time.time() - (dias - 1) * 86400)
-    out = [{"fecha": f, "videos": int(x.get("videos", 0)), "minutos_gastados": int(x.get("creditos", 0))}
+    out = [{"fecha": f, "videos": int(x.get("videos", 0)), "minutos_gastados": cr(x.get("creditos", 0))}
            for f, x in sorted((h.get("dias") or {}).items(), reverse=True) if f >= desde]
-    return {"dias": out, "creditos_gastados_total": int(h.get("creditos_total", 0))}
+    return {"dias": out, "creditos_gastados_total": cr(h.get("creditos_total", 0))}
 
 
 def actividad(dias: int = 7, limite_videos: int = 100) -> dict:

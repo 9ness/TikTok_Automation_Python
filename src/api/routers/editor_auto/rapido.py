@@ -186,7 +186,7 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
 def saldo(claims: Claims) -> dict:
     s = svc.saldo(claims.email)
     return {
-        "creditos": int(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0)),
+        "creditos": svc.cr(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0)),
         "nivel": _nivel(claims), "ilimitado": _es_admin(claims),
     }
 
@@ -251,7 +251,7 @@ async def subir(claims: Claims, file: Annotated[UploadFile, File(...)]) -> dict:
         "creditos": ficha_prov["creditos"], "via": "multipart"})
     return {
         "id": vid, "duracion_s": ficha_prov["duracion_s"], "creditos": ficha_prov["creditos"],
-        "saldo": int(svc.saldo(claims.email)["creditos"]),
+        "saldo": svc.cr(svc.saldo(claims.email)["creditos"]),
     }
 
 
@@ -333,7 +333,7 @@ def subida_fin(vid: str, claims: Claims) -> dict:
         "nombre": f["nombre"], "duracion_s": f["duracion_s"], "bytes": tam,
         "creditos": f["creditos"], "via": "trozos"})
     return {"id": vid, "duracion_s": f["duracion_s"], "creditos": f["creditos"],
-            "saldo": int(svc.saldo(claims.email)["creditos"])}
+            "saldo": svc.cr(svc.saldo(claims.email)["creditos"])}
 
 
 @router.post("/videos/{vid}/cortar", status_code=status.HTTP_202_ACCEPTED)
@@ -345,10 +345,10 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     if ficha["estado"] not in ("subido", "error"):
         raise APIError("Este vídeo ya se ha cortado o está en marcha.", status_code=409)
     admin = _es_admin(claims)  # el admin no gasta créditos
-    if not admin and not svc.cobrar(claims.email, int(ficha["creditos"])):
+    if not admin and not svc.cobrar(claims.email, svc.cr(ficha["creditos"])):
         raise APIError(
             f"Necesitas {ficha['creditos']} crédito(s) y no te alcanzan.", status_code=402,
-            details={"necesarios": ficha["creditos"], "saldo": int(svc.saldo(claims.email)["creditos"])},
+            details={"necesarios": ficha["creditos"], "saldo": svc.cr(svc.saldo(claims.email)["creditos"])},
         )
     ficha.update(ajustes={**ajustes.model_dump(), "subtitulos": sub, "flecha": fl}, aviso=None, cobrado=not admin, devuelto=False, error=None, estado="cola")
     job = queue.enqueue(
@@ -358,12 +358,12 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     )
     ficha["job_id"] = job.id
     _optout(ficha, claims)
-    ficha["cobrado_fecha"] = svc.contar_uso(claims.email, int(ficha["creditos"]) if not admin else 0, ficha["duracion_s"])
+    ficha["cobrado_fecha"] = svc.contar_uso(claims.email, svc.cr(ficha["creditos"]) if not admin else 0, ficha["duracion_s"])
     svc.guardar_ficha(ficha)
     svc.registrar_evento(vid, claims.email, "cortar", {
-        "ajustes": ficha["ajustes"], "creditos": int(ficha["creditos"]) if not admin else 0,
+        "ajustes": ficha["ajustes"], "creditos": svc.cr(ficha["creditos"]) if not admin else 0,
         "duracion_s": ficha["duracion_s"]})
-    return {"ok": True, "job_id": job.id, "saldo": int(svc.saldo(claims.email)["creditos"])}
+    return {"ok": True, "job_id": job.id, "saldo": svc.cr(svc.saldo(claims.email)["creditos"])}
 
 
 @router.get("/videos/{vid}")

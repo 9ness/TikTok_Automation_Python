@@ -49,11 +49,24 @@ def test_saldo_gratis_inicial_una_sola_vez(rapido):
 
 
 def test_creditos_redondeo_hacia_arriba():
+    # medio crédito por cada 30 s empezados
+    assert svc.creditos_de(0.2) == 0.5
+    assert svc.creditos_de(30) == 0.5
+    assert svc.creditos_de(31) == 1
     assert svc.creditos_de(59) == 1
     assert svc.creditos_de(60) == 1
-    assert svc.creditos_de(60.5) == 2
+    assert svc.creditos_de(60.5) == 1.5
     assert svc.creditos_de(109) == 2
-    assert svc.creditos_de(0.2) == 1
+
+
+def test_medios_creditos_cobro_y_devolucion(rapido):
+    svc.ajustar_creditos("medio@x.com", 0)
+    base = svc.saldo("medio@x.com")["creditos"]
+    assert svc.cobrar("medio@x.com", 0.5)
+    assert svc.saldo("medio@x.com")["creditos"] == base - 0.5
+    svc.ajustar_creditos("medio@x.com", 0.5)
+    assert svc.saldo("medio@x.com")["creditos"] == base
+    assert isinstance(svc.saldo("medio@x.com")["creditos"], int)
 
 
 def test_subir_rechaza_formato_y_no_cobra(rapido):
