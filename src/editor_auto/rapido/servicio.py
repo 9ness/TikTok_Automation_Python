@@ -880,7 +880,8 @@ def config_cortador(ajustes: dict) -> dict[str, Any]:
 
 def _escalar(on_progress: Callable[[float, str], None], a: float, b: float, defecto: str):
     """Sub-progreso [0..1] de una herramienta → tramo [a..b] del trabajo."""
-    return lambda f, m="": on_progress(a + max(0.0, min(1.0, float(f))) * (b - a), m or defecto)
+    # Al usuario solo le contamos qué se hace, nunca el nombre de la herramienta (Silero, Whisper…)
+    return lambda f, m="": on_progress(a + max(0.0, min(1.0, float(f))) * (b - a), defecto)
 
 
 def _estilizar(base: Path, destino: Path, ficha: dict, job,
@@ -913,7 +914,7 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
             palabras = leer_palabras(ficha["id"])
             extras = {"palabras": palabras} if palabras else {"guardar_palabras": str(ruta_palabras(ficha["id"]))}
             SubsAutoTool().run(input_path=str(actual), output_path=str(out),
-                               config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Subtítulos…", extras))
+                               config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Poniendo subtítulos…", extras))
             if not out.exists() or out.stat().st_size == 0:
                 raise RuntimeError("no se generó el vídeo con subtítulos")
             actual = out
@@ -927,7 +928,7 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
         try:
             from src.editor_auto.tools.sticker_arrow import StickerArrowTool
             StickerArrowTool().run(input_path=str(actual), output_path=str(out),
-                                   config=config_flecha(fl, idioma), ctx=_ctx(t1, t2, "Flecha…"))
+                                   config=config_flecha(fl, idioma), ctx=_ctx(t1, t2, "Poniendo la flecha…"))
             if not out.exists() or out.stat().st_size == 0:
                 raise RuntimeError("no se generó el vídeo con flecha")
             if actual != base:
@@ -979,7 +980,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
             ctx = ToolContext(
                 user_id=ficha["email"], user_name=ficha["email"], job_id=job.id,
                 temp_folder=str(carp), on_log=on_log,
-                on_progress=_escalar(on_progress, 0.0, 0.6, "Cortando…"),
+                on_progress=_escalar(on_progress, 0.0, 0.6, "Quitando pausas y repeticiones…"),
             )
             cfg = config_cortador(ficha.get("ajustes") or {})
             if modo == "retoque":
