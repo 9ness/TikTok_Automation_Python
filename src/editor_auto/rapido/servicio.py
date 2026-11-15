@@ -909,8 +909,9 @@ def config_cortador(ajustes: dict) -> dict[str, Any]:
         "vad_enabled": True,
         "amplitude_enabled": True,
         "ai_clean_enabled": os.getenv("EDITOR_RAPIDO_AI_CLEAN", "0") == "1",
-        # Falsos inicios («por porque yo la…») con OpenAI: el default del cortador es Gemini
-        # 2.5 Pro, retirado (404) → la pasada no hacía nada. 1 llamada gpt-4o, < 1 cént./vídeo.
+        # Falsos inicios («por porque yo la…») por la vía «openai» del cortador, que en realidad
+        # llama a Claude Haiku (claude_client, créditos de la Console); OpenAI solo si Claude falla.
+        # El default era Gemini 2.5 Pro, retirado (404) → la pasada no hacía nada.
         "ai_false_starts_pass2": True,
         "ai_pass2_openai_enabled": True,
         "ai_pass2_gemini_enabled": False,
