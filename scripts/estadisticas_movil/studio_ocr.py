@@ -54,6 +54,8 @@ def num(s):
     s = s.rstrip("K")
     if k > 1:
         s = s.replace(",", ".")
+    elif "," not in s and re.fullmatch(r"\d+\.\d{1,2}", s):
+        pass  # «1.98 €»: el OCR lee la coma como punto; con 1-2 decimales es decimal, no miles (15/11: salía 198)
     else:
         s = s.replace(".", "").replace(",", ".")
     try:

@@ -1593,3 +1593,4 @@
 - 2026-11-15 · Guion manual (guardar_guion) del POV BOF Largo salía con CTA de plazos/envío → el encaje de la voz (ctas_posibles) cambiaba el cierre; con guion_manual se locuta sin escalera, sin reescribir por modo y sin corrección de CTA en lote
 - 2026-11-15 · editor rápido: subs+flecha reutilizando style_mapper.build_tool_flow (sin copiar lógica) y cortado.mp4 guardado para re-estilizar sin recortar → el estilo no cobra ni repite el corte
 - 2026-11-15 · editor rápido: `temp_storage.cleanup_expired` (arranque de la API) borraba a las 24 h todo `api_uploads/editor_rapido/` (originales y resultados) → ahora salta ese subdirectorio; el editor rápido necesita su propia retención.
+- 2026-11-15 · dias_mi8 apuntaba «1,98 €» como 198: el OCR lee la coma como punto («1.98») y num() lo tomaba por miles → studio_ocr.num(): un punto con 1-2 decimales y sin coma es decimal (test en test_studio_ocr.py). En el VPS no hay pytest instalado (venv-tests sin él).

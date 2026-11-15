@@ -54,6 +54,7 @@ def test_cabecera_es_del_dia(dia):
 @pytest.mark.parametrize("texto, valor", [
     ("37,75 €", 37.75), ("4,4K", 4400), ("11K", 11000), ("1.234", 1234), ("1/1K", 1100),
     ("O", 0), ("—", None), (None, None), ("98", 98),
+    ("1,98 €", 1.98), ("1.98 €", 1.98), ("1.98€", 1.98), ("39,58 €", 39.58), ("1.234,56 €", 1234.56),
 ])
 def test_num(texto, valor):
     assert so.num(texto) == valor
