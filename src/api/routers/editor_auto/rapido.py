@@ -71,6 +71,7 @@ class SubsAjustes(BaseModel):
     color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="hex; sobrescribe el color de resalte")
     fuente: str | None = Field(None, description="id de GET /opciones → fuentes")
     posicion: str = Field("abajo", description="abajo | centro | arriba")
+    palabras: str = Field("frase", description="una | dos | frase (palabras que salen a la vez)")
 
     @field_validator("color", "estilo", "fuente", mode="before")
     @classmethod

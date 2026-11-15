@@ -33,7 +33,11 @@ FORMATOS = ("9:16", "original")
 IDIOMAS = ("auto", "es", "en")
 
 POSICIONES = ("abajo", "centro", "arriba")
-_POS_Y = {"abajo": 0.78, "centro": 0.5, "arriba": 0.18}
+# «abajo» a 0.68: por encima del pie de TikTok (texto, nombre de usuario y enlace del carrito)
+# y de la flecha, que va pegada al carrito (abajo a la izquierda).
+_POS_Y = {"abajo": 0.68, "centro": 0.5, "arriba": 0.18}
+# Palabras que salen a la vez: una (estilo TikTok, con «pop»), dos o frase (hasta las del estilo).
+PALABRAS = ("una", "dos", "frase")
 # Colores de resalte que ofrece la web (el usuario puede sobrescribir el del estilo).
 COLORES = ("#FFFFFF", "#FDE047", "#F97316", "#EF2D2D", "#EC4899", "#7C3AED", "#2563EB", "#22C55E")
 # Fuentes ofrecidas: ids de `style_mapper._FONT_CANDIDATES` (tipografías incluidas en assets/fonts).
@@ -167,6 +171,7 @@ def opciones(prefijo_api: str) -> dict:
             for f in flechas_disponibles()
         ],
         "posiciones": list(POSICIONES),
+        "palabras": list(PALABRAS),
     }
 
 
@@ -183,8 +188,11 @@ def validar_subtitulos(d: dict | None) -> dict:
     pos = d.get("posicion") or "abajo"
     if pos not in POSICIONES:
         raise ValueError(f"Posición desconocida: {pos}")
+    palabras = d.get("palabras") or "frase"
+    if palabras not in PALABRAS:
+        raise ValueError(f"Palabras a la vez desconocido: {palabras}")
     return {"activo": bool(d.get("activo", True)), "estilo": estilo, "color": d.get("color") or None,
-            "fuente": fuente or None, "posicion": pos}
+            "fuente": fuente or None, "posicion": pos, "palabras": palabras}
 
 
 FLECHA_AUTO = "auto"  # modo Inteligente: el motor elige forma+color por contraste con el fondo
@@ -861,8 +869,11 @@ def config_subtitulos(sub: dict, idioma: str) -> dict[str, Any]:
     from src.editor_auto.services.style_mapper import build_tool_flow
     estilo = {"cuts": {"enabled": False},
               "subtitle": {"enabled": True, "presetId": sub.get("estilo"), "fontId": sub.get("fuente"),
-                           "mode": "phrase", "y": _POS_Y.get(sub.get("posicion"), 0.78)}}
+                           "mode": "word" if sub.get("palabras") == "una" else "phrase",
+                           "y": _POS_Y.get(sub.get("posicion"), _POS_Y["abajo"])}}
     cfg = next(st.config for st in build_tool_flow(estilo) if st.tool_id == "subs_auto")
+    if sub.get("palabras") == "dos":
+        cfg["max_words"] = 2
     color = sub.get("color")
     if color:
         cfg["highlight_color"] = color
@@ -882,7 +893,9 @@ def config_flecha(fl: dict, idioma: str) -> dict[str, Any]:
     fid = fl.get("id") or ""
     fichero = "auto" if fid == FLECHA_AUTO else (fichero_flecha(fid) or "flecha_roja.mov")
     estilo = {"cuts": {"enabled": False}, "subtitle": {"enabled": False},
-              "arrow": {"enabled": True, "shapeId": fichero, "x": 0.5, "y": 0.62, "scale": 0.8}}
+              # Apuntando al enlace naranja del carrito (abajo a la izquierda): misma
+              # posición que ya validó el operador en los vídeos listos (learnings 22/07).
+              "arrow": {"enabled": True, "shapeId": fichero, "x": 0.22, "y": 0.82, "scale": 0.8}}
     cfg = next(st.config for st in build_tool_flow(estilo) if st.tool_id == "sticker_arrow")
     cfg["whisper_model_size"] = os.getenv("EDITOR_RAPIDO_WHISPER_MODEL", "small")
     cfg["ai_language"] = None if idioma == "auto" else idioma
