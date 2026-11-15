@@ -213,18 +213,22 @@ def _k_lista(email: str) -> str:
     return f"rapido:videos:{email}"
 
 
-CADUCIDAD_DIAS = 365  # los créditos caducan a los 12 meses de la última recarga
+# Caducidad de los créditos: APAGADA por ahora (None = no caducan). Se guarda
+# `ultima_recarga` para poder activarla más adelante (p. ej. distinta según el pack).
+CADUCIDAD_DIAS: int | None = None
 
 
-def caduca_en(s: dict) -> float:
-    """Momento (epoch) en que caduca el saldo: 12 meses tras la última recarga."""
+def caduca_en(s: dict) -> float | None:
+    """Momento (epoch) en que caduca el saldo, o None si los créditos no caducan."""
+    if not CADUCIDAD_DIAS:
+        return None
     base = float(s.get("ultima_recarga") or s.get("creado") or time.time())
     return base + CADUCIDAD_DIAS * 86400
 
 
 def saldo(email: str) -> dict:
     """Saldo del usuario; lo crea con los créditos gratis la primera vez.
-    Si han pasado 12 meses desde la última recarga, el saldo se pone a 0."""
+    Si la caducidad está activa (CADUCIDAD_DIAS) y ha vencido, el saldo se pone a 0."""
     r = get_editor_redis()
     with _LOCK:
         s = r.get_json(_k_saldo(email))
@@ -245,7 +249,8 @@ def saldo(email: str) -> dict:
         if not s.get("ultima_recarga"):  # cuentas de antes de la caducidad: cuentan desde hoy
             s["ultima_recarga"] = time.time()
             cambiado = True
-        if cr(s.get("creditos", 0)) > 0 and time.time() > caduca_en(s):
+        fin = caduca_en(s)
+        if fin is not None and cr(s.get("creditos", 0)) > 0 and time.time() > fin:
             s["caducados"] = cr(cr(s.get("caducados", 0)) + cr(s["creditos"]))
             s["creditos"] = 0
             cambiado = True
@@ -260,8 +265,8 @@ def _guardar_saldo(email: str, s: dict) -> None:
 
 def ajustar_creditos(email: str, delta: float, *, recarga: bool = False) -> float | int:
     """Suma (o resta) créditos. Devuelve el saldo nuevo (nunca < 0).
-    `recarga=True` (compra o regalo) renueva los 12 meses de caducidad de TODO el saldo;
-    una devolución por fallo no la renueva."""
+    `recarga=True` (compra o regalo) apunta `ultima_recarga` (base de la caducidad, si se
+    activa); una devolución por fallo no la cambia."""
     saldo(email)
     with _LOCK:
         s = get_editor_redis().get_json(_k_saldo(email)) or {"creditos": 0}

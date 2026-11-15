@@ -187,7 +187,7 @@ def saldo(claims: Claims) -> dict:
     s = svc.saldo(claims.email)
     return {
         "creditos": svc.cr(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0)),
-        "caduca": int(svc.caduca_en(s)), "caducidad_dias": svc.CADUCIDAD_DIAS,
+        "caduca": int(svc.caduca_en(s)) if svc.caduca_en(s) else None,
         "nivel": _nivel(claims), "ilimitado": _es_admin(claims),
     }
 
