@@ -368,6 +368,14 @@ CACHE = TMP / "tandas.json"
 _CERROJO_ENLACES = threading.Lock()
 
 
+def enlace_sonido(c: dict) -> str:
+    """15/11: hay carruseles con musica.tiktok vacío (solo música de Meta) → KeyError y reintentos inútiles."""
+    e = ((c.get("musica") or {}).get("tiktok") or {}).get("enlace")
+    if not e:
+        raise SystemExit("sin sonido de TikTok (musica.tiktok sin enlace): saltar")
+    return e
+
+
 def carrusel(cid: str) -> dict:
     c = _carrusel(cid)
     if SONIDO_ID:
@@ -450,8 +458,8 @@ def al_escaparate(pid: str) -> bool:
         "-d", f"https://www.tiktok.com/view/product/{pid}", PAQUETE)
     time.sleep(12 if perfil().get("ficha_en_caliente") else 8)
     captura("6_ficha")
-    if buscar(r"(se ha eliminado|Producto no disponible)", intentos=1):
-        sin_stock(pid, "la ficha dice «eliminado/no disponible» (6_ficha)")
+    if buscar(r"(se ha eliminado|Producto no disponible|est[áa] agotado)", intentos=1):
+        sin_stock(pid, "la ficha dice «eliminado/no disponible/agotado» (6_ficha)")
     # el stock sale en el panel «Información de la promoción», que sube al 2.º deslizamiento
     for _ in range(2):
         deslizar("swipe_ficha", 600)
@@ -629,7 +637,7 @@ def preparar(cid: str) -> None:
 
     # Sonido → Favoritos (los originales no salen en el buscador)
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
-        "-d", c["musica"]["tiktok"]["enlace"], PAQUETE)
+        "-d", enlace_sonido(c), PAQUETE)
     time.sleep(6)
     deslizar("swipe_sonido", 300)  # a veces abre a media página
     time.sleep(2)
@@ -761,7 +769,7 @@ def rapido(cid: str) -> None:
             "-d", f"file://{destino}")
     fase("push_fotos")
     adb("shell", "am", "start", "-a", "android.intent.action.VIEW",
-        "-d", c["musica"]["tiktok"]["enlace"], PAQUETE)
+        "-d", enlace_sonido(c), PAQUETE)
     time.sleep(7)
     fase("abrir_sonido")
     for _ in range(3):                    # «Hubo un problema» al abrir en frío: «Volver a intentar»
@@ -888,7 +896,7 @@ def producto(cid: str) -> None:
         tap(x, y, 4)
         # 11/11 (Black Friday): en algunos productos «Añadir» abre su ficha con «Gana X € por cada venta»
         # y un botón «Añadir al vídeo» (captura 3_sin_campo del 11/11: 8 de 20 saltados por esto)
-        n = buscar(r"^\W*Añadir al v[ií]deo\W*$", intentos=2)
+        n = buscar(r"^\W*(Añadir al v[ií]deo|Add to video)\W*$", intentos=2)   # 15/11: la ficha sale en inglés en productos de tiendas francesas
         if n:
             tap(n["x"], n["y"], 4)
         if buscar(r"Obtener una muestra", intentos=1):
