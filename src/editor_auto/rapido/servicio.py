@@ -213,20 +213,43 @@ def _k_lista(email: str) -> str:
     return f"rapido:videos:{email}"
 
 
+CADUCIDAD_DIAS = 365  # los créditos caducan a los 12 meses de la última recarga
+
+
+def caduca_en(s: dict) -> float:
+    """Momento (epoch) en que caduca el saldo: 12 meses tras la última recarga."""
+    base = float(s.get("ultima_recarga") or s.get("creado") or time.time())
+    return base + CADUCIDAD_DIAS * 86400
+
+
 def saldo(email: str) -> dict:
-    """Saldo del usuario; lo crea con los créditos gratis la primera vez."""
+    """Saldo del usuario; lo crea con los créditos gratis la primera vez.
+    Si han pasado 12 meses desde la última recarga, el saldo se pone a 0."""
     r = get_editor_redis()
     with _LOCK:
         s = r.get_json(_k_saldo(email))
         if s is None:
-            s = {"creditos": gratis_inicial(), "gratis_dados": gratis_inicial(), "creado": time.time(), "unidad": UNIDAD}
+            ahora = time.time()
+            s = {"creditos": gratis_inicial(), "gratis_dados": gratis_inicial(), "creado": ahora,
+                 "ultima_recarga": ahora, "unidad": UNIDAD}
             r.set_json(_k_saldo(email), s)
             r.sadd(_K_CUENTAS, email)
-        elif s.get("unidad") != UNIDAD:  # saldo de cuando 1 crédito era 1 minuto o 1 segundo
+            return s
+        cambiado = False
+        if s.get("unidad") != UNIDAD:  # saldo de cuando 1 crédito era 1 minuto o 1 segundo
             div = 60 if s.get("unidad") == "s" else 1
             s["creditos"] = math.ceil(float(s.get("creditos", 0) or 0) / div - 1e-9)
             s["gratis_dados"] = math.ceil(int(s.get("gratis_dados", 0) or 0) / div - 1e-9)
             s["unidad"] = UNIDAD
+            cambiado = True
+        if not s.get("ultima_recarga"):  # cuentas de antes de la caducidad: cuentan desde hoy
+            s["ultima_recarga"] = time.time()
+            cambiado = True
+        if cr(s.get("creditos", 0)) > 0 and time.time() > caduca_en(s):
+            s["caducados"] = cr(cr(s.get("caducados", 0)) + cr(s["creditos"]))
+            s["creditos"] = 0
+            cambiado = True
+        if cambiado:
             r.set_json(_k_saldo(email), s)
         return s
 
@@ -235,12 +258,16 @@ def _guardar_saldo(email: str, s: dict) -> None:
     get_editor_redis().set_json(_k_saldo(email), s)
 
 
-def ajustar_creditos(email: str, delta: float) -> float | int:
-    """Suma (o resta) créditos. Devuelve el saldo nuevo (nunca < 0)."""
+def ajustar_creditos(email: str, delta: float, *, recarga: bool = False) -> float | int:
+    """Suma (o resta) créditos. Devuelve el saldo nuevo (nunca < 0).
+    `recarga=True` (compra o regalo) renueva los 12 meses de caducidad de TODO el saldo;
+    una devolución por fallo no la renueva."""
     saldo(email)
     with _LOCK:
         s = get_editor_redis().get_json(_k_saldo(email)) or {"creditos": 0}
         s["creditos"] = cr(max(0, cr(s.get("creditos", 0)) + cr(delta)))
+        if recarga and cr(delta) > 0:
+            s["ultima_recarga"] = time.time()
         _guardar_saldo(email, s)
         get_editor_redis().sadd(_K_CUENTAS, email)
         return s["creditos"]

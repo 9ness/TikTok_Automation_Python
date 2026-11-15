@@ -187,6 +187,7 @@ def saldo(claims: Claims) -> dict:
     s = svc.saldo(claims.email)
     return {
         "creditos": svc.cr(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0)),
+        "caduca": int(svc.caduca_en(s)), "caducidad_dias": svc.CADUCIDAD_DIAS,
         "nivel": _nivel(claims), "ilimitado": _es_admin(claims),
     }
 
@@ -504,7 +505,7 @@ def admin_creditos(body: AjusteCreditos) -> dict:
     if not email or "@" not in email:
         raise ValidationError("Email no válido.")
     svc.saldo(email)
-    return {"email": email, "creditos": svc.ajustar_creditos(email, body.delta)}
+    return {"email": email, "creditos": svc.ajustar_creditos(email, body.delta, recarga=True)}
 
 
 @router.get("/admin/cuentas")
@@ -522,7 +523,7 @@ def admin_dar(body: DarCreditos, claims: Claims) -> dict:
     if not email or "@" not in email:
         raise ValidationError("Email no válido.")
     svc.saldo(email)
-    return {"email": email, "creditos": svc.ajustar_creditos(email, body.creditos)}
+    return {"email": email, "creditos": svc.ajustar_creditos(email, body.creditos, recarga=True)}
 
 
 @router.get("/admin/actividad")

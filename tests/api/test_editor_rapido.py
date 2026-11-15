@@ -68,6 +68,21 @@ def test_saldo_viejo_pasa_a_videos_una_vez(rapido):
     assert svc.saldo("nuevo@x.com")["creditos"] == svc.gratis_inicial() == 150
 
 
+def test_creditos_caducan_a_los_12_meses_y_la_recarga_renueva(rapido):
+    import time as _t
+    r = svc.get_editor_redis()
+    viejo = _t.time() - 366 * 86400
+    r.set_json(svc._k_saldo("cad@x.com"), {"creditos": 7, "unidad": "v", "creado": viejo, "ultima_recarga": viejo})
+    s = svc.saldo("cad@x.com")
+    assert s["creditos"] == 0 and s["caducados"] == 7
+    svc.ajustar_creditos("cad@x.com", 25, recarga=True)
+    s = svc.saldo("cad@x.com")
+    assert s["creditos"] == 25 and svc.caduca_en(s) > _t.time() + 364 * 86400
+    # sin fecha (cuenta antigua): cuenta desde hoy, no caduca de golpe
+    r.set_json(svc._k_saldo("ant@x.com"), {"creditos": 5, "unidad": "v", "creado": viejo})
+    assert svc.saldo("ant@x.com")["creditos"] == 5
+
+
 def test_medios_creditos_cobro_y_devolucion(rapido):
     svc.ajustar_creditos("medio@x.com", 0)
     base = svc.saldo("medio@x.com")["creditos"]
