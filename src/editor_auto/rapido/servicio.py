@@ -1,8 +1,10 @@
 """Lógica del Editor rápido: créditos, fichas de vídeo, cortes y runner.
 
-- 1 crédito = 1 minuto de vídeo ORIGINAL (redondeo hacia arriba).
+- 1 crédito = 1 segundo de vídeo ORIGINAL (hacia abajo), mínimo 10 y tope 300 por vídeo
+  (docs/PRECIOS_CREDITOS.md de nebulabs-media). Hasta el 15/11/2026 era 1 crédito = 1 minuto:
+  los saldos viejos se pasan solos ×60 la primera vez que se leen (campo `unidad`).
 - V1: saldo en el Redis del Editor, SIN pagos reales. Alta = N créditos gratis
-  (`EDITOR_RAPIDO_FREE_CREDITS`, 5 por defecto) la primera vez que se ve el email.
+  (`EDITOR_RAPIDO_FREE_CREDITS`, 300 por defecto) la primera vez que se ve el email.
 - Se cobra al pulsar «Cortar» y se devuelve solo si el trabajo falla (idempotente).
 - El retoque «devolver un corte» no cuesta créditos en V1.
 """
@@ -47,7 +49,7 @@ EVENTOS_TTL_S = int(os.getenv("EDITOR_RAPIDO_EVENTOS_DIAS", "180")) * 86400
 MAX_EVENTOS = 300  # por vídeo
 MAX_INDICE = 500   # vídeos del índice global (admin)
 
-MAX_MINUTOS = int(os.getenv("EDITOR_RAPIDO_MAX_MINUTOS", "30"))
+MAX_MINUTOS = int(os.getenv("EDITOR_RAPIDO_MAX_MINUTOS", "10"))
 MAX_BYTES = int(os.getenv("EDITOR_RAPIDO_MAX_MB", "1024")) * 1024 * 1024
 # Cortes más cortos que esto no se enseñan en la lista de retoque.
 MIN_CORTE_S = 0.25
@@ -57,9 +59,9 @@ _LOCK = threading.Lock()  # un solo proceso de API: basta para el saldo
 
 def gratis_inicial() -> int:
     try:
-        return max(0, int(os.getenv("EDITOR_RAPIDO_FREE_CREDITS", "5")))
+        return max(0, int(os.getenv("EDITOR_RAPIDO_FREE_CREDITS", "300")))
     except ValueError:
-        return 5
+        return 300
 
 
 def cr(x) -> float | int:
@@ -72,9 +74,18 @@ def cr(x) -> float | int:
     return int(v) if v == int(v) else v
 
 
-def creditos_de(duracion_s: float) -> float | int:
-    """Medios minutos del original redondeados hacia arriba (mínimo 0,5): 30 s = 0,5 créditos."""
-    return cr(max(1, math.ceil(float(duracion_s) / 30.0 - 1e-9)) / 2)
+CREDITOS_MIN = 10   # un vídeo cortísimo gasta al menos esto
+CREDITOS_MAX = 300  # y ninguno más de esto (5 min), aunque dure 10
+UNIDAD = "s"        # 1 crédito = 1 segundo; los saldos sin este campo vienen de minutos
+
+
+def creditos_de(duracion_s: float) -> int:
+    """Segundos del original hacia abajo, entre 10 y 300: 0:47 = 47 créditos."""
+    try:
+        seg = int(math.floor(float(duracion_s) + 1e-9))
+    except (TypeError, ValueError):
+        seg = 0
+    return max(CREDITOS_MIN, min(CREDITOS_MAX, seg))
 
 
 def raiz_datos() -> Path:
@@ -208,9 +219,14 @@ def saldo(email: str) -> dict:
     with _LOCK:
         s = r.get_json(_k_saldo(email))
         if s is None:
-            s = {"creditos": gratis_inicial(), "gratis_dados": gratis_inicial(), "creado": time.time()}
+            s = {"creditos": gratis_inicial(), "gratis_dados": gratis_inicial(), "creado": time.time(), "unidad": UNIDAD}
             r.set_json(_k_saldo(email), s)
             r.sadd(_K_CUENTAS, email)
+        elif s.get("unidad") != UNIDAD:  # saldo de cuando 1 crédito era 1 minuto
+            s["creditos"] = cr(cr(s.get("creditos", 0)) * 60)
+            s["gratis_dados"] = int(s.get("gratis_dados", 0)) * 60
+            s["unidad"] = UNIDAD
+            r.set_json(_k_saldo(email), s)
         return s
 
 
