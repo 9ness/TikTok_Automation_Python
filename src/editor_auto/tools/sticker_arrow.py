@@ -260,9 +260,12 @@ class StickerArrowTool:
                 tmp_audio = str(
                     tmp_dir / f"sticker_arrow_{ctx.job_id}_{int(time.time())}.wav"
                 )
-                extract_audio_from_video(input_path, tmp_audio)
+                dadas = ctx.extras.get("palabras")
+                if not dadas:
+                    extract_audio_from_video(input_path, tmp_audio)
                 from src.editor_auto.asr import transcribe_words
-                words = transcribe_words(
+                # Palabras ya transcritas (subs de esta misma edición) → sin repetir.
+                words = [dict(w) for w in dadas] if dadas else transcribe_words(
                     tmp_audio,
                     reference_script=None,
                     model_size=config.get("whisper_model_size", "large-v3"),
@@ -271,6 +274,7 @@ class StickerArrowTool:
                     progress_callback=lambda f, m: ctx.on_progress(
                         0.15 + f * 0.40, m
                     ),
+                    keyterms=config.get("keyterms") or None,
                 )
                 try:
                     os.remove(tmp_audio)

@@ -799,6 +799,14 @@ def ruta_palabras(vid: str) -> Path:
     return carpeta(vid) / "palabras.json"
 
 
+# Vocabulario de vídeos de venta que Deepgram (nova-3) debe acertar:
+# sin él salía «Tito Shop» o «un carrillo naranja» (vídeo 8b48182a8d26).
+KEYTERMS = (
+    "TikTok Shop", "TikTok", "carrito naranja", "carrito", "enlace", "link",
+    "perfil", "oferta", "descuento", "envío gratis", "cupón", "comprar",
+)
+
+
 def leer_palabras(vid: str) -> list[dict] | None:
     p = ruta_palabras(vid)
     if not p.exists():
@@ -849,6 +857,8 @@ def config_subtitulos(sub: dict, idioma: str) -> dict[str, Any]:
     cfg["language"] = None if idioma == "auto" else idioma
     cfg["corregir_nombres"] = False  # sin llamada a IA de pago
     cfg["reference_text"] = ""
+    cfg["keyterms"] = list(KEYTERMS)
+    cfg["revisar_ia"] = True  # Haiku, céntimos: arregla palabras mal oídas
     return cfg
 
 
@@ -861,6 +871,7 @@ def config_flecha(fl: dict, idioma: str) -> dict[str, Any]:
     cfg = next(st.config for st in build_tool_flow(estilo) if st.tool_id == "sticker_arrow")
     cfg["whisper_model_size"] = os.getenv("EDITOR_RAPIDO_WHISPER_MODEL", "small")
     cfg["ai_language"] = None if idioma == "auto" else idioma
+    cfg["keyterms"] = list(KEYTERMS)
     return cfg
 
 
@@ -928,7 +939,9 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
         try:
             from src.editor_auto.tools.sticker_arrow import StickerArrowTool
             StickerArrowTool().run(input_path=str(actual), output_path=str(out),
-                                   config=config_flecha(fl, idioma), ctx=_ctx(t1, t2, "Poniendo la flecha…"))
+                                   config=config_flecha(fl, idioma),
+                                   ctx=_ctx(t1, t2, "Poniendo la flecha…",
+                                            {"palabras": leer_palabras(ficha["id"]) or []}))
             if not out.exists() or out.stat().st_size == 0:
                 raise RuntimeError("no se generó el vídeo con flecha")
             if actual != base:

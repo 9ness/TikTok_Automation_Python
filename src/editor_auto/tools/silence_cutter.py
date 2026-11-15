@@ -2701,6 +2701,7 @@ def _level_audio(src: str, dst: str, *, log=None) -> bool:
 
 def _deepgram_words(
     payload: bytes, *, language: str | None, model: str = "nova-3", offset: float = 0.0,
+    keyterms: list[str] | None = None,
 ) -> list[dict]:
     """Una llamada a Deepgram (WAV 16k mono) → [{word, start, end}] + coste."""
     import json
@@ -2713,6 +2714,10 @@ def _deepgram_words(
         f"https://api.deepgram.com/v1/listen?model={model}&{idioma}"
         "&punctuate=true&smart_format=true"
     )
+    if keyterms and model.startswith("nova-3"):
+        # Vocabulario que debe salir bien («TikTok Shop», «carrito naranja»…).
+        from urllib.parse import quote
+        url += "".join(f"&keyterm={quote(t)}" for t in keyterms[:50] if t.strip())
     req = urllib.request.Request(
         url, data=payload, method="POST",
         headers={"Authorization": f"Token {key}", "Content-Type": "audio/wav"},
@@ -2760,6 +2765,7 @@ def _deepgram_uniform_runs(words: list[dict], min_len: int = 6) -> list[tuple[in
 
 def _transcribe_deepgram(
     audio_path: str, *, language: str | None = "es", model: str | None = None,
+    keyterms: list[str] | None = None,
 ) -> list[dict]:
     """Transcribe con Deepgram (timestamps por palabra más precisos que Whisper
     en audio ruidoso). Devuelve el MISMO formato que `_transcribe`:
@@ -2781,7 +2787,7 @@ def _transcribe_deepgram(
              "-ac", "1", "-ar", "16000", "-vn", wav],
             check=True, timeout=180,
         )
-        out = _deepgram_words(open(wav, "rb").read(), language=language, model=model)
+        out = _deepgram_words(open(wav, "rb").read(), language=language, model=model, keyterms=keyterms)
         for i0, i1 in reversed(_deepgram_uniform_runs(out)):
             t0, t1 = out[i0]["start"], out[i1]["end"]
             ss = max(0.0, t0 - 3.0)
@@ -2792,7 +2798,7 @@ def _transcribe_deepgram(
                     check=True, timeout=60,
                 )
                 nuevas = _deepgram_words(
-                    open(crop, "rb").read(), language=language, model=model, offset=ss,
+                    open(crop, "rb").read(), language=language, model=model, offset=ss, keyterms=keyterms,
                 )
             except Exception:  # noqa: BLE001 — si falla, se queda la racha
                 continue
@@ -2821,7 +2827,7 @@ def _transcribe_deepgram(
                     check=True, timeout=60,
                 )
                 nuevas = _deepgram_words(
-                    open(crop, "rb").read(), language=language, model=model, offset=ss,
+                    open(crop, "rb").read(), language=language, model=model, offset=ss, keyterms=keyterms,
                 )
             except Exception:  # noqa: BLE001
                 continue

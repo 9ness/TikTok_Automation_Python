@@ -741,3 +741,24 @@ def test_ajustes_color_vacio_y_flecha_inteligente():
     assert a.subtitulos.color is None and a.subtitulos.fuente is None
     assert s.validar_flecha({"activo": True, "id": "auto"}) == {"activo": True, "id": "auto"}
     assert s.validar_flecha({"activo": True})["id"] == "auto"
+
+
+def test_revision_ia_sustituye_sin_mover_tiempos(monkeypatch):
+    from src.editor_auto.tools import subs_auto
+    from src.editor_auto.api import openai_client
+    from src.editor_auto.rapido import servicio as sv
+
+    words = [{"word": "estoy", "start": 0.0, "end": 0.3}, {"word": "bebiendo", "start": 0.3, "end": 0.8},
+             {"word": "mi", "start": 0.8, "end": 0.9}, {"word": "vida", "start": 0.9, "end": 1.2}]
+    monkeypatch.setattr(openai_client, "analyze_transcript_json", lambda **k: {"cambios": [
+        {"i": 1, "bien": "viviendo"}, {"i": 9, "bien": "x"}, {"i": 2, "bien": "una frase demasiado larga"}]})
+
+    class Ctx:
+        on_log = staticmethod(lambda m: None)
+
+    assert subs_auto._revisar_palabras(words, Ctx()) == 1
+    assert [w["word"] for w in words] == ["estoy", "viviendo", "mi", "vida"]
+    assert words[1]["start"] == 0.3 and words[1]["end"] == 0.8
+    cfg = sv.config_subtitulos({}, "auto")
+    assert cfg["revisar_ia"] and "TikTok Shop" in cfg["keyterms"]
+    assert "carrito naranja" in sv.config_flecha({"activo": True, "id": "auto"}, "es")["keyterms"]

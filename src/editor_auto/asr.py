@@ -29,6 +29,7 @@ def transcribe_words(
     reference_script: str | None = None,
     progress_callback=None,
     on_log=None,
+    keyterms: list[str] | None = None,
 ) -> list[dict]:
     if usa_deepgram() and audio_type == "speech":
         try:
@@ -37,7 +38,7 @@ def transcribe_words(
 
             if progress_callback:
                 progress_callback(0.1, "🎙️ Transcribiendo (Deepgram)…")
-            words = _clean_whisper_tokens(_transcribe_deepgram(audio_path, language=language))
+            words = _clean_whisper_tokens(_transcribe_deepgram(audio_path, language=language, keyterms=keyterms))
             if words:
                 if progress_callback:
                     progress_callback(1.0, "🎙️ Transcripción completa")

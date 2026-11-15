@@ -298,6 +298,7 @@ class SubsAutoTool:
                 language=config.get("language") or None,
                 audio_type=config.get("audio_type", "speech"),
                 progress_callback=_on_transcribe_progress,
+                keyterms=config.get("keyterms") or None,
             )
             if not words:
                 raise RuntimeError(
@@ -320,6 +321,10 @@ class SubsAutoTool:
                 n = _corregir_nombres(words, corr)
                 if n:
                     ctx.on_log(f"[subs_auto] {n} nombre(s) corregidos: {corr}")
+            if config.get("revisar_ia"):
+                ctx.on_progress(0.56, "Revisando el texto…")
+                n = _revisar_palabras(words, ctx)
+                ctx.on_log(f"[subs_auto] revisión IA: {n} palabra(s) corregidas")
         finally:
             try:
                 os.remove(tmp_audio)
@@ -330,6 +335,40 @@ class SubsAutoTool:
 
 BORDE_MIN = 5
 _PROMPT_NOMBRES = Path(__file__).resolve().parent.parent / "prompts" / "subs_nombres.md"
+_PROMPT_REVISION = Path(__file__).resolve().parent.parent / "prompts" / "subs_revision.md"
+
+
+def _revisar_palabras(words: list[dict], ctx: ToolContext) -> int:
+    """Pasada de IA que arregla palabras mal oídas por el contexto («bebiendo»
+    → «viviendo»). Sustituye palabra por palabra, así los tiempos no se mueven.
+    Si falla, se queda la transcripción tal cual. Devuelve cuántas cambió."""
+    def txt(w: dict) -> str:
+        return str(w.get("word", w.get("text", ""))).strip()
+
+    if not words:
+        return 0
+    try:
+        from src.editor_auto.api.openai_client import analyze_transcript_json
+        res = analyze_transcript_json(
+            system_prompt=_PROMPT_REVISION.read_text(encoding="utf-8"),
+            user_payload={"palabras": [f"{i}:{txt(w)}" for i, w in enumerate(words[:1500])]})
+    except Exception as e:  # noqa: BLE001
+        ctx.on_log(f"[subs_auto] ⚠️ sin revisión de palabras ({str(e)[:150]})")
+        return 0
+    cambios = (res or {}).get("cambios") if isinstance(res, dict) else None
+    tope = max(3, len(words) // 4)  # una IA que lo reescribe todo no vale
+    hechas = 0
+    for c in (cambios or [])[:tope]:
+        try:
+            i, bien = int(c.get("i")), str(c.get("bien") or "").strip()
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not (0 <= i < len(words)) or not bien or len(bien.split()) > 2 or len(bien) > 30:
+            continue
+        if bien != txt(words[i]):
+            words[i]["word" if "word" in words[i] else "text"] = bien
+            hechas += 1
+    return hechas
 
 
 def _con_borde(config: dict, minimo=None) -> dict:
