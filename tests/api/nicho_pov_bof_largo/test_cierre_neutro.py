@@ -41,3 +41,17 @@ def test_ningun_cierre_afirma_cupones():
             assert "aplica tus cupones" not in cta.lower(), cta
             assert "tus cupones" not in cta.lower(), cta
     assert "aplica" not in cfg.cta_final(True, True).lower()
+
+
+def test_ctas_para_locutar_manual_y_ficha():
+    """15/11: un guion de guardar_guion no se reescribe y el cierre no promete
+    plazos/envío que la ficha no trae (el precio solo no basta)."""
+    assert config.ctas_para_locutar({}, True, True, "x. Lo tienes en el carrito naranja.", manual=True) == ()
+    # Precio alto pero ficha sin plazos/envío: nada de promesas en el cierre.
+    for neutro in (False, True):
+        ctas = config.ctas_para_locutar({"precio": "89"}, True, True, "Cuerpo.", neutro=neutro)
+        assert ctas
+        assert all("plazos" not in c and "envío gratis" not in c for c in ctas)
+    # Ficha que SÍ lo trae: se ofrece.
+    ctas = config.ctas_para_locutar({"plazos": "si", "envio": "gratis"}, True, True, "Cuerpo.")
+    assert any("plazos" in c for c in ctas) and any("envío gratis" in c for c in ctas)

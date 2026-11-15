@@ -1590,3 +1590,4 @@
 - 2026-11-14 · silence_regression.py en modo offline carga Whisper large-v3 (×5, CPU): 1 h+ y swap al 70 % → no correrlo en el VPS; usar --modo replay o el PC de casa
 - 2026-11-14 · Carruseles Ama: gpt-imagen pone cremallera a abrigos que solo llevan botones → «NO zipper» en el prompt y comparar con la ficha; el emoji 🦌 no se pinta en el estilo `tiktok` (usar otro); si Social1 ES no da moda, los referentes de ayoubbshop sirven de fuente de virales.
 - 2026-11-14 · Genjutsu copia los subtítulos quemados del viral deformados, y si se borran con delogo copia la mancha como barras → elegir tramos sin texto o quitar el tramo del montaje (bici HillMiles R10)
+- 2026-11-15 · POV BOF Largo: vídeos con «cómodos plazos»/«envío gratis» pese a guardar_guion → el encaje de voz (`ctas_posibles`) reemplazaba el cierre del guion a mano y ofrecía plazos/envío por precio → `ctas_para_locutar`: manual = sin encaje; resto solo promesas que la ficha trae

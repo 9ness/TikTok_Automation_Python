@@ -341,6 +341,8 @@ son nuevos, así que se puede repetir un producto ya publicado.
   carpeta="Variantes regalo", producto="<número>", texto="…")` (API: `POST /guion`
   con `texto`). Se guarda tal cual y lo locuta Fish; no lo pisa `preparar_carpeta`
   salvo que se pida rehacer.
+  Al montar se locuta TAL CUAL (el encaje de voz ya no le cambia el cierre ni le
+  añade «cómodos plazos»/«envío gratis»): lo que escribas es lo que se oye.
 
 ## Lo que aprendimos haciendo carpetas enteras (sep 2026)
 

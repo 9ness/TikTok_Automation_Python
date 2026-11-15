@@ -471,6 +471,28 @@ def ctas_posibles(
     return tuple(sorted(dict.fromkeys(escalera), key=len))
 
 
+def ctas_para_locutar(
+    textos: dict, plazos: bool, envio: bool, guion: str = "", *,
+    manual: bool = False, neutro: bool = False,
+) -> tuple[str, ...]:
+    """Los cierres que el ENCAJE de la voz puede poner al locutar.
+
+    - Guion escrito a mano (`guardar_guion`, `guion_manual`): se locuta TAL
+      CUAL, sin escalera (vacío = no se cambia el cierre). Antes el encaje le
+      cambiaba el cierre y le colaba «cómodos plazos» / «envío gratis».
+    - Resto: solo se ofrece plazos o envío gratis si la FICHA lo trae de verdad
+      (`plazos` = sí, `envio` = gratis). El precio solo decide el cuerpo del
+      guion; prometer en el cierre lo que la ficha no dice trae infracciones.
+    """
+    if manual:
+        return ()
+    plazos_ficha = plazos and str(textos.get("plazos") or "").strip().lower() in ("si", "sí")
+    envio_ficha = envio and str(textos.get("envio") or "").strip().lower() == "gratis"
+    return ctas_posibles(
+        plazos_ficha, envio_ficha, inversa=es_cierre_inverso(guion), neutro=neutro,
+    )
+
+
 def cuerpo_sin_cta(guion: str) -> str:
     """El guion sin su última frase (el cierre). Vacío si no se reconoce."""
     if not guion or not _CTA_FINAL_RE.search(guion):
