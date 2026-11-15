@@ -658,3 +658,71 @@ def test_limpieza_global_no_toca_editor_rapido(rapido, monkeypatch, tmp_path):
     os.utime(f, (viejo, viejo)); os.utime(otro, (viejo, viejo))
     ts.cleanup_expired()
     assert f.exists() and not otro.exists()
+
+
+def test_corregir_subtitulos_sin_whisper_y_gratis(rapido, monkeypatch):
+    c, q, hdr = rapido
+    vid = _subir(c, hdr).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={})
+    llamadas = []
+
+    class FalsoSubs:
+        def run(self, *, input_path, output_path, config, ctx):
+            llamadas.append(dict(ctx.extras))
+            if ctx.extras.get("guardar_palabras"):
+                open(ctx.extras["guardar_palabras"], "w").write(json.dumps([
+                    {"word": "Hola", "start": 0.1, "end": 0.4},
+                    {"word": "nebulas", "start": 0.5, "end": 0.9},
+                    {"word": "eh", "start": 1.0, "end": 1.2}]))
+            open(output_path, "wb").write(b"mp4+subs")
+            return output_path
+
+    import src.editor_auto.tools.silence_cutter as sc
+    import src.editor_auto.tools.subs_auto as sa
+    monkeypatch.setattr(sa, "SubsAutoTool", FalsoSubs)
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+    assert c.get(f"{BASE}/videos/{vid}/subtitulos", headers=hdr).json() == {"palabras": []}
+    assert c.post(f"{BASE}/videos/{vid}/subtitulos", headers=hdr,
+                  json={"cambios": [{"i": 0, "texto": "x"}]}).status_code == 409  # aún en cola
+    svc.ejecutar(q.get_all()[0], lambda m: None, lambda f, m="": None)
+    assert "guardar_palabras" in llamadas[0]
+    p = c.get(f"{BASE}/videos/{vid}/subtitulos", headers=hdr).json()["palabras"]
+    assert [w["texto"] for w in p] == ["Hola", "nebulas", "eh"] and p[1]["inicio"] == 0.5
+
+    saldo0 = c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"]
+    assert c.post(f"{BASE}/videos/{vid}/subtitulos", headers=hdr,
+                  json={"cambios": [{"i": 9, "texto": "x"}]}).status_code in (400, 422)
+    r = c.post(f"{BASE}/videos/{vid}/subtitulos", headers=hdr,
+               json={"cambios": [{"i": 1, "texto": " Nebulabs "}, {"i": 2, "texto": ""}, {"i": 0, "texto": "Hola"}]})
+    assert r.status_code == 202 and r.json()["cambiadas"] == 2
+    job2 = q.get_all()[-1]
+    assert job2.params["modo"] == "estilo"
+    svc.ejecutar(job2, lambda m: None, lambda f, m="": None)
+    assert [w["word"] for w in llamadas[-1]["palabras"]] == ["Hola", "Nebulabs", ""]
+    assert "guardar_palabras" not in llamadas[-1]
+    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == saldo0
+    # sin cambios reales → no encola
+    assert c.post(f"{BASE}/videos/{vid}/subtitulos", headers=hdr,
+                  json={"cambios": [{"i": 1, "texto": "Nebulabs"}]}).json()["job_id"] is None
+
+    # un corte nuevo (retoque) tira la transcripción vieja: los tiempos cambian
+    svc.ruta_palabras(vid).write_text("[]")
+    c.post(f"{BASE}/videos/{vid}/retocar", headers=hdr, json={"devueltos": [1]})
+    svc.ejecutar(q.get_all()[-1], lambda m: None, lambda f, m="": None)
+    assert "guardar_palabras" in llamadas[-1]
+
+
+def test_subs_auto_con_palabras_dadas_no_transcribe(tmp_path, monkeypatch):
+    import src.subtitles_only as so
+    from src.editor_auto.tools.base import ToolContext
+    from src.editor_auto.tools.subs_auto import SubsAutoTool
+    vistos = {}
+    monkeypatch.setattr(so, "extract_audio_from_video", lambda *a, **k: (_ for _ in ()).throw(AssertionError("whisper")))
+    monkeypatch.setattr(so, "render_subtitles_on_video",
+                        lambda inp, words, style, out, **k: vistos.update(words=words) or open(out, "wb").write(b"x"))
+    t = SubsAutoTool()
+    ctx = ToolContext(user_id="u", user_name="u", job_id="j", temp_folder=str(tmp_path), on_log=lambda m: None, on_progress=lambda f, m="": None,
+                      extras={"palabras": [{"word": "Hola", "start": 0, "end": 1}, {"word": " ", "start": 1, "end": 2}]})
+    t.run(input_path="in.mp4", output_path=str(tmp_path / "o.mp4"), config=t.default_config(), ctx=ctx)
+    assert [w["word"] for w in vistos["words"]] == ["Hola"]

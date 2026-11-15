@@ -182,6 +182,68 @@ class SubsAutoTool:
         if os.environ.get("EDITOR_SUBS_MOTOR", "ffmpeg").strip() == "ffmpeg":
             quality = {**quality, "motor": "ffmpeg"}
 
+        # Palabras ya transcritas (editor rápido: el usuario corrigió el texto)
+        # → sin Whisper. `guardar_palabras` deja las de esta pasada en un JSON.
+        dadas = ctx.extras.get("palabras")
+        if dadas:
+            words = [dict(w) for w in dadas if str(w.get("word", "")).strip()]
+            ctx.on_log(f"[subs_auto] {len(words)} palabras dadas (sin Whisper)")
+            if not words:
+                raise RuntimeError("No quedan palabras para los subtítulos.")
+        else:
+            words = self._transcribir(input_path, config, ctx)
+        if ctx.extras.get("guardar_palabras"):
+            import json as _json
+            Path(ctx.extras["guardar_palabras"]).write_text(
+                _json.dumps(words, ensure_ascii=False), encoding="utf-8")
+
+        # Borde obligatorio en toda edición (básico y VIP): sin él, letra fina
+        # blanca o amarilla desaparece sobre caras, fondos claros y el producto.
+        nuevo = _con_borde(config, ctx.extras.get("subs_borde_min"))
+        if nuevo is not config:
+            config = nuevo
+            ctx.on_log(f"[subs_auto] borde {config['stroke_width']}px {config['stroke_color']}")
+
+        ctx.on_progress(0.58, "🎬 Render overlay subtítulos…")
+        style = {
+            "font_path": config["font_path"],
+            "highlight_mode": config["highlight_mode"],
+            "highlight_color": config["highlight_color"],
+            "text_color": config["text_color"],
+            "stroke_color": config["stroke_color"],
+            "stroke_width": config["stroke_width"],
+            "case_mode": config["case_mode"],
+            "font_scale": config["font_scale"],
+            "max_words_per_chunk": config["max_words"],
+            "y_position_pct": config["y_position"],
+            "pill_enabled": config.get("pill_enabled", True),
+            "max_width_pct": config.get("max_width", 0.85),
+            "sync_offset_ms": config.get("sync_offset", 0),
+            "entrance_anim": config.get("entrance_anim", "none"),
+        }
+        # Evita que la ÚLTIMA palabra quede CONGELADA hasta el final del vídeo
+        # cuando hay cola sin voz (el habla acaba antes que el vídeo). Cap del
+        # último subtítulo = fin de la última palabra + 1s de margen.
+        last_word_end = max((float(w.get("end", 0) or 0) for w in words), default=0.0)
+        last_chunk_max_end = last_word_end + 1.0 if last_word_end > 0 else None
+
+        render_subtitles_on_video(
+            input_path, words, style, output_path,
+            quality_settings=quality,
+            log_callback=ctx.on_log,
+            logger=None,
+            last_chunk_max_end=last_chunk_max_end,
+        )
+        ctx.on_progress(1.0, "✅ Subtítulos aplicados")
+        return output_path
+
+    def _transcribir(self, input_path: str, config: dict[str, Any], ctx: ToolContext) -> list[dict]:
+        """Audio → palabras con tiempos (Whisper local), sin huecos VIP y con nombres corregidos."""
+        import os
+        import time
+
+        from src.subtitles_only import extract_audio_from_video
+
         ctx.on_progress(0.02, "🔊 Extrayendo audio…")
         ctx.on_log("[subs_auto] Extrayendo audio del vídeo…")
         tmp_audio = os.path.join(
@@ -263,46 +325,7 @@ class SubsAutoTool:
                 os.remove(tmp_audio)
             except OSError:
                 pass
-
-        # Borde obligatorio en toda edición (básico y VIP): sin él, letra fina
-        # blanca o amarilla desaparece sobre caras, fondos claros y el producto.
-        nuevo = _con_borde(config, ctx.extras.get("subs_borde_min"))
-        if nuevo is not config:
-            config = nuevo
-            ctx.on_log(f"[subs_auto] borde {config['stroke_width']}px {config['stroke_color']}")
-
-        ctx.on_progress(0.58, "🎬 Render overlay subtítulos…")
-        style = {
-            "font_path": config["font_path"],
-            "highlight_mode": config["highlight_mode"],
-            "highlight_color": config["highlight_color"],
-            "text_color": config["text_color"],
-            "stroke_color": config["stroke_color"],
-            "stroke_width": config["stroke_width"],
-            "case_mode": config["case_mode"],
-            "font_scale": config["font_scale"],
-            "max_words_per_chunk": config["max_words"],
-            "y_position_pct": config["y_position"],
-            "pill_enabled": config.get("pill_enabled", True),
-            "max_width_pct": config.get("max_width", 0.85),
-            "sync_offset_ms": config.get("sync_offset", 0),
-            "entrance_anim": config.get("entrance_anim", "none"),
-        }
-        # Evita que la ÚLTIMA palabra quede CONGELADA hasta el final del vídeo
-        # cuando hay cola sin voz (el habla acaba antes que el vídeo). Cap del
-        # último subtítulo = fin de la última palabra + 1s de margen.
-        last_word_end = max((float(w.get("end", 0) or 0) for w in words), default=0.0)
-        last_chunk_max_end = last_word_end + 1.0 if last_word_end > 0 else None
-
-        render_subtitles_on_video(
-            input_path, words, style, output_path,
-            quality_settings=quality,
-            log_callback=ctx.on_log,
-            logger=None,
-            last_chunk_max_end=last_chunk_max_end,
-        )
-        ctx.on_progress(1.0, "✅ Subtítulos aplicados")
-        return output_path
+        return words
 
 
 BORDE_MIN = 5

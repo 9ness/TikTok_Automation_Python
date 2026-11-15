@@ -755,6 +755,44 @@ def resumen(ficha: dict) -> dict | None:
     }
 
 
+def ruta_palabras(vid: str) -> Path:
+    """Palabras de los subtítulos (Whisper sobre el corte, con las correcciones del usuario)."""
+    return carpeta(vid) / "palabras.json"
+
+
+def leer_palabras(vid: str) -> list[dict] | None:
+    p = ruta_palabras(vid)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+MAX_TEXTO_PALABRA = 60
+
+
+def corregir_palabras(vid: str, cambios: list[dict]) -> int:
+    """Cambia el texto de palabras por índice ({i, texto}); texto vacío la quita del
+    subtítulo (el audio no se toca). ValueError si no hay transcripción o un índice no existe."""
+    palabras = leer_palabras(vid)
+    if not palabras:
+        raise ValueError("Este vídeo aún no tiene subtítulos que corregir.")
+    n = 0
+    for c in cambios:
+        i = int(c.get("i", -1))
+        if not 0 <= i < len(palabras):
+            raise ValueError(f"Palabra {i} no existe.")
+        texto = " ".join(str(c.get("texto") or "").split())[:MAX_TEXTO_PALABRA]
+        if texto != str(palabras[i].get("word", "")).strip():
+            palabras[i]["word"] = texto
+            n += 1
+    if n:
+        ruta_palabras(vid).write_text(json.dumps(palabras, ensure_ascii=False), encoding="utf-8")
+    return n
+
+
 def config_subtitulos(sub: dict, idioma: str) -> dict[str, Any]:
     """Config de `subs_auto` para los ajustes del editor rápido, reutilizando el mapeo del
     Editor Auto (`style_mapper`: estilo del catálogo → claves del motor)."""
@@ -822,16 +860,20 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
     actual, avisos = base, []
     carp = carpeta(ficha["id"])
 
-    def _ctx(a: float, b: float, msg: str):
+    def _ctx(a: float, b: float, msg: str, extras: dict | None = None):
         return ToolContext(user_id=ficha["email"], user_name=ficha["email"], job_id=job.id,
-                           temp_folder=str(carp), on_log=on_log, on_progress=_escalar(on_progress, a, b, msg))
+                           temp_folder=str(carp), on_log=on_log, on_progress=_escalar(on_progress, a, b, msg),
+                           extras=extras or {})
 
     if sub.get("activo", True):
         out = carp / f"subs_{job.id}.mp4"
         try:
             from src.editor_auto.tools.subs_auto import SubsAutoTool
+            # Palabras ya transcritas de este corte (con correcciones) → sin Whisper.
+            palabras = leer_palabras(ficha["id"])
+            extras = {"palabras": palabras} if palabras else {"guardar_palabras": str(ruta_palabras(ficha["id"]))}
             SubsAutoTool().run(input_path=str(actual), output_path=str(out),
-                               config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Subtítulos…"))
+                               config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Subtítulos…", extras))
             if not out.exists() or out.stat().st_size == 0:
                 raise RuntimeError("no se generó el vídeo con subtítulos")
             actual = out
@@ -920,6 +962,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                 n_cortes = len(cortes)
                 proyecto.unlink(missing_ok=True)
             os.replace(salida, cortado)
+            ruta_palabras(vid).unlink(missing_ok=True)  # corte nuevo → tiempos nuevos
             tramos = (0.6, 0.9, 1.0)
         final = ruta_resultado(vid)
         ficha = cargar_ficha(vid) or ficha

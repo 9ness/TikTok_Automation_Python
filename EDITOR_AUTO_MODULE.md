@@ -338,6 +338,9 @@ API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapi
 - Runner `ejecutar` (modos `auto`, `retoque`, `estilo`): corte (0-0.6) → guarda `cortado.mp4` → `SubsAutoTool` (0.6-0.9, Whisper `EDITOR_RAPIDO_WHISPER_MODEL`, def. `small`)
   → `StickerArrowTool` (0.9-1) vía `style_mapper.build_tool_flow`. Si subs/flecha fallan se entrega el corte con `aviso` en la ficha (sin devolver créditos).
 - `POST /videos/{id}/estilo` `{subtitulos?, flecha?}` (gratis, 409 si está en marcha o sin cortar): re-renderiza desde `cortado.mp4` sin volver a cortar.
+- **Corregir subtítulos (15/11/2026):** al poner subs se guarda `palabras.json` (Whisper sobre `cortado.mp4`, vía `ctx.extras["guardar_palabras"]`).
+  `GET /videos/{id}/subtitulos` → `{palabras[{i,inicio,fin,texto}]}`; `POST /videos/{id}/subtitulos {cambios[{i,texto}]}` (vacío = quitarla) → `{ok,cambiadas,job_id}`:
+  re-monta en modo `estilo` con `ctx.extras["palabras"]` (sin Whisper), gratis. Un corte nuevo (`auto`/`retoque`) borra `palabras.json` (tiempos nuevos).
 - La vista del vídeo trae `aviso` y `resumen {pausas, repeticiones(0: no se distingue), segundos_quitados, duracion_original_s, duracion_final_s}`.
 - Admin: `GET /admin/cuentas` → `{cuentas[{email,creditos,n_videos}]}` y `POST /admin/dar {email, creditos(+/-)}` → `{email, creditos}` (ticket con rol admin, 403 si no;
   set Redis `editor_rapido:cuentas`, que se rellena con KEYS si está vacío). `POST /admin/creditos` (API key) sigue igual.

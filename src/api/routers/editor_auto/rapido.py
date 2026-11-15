@@ -91,6 +91,15 @@ class Estilo(BaseModel):
     flecha: FlechaAjustes | None = None
 
 
+class CambioPalabra(BaseModel):
+    i: int = Field(..., ge=0, description="índice en GET /videos/{id}/subtitulos")
+    texto: str = Field("", max_length=200, description="texto nuevo; vacío = quitarla del subtítulo")
+
+
+class CorreccionSubs(BaseModel):
+    cambios: list[CambioPalabra] = Field(..., min_length=1, max_length=5000)
+
+
 class DarCreditos(BaseModel):
     email: str
     creditos: int
@@ -429,6 +438,46 @@ def cambiar_estilo(vid: str, body: Estilo, claims: Claims, queue: Annotated[JobQ
     svc.guardar_ficha(ficha)
     svc.registrar_evento(vid, claims.email, "estilo", {"subtitulos": sub, "flecha": fl})
     return {"ok": True, "job_id": job.id}
+
+
+@router.get("/videos/{vid}/subtitulos")
+def subtitulos(vid: str, claims: Claims) -> dict:
+    """Palabras de los subtítulos del vídeo con sus tiempos (sobre el vídeo YA cortado)."""
+    _ficha_o_404(vid, claims.email)
+    palabras = svc.leer_palabras(vid) or []
+    return {"palabras": [
+        {"i": i, "inicio": round(float(w.get("start", 0)), 2), "fin": round(float(w.get("end", 0)), 2),
+         "texto": str(w.get("word", "")).strip()}
+        for i, w in enumerate(palabras)
+    ]}
+
+
+@router.post("/videos/{vid}/subtitulos", status_code=status.HTTP_202_ACCEPTED)
+def corregir_subtitulos(vid: str, body: CorreccionSubs, claims: Claims,
+                        queue: Annotated[JobQueue, Depends(get_queue)]) -> dict:
+    """Corrige el texto de los subtítulos y vuelve a montarlos (sin cortar ni Whisper). Gratis."""
+    ficha = _ficha_o_404(vid, claims.email)
+    if ficha["estado"] == "cola":
+        raise APIError("El vídeo está en marcha; espera a que termine.", status_code=409)
+    if ficha["estado"] != "listo":
+        raise APIError("El vídeo aún no está cortado.", status_code=409)
+    try:
+        n = svc.corregir_palabras(vid, [c.model_dump() for c in body.cambios])
+    except ValueError as e:
+        raise ValidationError(str(e)) from e
+    if not n:
+        return {"ok": True, "cambiadas": 0, "job_id": None}
+    aj = dict(ficha.get("ajustes") or {})
+    aj["subtitulos"] = {**(aj.get("subtitulos") or svc.validar_subtitulos(None)), "activo": True}
+    job = queue.enqueue(
+        JobMode.EDITOR_RAPIDO, title=f"Rápido (subtítulos) · {ficha['nombre'][:40]}",
+        params={"video_id": vid, "modo": "estilo", "user_name": claims.email},
+        enqueued_by=claims.email,
+    )
+    ficha.update(ajustes=aj, estado="cola", job_id=job.id, error=None, aviso=None)
+    svc.guardar_ficha(ficha)
+    svc.registrar_evento(vid, claims.email, "subtitulos", {"cambiadas": n})
+    return {"ok": True, "cambiadas": n, "job_id": job.id}
 
 
 @router.post("/videos/{vid}/valorar")
