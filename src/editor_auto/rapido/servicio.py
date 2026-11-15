@@ -215,6 +215,21 @@ def _k_lista(email: str) -> str:
     return f"rapido:videos:{email}"
 
 
+def _k_pref(email: str) -> str:
+    return f"rapido:pref:{email}"
+
+
+def leer_preferencias(email: str) -> dict | None:
+    """Estilo guardado de la cuenta (ritmo, formato, idioma, subtítulos, flecha).
+    None = aún no ha guardado ninguno."""
+    p = get_editor_redis().get_json(_k_pref(email))
+    return p if isinstance(p, dict) else None
+
+
+def guardar_preferencias(email: str, pref: dict) -> None:
+    get_editor_redis().set_json(_k_pref(email), pref)
+
+
 # Caducidad de los créditos: APAGADA por ahora (None = no caducan). Se guarda
 # `ultima_recarga` para poder activarla más adelante (p. ej. distinta según el pack).
 CADUCIDAD_DIAS: int | None = None

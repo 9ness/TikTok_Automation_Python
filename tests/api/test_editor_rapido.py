@@ -762,3 +762,15 @@ def test_revision_ia_sustituye_sin_mover_tiempos(monkeypatch):
     cfg = sv.config_subtitulos({}, "auto")
     assert cfg["revisar_ia"] and "TikTok Shop" in cfg["keyterms"]
     assert "carrito naranja" in sv.config_flecha({"activo": True, "id": "auto"}, "es")["keyterms"]
+
+
+def test_preferencias_guardar_y_leer(rapido):
+    c, _, hdr = rapido
+    assert c.get(f"{BASE}/preferencias", headers=hdr).json() == {"guardado": False, "preferencias": None}
+    r = c.put(f"{BASE}/preferencias", headers=hdr, json={
+        "ritmo": "sin_pausas", "subtitulos": {"activo": True, "color": ""}, "flecha": {"activo": True}})
+    assert r.status_code == 200
+    p = c.get(f"{BASE}/preferencias", headers=hdr).json()
+    assert p["guardado"] and p["preferencias"]["ritmo"] == "sin_pausas"
+    assert p["preferencias"]["flecha"] == {"activo": True, "id": "auto"}
+    assert c.put(f"{BASE}/preferencias", headers=hdr, json={"ritmo": "loco"}).status_code == 422

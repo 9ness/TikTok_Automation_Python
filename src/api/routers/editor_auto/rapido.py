@@ -221,6 +221,24 @@ def flecha_png(fid: str):
     return FileResponse(png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
+@router.get("/preferencias")
+def ver_preferencias(claims: Claims) -> dict:
+    """Estilo guardado de la cuenta; `guardado=False` si aún no hay."""
+    p = svc.leer_preferencias(claims.email)
+    return {"guardado": p is not None, "preferencias": p}
+
+
+@router.put("/preferencias")
+def guardar_preferencias(ajustes: Ajustes, claims: Claims) -> dict:
+    """Guarda el estilo por defecto: los vídeos subidos sin «Elegir ajustes» se cortan con él."""
+    if ajustes.ritmo not in svc.RITMOS or ajustes.formato not in svc.FORMATOS or ajustes.idioma not in svc.IDIOMAS:
+        raise ValidationError("Ajustes no válidos.", details=ajustes.model_dump())
+    sub, fl = _validar_estilo(ajustes.subtitulos, ajustes.flecha)
+    pref = {**ajustes.model_dump(), "subtitulos": sub, "flecha": fl}
+    svc.guardar_preferencias(claims.email, pref)
+    return {"ok": True, "preferencias": pref}
+
+
 @router.get("/videos")
 def listar(claims: Claims, queue: Annotated[JobQueue, Depends(get_queue)]) -> dict:
     return {"videos": [_vista(f, queue) for f in svc.listar_fichas(claims.email) if f.get("estado") != "subiendo"]}
