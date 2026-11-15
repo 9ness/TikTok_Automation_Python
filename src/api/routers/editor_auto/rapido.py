@@ -5,7 +5,7 @@ el saldo de créditos. Auth = ticket firmado de la web (`Authorization: Bearer`,
 scope «rapido»); para `<video src>` y descargas se acepta también `?t=<ticket>`.
 Los bytes del vídeo van del navegador al box (no pasan por Vercel).
 
-Créditos: 1 = 1 segundo del original (hacia abajo, mínimo 10, tope 300). V1 sin pagos reales.
+Créditos: 1 = 1 vídeo (hasta 5 min gasta 1, hasta 10 min gasta 2). V1 sin pagos reales.
 """
 
 from __future__ import annotations
@@ -345,7 +345,7 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     if ficha["estado"] not in ("subido", "error"):
         raise APIError("Este vídeo ya se ha cortado o está en marcha.", status_code=409)
     admin = _es_admin(claims)  # el admin no gasta créditos
-    ficha["creditos"] = svc.creditos_de(ficha["duracion_s"])  # tarifa vigente (fichas de antes del cambio a segundos)
+    ficha["creditos"] = svc.creditos_de(ficha["duracion_s"])  # tarifa vigente (fichas de antes del cambio a vídeos)
     if not admin and not svc.cobrar(claims.email, svc.cr(ficha["creditos"])):
         raise APIError(
             f"Necesitas {ficha['creditos']} crédito(s) y no te alcanzan.", status_code=402,

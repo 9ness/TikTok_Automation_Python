@@ -25,7 +25,7 @@ def rapido(app_client, fake_job_queue, tmp_path, monkeypatch):
     redis = FakeRedis()
     redis.prefix = "editor_auto:"
     monkeypatch.setattr(svc, "get_editor_redis", lambda: redis)
-    monkeypatch.setattr(svc, "duracion_video", lambda p: 95.0)  # 95 s → 95 créditos
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 95.0)  # 95 s → 1 crédito (1 vídeo)
     hdr = {"Authorization": "Bearer " + make_ticket(EMAIL, "", scope="rapido")}
     return app_client, fake_job_queue, hdr
 
@@ -48,21 +48,23 @@ def test_saldo_gratis_inicial_una_sola_vez(rapido):
     assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 149
 
 
-def test_creditos_por_segundo_con_minimo_y_tope():
-    # 1 crédito = 1 segundo hacia abajo, mínimo 10 y tope 300
-    assert svc.creditos_de(0.2) == 10
-    assert svc.creditos_de(9.9) == 10
-    assert svc.creditos_de(47.9) == 47
-    assert svc.creditos_de(60) == 60
-    assert svc.creditos_de(299.5) == 299
-    assert svc.creditos_de(600) == 300
+def test_creditos_por_video_1_hasta_5_min_2_hasta_10():
+    assert svc.creditos_de(0.2) == 1
+    assert svc.creditos_de(47.9) == 1
+    assert svc.creditos_de(300) == 1
+    assert svc.creditos_de(300.5) == 2
+    assert svc.creditos_de(600) == 2
 
 
-def test_saldo_viejo_en_minutos_pasa_a_segundos_una_vez(rapido):
-    from src.editor_auto.rapido.servicio import get_editor_redis, _k_saldo
-    get_editor_redis().set_json(_k_saldo("viejo@x.com"), {"creditos": 105, "gratis_dados": 5})
-    assert svc.saldo("viejo@x.com")["creditos"] == 6300
-    assert svc.saldo("viejo@x.com")["creditos"] == 6300  # no vuelve a multiplicar
+def test_saldo_viejo_pasa_a_videos_una_vez(rapido):
+    from src.editor_auto.rapido.servicio import _k_saldo
+    r = svc.get_editor_redis()
+    r.set_json(_k_saldo("min@x.com"), {"creditos": 105, "gratis_dados": 5})  # minutos
+    r.set_json(_k_saldo("seg@x.com"), {"creditos": 10000, "gratis_dados": 300, "unidad": "s"})  # segundos
+    assert svc.saldo("min@x.com")["creditos"] == 105
+    assert svc.saldo("seg@x.com")["creditos"] == 167
+    assert svc.saldo("seg@x.com")["creditos"] == 167  # no vuelve a dividir
+    assert svc.saldo("seg@x.com")["gratis_dados"] == 5
     assert svc.saldo("nuevo@x.com")["creditos"] == svc.gratis_inicial() == 150
 
 
@@ -82,7 +84,7 @@ def test_subir_rechaza_formato_y_no_cobra(rapido):
     assert r.status_code == 422 or r.status_code == 400
     r = _subir(c, hdr)
     assert r.status_code == 201
-    assert r.json()["creditos"] == 95 and r.json()["saldo"] == 150
+    assert r.json()["creditos"] == 1 and r.json()["saldo"] == 150
 
 
 def test_cortar_cobra_encola_y_progreso(rapido):
@@ -90,7 +92,7 @@ def test_cortar_cobra_encola_y_progreso(rapido):
     vid = _subir(c, hdr).json()["id"]
     r = c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr,
                json={"ritmo": "sin_pausas", "formato": "original", "idioma": "es"})
-    assert r.status_code == 202 and r.json()["saldo"] == 55
+    assert r.status_code == 202 and r.json()["saldo"] == 149
     job = q.get_all()[0]
     assert job.mode == JobMode.EDITOR_RAPIDO and job.params["video_id"] == vid
     job.progress, job.progress_label = 0.4, "Whisper transcribiendo…"
@@ -103,11 +105,11 @@ def test_cortar_cobra_encola_y_progreso(rapido):
 
 def test_sin_saldo_402(rapido):
     c, _, hdr = rapido
-    svc.ajustar_creditos(EMAIL, -100)  # quedan 50
+    svc.ajustar_creditos(EMAIL, -150)  # quedan 0
     vid = _subir(c, hdr).json()["id"]
     r = c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={})
     assert r.status_code == 402
-    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 50
+    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 0
 
 
 def test_ajustes_invalidos(rapido):
@@ -232,7 +234,7 @@ def test_subida_por_trozos_reanudable(rapido):
     assert c.post(f"{BASE}/subidas/{vid}/fin", headers=hdr).status_code == 409  # faltan bytes
     c.put(f"{BASE}/subidas/{vid}?offset=4", headers=hdr, content=b"efghi")
     r = c.post(f"{BASE}/subidas/{vid}/fin", headers=hdr)
-    assert r.status_code == 200 and r.json()["creditos"] == 95
+    assert r.status_code == 200 and r.json()["creditos"] == 1
     assert [v["id"] for v in c.get(f"{BASE}/videos", headers=hdr).json()["videos"]] == [vid]
 
 
@@ -419,7 +421,7 @@ def test_subs_fallan_se_entrega_el_corte_con_aviso(rapido, monkeypatch):
     v = c.get(f"{BASE}/videos/{vid}", headers=hdr).json()
     assert v["estado"] == "listo" and "subtítulos" in v["aviso"]
     assert svc.ruta_resultado(vid).read_bytes() == b"mp4"
-    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 55  # no se devuelven
+    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 149  # no se devuelven
 
 
 def test_admin_cuentas_y_dar(rapido):
@@ -536,15 +538,15 @@ def test_historial_usuario_y_fecha(rapido, monkeypatch, tmp_path):
     lista = c.get(f"{BASE}/videos", headers=hdr).json()["videos"]
     assert lista[0]["fecha"][:10] == svc.fecha_dia() and "T" in lista[0]["fecha"]
     h = c.get(f"{BASE}/historial", headers=hdr).json()
-    assert h == {"dias": [{"fecha": svc.fecha_dia(), "videos": 1, "minutos_gastados": 95}],
-                 "creditos_gastados_total": 95}
+    assert h == {"dias": [{"fecha": svc.fecha_dia(), "videos": 1, "minutos_gastados": 1}],
+                 "creditos_gastados_total": 1}
     # un fallo devuelve créditos y se descuenta del historial
     v2 = _subir(c, hdr).json()["id"]
     svc.ajustar_creditos(EMAIL, 0)
     c.post(f"{BASE}/videos/{v2}/cortar", headers=hdr, json={})
     q.set_status(q.get_all()[-1].id, "failed")
     c.get(f"{BASE}/videos/{v2}", headers=hdr)
-    assert c.get(f"{BASE}/historial", headers=hdr).json()["creditos_gastados_total"] == 95
+    assert c.get(f"{BASE}/historial", headers=hdr).json()["creditos_gastados_total"] == 1
     # solo cuenta el propio usuario
     otro = {"Authorization": "Bearer " + make_ticket("otro@example.com", "", scope="rapido")}
     assert c.get(f"{BASE}/historial", headers=otro).json() == {"dias": [], "creditos_gastados_total": 0}
