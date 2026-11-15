@@ -65,10 +65,48 @@ def _es_admin(claims: TicketClaims) -> bool:
     return _nivel(claims) == "admin"
 
 
+class SubsAjustes(BaseModel):
+    activo: bool = True
+    estilo: str | None = Field(None, description="id del catálogo (GET /opciones); por defecto el primero")
+    color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$", description="hex; sobrescribe el color de resalte")
+    fuente: str | None = Field(None, description="id de GET /opciones → fuentes")
+    posicion: str = Field("abajo", description="abajo | centro | arriba")
+
+
+class FlechaAjustes(BaseModel):
+    activo: bool = False
+    id: str | None = Field(None, description="id de GET /opciones → flechas")
+
+
 class Ajustes(BaseModel):
     ritmo: str = Field("natural", description="natural | sin_pausas")
     formato: str = Field("9:16", description="9:16 | original")
     idioma: str = Field("auto", description="auto | es | en")
+    subtitulos: SubsAjustes = Field(default_factory=SubsAjustes)
+    flecha: FlechaAjustes = Field(default_factory=FlechaAjustes)
+
+
+class Estilo(BaseModel):
+    subtitulos: SubsAjustes | None = None
+    flecha: FlechaAjustes | None = None
+
+
+class DarCreditos(BaseModel):
+    email: str
+    creditos: int
+
+
+def _validar_estilo(sub: SubsAjustes | None, fl: FlechaAjustes | None) -> tuple[dict | None, dict | None]:
+    try:
+        return (svc.validar_subtitulos(sub.model_dump()) if sub is not None else None,
+                svc.validar_flecha(fl.model_dump()) if fl is not None else None)
+    except ValueError as e:
+        raise ValidationError(str(e)) from e
+
+
+def _admin_o_403(claims: TicketClaims) -> None:
+    if not _es_admin(claims):
+        raise APIError("Solo para administradores.", status_code=403)
 
 
 class Retoque(BaseModel):
@@ -112,6 +150,7 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
         "duracion_s": ficha["duracion_s"], "duracion_final_s": ficha.get("duracion_final_s"),
         "creditos": ficha["creditos"], "creado": ficha["creado"], "error": ficha.get("error"),
         "ajustes": ficha.get("ajustes"), "version": ficha.get("version", 0),
+        "aviso": ficha.get("aviso"), "resumen": svc.resumen(ficha),
         "progreso": None,
     }
     if ficha["estado"] == "cola" and job is not None:
@@ -139,6 +178,21 @@ def saldo(claims: Claims) -> dict:
         "creditos": int(s["creditos"]), "gratis_dados": int(s.get("gratis_dados", 0)),
         "nivel": _nivel(claims), "ilimitado": _es_admin(claims),
     }
+
+
+@router.get("/opciones")
+def opciones(claims: Claims) -> dict:
+    """Estilos de subtítulos, colores, fuentes, flechas y posiciones que ofrece la web."""
+    return svc.opciones(router.prefix)
+
+
+@router.get("/flechas/{fid}.png")
+def flecha_png(fid: str):
+    """Imagen de una flecha (público, sin ticket: va en un <img>)."""
+    png = svc.png_flecha(fid) if re.fullmatch(r"[A-Za-z0-9_-]+", fid) else None
+    if png is None:
+        raise APIError("Flecha no encontrada.", status_code=404)
+    return FileResponse(png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/videos")
@@ -267,6 +321,7 @@ def subida_fin(vid: str, claims: Claims) -> dict:
 def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue, Depends(get_queue)]) -> dict:
     if ajustes.ritmo not in svc.RITMOS or ajustes.formato not in svc.FORMATOS or ajustes.idioma not in svc.IDIOMAS:
         raise ValidationError("Ajustes no válidos.", details=ajustes.model_dump())
+    sub, fl = _validar_estilo(ajustes.subtitulos, ajustes.flecha)
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] not in ("subido", "error"):
         raise APIError("Este vídeo ya se ha cortado o está en marcha.", status_code=409)
@@ -276,7 +331,7 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
             f"Necesitas {ficha['creditos']} crédito(s) y no te alcanzan.", status_code=402,
             details={"necesarios": ficha["creditos"], "saldo": int(svc.saldo(claims.email)["creditos"])},
         )
-    ficha.update(ajustes=ajustes.model_dump(), cobrado=not admin, devuelto=False, error=None, estado="cola")
+    ficha.update(ajustes={**ajustes.model_dump(), "subtitulos": sub, "flecha": fl}, aviso=None, cobrado=not admin, devuelto=False, error=None, estado="cola")
     job = queue.enqueue(
         JobMode.EDITOR_RAPIDO, title=f"Rápido · {ficha['nombre'][:40]}",
         params={"video_id": vid, "modo": "auto", "user_name": claims.email},
@@ -314,6 +369,32 @@ def retocar(vid: str, body: Retoque, claims: Claims, queue: Annotated[JobQueue, 
         enqueued_by=claims.email,
     )
     ficha.update(estado="cola", job_id=job.id, error=None)
+    svc.guardar_ficha(ficha)
+    return {"ok": True, "job_id": job.id}
+
+
+@router.post("/videos/{vid}/estilo", status_code=status.HTTP_202_ACCEPTED)
+def cambiar_estilo(vid: str, body: Estilo, claims: Claims, queue: Annotated[JobQueue, Depends(get_queue)]) -> dict:
+    """Cambia subtítulos y/o flecha de un vídeo ya cortado, SIN volver a cortar y gratis."""
+    if body.subtitulos is None and body.flecha is None:
+        raise ValidationError("Indica subtitulos y/o flecha.")
+    sub, fl = _validar_estilo(body.subtitulos, body.flecha)
+    ficha = _ficha_o_404(vid, claims.email)
+    if ficha["estado"] == "cola":
+        raise APIError("El vídeo está en marcha; espera a que termine.", status_code=409)
+    if ficha["estado"] != "listo":
+        raise APIError("El vídeo aún no está cortado.", status_code=409)
+    aj = dict(ficha.get("ajustes") or {})
+    if sub is not None:
+        aj["subtitulos"] = sub
+    if fl is not None:
+        aj["flecha"] = fl
+    job = queue.enqueue(
+        JobMode.EDITOR_RAPIDO, title=f"Rápido (estilo) · {ficha['nombre'][:40]}",
+        params={"video_id": vid, "modo": "estilo", "user_name": claims.email},
+        enqueued_by=claims.email,
+    )
+    ficha.update(ajustes=aj, estado="cola", job_id=job.id, error=None, aviso=None)
     svc.guardar_ficha(ficha)
     return {"ok": True, "job_id": job.id}
 
@@ -358,3 +439,21 @@ def admin_creditos(body: AjusteCreditos) -> dict:
         raise ValidationError("Email no válido.")
     svc.saldo(email)
     return {"email": email, "creditos": svc.ajustar_creditos(email, body.delta)}
+
+
+@router.get("/admin/cuentas")
+def admin_cuentas(claims: Claims) -> dict:
+    """Cuentas con saldo y nº de vídeos (solo rol admin del ticket)."""
+    _admin_o_403(claims)
+    return {"cuentas": svc.listar_cuentas()}
+
+
+@router.post("/admin/dar")
+def admin_dar(body: DarCreditos, claims: Claims) -> dict:
+    """Suma (o resta, con negativo) créditos a una cuenta (solo rol admin del ticket)."""
+    _admin_o_403(claims)
+    email = body.email.strip().lower()
+    if not email or "@" not in email:
+        raise ValidationError("Email no válido.")
+    svc.saldo(email)
+    return {"email": email, "creditos": svc.ajustar_creditos(email, body.creditos)}

@@ -239,3 +239,180 @@ def test_rol_desconocido_es_standard(rapido):
     c, _, _ = rapido
     h = {"Authorization": "Bearer " + make_ticket(EMAIL, "", scope="rapido", extra={"rol": "dios"})}
     assert c.get(f"{BASE}/saldo", headers=h).json()["nivel"] == "standard"
+
+
+# ───────────────────── Estilo: opciones, subtítulos, flecha ─────────────────────
+
+def _falso_cortador(vid, llamadas=None):
+    class FalsoCortador:
+        def run(self, *, input_path, output_path, config, ctx):
+            if llamadas is not None:
+                llamadas.append(config)
+            open(output_path, "wb").write(b"mp4")
+            if "manual_keep_intervals" not in config:
+                (svc.carpeta(vid) / f"editproject_{ctx.job_id}.json").write_text(json.dumps({
+                    "video_duration_s": 95.0, "keep_intervals": [[2.0, 60.0], [62.0, 95.0]],
+                    "words": [{"word": "mmm", "start": 60.2, "end": 61.5}],
+                }))
+            ctx.on_progress(1.0, "Cortando…")
+            return output_path
+    return FalsoCortador
+
+
+def _falsas_estilo(monkeypatch, subs_calls, flecha_calls, fallar_subs=False):
+    class FalsoSubs:
+        def run(self, *, input_path, output_path, config, ctx):
+            subs_calls.append((input_path, config))
+            if fallar_subs:
+                raise RuntimeError("whisper roto")
+            open(output_path, "wb").write(b"mp4+subs")
+            return output_path
+
+    class FalsaFlecha:
+        def run(self, *, input_path, output_path, config, ctx):
+            flecha_calls.append((input_path, config))
+            open(output_path, "wb").write(open(input_path, "rb").read() + b"+flecha")
+            return output_path
+
+    import src.editor_auto.tools.silence_cutter as sc
+    import src.editor_auto.tools.subs_auto as sa
+    import src.editor_auto.tools.sticker_arrow as st
+    monkeypatch.setattr(sa, "SubsAutoTool", FalsoSubs)
+    monkeypatch.setattr(st, "StickerArrowTool", FalsaFlecha)
+    return sc
+
+
+def test_opciones_catalogo(rapido):
+    c, _, hdr = rapido
+    assert c.get(f"{BASE}/opciones").status_code == 401
+    o = c.get(f"{BASE}/opciones", headers=hdr).json()
+    assert o["posiciones"] == ["abajo", "centro", "arriba"]
+    assert len(o["colores"]) == 8 and all(x.startswith("#") and len(x) == 7 for x in o["colores"])
+    assert 1 <= len(o["fuentes"]) <= 8 and {"id", "nombre"} <= set(o["fuentes"][0])
+    e = o["estilos"][0]
+    assert {"id", "nombre", "fuente", "color_texto", "color_resalte", "modo_resalte", "borde"} <= set(e)
+    assert o["flechas"] and not any("navidad" in f["id"] for f in o["flechas"])
+    f = o["flechas"][0]
+    assert f["png_url"] == f"{BASE}/flechas/{f['id']}.png"
+
+
+def test_flecha_png_publica(rapido, tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg"):
+        pytest.skip("sin ffmpeg")
+    c, _, _ = rapido
+    carp = tmp_path / "flechas"
+    carp.mkdir()
+    fid = svc.flechas_disponibles()[0]
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "color=c=red:s=64x64:d=1",
+                    str(carp / fid["fichero"])], check=True)
+    import src.editor_auto.config as cfg
+    monkeypatch.setattr(cfg, "arrows_folder", lambda: str(carp))
+    r = c.get(f"{BASE}/flechas/{fid['id']}.png")  # sin ticket
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content[:4] == b"\x89PNG"
+    assert c.get(f"{BASE}/flechas/no_existe.png").status_code == 404
+
+
+def test_cortar_con_estilo_se_guarda_y_valida(rapido):
+    c, q, hdr = rapido
+    o = c.get(f"{BASE}/opciones", headers=hdr).json()
+    vid = _subir(c, hdr).json()["id"]
+    for malo in ({"subtitulos": {"estilo": "nope"}}, {"subtitulos": {"posicion": "lado"}},
+                 {"subtitulos": {"color": "rojo"}}, {"subtitulos": {"fuente": "zzz"}},
+                 {"flecha": {"activo": True, "id": "nope"}}):
+        assert c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json=malo).status_code in (400, 422)
+    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 3  # nada cobrado
+    body = {"subtitulos": {"estilo": o["estilos"][1]["id"], "color": "#FDE047", "fuente": "anton", "posicion": "arriba"},
+            "flecha": {"activo": True, "id": o["flechas"][0]["id"]}}
+    assert c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json=body).status_code == 202
+    aj = c.get(f"{BASE}/videos/{vid}", headers=hdr).json()["ajustes"]
+    assert aj["subtitulos"]["color"] == "#FDE047" and aj["subtitulos"]["posicion"] == "arriba"
+    assert aj["flecha"] == {"activo": True, "id": o["flechas"][0]["id"]}
+
+
+def test_peticion_antigua_defaults(rapido):
+    c, _, hdr = rapido
+    vid = _subir(c, hdr).json()["id"]
+    assert c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={"ritmo": "natural"}).status_code == 202
+    aj = c.get(f"{BASE}/videos/{vid}", headers=hdr).json()["ajustes"]
+    assert aj["subtitulos"]["activo"] is True and aj["subtitulos"]["estilo"] and aj["subtitulos"]["posicion"] == "abajo"
+    assert aj["flecha"]["activo"] is False
+
+
+def test_runner_subs_flecha_estilo_y_resumen(rapido, monkeypatch):
+    c, q, hdr = rapido
+    o = c.get(f"{BASE}/opciones", headers=hdr).json()
+    vid = _subir(c, hdr).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={
+        "idioma": "es", "subtitulos": {"color": "#22C55E", "posicion": "centro"},
+        "flecha": {"activo": True, "id": o["flechas"][0]["id"]}})
+    job = q.get_all()[0]
+    subs, flechas = [], []
+    sc = _falsas_estilo(monkeypatch, subs, flechas)
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+    monkeypatch.setenv("EDITOR_RAPIDO_WHISPER_MODEL", "base")
+    prog = []
+    svc.ejecutar(job, lambda m: None, lambda f, m="": prog.append(f))
+    assert prog == sorted(prog) and prog[-1] == 1.0
+    cfg = subs[0][1]
+    assert cfg["model_size"] == "base" and cfg["language"] == "es" and cfg["highlight_color"] == "#22C55E"
+    assert cfg["y_position"] == 0.5 and cfg["corregir_nombres"] is False
+    assert subs[0][0].endswith("cortado.mp4") and flechas[0][0] != subs[0][0]
+    assert (svc.carpeta(vid) / "cortado.mp4").read_bytes() == b"mp4"
+    assert svc.ruta_resultado(vid).read_bytes() == b"mp4+subs+flecha"
+    v = c.get(f"{BASE}/videos/{vid}", headers=hdr).json()
+    assert v["estado"] == "listo" and v["aviso"] is None
+    assert v["resumen"] == {"pausas": 2, "repeticiones": 0, "segundos_quitados": 4.0,
+                            "duracion_original_s": 95.0, "duracion_final_s": 70.0}
+    assert set(v["resumen"]) == {"pausas", "repeticiones", "segundos_quitados", "duracion_original_s", "duracion_final_s"}
+
+    # re-estilizar: sin cortar, gratis, solo subs sin flecha
+    saldo0 = c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"]
+    r = c.post(f"{BASE}/videos/{vid}/estilo", headers=hdr,
+               json={"subtitulos": {"estilo": o["estilos"][2]["id"]}, "flecha": {"activo": False}})
+    assert r.status_code == 202
+    assert c.post(f"{BASE}/videos/{vid}/estilo", headers=hdr, json={"flecha": {"activo": False}}).status_code == 409
+    job2 = q.get_all()[-1]
+    assert job2.params["modo"] == "estilo"
+    subs.clear(); flechas.clear()
+    svc.ejecutar(job2, lambda m: None, lambda f, m="": None)
+    assert subs[0][0].endswith("cortado.mp4") and not flechas
+    assert svc.ruta_resultado(vid).read_bytes() == b"mp4+subs"
+    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == saldo0
+    assert c.get(f"{BASE}/videos/{vid}", headers=hdr).json()["ajustes"]["subtitulos"]["estilo"] == o["estilos"][2]["id"]
+    # validación del endpoint
+    assert c.post(f"{BASE}/videos/{vid}/estilo", headers=hdr, json={}).status_code in (400, 422)
+    assert c.post(f"{BASE}/videos/{vid}/estilo", headers=hdr, json={"subtitulos": {"estilo": "x"}}).status_code in (400, 422)
+
+
+def test_subs_fallan_se_entrega_el_corte_con_aviso(rapido, monkeypatch):
+    c, q, hdr = rapido
+    vid = _subir(c, hdr).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={})
+    job = q.get_all()[0]
+    sc = _falsas_estilo(monkeypatch, [], [], fallar_subs=True)
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+    svc.ejecutar(job, lambda m: None, lambda f, m="": None)
+    v = c.get(f"{BASE}/videos/{vid}", headers=hdr).json()
+    assert v["estado"] == "listo" and "subtítulos" in v["aviso"]
+    assert svc.ruta_resultado(vid).read_bytes() == b"mp4"
+    assert c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 1  # no se devuelven
+
+
+def test_admin_cuentas_y_dar(rapido):
+    c, _, hdr = rapido
+    adm = {"Authorization": "Bearer " + make_ticket("jefe@example.com", "", scope="rapido", extra={"rol": "admin"})}
+    assert c.get(f"{BASE}/admin/cuentas", headers=hdr).status_code == 403
+    assert c.post(f"{BASE}/admin/dar", headers=hdr, json={"email": EMAIL, "creditos": 5}).status_code == 403
+    _subir(c, hdr)  # crea saldo de ana
+    cuentas = c.get(f"{BASE}/admin/cuentas", headers=adm).json()["cuentas"]
+    ana = next(x for x in cuentas if x["email"] == EMAIL)
+    assert ana == {"email": EMAIL, "creditos": 3, "n_videos": 1}
+    r = c.post(f"{BASE}/admin/dar", headers=adm, json={"email": "Nuevo@Example.com", "creditos": 4})
+    assert r.json() == {"email": "nuevo@example.com", "creditos": 7}
+    assert c.post(f"{BASE}/admin/dar", headers=adm, json={"email": "nuevo@example.com", "creditos": -2}).json()["creditos"] == 5
+    assert any(x["email"] == "nuevo@example.com" for x in c.get(f"{BASE}/admin/cuentas", headers=adm).json()["cuentas"])
+    assert c.post(f"{BASE}/admin/dar", headers=adm, json={"email": "mal", "creditos": 1}).status_code in (400, 422)

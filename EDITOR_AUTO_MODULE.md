@@ -326,3 +326,18 @@ leídos con Claude Haiku, Gemini de reserva; prompt `prompts/vip_ritmo_referenci
 lo explícito gana. `vip_overlays` también acepta `video_referencia` (ruta). `quitar_marca` (auto|omni|veo|no,
 `services/marca_agua.py`) quita la marca con el MISMO zoom/recorte que AI Pro (`nicho_pov_bof.config`).
 La cuenta `EDITOR_CUENTA_AGENTES_EMAIL` no manda avisos por email ni WhatsApp.
+
+## Editor rápido (editor.nebulabsmedia.com, 15/11/2026)
+API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapido`, ticket firmado scope «rapido», rol en `claims.raw["rol"]`)
++ lógica y runner en `src/editor_auto/rapido/servicio.py` (`JobMode.EDITOR_RAPIDO`). 1 crédito = 1 min del original.
+- Subida: `POST /videos` (multipart) o por trozos `POST /subidas` → `PUT /subidas/{id}?offset=` → `POST /subidas/{id}/fin`. Saldo: `GET /saldo`.
+- `GET /opciones` → `{estilos[{id,nombre,fuente,color_texto,color_resalte,modo_resalte,borde}], colores[8 hex], fuentes[{id,nombre}], flechas[{id,nombre,png_url}], posiciones}`
+  (estilos y flechas de bucle del catálogo común `src/catalogo_edicion`). `GET /flechas/{id}.png` es público (sin ticket).
+- `POST /videos/{id}/cortar` `{ritmo, formato, idioma, subtitulos:{activo=true, estilo, color, fuente, posicion=abajo|centro|arriba}, flecha:{activo=false, id}}`
+  (todo opcional; estilo por defecto = el primero del catálogo). Se valida (400/422) y se guarda en `ficha.ajustes`.
+- Runner `ejecutar` (modos `auto`, `retoque`, `estilo`): corte (0-0.6) → guarda `cortado.mp4` → `SubsAutoTool` (0.6-0.9, Whisper `EDITOR_RAPIDO_WHISPER_MODEL`, def. `small`)
+  → `StickerArrowTool` (0.9-1) vía `style_mapper.build_tool_flow`. Si subs/flecha fallan se entrega el corte con `aviso` en la ficha (sin devolver créditos).
+- `POST /videos/{id}/estilo` `{subtitulos?, flecha?}` (gratis, 409 si está en marcha o sin cortar): re-renderiza desde `cortado.mp4` sin volver a cortar.
+- La vista del vídeo trae `aviso` y `resumen {pausas, repeticiones(0: no se distingue), segundos_quitados, duracion_original_s, duracion_final_s}`.
+- Admin: `GET /admin/cuentas` → `{cuentas[{email,creditos,n_videos}]}` y `POST /admin/dar {email, creditos(+/-)}` → `{email, creditos}` (ticket con rol admin, 403 si no;
+  set Redis `editor_rapido:cuentas`, que se rellena con KEYS si está vacío). `POST /admin/creditos` (API key) sigue igual.

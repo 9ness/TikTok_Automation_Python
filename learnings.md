@@ -1591,3 +1591,4 @@
 - 2026-11-14 · Carruseles Ama: gpt-imagen pone cremallera a abrigos que solo llevan botones → «NO zipper» en el prompt y comparar con la ficha; el emoji 🦌 no se pinta en el estilo `tiktok` (usar otro); si Social1 ES no da moda, los referentes de ayoubbshop sirven de fuente de virales.
 - 2026-11-14 · Genjutsu copia los subtítulos quemados del viral deformados, y si se borran con delogo copia la mancha como barras → elegir tramos sin texto o quitar el tramo del montaje (bici HillMiles R10)
 - 2026-11-15 · Guion manual (guardar_guion) del POV BOF Largo salía con CTA de plazos/envío → el encaje de la voz (ctas_posibles) cambiaba el cierre; con guion_manual se locuta sin escalera, sin reescribir por modo y sin corrección de CTA en lote
+- 2026-11-15 · editor rápido: subs+flecha reutilizando style_mapper.build_tool_flow (sin copiar lógica) y cortado.mp4 guardado para re-estilizar sin recortar → el estilo no cobra ni repite el corte
