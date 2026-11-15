@@ -1598,3 +1598,4 @@
 - 2026-11-15 · Editor rápido: «Cortar» daba 422 porque la web mandaba color "" y el patrón hex lo rechazaba → validador ""→None en SubsAjustes y la web ya no manda vacíos
 - 2026-11-15 · Subs del editor rápido fallaban («Tito Shop», «bebiendo» por «viviendo») → keyterm= de Deepgram nova-3 + pasada Haiku palabra a palabra (sin mover tiempos)
 - 2026-11-15 · Editor rápido: Cuenta daba excepción para el admin porque `/admin/cuentas` devuelve `{cuentas:[…]}` y la web hacía `.map` sobre el objeto → `adminCuentas()` desenvuelve `r.cuentas`; al cambiar la forma de un endpoint, revisar su tipo en nebulabs-media/lib/editor-api.ts
+- 2026-11-16 · Editor rápido dejaba repeticiones («por porque yo la»): la pasada 2 de falsos inicios usaba Gemini 2.5 Pro, retirado (404 silencioso en el diagnóstico) → en config_cortador OpenAI on / Gemini off; probado en e5eeb973d6ff, quita 0,3 s.
