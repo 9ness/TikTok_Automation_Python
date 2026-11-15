@@ -517,9 +517,46 @@ def actividad(dias: int = 7, limite_videos: int = 100) -> dict:
               "minutos": round(float((d or {}).get("segundos", 0.0)) / 60.0, 1),
               "usuarios": len((d or {}).get("usuarios") or [])} for f, d in zip(fechas, datos)]
     idx = get_editor_redis().get_json(_K_INDICE)
-    ids = (idx if isinstance(idx, list) else [])[: limite_videos * 2]
-    fichas = [f for f in _mget([_k_ficha(i) for i in ids]) if f and f.get("estado") != "subiendo"][:limite_videos]
-    return {"dias": lista, "videos": [resumen_admin(f) for f in fichas]}
+    ids = idx if isinstance(idx, list) else []
+    todas = [f for f in _mget([_k_ficha(i) for i in ids]) if f and f.get("estado") != "subiendo"]
+    resumenes = [resumen_admin(f) for f in todas]
+    return {"dias": lista, "videos": resumenes[:limite_videos], **estadisticas(todas, resumenes)}
+
+
+def _media(xs: list) -> float | None:
+    xs = [x for x in xs if x is not None]
+    return round(sum(xs) / len(xs), 1) if xs else None
+
+
+def estadisticas(fichas: list[dict], resumenes: list[dict] | None = None) -> dict:
+    """Admin: totales y desglose por usuario de los vídeos del índice (últimos 500)."""
+    resumenes = resumenes or [resumen_admin(f) for f in fichas]
+
+    def bloque(fs: list[dict], rs: list[dict]) -> dict:
+        listos = [r for r in rs if r["estado"] == "listo"]
+        return {
+            "videos": len(rs), "listos": len(listos), "errores": sum(r["estado"] == "error" for r in rs),
+            "minutos_subidos": round(sum(float(f.get("duracion_s") or 0) for f in fs) / 60, 1),
+            "minutos_quitados": round(sum(max(0.0, float(f.get("duracion_s") or 0) - float(f.get("duracion_final_s") or f.get("duracion_s") or 0))
+                                          for f in fs if f.get("estado") == "listo") / 60, 1),
+            "descargados": sum(r["descargado"] for r in rs),
+            "con_cortes_devueltos": sum(r["devueltos"] > 0 for r in listos),
+            "valorados": sum(nota_valor(r["nota"]) is not None for r in rs),
+            "nota_media": _media([nota_valor(r["nota"]) for r in rs]),
+            "calidad_media": _media([r["calidad"] for r in listos]),
+            "proceso_medio_s": _media([f.get("proceso_s") for f in fs if f.get("estado") == "listo"]),
+        }
+
+    por: dict[str, list[int]] = {}
+    for k, f in enumerate(fichas):
+        por.setdefault(f.get("email") or "?", []).append(k)
+    usuarios = []
+    for email, ks in por.items():
+        b = bloque([fichas[k] for k in ks], [resumenes[k] for k in ks])
+        b.update(email=email, ultimo=max(resumenes[k]["fecha"] for k in ks), creditos=saldo(email).get("creditos"))
+        usuarios.append(b)
+    usuarios.sort(key=lambda u: (-u["videos"], u["email"]))
+    return {"totales": {**bloque(fichas, resumenes), "usuarios": len(usuarios)}, "usuarios": usuarios}
 
 
 def resumen_admin(f: dict) -> dict:

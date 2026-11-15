@@ -591,6 +591,12 @@ def test_admin_actividad_y_video(rapido, monkeypatch, tmp_path):
     assert v["devueltos"] == 0 and v["descargado"] is False and v["nota"] == 5 and v["calidad"] == 90
     assert set(v) == {"id", "email", "nombre", "fecha", "duracion_s", "estado", "cortes", "devueltos",
                       "descargado", "nota", "calidad"}
+    t = a["totales"]
+    assert t["videos"] == 1 and t["listos"] == 1 and t["usuarios"] == 1 and t["errores"] == 0
+    assert t["nota_media"] == 5 and t["calidad_media"] == 90 and t["valorados"] == 1 and t["descargados"] == 0
+    u = a["usuarios"][0]
+    assert u["email"] == EMAIL and u["videos"] == 1 and u["calidad_media"] == 90 and u["creditos"] is not None
+    assert u["ultimo"] == v["fecha"]
     d = c.get(f"{BASE}/admin/videos/{vid}", headers=_adm()).json()
     assert d["ficha"]["id"] == vid and d["ficha"]["calidad"] == 90
     assert [e["tipo"] for e in d["eventos"]] == ["subido", "cortar", "listo", "valoracion"]
