@@ -869,6 +869,7 @@ def test_lemon_creditos_por_nombre_sin_ids(lemon, monkeypatch):
 def test_lemon_enlace_de_pago(lemon, rapido, monkeypatch):
     from src.editor_auto.rapido import lemon as ls
     c, _, hdr = rapido
+    monkeypatch.setenv("EDITOR_PAGOS_PROVEEDOR", "lemon")
     r = c.post("/api/v1/editor-auto/rapido/pagos/enlace", json={"creditos": 60}, headers=hdr)
     assert r.status_code == 503  # sin EDITOR_LS_API_KEY
     pedidos = []
@@ -907,3 +908,87 @@ def test_nueva_version_reusa_original_y_se_corta_aparte(rapido):
     # de otro usuario: 404
     otro = {"Authorization": "Bearer " + make_ticket("x@y.com", "", scope="rapido")}
     assert c.post(f"{BASE}/videos/{v2['id']}/version", headers=otro).status_code == 404
+
+
+# ── Polar ───────────────────────────────────────────────────────────────────
+
+def _polar(c, *, oid="ord-1", email="p@x.com", pack="60", producto="prod-60", paid=True, tipo="order.paid",
+           secreto="whsec_" + __import__("base64").b64encode(b"k" * 24).decode(), ts=None, firma=None, wid="msg_1"):
+    import base64, hashlib, hmac, json as _j, time as _t
+    cuerpo = _j.dumps({"type": tipo, "data": {"id": oid, "status": "paid" if paid else "pending", "paid": paid,
+                       "product_id": producto, "metadata": {"email": email, "pack": pack},
+                       "customer": {"email": "otro@x.com"}}}).encode()
+    ts = str(int(_t.time())) if ts is None else str(ts)
+    if firma is None:
+        k = base64.b64decode(secreto.removeprefix("whsec_"))
+        firma = "v1," + base64.b64encode(hmac.new(k, f"{wid}.{ts}.".encode() + cuerpo, hashlib.sha256).digest()).decode()
+    return c.post(f"{BASE}/pagos/polar/webhook", content=cuerpo, headers={
+        "webhook-id": wid, "webhook-timestamp": ts, "webhook-signature": firma})
+
+
+@pytest.fixture
+def polar(rapido, monkeypatch):
+    import base64
+    monkeypatch.setenv("POLAR_WEBHOOK_SECRET", "whsec_" + base64.b64encode(b"k" * 24).decode())
+    for n in ("25", "60", "150"):
+        monkeypatch.setenv(f"POLAR_PRODUCT_{n}", f"prod-{n}")
+    return rapido[0]
+
+
+def test_polar_firma_invalida_vieja_y_sin_secreto(polar, monkeypatch):
+    import time as _t
+    assert _polar(polar, firma="v1,AAAA").status_code == 401
+    assert _polar(polar, ts=int(_t.time()) - 400).status_code == 401
+    assert svc.get_editor_redis().get_json("rapido:saldo:p@x.com") is None
+    monkeypatch.delenv("POLAR_WEBHOOK_SECRET")
+    assert _polar(polar).status_code == 503
+
+
+def test_polar_compra_suma_una_vez(polar):
+    base = svc.saldo("p@x.com")["creditos"]
+    r = _polar(polar)
+    assert r.status_code == 200 and r.json()["accion"] == "sumado" and r.json()["creditos"] == 60
+    assert _polar(polar, wid="msg_2").json()["accion"] == "repetido"  # reintento
+    assert svc.saldo("p@x.com")["creditos"] == base + 60
+
+
+def test_polar_secreto_legado(polar, monkeypatch):
+    import base64, hashlib, hmac, time as _t
+    monkeypatch.setenv("POLAR_WEBHOOK_SECRET", "whsec_legado")
+    ts = str(int(_t.time()))
+    # el cuerpo lo fija _polar, así que firmamos con la clave legada = bytes del secreto entero
+    import json as _j
+    cuerpo = _j.dumps({"type": "order.paid", "data": {"id": "o9", "paid": True, "product_id": "prod-25",
+                       "metadata": {"email": "l@x.com"}}}).encode()
+    f = "v1," + base64.b64encode(hmac.new(b"whsec_legado", f"m.{ts}.".encode() + cuerpo, hashlib.sha256).digest()).decode()
+    r = polar.post(f"{BASE}/pagos/polar/webhook", content=cuerpo,
+                   headers={"webhook-id": "m", "webhook-timestamp": ts, "webhook-signature": f})
+    assert r.json()["creditos"] == 25  # pack deducido del product_id
+
+
+def test_polar_ignora_evento_no_pagado_y_pack_desconocido(polar):
+    assert _polar(polar, tipo="order.refunded").json()["accion"] == "ignorado"
+    assert _polar(polar, oid="a", paid=False).json()["accion"] == "ignorado"
+    assert _polar(polar, oid="b", pack="999", producto="otro").json()["accion"] == "ignorado"
+    assert svc.get_editor_redis().get_json("rapido:saldo:p@x.com") is None
+
+
+def test_polar_enlace_de_pago(polar, rapido, monkeypatch):
+    import requests
+    c, _, hdr = rapido
+    monkeypatch.setenv("POLAR_SERVER", "sandbox")
+    assert c.post(f"{BASE}/pagos/enlace", json={"creditos": 60}, headers=hdr).status_code == 503  # sin token
+    monkeypatch.setenv("POLAR_ACCESS_TOKEN", "t")
+    vistos = []
+
+    class R:
+        status_code = 201
+        text = ""
+        def json(self): return {"url": "https://polar/x"}
+    monkeypatch.setattr(requests, "post", lambda u, **kw: vistos.append((u, kw["json"])) or R())
+    r = c.post(f"{BASE}/pagos/enlace", json={"creditos": 60}, headers=hdr)
+    assert r.status_code == 200 and r.json()["url"] == "https://polar/x"
+    u, cuerpo = vistos[0]
+    assert u == "https://sandbox-api.polar.sh/v1/checkouts/" and cuerpo["products"] == ["prod-60"]
+    assert cuerpo["metadata"] == {"email": EMAIL, "pack": "60"} and cuerpo["customer_email"] == EMAIL
+    assert c.post(f"{BASE}/pagos/enlace", json={"creditos": 7}, headers=hdr).status_code == 503

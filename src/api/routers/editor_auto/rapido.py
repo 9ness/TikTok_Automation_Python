@@ -618,17 +618,35 @@ class NuevoPago(BaseModel):
 
 @router.post("/pagos/enlace")
 def enlace_pago(body: NuevoPago, claims: Claims) -> dict:
-    """Enlace de pago de Lemon con el email de la cuenta ya puesto. 503 si Lemon no está
-    configurado o no responde: la web usa entonces su enlace fijo (si lo tiene)."""
-    from src.editor_auto.rapido import lemon
+    """Enlace de pago del proveedor activo (EDITOR_PAGOS_PROVEEDOR, por defecto Polar) con el email
+    de la cuenta puesto. 503 si no está configurado o no responde."""
+    from src.editor_auto.rapido import pagos
     try:
-        return {"url": lemon.crear_checkout(body.creditos, claims.email)}
-    except lemon.LemonError as e:
+        return {"url": pagos.proveedor().crear_checkout(str(body.creditos), claims.email)}
+    except Exception as e:  # noqa: BLE001 — PagoError, red caída, JSON raro…
         logger.warning("[rapido] sin enlace de pago para %s (%s créditos): %s", claims.email, body.creditos, e)
         raise APIError("El pago no está disponible ahora mismo.", status_code=503)
-    except Exception as e:  # noqa: BLE001 — red caída, JSON raro…
-        logger.warning("[rapido] Lemon falló al crear el checkout: %s", e)
-        raise APIError("El pago no está disponible ahora mismo.", status_code=503)
+
+
+@router.post("/pagos/polar/webhook")
+async def pago_polar(request: Request) -> dict:
+    """Webhook de Polar (sin login): firma Standard Webhooks con POLAR_WEBHOOK_SECRET.
+    Solo `order.paid` suma créditos (idempotente por id de pedido); el resto, 200 ignorado."""
+    from src.editor_auto.rapido.pagos import FirmaInvalida, NoConfigurado
+    from src.editor_auto.rapido.pagos.polar import Polar
+    cuerpo = await request.body()
+    try:
+        ev = Polar().verificar_y_parsear_webhook(request.headers, cuerpo)
+    except NoConfigurado:
+        logger.error("[rapido] webhook de Polar sin POLAR_WEBHOOK_SECRET")
+        raise APIError("Webhook no configurado.", status_code=503)
+    except FirmaInvalida as e:
+        raise UnauthorizedError(f"Firma no válida ({e}).")
+    if ev is None:
+        return {"ok": True, "accion": "ignorado", "motivo": "evento no soportado"}
+    res = svc.procesar_pago(ev)
+    logger.info("[rapido] webhook Polar %s → %s", ev.id_pedido, res)
+    return {"ok": True, **{k: v for k, v in res.items() if k != "email"}}
 
 
 @router.post("/pagos/lemon")

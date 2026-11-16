@@ -1190,6 +1190,35 @@ def variantes_lemon() -> dict[str, float]:
         return {}
 
 
+def _abonar_pedido(pid: str, email: str, n: float, variante: str, datos_ev: dict) -> dict:
+    """Suma `n` créditos a `email` UNA sola vez por pedido (idempotente por id). Lo usan todas las pasarelas."""
+    r = get_editor_redis()
+    with _LOCK:
+        if r.get_json(_k_pedido(pid)) is not None:
+            return {"accion": "repetido", "pedido": pid}
+        r.set_json(_k_pedido(pid), {"email": email, "creditos": n, "variante": variante,
+                                    "t": time.time(), "reembolsado": False})
+    saldo_nuevo = ajustar_creditos(email, n, recarga=True)
+    registrar_evento("pagos", email, "compra", {**datos_ev, "variante": variante, "creditos": cr(n)})
+    logger.info("[rapido] compra %s: +%s créditos a %s", pid, cr(n), email)
+    return {"accion": "sumado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}
+
+
+def procesar_pago(ev) -> dict:
+    """Aplica un `EventoPago` YA verificado (cualquier pasarela). Nunca lanza por datos raros."""
+    if not ev.id_pedido:
+        return {"accion": "ignorado", "motivo": "sin id de pedido"}
+    if not ev.pagado:
+        return {"accion": "ignorado", "motivo": "no pagado"}
+    if "@" not in ev.email:
+        return {"accion": "ignorado", "motivo": "sin email"}
+    if not ev.creditos:
+        logger.warning("[rapido] pedido %s de %s con pack desconocido", ev.id_pedido, ev.email)
+        registrar_evento("pagos", ev.email, "compra_sin_variante", {"pedido": ev.id_pedido})
+        return {"accion": "ignorado", "motivo": "pack desconocido"}
+    return _abonar_pedido(ev.id_pedido, ev.email, ev.creditos, f"pack{ev.pack}", {"pedido": ev.id_pedido})
+
+
 def procesar_lemon(evento: str, meta: dict, data: dict) -> dict:
     """Aplica un webhook YA FIRMADO de Lemon. Devuelve qué se hizo (para el log y la respuesta).
 
@@ -1224,15 +1253,7 @@ def procesar_lemon(evento: str, meta: dict, data: dict) -> dict:
             logger.warning("[rapido] pedido %s de %s con variante desconocida %s", pid, email, variante)
             registrar_evento("pagos", email, "compra_sin_variante", {**datos_ev, "variante": variante})
             return {"accion": "ignorado", "motivo": f"variante {variante} desconocida"}
-        with _LOCK:
-            if r.get_json(_k_pedido(pid)) is not None:
-                return {"accion": "repetido", "pedido": pid}
-            r.set_json(_k_pedido(pid), {"email": email, "creditos": n, "variante": variante,
-                                        "t": time.time(), "reembolsado": False})
-        saldo_nuevo = ajustar_creditos(email, n, recarga=True)
-        registrar_evento("pagos", email, "compra", {**datos_ev, "variante": variante, "creditos": cr(n)})
-        logger.info("[rapido] compra %s: +%s créditos a %s", pid, cr(n), email)
-        return {"accion": "sumado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}
+        return _abonar_pedido(pid, email, n, variante, datos_ev)
 
     # order_refunded
     with _LOCK:
