@@ -614,6 +614,13 @@ def admin_cuentas(claims: Claims) -> dict:
 
 class NuevoPago(BaseModel):
     creditos: int = Field(..., ge=1, le=10000)
+    ref: str | None = Field(default=None, max_length=32)  # código de referido, opcional
+
+
+@router.get("/referido")
+def referido(claims: Claims) -> dict:
+    """Código propio de referido, su enlace y los créditos ganados."""
+    return svc.referido(claims.email)
 
 
 @router.post("/pagos/enlace")
@@ -621,8 +628,16 @@ def enlace_pago(body: NuevoPago, claims: Claims) -> dict:
     """Enlace de pago del proveedor activo (EDITOR_PAGOS_PROVEEDOR, por defecto Polar) con el email
     de la cuenta puesto. 503 si no está configurado o no responde."""
     from src.editor_auto.rapido import pagos
+    ref = ""
+    if (body.ref or "").strip():
+        try:
+            ref = svc.validar_referido(body.ref, claims.email)
+        except ValueError as e:
+            raise APIError(str(e), status_code=400)
     try:
-        return {"url": pagos.proveedor().crear_checkout(str(body.creditos), claims.email)}
+        prov = pagos.proveedor()
+        return {"url": prov.crear_checkout(str(body.creditos), claims.email, ref) if ref
+                else prov.crear_checkout(str(body.creditos), claims.email)}
     except Exception as e:  # noqa: BLE001 — PagoError, red caída, JSON raro…
         logger.warning("[rapido] sin enlace de pago para %s (%s créditos): %s", claims.email, body.creditos, e)
         raise APIError("El pago no está disponible ahora mismo.", status_code=503)

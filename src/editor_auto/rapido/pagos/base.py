@@ -25,12 +25,13 @@ class EventoPago:
     creditos: int      # 0 si pack desconocido
     pagado: bool
     tipo: str = "pago"  # "pago" | "reembolso" (total) | "reembolso_parcial"
+    ref: str = ""      # código de referido de la metadata del checkout ("" si no hay)
 
 
 class ProveedorPago(Protocol):
     nombre: str
 
-    def crear_checkout(self, pack: str, email: str) -> str: ...
+    def crear_checkout(self, pack: str, email: str, ref: str = "") -> str: ...
 
     def verificar_y_parsear_webhook(self, headers: Mapping[str, str], body: bytes) -> EventoPago | None:
         """Verifica la firma (lanza FirmaInvalida/NoConfigurado) y devuelve el evento normalizado,

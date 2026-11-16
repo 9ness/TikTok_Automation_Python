@@ -55,7 +55,7 @@ def _claves(secreto: str) -> list[bytes]:
 class Polar:
     nombre = "polar"
 
-    def crear_checkout(self, pack: str, email: str) -> str:
+    def crear_checkout(self, pack: str, email: str, ref: str = "") -> str:
         token = os.getenv("POLAR_ACCESS_TOKEN", "").strip()
         if not token:
             raise PagoError("Falta POLAR_ACCESS_TOKEN")
@@ -64,6 +64,8 @@ class Polar:
             raise PagoError(f"No hay producto de Polar para el pack {pack}")
         cuerpo: dict = {"products": [prod], "customer_email": email,
                         "metadata": {"email": email, "pack": str(pack)}}
+        if ref:
+            cuerpo["metadata"]["ref"] = ref
         vuelta = os.getenv("EDITOR_PAGOS_VUELTA", "https://editor.nebulabsmedia.com/editor")
         if vuelta:
             cuerpo["success_url"] = vuelta
@@ -115,4 +117,5 @@ class Polar:
             pack = ""
         pagado = bool(o.get("paid")) or o.get("status") == "paid"
         return EventoPago(id_pedido=str(o.get("id") or ""), email=email, pack=pack,
-                          creditos=int(pack) if pack else 0, pagado=pagado)
+                          creditos=int(pack) if pack else 0, pagado=pagado,
+                          ref=str(meta.get("ref") or "").strip().upper())

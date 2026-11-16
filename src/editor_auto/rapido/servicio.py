@@ -51,6 +51,9 @@ logger = logging.getLogger("editor_auto.rapido")
 TZ = ZoneInfo("Europe/Madrid")
 # Eventos y agregados por día: 180 días por defecto.
 EVENTOS_TTL_S = int(os.getenv("EDITOR_RAPIDO_EVENTOS_DIAS", "180")) * 86400
+# Créditos FIJOS que gana quien refiere por cada pack comprado (id del pack → créditos). No se calcula.
+REFERIDO_CREDITOS = {"25": 5, "60": 15, "150": 45}
+MAX_MOVIMIENTOS = 200
 MAX_EVENTOS = 300  # por vídeo
 MAX_INDICE = 500   # vídeos del índice global (admin)
 
@@ -447,6 +450,88 @@ def _k_hist(email: str) -> str:
 _K_INDICE = "rapido:indice"
 
 
+def _k_movs(email: str) -> str:
+    return f"rapido:movs:{email}"
+
+
+def registrar_movimiento(email: str, texto: str, creditos: float) -> None:
+    """Apunta un movimiento de créditos que no es un vídeo («Referido: +15») en el historial del usuario."""
+    try:
+        r = get_editor_redis()
+        with _LOCK:
+            lst = r.get_json(_k_movs(email))
+            lst = lst if isinstance(lst, list) else []
+            ahora = time.time()
+            lst.append({"t": round(ahora, 2), "fecha": fecha_dia(ahora), "texto": texto, "creditos": cr(creditos)})
+            r.set_json(_k_movs(email), lst[-MAX_MOVIMIENTOS:])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[rapido] no se pudo apuntar el movimiento de %s: %s", email, e)
+
+
+# ── Códigos de referido ─────────────────────────────────────────────────────
+# Alfabeto sin 0/O/1/I/L. `rapido:ref:email:<email>` = {codigo, ganados}; `rapido:ref:codigo:<COD>` = {email}.
+_ALFA_REF = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+LARGO_REF = 6
+URL_REF = os.getenv("EDITOR_REFERIDO_URL", "https://editor.nebulabsmedia.com/editor")
+
+
+def _k_ref_email(email: str) -> str:
+    return f"rapido:ref:email:{email}"
+
+
+def _k_ref_codigo(codigo: str) -> str:
+    return f"rapido:ref:codigo:{codigo}"
+
+
+def normalizar_codigo(codigo: Any) -> str:
+    return str(codigo or "").strip().upper()
+
+
+def referido(email: str) -> dict:
+    """Código propio del usuario (se crea la primera vez y no cambia), enlace y créditos ganados."""
+    email = email.strip().lower()
+    r = get_editor_redis()
+    with _LOCK:
+        d = r.get_json(_k_ref_email(email))
+        if not d or not d.get("codigo"):
+            import secrets
+            while True:
+                codigo = "".join(secrets.choice(_ALFA_REF) for _ in range(LARGO_REF))
+                if r.get_json(_k_ref_codigo(codigo)) is None:
+                    break
+            r.set_json(_k_ref_codigo(codigo), {"email": email})
+            d = {"codigo": codigo, "ganados": 0}
+            r.set_json(_k_ref_email(email), d)
+    return {"codigo": d["codigo"], "enlace": f"{URL_REF}?ref={d['codigo']}", "ganados": cr(d.get("ganados", 0))}
+
+
+def dueno_de_codigo(codigo: Any) -> str | None:
+    c = normalizar_codigo(codigo)
+    if not c:
+        return None
+    d = get_editor_redis().get_json(_k_ref_codigo(c))
+    return (str(d.get("email") or "") or None) if d else None
+
+
+def validar_referido(codigo: Any, comprador: str) -> str:
+    """Devuelve el código normalizado si existe y no es del propio comprador; si no, lanza ValueError con el motivo."""
+    c = normalizar_codigo(codigo)
+    dueno = dueno_de_codigo(c)
+    if not dueno:
+        raise ValueError("Ese código de referido no existe.")
+    if dueno.strip().lower() == str(comprador).strip().lower():
+        raise ValueError("No puedes usar tu propio código de referido.")
+    return c
+
+
+def _sumar_ganados(email: str, delta: float) -> None:
+    r = get_editor_redis()
+    with _LOCK:
+        d = r.get_json(_k_ref_email(email)) or {}
+        d["ganados"] = cr(max(0, cr(d.get("ganados", 0)) + cr(delta)))
+        r.set_json(_k_ref_email(email), d)
+
+
 def _ttl(key: str) -> None:
     exp = getattr(get_editor_redis(), "expire", None)
     if exp:
@@ -553,7 +638,9 @@ def historial(email: str, dias: int = 30) -> dict:
     desde = fecha_dia(time.time() - (dias - 1) * 86400)
     out = [{"fecha": f, "videos": int(x.get("videos", 0)), "minutos_gastados": cr(x.get("creditos", 0))}
            for f, x in sorted((h.get("dias") or {}).items(), reverse=True) if f >= desde]
-    return {"dias": out, "creditos_gastados_total": cr(h.get("creditos_total", 0))}
+    movs = get_editor_redis().get_json(_k_movs(email)) or []
+    return {"dias": out, "creditos_gastados_total": cr(h.get("creditos_total", 0)),
+            "movimientos": list(reversed(movs if isinstance(movs, list) else []))}
 
 
 def actividad(dias: int = 7, limite_videos: int = 100) -> dict:
@@ -1190,7 +1277,7 @@ def variantes_lemon() -> dict[str, float]:
         return {}
 
 
-def _abonar_pedido(pid: str, email: str, n: float, variante: str, datos_ev: dict) -> dict:
+def _abonar_pedido(pid: str, email: str, n: float, variante: str, datos_ev: dict, ref: str = "") -> dict:
     """Suma `n` créditos a `email` UNA sola vez por pedido (idempotente por id). Lo usan todas las pasarelas."""
     r = get_editor_redis()
     with _LOCK:
@@ -1200,8 +1287,34 @@ def _abonar_pedido(pid: str, email: str, n: float, variante: str, datos_ev: dict
                                     "t": time.time(), "reembolsado": False})
     saldo_nuevo = ajustar_creditos(email, n, recarga=True)
     registrar_evento("pagos", email, "compra", {**datos_ev, "variante": variante, "creditos": cr(n)})
+    registrar_movimiento(email, f"Compra: +{cr(n)}", n)
     logger.info("[rapido] compra %s: +%s créditos a %s", pid, cr(n), email)
+    if ref:
+        _abonar_referido(pid, email, variante, ref, datos_ev)
     return {"accion": "sumado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}
+
+
+def _abonar_referido(pid: str, comprador: str, variante: str, ref: str, datos_ev: dict) -> None:
+    """Suma al dueño del código la cantidad FIJA de su pack. Solo se llama la primera vez que se abona el pedido.
+    Revalida (la metadata del checkout podría estar manipulada): código existente y dueño ≠ comprador."""
+    try:
+        dueno = dueno_de_codigo(ref)
+        n = REFERIDO_CREDITOS.get(str(variante).removeprefix("pack"), 0)
+        if not dueno or dueno.strip().lower() == comprador.strip().lower() or not n:
+            logger.warning("[rapido] referido %r del pedido %s descartado", ref, pid)
+            return
+        r = get_editor_redis()
+        with _LOCK:
+            p = r.get_json(_k_pedido(pid)) or {}
+            p.update({"ref": normalizar_codigo(ref), "ref_email": dueno, "ref_creditos": n})
+            r.set_json(_k_pedido(pid), p)
+        ajustar_creditos(dueno, n, recarga=True)
+        _sumar_ganados(dueno, n)
+        registrar_evento("pagos", dueno, "referido", {**datos_ev, "comprador": comprador, "creditos": cr(n)})
+        registrar_movimiento(dueno, f"Referido: +{cr(n)}", n)
+        logger.info("[rapido] referido %s: +%s créditos a %s", pid, cr(n), dueno)
+    except Exception as e:  # noqa: BLE001 — el referido nunca rompe la compra
+        logger.warning("[rapido] no se pudo abonar el referido del pedido %s: %s", pid, e)
 
 
 def procesar_pago(ev) -> dict:
@@ -1221,7 +1334,8 @@ def procesar_pago(ev) -> dict:
         logger.warning("[rapido] pedido %s de %s con pack desconocido", ev.id_pedido, ev.email)
         registrar_evento("pagos", ev.email, "compra_sin_variante", {"pedido": ev.id_pedido})
         return {"accion": "ignorado", "motivo": "pack desconocido"}
-    return _abonar_pedido(ev.id_pedido, ev.email, ev.creditos, f"pack{ev.pack}", {"pedido": ev.id_pedido})
+    return _abonar_pedido(ev.id_pedido, ev.email, ev.creditos, f"pack{ev.pack}", {"pedido": ev.id_pedido},
+                          ref=getattr(ev, "ref", "") or "")
 
 
 def procesar_lemon(evento: str, meta: dict, data: dict) -> dict:
@@ -1279,5 +1393,12 @@ def _reembolsar_pedido(pid: str, datos_ev: dict) -> dict:
     email, n = p["email"], float(p.get("creditos") or 0)
     saldo_nuevo = ajustar_creditos(email, -n)
     registrar_evento("pagos", email, "reembolso", {**datos_ev, "creditos": cr(n)})
+    registrar_movimiento(email, f"Reembolso: −{cr(n)}", -n)
+    nr, dueno = float(p.get("ref_creditos") or 0), p.get("ref_email")
+    if nr and dueno:  # lo que cobró el dueño por este pedido, una sola vez (el pedido ya está marcado)
+        ajustar_creditos(dueno, -nr)
+        _sumar_ganados(dueno, -nr)
+        registrar_evento("pagos", dueno, "referido_devuelto", {**datos_ev, "comprador": email, "creditos": cr(nr)})
+        registrar_movimiento(dueno, f"Referido devuelto: −{cr(nr)}", -nr)
     logger.info("[rapido] reembolso %s: -%s créditos a %s", pid, cr(n), email)
     return {"accion": "restado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}

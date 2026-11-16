@@ -10,7 +10,7 @@ from .base import EventoPago, PagoError
 class Lemon:
     nombre = "lemon"
 
-    def crear_checkout(self, pack: str, email: str) -> str:
+    def crear_checkout(self, pack: str, email: str, ref: str = "") -> str:  # Lemon ignora el referido
         try:
             return _ls.crear_checkout(int(pack), email)
         except _ls.LemonError as e:

@@ -585,7 +585,7 @@ def test_historial_usuario_y_fecha(rapido, monkeypatch, tmp_path):
     assert lista[0]["fecha"][:10] == svc.fecha_dia() and "T" in lista[0]["fecha"]
     h = c.get(f"{BASE}/historial", headers=hdr).json()
     assert h == {"dias": [{"fecha": svc.fecha_dia(), "videos": 1, "minutos_gastados": 1}],
-                 "creditos_gastados_total": 1}
+                 "creditos_gastados_total": 1, "movimientos": []}
     # un fallo devuelve créditos y se descuenta del historial
     v2 = _subir(c, hdr).json()["id"]
     svc.ajustar_creditos(EMAIL, 0)
@@ -595,7 +595,7 @@ def test_historial_usuario_y_fecha(rapido, monkeypatch, tmp_path):
     assert c.get(f"{BASE}/historial", headers=hdr).json()["creditos_gastados_total"] == 1
     # solo cuenta el propio usuario
     otro = {"Authorization": "Bearer " + make_ticket("otro@example.com", "", scope="rapido")}
-    assert c.get(f"{BASE}/historial", headers=otro).json() == {"dias": [], "creditos_gastados_total": 0}
+    assert c.get(f"{BASE}/historial", headers=otro).json() == {"dias": [], "creditos_gastados_total": 0, "movimientos": []}
 
 
 def test_admin_actividad_y_video(rapido, monkeypatch, tmp_path):
@@ -913,10 +913,10 @@ def test_nueva_version_reusa_original_y_se_corta_aparte(rapido):
 # ── Polar ───────────────────────────────────────────────────────────────────
 
 def _polar(c, *, oid="ord-1", email="p@x.com", pack="60", producto="prod-60", paid=True, tipo="order.paid", estado=None,
-           secreto="whsec_" + __import__("base64").b64encode(b"k" * 24).decode(), ts=None, firma=None, wid="msg_1"):
+           secreto="whsec_" + __import__("base64").b64encode(b"k" * 24).decode(), ts=None, firma=None, wid="msg_1", ref=None):
     import base64, hashlib, hmac, json as _j, time as _t
     cuerpo = _j.dumps({"type": tipo, "data": {"id": oid, "status": estado or ("paid" if paid else "pending"), "paid": paid,
-                       "product_id": producto, "metadata": {"email": email, "pack": pack},
+                       "product_id": producto, "metadata": {"email": email, "pack": pack, **({"ref": ref} if ref else {})},
                        "customer": {"email": "otro@x.com"}}}).encode()
     ts = str(int(_t.time())) if ts is None else str(ts)
     if firma is None:
@@ -1003,3 +1003,91 @@ def test_polar_enlace_de_pago(polar, rapido, monkeypatch):
     assert u == "https://sandbox-api.polar.sh/v1/checkouts/" and cuerpo["products"] == ["prod-60"]
     assert cuerpo["metadata"] == {"email": EMAIL, "pack": "60"} and cuerpo["customer_email"] == EMAIL
     assert c.post(f"{BASE}/pagos/enlace", json={"creditos": 7}, headers=hdr).status_code == 503
+
+
+# ── Referidos ───────────────────────────────────────────────────────────────
+
+def _codigo_de(email):
+    return svc.referido(email)["codigo"]
+
+
+def test_referido_endpoint_codigo_estable_y_enlace(rapido):
+    c, _, hdr = rapido
+    r = c.get(f"{BASE}/referido", headers=hdr).json()
+    assert len(r["codigo"]) == 6 and r["codigo"] == r["codigo"].upper() and not set(r["codigo"]) & set("01OIL")
+    assert r["enlace"] == f"https://editor.nebulabsmedia.com/editor?ref={r['codigo']}" and r["ganados"] == 0
+    assert c.get(f"{BASE}/referido", headers=hdr).json()["codigo"] == r["codigo"]  # estable
+    assert svc.dueno_de_codigo(r["codigo"].lower()) == EMAIL
+    assert _codigo_de("otro@x.com") != r["codigo"]
+
+
+def test_referido_abona_al_dueno_una_vez(polar):
+    cod = _codigo_de("dueno@x.com")
+    base_d, base_c = svc.saldo("dueno@x.com")["creditos"], svc.saldo("p@x.com")["creditos"]
+    assert _polar(polar, ref=cod).json()["accion"] == "sumado"
+    assert _polar(polar, wid="msg_2", ref=cod).json()["accion"] == "repetido"  # reintento
+    assert svc.saldo("p@x.com")["creditos"] == base_c + 60
+    assert svc.saldo("dueno@x.com")["creditos"] == base_d + 15  # tabla fija: pack 60 → 15
+    assert svc.referido("dueno@x.com")["ganados"] == 15
+    p = svc.get_editor_redis().get_json(svc._k_pedido("ord-1"))
+    assert p["ref_email"] == "dueno@x.com" and p["ref_creditos"] == 15
+    assert svc.historial("dueno@x.com")["movimientos"][0]["texto"] == "Referido: +15"
+
+
+def test_referido_tabla_fija_por_pack(polar):
+    cod = _codigo_de("dueno@x.com")
+    base = svc.saldo("dueno@x.com")["creditos"]
+    _polar(polar, oid="a", pack="25", producto="prod-25", ref=cod)
+    _polar(polar, oid="b", pack="150", producto="prod-150", ref=cod, wid="m2")
+    assert svc.saldo("dueno@x.com")["creditos"] == base + 5 + 45
+
+
+def test_referido_devuelto_en_reembolso(polar):
+    cod = _codigo_de("dueno@x.com")
+    base = svc.saldo("dueno@x.com")["creditos"]
+    _polar(polar, oid="r1", ref=cod)
+    assert _polar(polar, oid="r1", tipo="order.refunded", estado="partially_refunded", wid="m2").json()["accion"] == "ignorado"
+    assert svc.saldo("dueno@x.com")["creditos"] == base + 15
+    assert _polar(polar, oid="r1", tipo="order.refunded", estado="refunded", wid="m3").json()["accion"] == "restado"
+    assert _polar(polar, oid="r1", tipo="order.refunded", estado="refunded", wid="m4").json()["accion"] == "repetido"
+    assert svc.saldo("dueno@x.com")["creditos"] == base and svc.referido("dueno@x.com")["ganados"] == 0
+    assert svc.historial("dueno@x.com")["movimientos"][0]["texto"] == "Referido devuelto: −15"
+
+
+def test_autorreferido_rechazado_en_webhook(polar):
+    cod = _codigo_de("p@x.com")  # el comprador usa su propio código
+    base = svc.saldo("p@x.com")["creditos"]
+    assert _polar(polar, ref=cod).json()["accion"] == "sumado"
+    assert svc.saldo("p@x.com")["creditos"] == base + 60  # solo la compra, sin bonus
+    assert "ref_email" not in svc.get_editor_redis().get_json(svc._k_pedido("ord-1"))
+
+
+def test_codigo_inexistente_en_webhook_no_rompe_la_compra(polar):
+    assert _polar(polar, ref="ZZZZZZ").json()["accion"] == "sumado"
+    assert "ref_email" not in svc.get_editor_redis().get_json(svc._k_pedido("ord-1"))
+
+
+def test_enlace_con_referido(polar, rapido, monkeypatch):
+    import requests
+    c, _, hdr = rapido
+    monkeypatch.setenv("POLAR_ACCESS_TOKEN", "t")
+    vistos = []
+
+    class R:
+        status_code = 201
+        text = ""
+        def json(self): return {"url": "https://polar/x"}
+    monkeypatch.setattr(requests, "post", lambda u, **kw: vistos.append(kw["json"]) or R())
+    cod = _codigo_de("dueno@x.com")
+    assert c.post(f"{BASE}/pagos/enlace", json={"creditos": 60, "ref": f" {cod.lower()} "}, headers=hdr).status_code == 200
+    assert vistos[-1]["metadata"] == {"email": EMAIL, "pack": "60", "ref": cod}
+    assert c.post(f"{BASE}/pagos/enlace", json={"creditos": 60}, headers=hdr).status_code == 200
+    assert "ref" not in vistos[-1]["metadata"]
+    n = len(vistos)
+    # inexistente y propio: 400 y sin checkout
+    r = c.post(f"{BASE}/pagos/enlace", json={"creditos": 60, "ref": "NOEXIS"}, headers=hdr)
+    assert r.status_code == 400 and "no existe" in json.dumps(r.json())
+    propio = _codigo_de(EMAIL)
+    r = c.post(f"{BASE}/pagos/enlace", json={"creditos": 60, "ref": propio}, headers=hdr)
+    assert r.status_code == 400 and "propio" in json.dumps(r.json())
+    assert len(vistos) == n
