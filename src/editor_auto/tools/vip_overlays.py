@@ -153,6 +153,13 @@ class VipOverlaysTool:
         tmp.mkdir(parents=True, exist_ok=True)
         try:
             info = _probe(input_path)
+            fijo = cfg.get("plan_fijo")
+            if isinstance(fijo, dict):  # el que llama ya decidió el plan (editor rápido: gancho de Sonnet)
+                plan = _sanitize(dict(fijo), info["dur"], cfg)
+                ctx.on_log("[vip] Plan fijo: " + json.dumps(plan, ensure_ascii=False)[:600])
+                _render(input_path, output_path, plan, info, cfg, tmp, ctx)
+                ctx.on_progress(1.0, "✅ VIP: plan fijo")
+                return output_path
             ctx.on_progress(0.05, "🎙️ Transcribiendo para la edición VIP…")
             wav = str(tmp / "audio.wav")
             words = _transcribe(input_path, wav, cfg, ctx) if info["audio"] else []

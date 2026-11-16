@@ -164,8 +164,11 @@ def png_flecha(fid: str) -> Path | None:
     return png if png.exists() else None
 
 
-def opciones(prefijo_api: str) -> dict:
+def opciones(prefijo_api: str, admin: bool = False) -> dict:
+    from src.editor_auto.rapido import extras as ex
     return {
+        "modos": ex.modos(admin),
+        "extras": ex.extras(admin),
         "estilos": estilos_subtitulos(),
         "colores": list(COLORES),
         "fuentes": [{"id": i, "nombre": n} for i, n in FUENTES],
@@ -682,6 +685,7 @@ def estadisticas(fichas: list[dict], resumenes: list[dict] | None = None) -> dic
             "proceso_medio_s": _media([f.get("proceso_s") for f in fs if f.get("estado") == "listo"]),
             "proceso_total_min": round(sum(float(f.get("proceso_total_s") or f.get("proceso_s") or 0) for f in fs) / 60, 1),
             "coste_api_usd": round(sum(float(f.get("coste_api_usd") or 0) for f in fs), 4),
+            "extras_s": _sumar_extras(fs),
         }
 
     por: dict[str, list[int]] = {}
@@ -696,6 +700,19 @@ def estadisticas(fichas: list[dict], resumenes: list[dict] | None = None) -> dic
     return {"totales": {**bloque(fichas, resumenes), "usuarios": len(usuarios)}, "usuarios": usuarios}
 
 
+def _sumar_extras(fs: list[dict]) -> dict:
+    """Por extra: vídeos que lo usaron, segundos de servidor totales y media por vídeo."""
+    out: dict[str, dict] = {}
+    for f in fs:
+        for k, v in (f.get("extras_total_s") or {}).items():
+            d = out.setdefault(k, {"videos": 0, "segundos": 0.0})
+            d["videos"] += 1
+            d["segundos"] = round(d["segundos"] + float(v or 0), 1)
+    for d in out.values():
+        d["medio_s"] = round(d["segundos"] / d["videos"], 1) if d["videos"] else None
+    return out
+
+
 def resumen_admin(f: dict) -> dict:
     return {
         "id": f["id"], "email": f.get("email"), "nombre": f.get("nombre"),
@@ -704,6 +721,8 @@ def resumen_admin(f: dict) -> dict:
         "devueltos": len(f.get("devueltos") or []),
         "descargado": int(f.get("descargas", 0)) > 0, "nota": f.get("nota"), "calidad": calidad(f),
         "coste_api_usd": f.get("coste_api_usd"), "proceso_s": f.get("proceso_total_s") or f.get("proceso_s"),
+        "modo": (f.get("ajustes") or {}).get("modo") or "basico",
+        "extras": (f.get("ajustes") or {}).get("extras") or [], "extras_s": f.get("extras_total_s") or {},
     }
 
 
@@ -1068,12 +1087,36 @@ def _escalar(on_progress: Callable[[float, str], None], a: float, b: float, defe
     return lambda f, m="": on_progress(a + max(0.0, min(1.0, float(f))) * (b - a), defecto)
 
 
+def _ex():
+    from src.editor_auto.rapido import extras
+    return extras
+
+
+def _tool_extra(nombre: str):
+    """Herramienta de un extra (función aparte para poder sustituirla en los tests)."""
+    if nombre == "audio_clean":
+        from src.editor_auto.tools.audio_clean import AudioCleanTool
+        return AudioCleanTool()
+    if nombre == "photo_insert":
+        from src.editor_auto.tools.photo_insert import PhotoInsertTool
+        return PhotoInsertTool()
+    if nombre == "vip_overlays":
+        from src.editor_auto.tools.vip_overlays import VipOverlaysTool
+        return VipOverlaysTool()
+    if nombre == "texto_fijo":
+        from src.editor_auto.tools.texto_fijo import TextoFijoTool
+        return TextoFijoTool()
+    raise ValueError(nombre)
+
+
 def _estilizar(base: Path, destino: Path, ficha: dict, job,
                on_log: Callable[[str], None], on_progress: Callable[[float, str], None],
-               tramos: tuple[float, float, float]) -> tuple[Path, list[str]]:
-    """Subtítulos y flecha sobre `base` (el corte). Devuelve (fichero a entregar, avisos).
+               tramos: tuple[float, float, float], cronometro=None) -> tuple[Path, list[str]]:
+    """Extras, subtítulos y flecha sobre `base` (el corte). Devuelve (fichero a entregar, avisos).
 
-    Un fallo de subs o flecha NO pierde el trabajo: se entrega lo último que salió bien.
+    Orden: voz y fotos → subtítulos → flecha → clip gancho (copia la frase YA subtitulada)
+    → nombre del producto. Un fallo de un extra, subs o flecha NO pierde el trabajo: se
+    entrega lo último que salió bien, con aviso.
     """
     from src.editor_auto.tools.base import ToolContext
 
@@ -1084,11 +1127,57 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
     t0, t1, t2 = tramos
     actual, avisos = base, []
     carp = carpeta(ficha["id"])
+    pedidos = list(ajustes.get("extras") or [])
+    crono = cronometro if cronometro is not None else _ex().Cronometro()
 
     def _ctx(a: float, b: float, msg: str, extras: dict | None = None):
         return ToolContext(user_id=ficha["email"], user_name=ficha["email"], job_id=job.id,
                            temp_folder=str(carp), on_log=on_log, on_progress=_escalar(on_progress, a, b, msg),
                            extras=extras or {})
+
+    def _paso(eid: str, nombre_tool: str, config: dict, t: float, msg: str, extras: dict | None = None) -> None:
+        """Aplica un extra sobre `actual`. Si falla se sigue sin él (con aviso)."""
+        nonlocal actual
+        out = carp / f"{eid}_{job.id}.mp4"
+        try:
+            with crono.medir(eid):
+                tool = _tool_extra(nombre_tool)
+                tool.run(input_path=str(actual), output_path=str(out), config=config,
+                         ctx=_ctx(t, t, msg, extras))
+            if not out.exists() or out.stat().st_size == 0:
+                raise RuntimeError("no se generó el vídeo")
+            if actual != base:
+                actual.unlink(missing_ok=True)
+            actual = out
+        except Exception as e:  # noqa: BLE001
+            out.unlink(missing_ok=True)
+            avisos.append(f"No se pudo aplicar «{_ex().EXTRAS[eid]['nombre']}»: " + str(e)[:150])
+            on_log(f"[rapido] ⚠️ {avisos[-1]}")
+
+    def _asegurar_palabras() -> list[dict]:
+        """Palabras del corte para fotos/gancho: las guardadas o se transcribe ahora (y se guardan)."""
+        palabras = leer_palabras(ficha["id"])
+        if palabras:
+            return palabras
+        try:
+            from src.editor_auto.tools.subs_auto import SubsAutoTool
+            palabras = SubsAutoTool()._transcribir(str(actual), config_subtitulos(sub, idioma),
+                                                   _ctx(t0, t0, "Escuchando el vídeo…"))
+            if palabras:
+                ruta_palabras(ficha["id"]).write_text(json.dumps(palabras, ensure_ascii=False), encoding="utf-8")
+            return palabras or []
+        except Exception as e:  # noqa: BLE001
+            on_log(f"[rapido] ⚠️ No se pudo transcribir para los extras: {str(e)[:150]}")
+            return []
+
+    ex = _ex()
+    if "voz" in pedidos:
+        _paso("voz", "audio_clean", ex.config_voz(), t0, "Mejorando la voz…")
+    if "fotos" in pedidos:
+        with crono.medir("fotos"):
+            palabras_f = _asegurar_palabras()
+        _paso("fotos", "photo_insert", ex.config_fotos(idioma), t0, "Poniendo fotos de apoyo…",
+              {"palabras": palabras_f} if palabras_f else None)
 
     if sub.get("activo", True):
         out = carp / f"subs_{job.id}.mp4"
@@ -1101,6 +1190,8 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
                                config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Poniendo subtítulos…", extras))
             if not out.exists() or out.stat().st_size == 0:
                 raise RuntimeError("no se generó el vídeo con subtítulos")
+            if actual != base:
+                actual.unlink(missing_ok=True)
             actual = out
         except Exception as e:  # noqa: BLE001
             out.unlink(missing_ok=True)
@@ -1124,6 +1215,19 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
             out.unlink(missing_ok=True)
             avisos.append("No se pudo poner la flecha: " + str(e)[:150])
             on_log(f"[rapido] ⚠️ {avisos[-1]}")
+    if "gancho" in pedidos:
+        with crono.medir("gancho"):
+            g = ficha.get("gancho") if job.params.get("modo") == "estilo" else None
+            if not g:  # en «estilo» se reusa el elegido (mismo corte, mismos tiempos)
+                g = ex.elegir_gancho(_asegurar_palabras(), duracion_video(actual), on_log)
+                ficha["gancho"] = g
+        if g:
+            _paso("gancho", "vip_overlays", ex.config_gancho(g), t2, "Poniendo el clip gancho…")
+        else:
+            avisos.append("No encontramos una frase gancho clara en este vídeo.")
+    if "nombre_producto" in pedidos and ajustes.get("nombre_producto"):
+        _paso("nombre_producto", "texto_fijo", ex.config_nombre(ajustes["nombre_producto"]), t2,
+              "Poniendo el nombre del producto…")
     if actual == base:
         shutil.copyfile(actual, destino)
     else:
@@ -1194,8 +1298,11 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
             tramos = (0.6, 0.9, 1.0)
         final = ruta_resultado(vid)
         ficha = cargar_ficha(vid) or ficha
-        entrega, avisos = _estilizar(cortado, carp / f"entrega_{job.id}.mp4", ficha, job, on_log, on_progress, tramos)
+        crono = _ex().Cronometro()
+        entrega, avisos = _estilizar(cortado, carp / f"entrega_{job.id}.mp4", ficha, job, on_log, on_progress,
+                                     tramos, crono)
         os.replace(entrega, final)
+        gancho_elegido = ficha.get("gancho")
         # Coste: todo local (Silero, faster-whisper, ffmpeg) → sin API de pago.
         try:
             from src import cost_tracking
@@ -1228,13 +1335,22 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
         except Exception:  # noqa: BLE001
             pass
         ficha["proceso_total_s"] = round(float(ficha.get("proceso_total_s") or 0) + ficha["proceso_s"], 1)
+        # Segundos de servidor de cada extra (esta pasada y acumulado) → precios con datos reales.
+        if crono.s:
+            ficha["extras_s"] = dict(crono.s)
+            tot = dict(ficha.get("extras_total_s") or {})
+            for k, v in crono.s.items():
+                tot[k] = round(float(tot.get(k) or 0) + v, 2)
+            ficha["extras_total_s"] = tot
+        if "gancho" in ((ficha.get("ajustes") or {}).get("extras") or []):
+            ficha["gancho"] = gancho_elegido
         guardar_ficha(ficha)
         res = resumen(ficha) or {}
         registrar_evento(vid, ficha["email"], "listo", {
             "modo": modo, "duracion_original_s": res.get("duracion_original_s"),
             "duracion_final_s": ficha["duracion_final_s"], "n_cortes": ficha.get("n_cortes"),
             "n_aplicados": res.get("pausas"), "segundos_quitados": res.get("segundos_quitados"),
-            "proceso_s": ficha["proceso_s"],
+            "proceso_s": ficha["proceso_s"], "extras_s": crono.s or None,
         })
         if avisos:
             registrar_evento(vid, ficha["email"], "aviso", {"modo": modo, "avisos": avisos})

@@ -169,8 +169,13 @@ class PhotoInsertTool:
         ctx.on_log(f"[photo_insert] Duración input: {duration:.1f}s")
 
         # 1) Transcribir para detectar entidades + tiempos.
-        ctx.on_progress(0.05, "🎙️ Whisper transcribiendo…")
-        words = _transcribe(input_path, config, ctx)
+        # Palabras ya transcritas de este vídeo (editor rápido) → sin Whisper.
+        dadas = (ctx.extras or {}).get("palabras")
+        if dadas:
+            words = [dict(w) for w in dadas if str(w.get("word", "")).strip()]
+        else:
+            ctx.on_progress(0.05, "🎙️ Whisper transcribiendo…")
+            words = _transcribe(input_path, config, ctx)
         if not words:
             ctx.on_log("[photo_insert] Sin transcripción — no inserto fotos.")
             return _noop_copy(input_path, output_path)
@@ -186,6 +191,8 @@ class PhotoInsertTool:
             max_n=max_photos,
             entity_types=str(config.get("entity_types", "personas y marcas")),
             ctx=ctx,
+            ia=str(config.get("entidades_ia") or "gemini"),
+            system_prompt=str(config.get("system_prompt_entidades") or "") or None,
         )
         if not inserts:
             ctx.on_log(
@@ -314,16 +321,35 @@ def _transcribe(input_path: str, config: dict, ctx: ToolContext) -> list[dict]:
         return []
 
 
+def _entidades_ia(*, system_prompt: str, payload: dict, ia: str, ctx: ToolContext) -> Any:
+    """`ia="claude"`: Claude Haiku (claude_client) y Gemini de reserva; si no, solo Gemini."""
+    if ia == "claude":
+        try:
+            from src.editor_auto.api import claude_client
+            if claude_client.activo():
+                return claude_client.analyze_transcript_json(
+                    system_prompt=system_prompt, user_payload=payload,
+                    detalle="editor_auto.photo_insert")
+            ctx.on_log("[photo_insert] Claude no configurado — uso Gemini.")
+        except Exception as e:  # noqa: BLE001
+            ctx.on_log(f"[photo_insert] ⚠️ Claude falló ({str(e)[:150]}) — uso Gemini.")
+    from src.editor_auto.api import gemini_client
+    if not gemini_client.is_configured():
+        ctx.on_log("[photo_insert] Gemini no configurado — no detecto entidades.")
+        return None
+    return gemini_client.analyze_transcript_json(
+        system_prompt=system_prompt, user_payload=payload,
+        model="gemini-2.5-flash", temperature=0.0,
+    )
+
+
 def _extract_entities(
     *, words: list[dict], max_n: int, entity_types: str, ctx: ToolContext,
+    ia: str = "gemini", system_prompt: str | None = None,
 ) -> list[dict]:
-    """Llama a Gemini con la transcripción y devuelve las entidades válidas
-    [{label, search_query, t_start, type}]. [] si no hay o si Gemini falla."""
+    """Pide a la IA las entidades de la transcripción y devuelve las válidas
+    [{label, search_query, t_start, type}]. [] si no hay o si la IA falla."""
     try:
-        from src.editor_auto.api import gemini_client
-        if not gemini_client.is_configured():
-            ctx.on_log("[photo_insert] Gemini no configurado — no detecto entidades.")
-            return []
         compact = [
             {"w": str(w.get("word", "")).strip(), "s": round(float(w.get("start", 0.0)), 2)}
             for w in words if str(w.get("word", "")).strip()
@@ -333,15 +359,14 @@ def _extract_entities(
             "solo marcas": "solo marcas",
             "personas y marcas": "personas famosas y marcas",
         }
-        result = gemini_client.analyze_transcript_json(
-            system_prompt=_SYSTEM_PROMPT,
-            user_payload={
+        result = _entidades_ia(
+            system_prompt=system_prompt or _SYSTEM_PROMPT,
+            payload={
                 "types": types_map.get(entity_types, "personas famosas y marcas"),
                 "max": max_n,
                 "words": compact,
             },
-            model="gemini-2.5-flash",
-            temperature=0.0,
+            ia=ia, ctx=ctx,
         )
         raw = result.get("inserts") if isinstance(result, dict) else None
         if not isinstance(raw, list):

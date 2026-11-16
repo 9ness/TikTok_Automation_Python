@@ -58,6 +58,7 @@ def _client():
 def analyze_transcript_json(
     *, system_prompt: str, user_payload: dict,
     modelo_forzado: str | None = None, esfuerzo: str | None = None,
+    detalle: str = "editor_auto.silence_cutter",
 ) -> Any:
     """Llamada a Claude con el prompt del cortador. Lanza si algo falla.
 
@@ -90,7 +91,7 @@ def analyze_transcript_json(
             cache_write_tokens=int(getattr(u, "cache_creation_input_tokens", 0) or 0),
             cache_read_tokens=int(getattr(u, "cache_read_input_tokens", 0) or 0),
             model=m,
-            detail=f"editor_auto.silence_cutter ({m})",
+            detail=f"{detalle} ({m})",
         )
     except Exception:  # noqa: BLE001 — el coste nunca rompe la llamada
         pass

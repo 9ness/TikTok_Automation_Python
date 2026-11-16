@@ -27,6 +27,7 @@ from src.api.dependencies import get_current_user, get_queue
 from src.api.exceptions import APIError, ValidationError
 from src.api.web_ticket import TicketClaims, verify_ticket
 from src.api.exceptions import UnauthorizedError
+from src.editor_auto.rapido import extras as ex
 from src.editor_auto.rapido import servicio as svc
 from src.queue.manager import JobQueue
 from src.queue.models import JobMode, JobStatus
@@ -94,6 +95,9 @@ class Ajustes(BaseModel):
     idioma: str = Field("auto", description="auto | es | en")
     subtitulos: SubsAjustes = Field(default_factory=SubsAjustes)
     flecha: FlechaAjustes = Field(default_factory=FlechaAjustes)
+    modo: str = Field("basico", description="id de GET /opciones → modos")
+    extras: list[str] = Field(default_factory=list, max_length=10, description="ids de GET /opciones → extras")
+    nombre_producto: str | None = Field(None, max_length=200, description="texto del extra «Nombre del producto»")
 
 
 class Estilo(BaseModel):
@@ -121,6 +125,17 @@ def _validar_estilo(sub: SubsAjustes | None, fl: FlechaAjustes | None) -> tuple[
                 svc.validar_flecha(fl.model_dump()) if fl is not None else None)
     except ValueError as e:
         raise ValidationError(str(e)) from e
+
+
+def _validar_modo(ajustes: Ajustes, claims: TicketClaims) -> dict:
+    """Modo y extras: lo `solo_admin` pedido por un usuario normal → 403; lo inválido → 422."""
+    try:
+        modo, extras, nombre = ex.validar(ajustes.modo, ajustes.extras, ajustes.nombre_producto, _es_admin(claims))
+    except ex.Prohibido as e:
+        raise APIError(str(e), status_code=403) from e
+    except ValueError as e:
+        raise ValidationError(str(e)) from e
+    return {"modo": modo, "extras": extras, "nombre_producto": nombre}
 
 
 def _admin_o_403(claims: TicketClaims) -> None:
@@ -215,8 +230,10 @@ def saldo(claims: Claims) -> dict:
 
 @router.get("/opciones")
 def opciones(claims: Claims) -> dict:
-    """Estilos de subtítulos, colores, fuentes, flechas y posiciones que ofrece la web."""
-    return svc.opciones(router.prefix)
+    """Modos, extras, estilos de subtítulos, colores, fuentes, flechas y posiciones que ofrece la web.
+
+    Los modos y extras `solo_admin` solo salen si el ticket es de admin."""
+    return svc.opciones(router.prefix, admin=_es_admin(claims))
 
 
 @router.get("/flechas/{fid}.png")
@@ -241,7 +258,7 @@ def guardar_preferencias(ajustes: Ajustes, claims: Claims) -> dict:
     if ajustes.ritmo not in svc.RITMOS or ajustes.formato not in svc.FORMATOS or ajustes.idioma not in svc.IDIOMAS:
         raise ValidationError("Ajustes no válidos.", details=ajustes.model_dump())
     sub, fl = _validar_estilo(ajustes.subtitulos, ajustes.flecha)
-    pref = {**ajustes.model_dump(), "subtitulos": sub, "flecha": fl}
+    pref = {**ajustes.model_dump(), "subtitulos": sub, "flecha": fl, **_validar_modo(ajustes, claims)}
     svc.guardar_preferencias(claims.email, pref)
     return {"ok": True, "preferencias": pref}
 
@@ -381,17 +398,21 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     if ajustes.ritmo not in svc.RITMOS or ajustes.formato not in svc.FORMATOS or ajustes.idioma not in svc.IDIOMAS:
         raise ValidationError("Ajustes no válidos.", details=ajustes.model_dump())
     sub, fl = _validar_estilo(ajustes.subtitulos, ajustes.flecha)
+    mx = _validar_modo(ajustes, claims)
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] not in ("subido", "error"):
         raise APIError("Este vídeo ya se ha cortado o está en marcha.", status_code=409)
     admin = _es_admin(claims)  # el admin no gasta créditos
-    ficha["creditos"] = svc.creditos_de(ficha["duracion_s"])  # tarifa vigente (fichas de antes del cambio a vídeos)
+    # Tarifa vigente (fichas de antes del cambio a vídeos) + cada extra. `creditos` = total cobrado
+    # (lo que devuelve `devolver_creditos` si el trabajo falla).
+    ficha["creditos_base"] = svc.creditos_de(ficha["duracion_s"])
+    ficha["creditos"] = svc.cr(ficha["creditos_base"] + ex.precio(mx["extras"]))
     if not admin and not svc.cobrar(claims.email, svc.cr(ficha["creditos"])):
         raise APIError(
             f"Necesitas {ficha['creditos']} crédito(s) y no te alcanzan.", status_code=402,
             details={"necesarios": ficha["creditos"], "saldo": svc.cr(svc.saldo(claims.email)["creditos"])},
         )
-    ficha.update(ajustes={**ajustes.model_dump(), "subtitulos": sub, "flecha": fl}, aviso=None, cobrado=not admin, devuelto=False, error=None, estado="cola")
+    ficha.update(ajustes={**ajustes.model_dump(), "subtitulos": sub, "flecha": fl, **mx}, aviso=None, gancho=None, cobrado=not admin, devuelto=False, error=None, estado="cola")
     job = queue.enqueue(
         JobMode.EDITOR_RAPIDO, title=f"Rápido · {ficha['nombre'][:40]}",
         params={"video_id": vid, "modo": "auto", "user_name": claims.email},

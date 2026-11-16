@@ -611,7 +611,7 @@ def test_admin_actividad_y_video(rapido, monkeypatch, tmp_path):
     assert v["id"] == vid and v["email"] == EMAIL and v["estado"] == "listo" and v["cortes"] == 2
     assert v["devueltos"] == 0 and v["descargado"] is False and v["nota"] == 5 and v["calidad"] == 90
     assert set(v) == {"id", "email", "nombre", "fecha", "duracion_s", "estado", "cortes", "devueltos",
-                      "descargado", "nota", "calidad", "coste_api_usd", "proceso_s"}
+                      "descargado", "nota", "calidad", "coste_api_usd", "proceso_s", "modo", "extras", "extras_s"}
     t = a["totales"]
     assert t["videos"] == 1 and t["listos"] == 1 and t["usuarios"] == 1 and t["errores"] == 0
     assert t["nota_media"] == 5 and t["calidad_media"] == 90 and t["valorados"] == 1 and t["descargados"] == 0
@@ -1091,3 +1091,142 @@ def test_enlace_con_referido(polar, rapido, monkeypatch):
     r = c.post(f"{BASE}/pagos/enlace", json={"creditos": 60, "ref": propio}, headers=hdr)
     assert r.status_code == 400 and "propio" in json.dumps(r.json())
     assert len(vistos) == n
+
+
+# ───────────────────── Modos y extras (solo admin de momento) ─────────────────────
+
+def test_opciones_modos_y_extras_segun_admin(rapido):
+    c, _, hdr = rapido
+    o = c.get(f"{BASE}/opciones", headers=hdr).json()
+    assert [m["id"] for m in o["modos"]] == ["basico"] and o["extras"] == []
+    a = c.get(f"{BASE}/opciones", headers=_adm()).json()
+    assert [m["id"] for m in a["modos"]] == ["basico", "replica"]
+    rep = a["modos"][1]
+    assert rep["solo_admin"] is True and rep["disponible"] is False
+    ids = {e["id"]: e for e in a["extras"]}
+    assert set(ids) == {"voz", "gancho", "fotos", "nombre_producto"}
+    assert all(e["creditos"] == 0.5 and e["solo_admin"] for e in ids.values())
+    assert ids["nombre_producto"]["pide_texto"] is True and ids["voz"]["pide_texto"] is False
+
+
+def test_extras_solo_admin_403_y_validacion(rapido):
+    c, q, hdr = rapido
+    vid = _subir(c, hdr).json()["id"]
+    url = f"{BASE}/videos/{vid}/cortar"
+    assert c.post(url, headers=hdr, json={"extras": ["voz"]}).status_code == 403
+    assert c.post(url, headers=hdr, json={"modo": "replica"}).status_code == 403
+    assert c.put(f"{BASE}/preferencias", headers=hdr, json={"extras": ["gancho"]}).status_code == 403
+    assert c.post(url, headers=hdr, json={"extras": ["nada"]}).status_code in (400, 422)
+    assert c.post(url, headers=hdr, json={"modo": "x"}).status_code in (400, 422)
+    assert q.get_all() == [] and c.get(f"{BASE}/saldo", headers=hdr).json()["creditos"] == 150
+    adm = _adm()
+    va = _subir(c, adm).json()["id"]
+    ua = f"{BASE}/videos/{va}/cortar"
+    assert c.post(ua, headers=adm, json={"modo": "replica"}).status_code in (400, 422)  # aún no disponible
+    assert c.post(ua, headers=adm, json={"extras": ["nombre_producto"]}).status_code in (400, 422)  # sin texto
+    assert c.post(ua, headers=adm, json={"extras": ["nombre_producto"], "nombre_producto": "x" * 41}).status_code in (400, 422)
+
+
+def test_admin_extras_precio_y_orden(rapido):
+    c, q, _ = rapido
+    adm = _adm()
+    vid = _subir(c, adm).json()["id"]
+    r = c.post(f"{BASE}/videos/{vid}/cortar", headers=adm,
+               json={"extras": ["nombre_producto", "voz", "gancho"], "nombre_producto": "  Botella térmica "})
+    assert r.status_code == 202
+    f = svc.cargar_ficha(vid)
+    assert f["creditos_base"] == 1 and f["creditos"] == 2.5 and f["cobrado"] is False
+    assert f["ajustes"]["extras"] == ["voz", "gancho", "nombre_producto"]  # orden de aplicación
+    assert f["ajustes"]["nombre_producto"] == "Botella térmica" and f["ajustes"]["modo"] == "basico"
+    assert c.get(f"{BASE}/saldo", headers=adm).json()["creditos"] == 150  # el admin no paga
+
+
+def test_runner_con_extras_mide_segundos(rapido, monkeypatch):
+    c, q, _ = rapido
+    adm = _adm()
+    vid = _subir(c, adm).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=adm, json={
+        "extras": ["voz", "fotos", "gancho", "nombre_producto"], "nombre_producto": "Lámpara"})
+    job = q.get_all()[0]
+    subs, flechas, usadas = [], [], []
+    sc = _falsas_estilo(monkeypatch, subs, flechas)
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+    palabras = [{"word": f"p{i}", "start": i * 0.5, "end": i * 0.5 + 0.4} for i in range(100)]
+    monkeypatch.setattr(svc, "leer_palabras", lambda v: palabras)
+
+    def falsa(nombre):
+        class T:
+            def run(self, *, input_path, output_path, config, ctx):
+                usadas.append((nombre, config, dict(ctx.extras)))
+                open(output_path, "wb").write(open(input_path, "rb").read() + f"+{nombre}".encode())
+                return output_path
+        return T()
+    monkeypatch.setattr(svc, "_tool_extra", falsa)
+    from src.editor_auto.api import claude_client
+    from src.editor_auto.rapido import extras as ex
+    llamadas = []
+    monkeypatch.setattr(claude_client, "activo", lambda: True)
+
+    def falso_claude(**kw):
+        llamadas.append(kw)
+        return {"t0": 10.0, "t1": 12.2, "frase": "esto nadie te lo cuenta", "motivo": "curiosidad"}
+    monkeypatch.setattr(claude_client, "analyze_transcript_json", falso_claude)
+    prog = []
+    svc.ejecutar(job, lambda m: None, lambda f, m="": prog.append(f))
+    assert prog == sorted(prog) and prog[-1] == 1.0
+    assert [u[0] for u in usadas] == ["audio_clean", "photo_insert", "vip_overlays", "texto_fijo"]
+    assert usadas[1][1]["entidades_ia"] == "claude" and usadas[1][2]["palabras"] == palabras
+    assert usadas[2][1]["plan_fijo"]["gancho"]["clip"] == {"t0": 10.0, "t1": 12.2}
+    assert usadas[3][1]["texto"] == "Lámpara"
+    assert llamadas[0]["modelo_forzado"] == ex.MODELO_GANCHO and llamadas[0]["detalle"] == "editor_rapido.gancho"
+    assert "fotos_" in subs[0][0]  # los subtítulos van sobre el vídeo con voz y fotos
+    assert svc.ruta_resultado(vid).read_bytes() == b"mp4+subs+vip_overlays+texto_fijo"
+    assert not list(svc.carpeta(vid).glob("voz_*.mp4")) and not list(svc.carpeta(vid).glob("fotos_*.mp4"))
+    f = svc.cargar_ficha(vid)
+    assert set(f["extras_s"]) == {"voz", "fotos", "gancho", "nombre_producto"} and f["extras_total_s"]
+    assert f["gancho"]["frase"] == "esto nadie te lo cuenta" and f["estado"] == "listo"
+    # re-estilizar reusa el gancho elegido (no vuelve a llamar a Claude) y acumula segundos
+    assert c.post(f"{BASE}/videos/{vid}/estilo", headers=adm, json={"flecha": {"activo": False}}).status_code == 202
+    usadas.clear()
+    svc.ejecutar(q.get_all()[-1], lambda m: None, lambda f, m="": None)
+    assert len(llamadas) == 1 and "vip_overlays" in [u[0] for u in usadas]
+    r = c.get(f"{BASE}/admin/videos/{vid}", headers=adm)
+    if r.status_code == 200:
+        assert "extras" in json.dumps(r.json())
+
+
+def test_extra_que_falla_no_rompe(rapido, monkeypatch):
+    c, q, _ = rapido
+    adm = _adm()
+    vid = _subir(c, adm).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=adm, json={"extras": ["voz"]})
+    sc = _falsas_estilo(monkeypatch, [], [])
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+
+    class Rota:
+        def run(self, **kw):
+            raise RuntimeError("rnnoise roto")
+    monkeypatch.setattr(svc, "_tool_extra", lambda n: Rota())
+    svc.ejecutar(q.get_all()[0], lambda m: None, lambda f, m="": None)
+    v = c.get(f"{BASE}/videos/{vid}", headers=adm).json()
+    assert v["estado"] == "listo" and "Mejorar voz" in v["aviso"]
+    assert svc.ruta_resultado(vid).read_bytes() == b"mp4+subs"
+
+
+def test_elegir_gancho_limites(monkeypatch):
+    from src.editor_auto.api import claude_client
+    from src.editor_auto.rapido import extras as ex
+    pal = [{"word": "hola", "start": 0.0, "end": 0.4}]
+    monkeypatch.setattr(claude_client, "activo", lambda: False)
+    assert ex.elegir_gancho(pal, 30.0, lambda m: None) is None
+    monkeypatch.setattr(claude_client, "activo", lambda: True)
+    for resp, ok in [({"t0": 1.0, "t1": 3.0}, False), ({"t0": 5.0, "t1": 5.5}, False),
+                     ({"t0": 5.0, "t1": 9.0}, False), ({"t0": None, "t1": None}, False),
+                     ({"t0": 29.0, "t1": 31.0}, False), ({"t0": 5.0, "t1": 7.0, "frase": "ojo"}, True)]:
+        monkeypatch.setattr(claude_client, "analyze_transcript_json", lambda r=resp, **kw: r)
+        g = ex.elegir_gancho(pal, 30.0, lambda m: None)
+        assert (g is not None) == ok, resp
+    monkeypatch.setattr(claude_client, "analyze_transcript_json", lambda **kw: (_ for _ in ()).throw(RuntimeError("x")))
+    assert ex.elegir_gancho(pal, 30.0, lambda m: None) is None

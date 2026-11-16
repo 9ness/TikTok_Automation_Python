@@ -359,5 +359,12 @@ API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapi
 - **Dataset de entrenamiento:** `<EDITOR_RAPIDO_DATASET_DIR | raíz de datos/_dataset>/<vid>/` con `original.*` (hardlink; copia si es otro disco y quedan ≥ `EDITOR_RAPIDO_DATASET_MIN_GB`=8 GB libres),
   `cortes.json`, `cortes_finales.json` (sin los devueltos), `eventos.json`, `ficha.json`. Se refresca al quedar listo, valorar, descargar y borrar (borrar el vídeo NO borra el dataset). Sin caducidad automática.
   Opt-out: ticket con `"no_dataset": true`. Sin él, la privacidad/términos de la web deben avisar de que se conservan los vídeos.
+- **Modos y extras (16/11/2026, `src/editor_auto/rapido/extras.py`).** `GET /opciones` añade `modos[{id,nombre,descripcion,desde_creditos,solo_admin,disponible}]`
+  (`basico`; `replica` solo admin y aún `disponible:false`) y `extras[{id,nombre,descripcion,creditos,solo_admin,pide_texto}]`: `voz` (audio_clean), `fotos` (photo_insert con
+  entidades por Claude Haiku y Gemini de respaldo, prompt `rapido/prompts/fotos_entidades.md`), `gancho` (frase de 1-3 s elegida por `MODELO_GANCHO` = Sonnet con `prompts/gancho.md`,
+  montada con vip_overlays `plan_fijo`), `nombre_producto` (texto_fijo, pide `nombre_producto` ≤ 40). Lo `solo_admin` solo sale y solo se acepta con ticket admin (si no, 403).
+  `Ajustes` gana `modo`, `extras[]`, `nombre_producto`. Precio: `ficha.creditos = creditos_base + Σ extras` (0,5 cada uno; tabla `EXTRAS`), y eso es lo que se devuelve si falla.
+  Orden en `_estilizar`: voz → fotos → subs → flecha → gancho (copia la frase ya subtitulada) → nombre. Un extra que falla deja `aviso` y se sigue sin él. Segundos de servidor por extra
+  en `ficha.extras_s` (última pasada) y `extras_total_s`; `admin/actividad` los suma en `totales.extras_s{id:{videos,segundos,medio_s}}`. En `estilo` se reusa `ficha.gancho`.
 - `temp_storage.cleanup_expired` (arranque de la API, TTL 24 h sobre `api_uploads/`) ahora SALTA `editor_rapido/`: antes borraba originales y resultados de más de un día en cada reinicio/deploy.
   El editor rápido aún no tiene caducidad propia para los vídeos de los usuarios (crece el disco).
