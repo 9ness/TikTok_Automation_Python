@@ -593,6 +593,8 @@ def estadisticas(fichas: list[dict], resumenes: list[dict] | None = None) -> dic
             "nota_media": _media([nota_valor(r["nota"]) for r in rs]),
             "calidad_media": _media([r["calidad"] for r in listos]),
             "proceso_medio_s": _media([f.get("proceso_s") for f in fs if f.get("estado") == "listo"]),
+            "proceso_total_min": round(sum(float(f.get("proceso_total_s") or f.get("proceso_s") or 0) for f in fs) / 60, 1),
+            "coste_api_usd": round(sum(float(f.get("coste_api_usd") or 0) for f in fs), 4),
         }
 
     por: dict[str, list[int]] = {}
@@ -614,6 +616,7 @@ def resumen_admin(f: dict) -> dict:
         "estado": f.get("estado"), "cortes": f.get("n_cortes"),
         "devueltos": len(f.get("devueltos") or []),
         "descargado": int(f.get("descargas", 0)) > 0, "nota": f.get("nota"), "calidad": calidad(f),
+        "coste_api_usd": f.get("coste_api_usd"), "proceso_s": f.get("proceso_total_s") or f.get("proceso_s"),
     }
 
 
@@ -1129,6 +1132,15 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
         if n_cortes is not None:
             ficha["n_cortes"] = n_cortes
         ficha["proceso_s"] = round(time.time() - t_ini, 1)
+        # Admin: lo gastado en APIs de pago (suma de todas las versiones) y tiempo de servidor acumulado.
+        try:
+            from src import cost_tracking
+            act = cost_tracking.get_active()
+            if act is not None:
+                ficha["coste_api_usd"] = round(float(ficha.get("coste_api_usd") or 0) + act.total_usd, 5)
+        except Exception:  # noqa: BLE001
+            pass
+        ficha["proceso_total_s"] = round(float(ficha.get("proceso_total_s") or 0) + ficha["proceso_s"], 1)
         guardar_ficha(ficha)
         res = resumen(ficha) or {}
         registrar_evento(vid, ficha["email"], "listo", {
