@@ -103,7 +103,9 @@ class Polar:
         o = d.get("data") or {}
         meta = o.get("metadata") or {}
         email = str(meta.get("email") or (o.get("customer") or {}).get("email") or "").strip().lower()
-        pack = _pack_de_producto(str(o.get("product_id") or "")) or str(meta.get("pack") or "")
+        # El pack sale del producto pagado; metadata.pack solo si no hay productos configurados.
+        configurados = any(_producto(p) for p in PACKS)
+        pack = _pack_de_producto(str(o.get("product_id") or "")) or ("" if configurados else str(meta.get("pack") or ""))
         if pack not in PACKS:
             pack = ""
         pagado = bool(o.get("paid")) or o.get("status") == "paid"
