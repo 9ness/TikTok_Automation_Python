@@ -60,3 +60,11 @@ def test_por_producto_incluye_carrusel(entorno):
         servicio.marcar_gmv_max("ana")
     with pytest.raises(servicio.ErrorTanda):
         servicio.marcar_gmv_max("ana", id_="car|nada")
+
+
+def test_por_id_de_tiktok_sin_video(entorno):
+    """La rutina de Social1 marca por id de producto de TikTok antes de tener vídeo (16/11)."""
+    r = servicio.marcar_gmv_max("ness", id_="1729384756123456789", producto="Lámpara LED")
+    assert r["ok"]
+    assert gmv_max.es_gmv_max(entorno["a"])
+    assert not gmv_max.es_gmv_max(entorno["b"])

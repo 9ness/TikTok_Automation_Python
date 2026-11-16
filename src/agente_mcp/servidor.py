@@ -860,7 +860,9 @@ async def marcar_gmv_max(ctx: Context, producto: str = "", tienda: str = "", id:
     """Black Friday (13-30/11): marca un producto o una tienda que INYECTA GMV Max
     (lo ves en Social1/Kalodata) para subir primero sus vídeos y carruseles en
     Mis tandas. Una de tres: `tienda` (todas sus piezas, de cualquier cuenta),
-    `id` (de `mis_tandas`, también `car|…`) o `producto` (parte del título: marca
+    `id` (de `mis_tandas`, también `car|…`, o el id numérico de producto de
+    TikTok Shop de Social1, aunque aún no tengas vídeo; con `producto` = su
+    título para verlo en la lista) o `producto` (parte del título: marca
     todos tus vídeos/carruseles que lo lleven). `si=False` quita la marca; `nota`
     = de dónde lo sacaste. La marca es común a todas las cuentas. Guía
     `mis-tandas.md` › GMV Max."""

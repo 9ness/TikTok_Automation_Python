@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as dt
+import re
 import shutil
 import threading
 import time
@@ -1022,7 +1023,12 @@ def marcar_gmv_max(usuario: str, *, id_: str = "", producto: str = "", tienda: s
 
     usuario = usuario or "ness"
     piezas: list[dict] = []
-    if id_:
+    if id_ and re.fullmatch(r"\d{10,}", id_.strip()):
+        # Id de producto de TikTok Shop (el de Social1/Kalodata o la URL): se marca aunque aún no
+        # haya vídeo; casará con cualquier pieza cuya URL de producto lleve ese id.
+        piezas = [{"product_url": f"https://shop.tiktok.com/view/product/{id_.strip()}",
+                   "titulo": producto.strip(), "tienda": ""}]
+    elif id_:
         if id_.startswith(CARRUSEL):
             cid = id_[len(CARRUSEL):]
             piezas = [c for t in fotos.tandas(usuario, todas=True)["tandas"] for c in t.get("items", [])
