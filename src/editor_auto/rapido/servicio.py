@@ -361,6 +361,28 @@ def nueva_ficha(email: str, nombre: str, duracion_s: float, bytes_: int) -> dict
     return ficha
 
 
+def nueva_version(ficha: dict) -> dict:
+    """Otra versión del mismo vídeo: ficha nueva sin cortar que reusa el original
+    (hardlink; copia si falla). La anterior no se toca. Se corta (y cobra) como cualquier vídeo."""
+    orig = ruta_original(ficha["id"])
+    if orig is None:
+        raise FileNotFoundError("Ya no está el vídeo original")
+    raiz = ficha.get("version_de") or ficha["id"]
+    base = cargar_ficha(raiz) or ficha
+    hermanas = [f for f in listar_fichas(ficha["email"], limite=1000) if (f.get("version_de") or f["id"]) == raiz]
+    n = max([f.get("n_version", 1) for f in hermanas] + [1]) + 1
+    nueva = nueva_ficha(ficha["email"], f"{base['nombre']} · v{n}", ficha["duracion_s"], ficha.get("bytes", 0))
+    destino = carpeta(nueva["id"])
+    destino.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(orig, destino / orig.name)
+    except OSError:
+        shutil.copy2(orig, destino / orig.name)
+    nueva.update(version_de=raiz, n_version=n, ajustes=ficha.get("ajustes"))
+    guardar_ficha(nueva)
+    return nueva
+
+
 def guardar_ficha(ficha: dict) -> None:
     get_editor_redis().set_json(_k_ficha(ficha["id"]), ficha)
 

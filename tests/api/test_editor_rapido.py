@@ -881,3 +881,29 @@ def test_lemon_enlace_de_pago(lemon, rapido, monkeypatch):
     assert d["relationships"]["variant"]["data"]["id"] == "77"
     assert d["attributes"]["checkout_data"]["custom"]["email"] == d["attributes"]["checkout_data"]["email"]
     assert c.post("/api/v1/editor-auto/rapido/pagos/enlace", json={"creditos": 25}, headers=hdr).status_code == 503
+
+
+def test_nueva_version_reusa_original_y_se_corta_aparte(rapido):
+    c, q, hdr = rapido
+    vid = _subir(c, hdr, "receta.mp4").json()["id"]
+    assert c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json={"ritmo": "natural"}).status_code == 202
+    orig = svc.ruta_original(vid)
+    r = c.post(f"{BASE}/videos/{vid}/version", headers=hdr)
+    assert r.status_code == 201
+    v2 = r.json()
+    assert v2["id"] != vid and v2["estado"] == "subido" and v2["nombre"].endswith("· v2")
+    o2 = svc.ruta_original(v2["id"])
+    assert o2 is not None and o2.read_bytes() == orig.read_bytes()
+    # la v1 sigue igual; la v2 se corta con otros ajustes (y cobra)
+    assert c.post(f"{BASE}/videos/{v2['id']}/cortar", headers=hdr, json={"ritmo": "sin_pausas"}).json()["saldo"] == 148
+    assert svc.cargar_ficha(vid)["ajustes"]["ritmo"] == "natural"
+    # desde la v2 sale la v3 (misma raíz)
+    assert c.post(f"{BASE}/videos/{v2['id']}/version", headers=hdr).status_code == 201
+    v3 = svc.listar_fichas(EMAIL)[0]
+    assert v3["n_version"] == 3 and v3["version_de"] == vid
+    # borrar la v1 no rompe la v2 (hardlink)
+    svc.borrar_ficha(svc.cargar_ficha(vid))
+    assert svc.ruta_original(v2["id"]).exists()
+    # de otro usuario: 404
+    otro = {"Authorization": "Bearer " + make_ticket("x@y.com", "", scope="rapido")}
+    assert c.post(f"{BASE}/videos/{v2['id']}/version", headers=otro).status_code == 404

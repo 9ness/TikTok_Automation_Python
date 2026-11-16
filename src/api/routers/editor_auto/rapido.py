@@ -412,6 +412,18 @@ def estado(vid: str, claims: Claims, queue: Annotated[JobQueue, Depends(get_queu
     return _vista(_ficha_o_404(vid, claims.email), queue, detalle=True)
 
 
+@router.post("/videos/{vid}/version", status_code=status.HTTP_201_CREATED)
+def nueva_version(vid: str, claims: Claims, queue: Annotated[JobQueue, Depends(get_queue)]) -> dict:
+    """Crea otra versión del vídeo (mismo original) para cortarla con otros ajustes."""
+    ficha = _ficha_o_404(vid, claims.email)
+    try:
+        nueva = svc.nueva_version(ficha)
+    except FileNotFoundError as e:
+        raise APIError(str(e), status_code=410) from e
+    svc.registrar_evento(nueva["id"], claims.email, "version", {"de": vid})
+    return _vista(nueva, queue)
+
+
 @router.post("/videos/{vid}/retocar", status_code=status.HTTP_202_ACCEPTED)
 def retocar(vid: str, body: Retoque, claims: Claims, queue: Annotated[JobQueue, Depends(get_queue)]) -> dict:
     """Devuelve al vídeo los cortes indicados y vuelve a renderizar (sin coste en V1).
