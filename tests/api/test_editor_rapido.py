@@ -611,7 +611,7 @@ def test_admin_actividad_y_video(rapido, monkeypatch, tmp_path):
     assert v["id"] == vid and v["email"] == EMAIL and v["estado"] == "listo" and v["cortes"] == 2
     assert v["devueltos"] == 0 and v["descargado"] is False and v["nota"] == 5 and v["calidad"] == 90
     assert set(v) == {"id", "email", "nombre", "fecha", "duracion_s", "estado", "cortes", "devueltos",
-                      "descargado", "nota", "calidad"}
+                      "descargado", "nota", "calidad", "coste_api_usd", "proceso_s"}
     t = a["totales"]
     assert t["videos"] == 1 and t["listos"] == 1 and t["usuarios"] == 1 and t["errores"] == 0
     assert t["nota_media"] == 5 and t["calidad_media"] == 90 and t["valorados"] == 1 and t["descargados"] == 0
