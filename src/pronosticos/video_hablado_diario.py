@@ -645,7 +645,13 @@ def textos_tiktok(partidos: list[dict], out: Path, fecha: str, r: UpstashRedis |
     if len(elegidos) == len(partidos) and any(es_partido):
         primero = es_partido.index(True)
         ultimo = len(es_partido) - 1 - es_partido[::-1].index(True)
-        intro = [re.sub(r"\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b", n, b, count=1)
+        # La IA cuenta los partidos de su caption («Cinco encuentros», «5 partidos»): se cambia
+        # por los del vídeo, también con mayúscula o en cifra (16/17-nov salió «Cinco»).
+        def _num(m: re.Match) -> str:
+            return n.capitalize() if m.group(0)[0].isupper() else n
+        intro = [re.sub(r"\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|[2-9]|10)\b"
+                        r"(?=\s+(?:\w+\s+){0,2}(?:partidos|encuentros|duelos|juegos|choques|picks|pronósticos)\b)",
+                        _num, b, count=1, flags=re.I)
                  for b in secciones[:primero]]
         desc = f"\n\n{SEP}\n\n".join(intro + elegidos + secciones[ultimo + 1:])
         # la caption de la IA a veces se equivoca de día («este viernes» para un sábado)
