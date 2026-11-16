@@ -912,10 +912,10 @@ def test_nueva_version_reusa_original_y_se_corta_aparte(rapido):
 
 # ── Polar ───────────────────────────────────────────────────────────────────
 
-def _polar(c, *, oid="ord-1", email="p@x.com", pack="60", producto="prod-60", paid=True, tipo="order.paid",
+def _polar(c, *, oid="ord-1", email="p@x.com", pack="60", producto="prod-60", paid=True, tipo="order.paid", estado=None,
            secreto="whsec_" + __import__("base64").b64encode(b"k" * 24).decode(), ts=None, firma=None, wid="msg_1"):
     import base64, hashlib, hmac, json as _j, time as _t
-    cuerpo = _j.dumps({"type": tipo, "data": {"id": oid, "status": "paid" if paid else "pending", "paid": paid,
+    cuerpo = _j.dumps({"type": tipo, "data": {"id": oid, "status": estado or ("paid" if paid else "pending"), "paid": paid,
                        "product_id": producto, "metadata": {"email": email, "pack": pack},
                        "customer": {"email": "otro@x.com"}}}).encode()
     ts = str(int(_t.time())) if ts is None else str(ts)
@@ -950,6 +950,17 @@ def test_polar_compra_suma_una_vez(polar):
     assert r.status_code == 200 and r.json()["accion"] == "sumado" and r.json()["creditos"] == 60
     assert _polar(polar, wid="msg_2").json()["accion"] == "repetido"  # reintento
     assert svc.saldo("p@x.com")["creditos"] == base + 60
+
+
+def test_polar_reembolso_resta_una_vez(polar):
+    base = svc.saldo("p@x.com")["creditos"]
+    assert _polar(polar, oid="r1").json()["accion"] == "sumado"
+    parcial = _polar(polar, oid="r1", tipo="order.refunded", estado="partially_refunded", wid="m2")
+    assert parcial.json()["accion"] == "ignorado"
+    r = _polar(polar, oid="r1", tipo="order.refunded", estado="refunded", wid="m3")
+    assert r.json()["accion"] == "restado"
+    assert _polar(polar, oid="r1", tipo="order.refunded", estado="refunded", wid="m4").json()["accion"] == "repetido"
+    assert svc.saldo("p@x.com")["creditos"] == base
 
 
 def test_polar_secreto_legado(polar, monkeypatch):

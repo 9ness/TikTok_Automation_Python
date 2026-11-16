@@ -1208,6 +1208,11 @@ def procesar_pago(ev) -> dict:
     """Aplica un `EventoPago` YA verificado (cualquier pasarela). Nunca lanza por datos raros."""
     if not ev.id_pedido:
         return {"accion": "ignorado", "motivo": "sin id de pedido"}
+    if ev.tipo == "reembolso":
+        return _reembolsar_pedido(ev.id_pedido, {"pedido": ev.id_pedido})
+    if ev.tipo == "reembolso_parcial":
+        logger.warning("[rapido] reembolso PARCIAL del pedido %s: no se restan créditos (revisar a mano)", ev.id_pedido)
+        return {"accion": "ignorado", "motivo": "reembolso parcial"}
     if not ev.pagado:
         return {"accion": "ignorado", "motivo": "no pagado"}
     if "@" not in ev.email:
@@ -1256,6 +1261,12 @@ def procesar_lemon(evento: str, meta: dict, data: dict) -> dict:
         return _abonar_pedido(pid, email, n, variante, datos_ev)
 
     # order_refunded
+    return _reembolsar_pedido(pid, datos_ev)
+
+
+def _reembolsar_pedido(pid: str, datos_ev: dict) -> dict:
+    """Resta lo que sumó el pedido `pid`, una sola vez. Lo usan todas las pasarelas."""
+    r = get_editor_redis()
     with _LOCK:
         p = r.get_json(_k_pedido(pid))
         if not p:

@@ -24,6 +24,7 @@ class EventoPago:
     pack: str          # "25" | "60" | "150" ("" si no se pudo identificar)
     creditos: int      # 0 si pack desconocido
     pagado: bool
+    tipo: str = "pago"  # "pago" | "reembolso" (total) | "reembolso_parcial"
 
 
 class ProveedorPago(Protocol):

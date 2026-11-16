@@ -98,9 +98,14 @@ class Polar:
             d = json.loads(body)
         except ValueError:
             return None
-        if d.get("type") != "order.paid":
+        tipo_ev = d.get("type")
+        if tipo_ev not in ("order.paid", "order.refunded"):
             return None
         o = d.get("data") or {}
+        if tipo_ev == "order.refunded":
+            total = o.get("status") == "refunded"
+            return EventoPago(id_pedido=str(o.get("id") or ""), email="", pack="", creditos=0, pagado=False,
+                              tipo="reembolso" if total else "reembolso_parcial")
         meta = o.get("metadata") or {}
         email = str(meta.get("email") or (o.get("customer") or {}).get("email") or "").strip().lower()
         # El pack sale del producto pagado; metadata.pack solo si no hay productos configurados.
