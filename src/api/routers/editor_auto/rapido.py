@@ -600,6 +600,25 @@ def admin_cuentas(claims: Claims) -> dict:
     return {"cuentas": svc.listar_cuentas()}
 
 
+class NuevoPago(BaseModel):
+    creditos: int = Field(..., ge=1, le=10000)
+
+
+@router.post("/pagos/enlace")
+def enlace_pago(body: NuevoPago, claims: Claims) -> dict:
+    """Enlace de pago de Lemon con el email de la cuenta ya puesto. 503 si Lemon no está
+    configurado o no responde: la web usa entonces su enlace fijo (si lo tiene)."""
+    from src.editor_auto.rapido import lemon
+    try:
+        return {"url": lemon.crear_checkout(body.creditos, claims.email)}
+    except lemon.LemonError as e:
+        logger.warning("[rapido] sin enlace de pago para %s (%s créditos): %s", claims.email, body.creditos, e)
+        raise APIError("El pago no está disponible ahora mismo.", status_code=503)
+    except Exception as e:  # noqa: BLE001 — red caída, JSON raro…
+        logger.warning("[rapido] Lemon falló al crear el checkout: %s", e)
+        raise APIError("El pago no está disponible ahora mismo.", status_code=503)
+
+
 @router.post("/pagos/lemon")
 async def pago_lemon(request: Request, x_signature: Annotated[str | None, Header()] = None) -> dict:
     """Webhook de Lemon Squeezy (sin login): firma HMAC-SHA256 del cuerpo con

@@ -32,8 +32,11 @@ ATLASCLOUD_API_KEY=...
 # Detalle: nebulabs-media/docs/LEMON_SQUEEZY_EDITOR.md. Sin el secreto el webhook da 503.
 # EDITOR_LS_WEBHOOK_SECRET=...                      # el «signing secret» del webhook (HMAC-SHA256)
 # EDITOR_LS_TIENDA_ID=525143                        # ignora pedidos de otras tiendas
-# EDITOR_LS_VARIANTES={"2381430":25,"2381434":60,"2381437":150}   # variante → créditos
-# EDITOR_LS_API_KEY=...                             # solo para crear/ver el webhook por API
+# EDITOR_LS_VARIANTES={"2381430":25,...}           # opcional: variante → créditos (si no, por nombre)
+# EDITOR_LS_API_KEY=...                             # enlaces de pago con email (POST …/rapido/pagos/enlace) y webhook
+# EDITOR_LS_PACKS=25,60,150                         # opcional: packs reconocidos por NOMBRE («60 vídeos»), sin ids
+# EDITOR_LS_VUELTA=https://editor.nebulabsmedia.com/editor   # opcional: adónde vuelve tras pagar
+# Crear el webhook sin pasar el secreto por chat: python3 scripts/lemon_editor.py webhook [--live]
 
 # === Compartido entre programas ===
 OPENAI_API_KEY=...                   # Presidentes — guion JSON

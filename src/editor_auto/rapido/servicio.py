@@ -1180,8 +1180,12 @@ def procesar_lemon(evento: str, meta: dict, data: dict) -> dict:
         email = str((meta.get("custom_data") or {}).get("email") or attrs.get("user_email") or "").strip().lower()
         if "@" not in email:
             return {"accion": "ignorado", "motivo": "sin email"}
-        variante = str((attrs.get("first_order_item") or {}).get("variant_id") or "")
-        n = variantes_lemon().get(variante)
+        item = attrs.get("first_order_item") or {}
+        variante = str(item.get("variant_id") or "")
+        # Por id (EDITOR_LS_VARIANTES, opcional) o por el nombre del pack («60 vídeos»):
+        # el nombre sigue valiendo al copiar los productos a live, aunque cambien los ids.
+        from src.editor_auto.rapido.lemon import creditos_de_nombre
+        n = variantes_lemon().get(variante) or creditos_de_nombre(item.get("product_name"), item.get("variant_name"))
         if not n:
             logger.warning("[rapido] pedido %s de %s con variante desconocida %s", pid, email, variante)
             registrar_evento("pagos", email, "compra_sin_variante", {**datos_ev, "variante": variante})

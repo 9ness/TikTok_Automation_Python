@@ -848,3 +848,36 @@ def test_lemon_ignora_otra_tienda_variante_estado_y_evento(lemon):
     assert _lemon(lemon, "subscription_created").json()["accion"] == "ignorado"
     assert _lemon(lemon, "order_refunded", pid="77").json()["accion"] == "ignorado"
     assert _lemon(lemon, "order_created", pid="2", variante="2381437").json()["creditos"] == 150
+
+
+def test_lemon_creditos_por_nombre_sin_ids(lemon, monkeypatch):
+    from src.editor_auto.rapido import lemon as ls
+    assert ls.creditos_de_nombre("Pack 60 vídeos", None) == 60
+    assert ls.creditos_de_nombre("Editor 2026", "150 créditos") == 150
+    assert ls.creditos_de_nombre("Default") is None
+    monkeypatch.delenv("EDITOR_LS_VARIANTES")  # ids de live distintos: vale el nombre del pedido
+    import hashlib, hmac, json as _j
+    cuerpo = _j.dumps({"meta": {"event_name": "order_created", "custom_data": {"email": "n@x.com"}},
+                       "data": {"id": "5", "attributes": {"store_id": 525143, "status": "paid",
+                                "first_order_item": {"variant_id": 999, "product_name": "60 vídeos",
+                                                     "variant_name": "Default"}}}}).encode()
+    f = hmac.new(b"s" * 32, cuerpo, hashlib.sha256).hexdigest()
+    r = lemon.post("/api/v1/editor-auto/rapido/pagos/lemon", content=cuerpo, headers={"X-Signature": f})
+    assert r.json()["creditos"] == 60
+
+
+def test_lemon_enlace_de_pago(lemon, rapido, monkeypatch):
+    from src.editor_auto.rapido import lemon as ls
+    c, _, hdr = rapido
+    r = c.post("/api/v1/editor-auto/rapido/pagos/enlace", json={"creditos": 60}, headers=hdr)
+    assert r.status_code == 503  # sin EDITOR_LS_API_KEY
+    pedidos = []
+    monkeypatch.setattr(ls, "packs", lambda forzar=False: {60: {"variante": "77"}})
+    monkeypatch.setattr(ls, "_pedir", lambda m, ruta, **kw: pedidos.append(kw["cuerpo"]) or
+                        {"data": {"attributes": {"url": "https://pago/x"}}})
+    r = c.post("/api/v1/editor-auto/rapido/pagos/enlace", json={"creditos": 60}, headers=hdr)
+    assert r.status_code == 200 and r.json()["url"] == "https://pago/x"
+    d = pedidos[0]["data"]
+    assert d["relationships"]["variant"]["data"]["id"] == "77"
+    assert d["attributes"]["checkout_data"]["custom"]["email"] == d["attributes"]["checkout_data"]["email"]
+    assert c.post("/api/v1/editor-auto/rapido/pagos/enlace", json={"creditos": 25}, headers=hdr).status_code == 503
