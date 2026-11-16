@@ -100,8 +100,10 @@ def main() -> None:
             print(f"Ya existe el webhook {w['id']} (test={test}). No se toca.")
             return
     secreto = env.get("EDITOR_LS_WEBHOOK_SECRET", "")
+    if len(secreto) > 40:  # Lemon no admite más de 40 caracteres
+        secreto = ""
     if not secreto:
-        secreto = secrets.token_hex(32)
+        secreto = secrets.token_hex(20)  # 40 caracteres: el máximo de Lemon
         poner_env(a.env, "EDITOR_LS_WEBHOOK_SECRET", secreto)
         print("EDITOR_LS_WEBHOOK_SECRET generado y escrito en el .env (no se muestra).")
     w = pedir(clave, "POST", "/webhooks", cuerpo={"data": {
