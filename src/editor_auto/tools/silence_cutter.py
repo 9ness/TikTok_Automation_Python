@@ -831,6 +831,8 @@ class SilenceCutterTool:
                 log=ctx.on_log,
             )
             holistic_diag.update(hol_diag)
+            if hol_diag.get("sugeridos"):
+                diagnostic.setdefault("cortes_sugeridos", []).extend(hol_diag["sugeridos"])
             if hol_intervals:
                 holistic_ok = True
                 for s, e in hol_intervals:
@@ -1410,6 +1412,7 @@ class SilenceCutterTool:
         _write_edit_project(
             ctx, input_path=input_path, words=words,
             keep_intervals=keep_intervals, video_duration=video_duration,
+            sugeridos=diagnostic.get("cortes_sugeridos"),
         )
 
         total_cut_s = sum(b - a for a, b in merged_cuts)
@@ -2287,9 +2290,50 @@ class SilenceCutterTool:
                                             cs - 0.35 <= float(_s0) and float(_e0) <= ce + 0.35
                                             for cs, ce, _ in _in_cuts
                                         )
+                                    # Falso «missing» del alineado: la frase SÍ suena
+                                    # en el render nuevo («idea de», shorts 16/11).
+                                    _sw_out = f" {(_sw_audit.get('deep') or {}).get('out_text') or ''} "
+
+                                    _sw_toks = _sw_out.split()
+
+                                    def _suena(_m: dict) -> bool:
+                                        _t = str(_m.get("text") or "").strip()
+                                        if not _t:
+                                            return False
+                                        if f" {_t} " in _sw_out:
+                                            return True
+                                        # Ruido de la re-transcripción («mirar»/«mirad»,
+                                        # «una de»/«una idea de»): casi todas sus palabras
+                                        # suenan seguidas en el render → no falta nada.
+                                        _mt = _t.split()
+                                        if len(_mt) < 2:
+                                            return False
+                                        _w = len(_mt) + 3
+                                        for _ix in range(max(1, len(_sw_toks) - _w + 1)):
+                                            _win = _sw_toks[_ix:_ix + _w]
+                                            _hit = sum(
+                                                1 for _x in _mt
+                                                if any(_x == _y or (len(_x) >= 4 and _x[:4] == _y[:4]) for _y in _win)
+                                            )
+                                            if _hit >= max(2, 0.8 * len(_mt)):
+                                                return True
+                                        return False
+                                    def _en_keeps(_m: dict) -> bool:
+                                        # El audio de ese tramo sigue ENTERO en el render
+                                        # (el barrido no lo toca): si Whisper no lo oye igual
+                                        # («mirad es es», «que podéis ver»), es ruido suyo.
+                                        _s0, _e0 = _m.get("input_start"), _m.get("input_end")
+                                        if _s0 is None or _e0 is None:
+                                            return False
+                                        _s0, _e0 = float(_s0), float(_e0)
+                                        if _e0 <= _s0:
+                                            return False
+                                        _cub = sum(max(0.0, min(b, _e0) - max(a, _s0)) for a, b in _sw_keeps)
+                                        return _cub >= 0.9 * (_e0 - _s0)
                                     _unexpected = [
                                         _m for _m in ((_sw_audit.get("deep") or {}).get("missing_blocks") or [])
                                         if _missing_key(_m) not in _best_miss and not _within_sweep(_m)
+                                        and not _suena(_m) and not _en_keeps(_m)
                                     ]
                                     _safe = (
                                         isinstance(_sw_audit.get("quality_score"), int)
@@ -2323,9 +2367,24 @@ class SilenceCutterTool:
                                         )
                                     else:
                                         os.remove(_tmp_sw)
+                                        diagnostic["barrido_descartado"] = {
+                                            "faltaria": _unexpected, "out_text": _sw_out.strip(),
+                                        }
+                                        # Detectado pero no aplicado → corte SUGERIDO
+                                        # para que el usuario decida en el retoque.
+                                        diagnostic.setdefault("cortes_sugeridos", []).extend(
+                                            {"start": round(float(a), 3), "end": round(float(b), 3),
+                                             "text": str(w), "motivo": "barrido"}
+                                            for a, b, w in _in_cuts
+                                        )
                                         ctx.on_log(
                                             "[silence_cutter] 🧹 Barrido DESCARTADO (rompería "
-                                            "coherencia o perdería contenido fuera del restart)."
+                                            "coherencia o perdería contenido fuera del restart): "
+                                            f"faltaría={[str(_m.get('text') or '')[:40] for _m in _unexpected]} · "
+                                            f"coherencia {_count_coherence_fallos(_sw_audit)} vs "
+                                            f"{_count_coherence_fallos(best_audit)} · "
+                                            f"score={_sw_audit.get('quality_score')} · "
+                                            f"transcripcion_ok={_sw_audit.get('transcription_ok', True)}"
                                         )
                                 except Exception as _e:  # noqa: BLE001
                                     try:
@@ -2340,6 +2399,17 @@ class SilenceCutterTool:
             keep_intervals = best_keeps
             audit = best_audit
             diagnostic["audit"] = audit
+            if diagnostic.get("cortes_sugeridos"):
+                diagnostic["cortes_sugeridos"] = _sugeridos_vigentes(
+                    diagnostic["cortes_sugeridos"], keep_intervals,
+                )
+            # El barrido cambia los keeps tras escribir el proyecto editable:
+            # reescribirlo para que el retoque parta del vídeo REAL entregado.
+            _write_edit_project(
+                ctx, input_path=input_path, words=words,
+                keep_intervals=keep_intervals, video_duration=video_duration,
+                sugeridos=diagnostic.get("cortes_sugeridos"),
+            )
 
             # APRENDIZAJE: si tras todo quedó un defecto de SENTIDO confirmado y
             # grave, escríbelo como lección → el motor no lo repetirá en los
@@ -2389,9 +2459,14 @@ class SilenceCutterTool:
                     {"start": round(s, 3), "end": round(e, 3)}
                     for s, e in keep_intervals[:20]
                 ]
+                if diagnostic.get("cortes_sugeridos"):
+                    diagnostic["cortes_sugeridos"] = _sugeridos_vigentes(
+                        diagnostic["cortes_sugeridos"], keep_intervals,
+                    )
                 _write_edit_project(
                     ctx, input_path=input_path, words=words,
                     keep_intervals=keep_intervals, video_duration=video_duration,
+                    sugeridos=diagnostic.get("cortes_sugeridos"),
                 )
                 ctx.on_log(
                     f"[silence_cutter] 🩹 Auto-corrección: {len(heal_hist)} intento(s) "
@@ -2465,9 +2540,31 @@ class SilenceCutterTool:
         return output_path
 
 
+def _sugeridos_vigentes(
+    sugeridos: list[dict] | None, keep_intervals: list[tuple[float, float]],
+) -> list[dict]:
+    """Quita los cortes sugeridos que el vídeo final ya no conserva (≥50 % de su
+    duración fuera de los keeps): p. ej. un barrido descartado que luego se
+    aplicó en una 2ª pasada. Sugerir borrar algo ya borrado confunde."""
+    out: list[dict] = []
+    for sg in sugeridos or []:
+        try:
+            a, b = float(sg["start"]), float(sg["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        dur = b - a
+        if dur <= 0:
+            continue
+        dentro = sum(max(0.0, min(b, e) - max(a, s)) for s, e in keep_intervals)
+        if dentro / dur >= 0.5:
+            out.append(sg)
+    return out
+
+
 def _write_edit_project(
     ctx, *, input_path: str, words: list[dict],
     keep_intervals: list[tuple[float, float]], video_duration: float,
+    sugeridos: list[dict] | None = None,
 ) -> None:
     """Persiste el 'proyecto editable' (retoque manual) en `temp_folder`.
 
@@ -2493,6 +2590,9 @@ def _write_edit_project(
                 for i, w in enumerate(words)
                 if "start" in w and "end" in w
             ],
+            # Cortes detectados y NO aplicados (tiempo de input): el editor
+            # rápido los enseña como sugerencia.
+            "sugeridos": list(sugeridos or []),
         }
         out = Path(ctx.temp_folder) / f"editproject_{ctx.job_id}.json"
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -4001,7 +4101,10 @@ def _ai_holistic_clean_removes(
 
         # Red de seguridad: nunca perder contenido ÚNICO (ingredientes, datos,
         # nombres) que el holístico haya decidido cortar por error.
-        final_keep, n_unique = _protect_unique_content(words, final_keep)
+        _sug: list[dict] = []
+        final_keep, n_unique = _protect_unique_content(words, final_keep, _sug)
+        if _sug:
+            diag["sugeridos"] = _sug
         if n_unique:
             diag["unique_content_protected"] = n_unique
             diag["kept_words"] = len(final_keep)
@@ -6988,6 +7091,7 @@ def _protect_words_from_acoustic_cuts(
 def _protect_unique_content(
     words: list[dict],
     keep: set[int],
+    sugeridos: list[dict] | None = None,
 ) -> tuple[set[int], int]:
     """Red de seguridad anti-OVER-CUT del holístico. Si un tramo ELIMINADO
     contiene una palabra de CONTENIDO ÚNICA en toda la transcripción (nombre/
@@ -7026,9 +7130,41 @@ def _protect_unique_content(
         while j < n and j not in keep:
             j += 1
         if any(_is_unique_content(norm[k]) for k in range(i, j)):
+            # RE-TOMA: si el contenido del tramo se repite casi igual justo después
+            # («Chicas, ¿cómo son estos shorts…? Chicas, ¿cómo son estos
+            # pantaloncitos cortos…?», 16/11) la palabra «única» es solo la
+            # variante del arranque abandonado → no se re-anexa. Puerta estrecha:
+            # ≥2 palabras de contenido del tramo y ≥60 % de ellas en las
+            # siguientes palabras conservadas.
+            cont = [norm[k] for k in range(i, j)
+                    if len(norm[k]) >= 4 and norm[k] not in _AUDIT_STOPWORDS
+                    and norm[k] not in _FILLER_TOKENS]
+            ventana: set[str] = set()
+            k2 = j
+            while k2 < n and len(ventana) < len(cont) + 10:
+                if k2 in keep and norm[k2]:
+                    ventana.add(norm[k2])
+                k2 += 1
+            comunes = sum(1 for t in cont if t in ventana)
+            if len(cont) >= 2 and comunes >= 2 and comunes >= 0.6 * len(cont):
+                i = j
+                continue
             for k in range(i, j):
                 keep.add(k)
             added += 1
+            # La IA lo quería quitar: se ofrece al usuario como corte sugerido
+            # (solo trozos cortos: un tramo largo de contenido único es un
+            # sobrecorte del holístico, no una repetición que sobre).
+            if sugeridos is not None and (j - i) <= 14:
+                try:
+                    sugeridos.append({
+                        "start": round(float(words[i]["start"]), 3),
+                        "end": round(float(words[j - 1]["end"]), 3),
+                        "text": " ".join(str(words[k].get("word", "")).strip() for k in range(i, j)),
+                        "motivo": "ia",
+                    })
+                except (KeyError, ValueError, TypeError):
+                    pass
         i = j
     return keep, added
 

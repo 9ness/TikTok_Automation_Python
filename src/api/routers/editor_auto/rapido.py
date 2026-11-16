@@ -126,6 +126,7 @@ def _admin_o_403(claims: TicketClaims) -> None:
 
 class Retoque(BaseModel):
     devueltos: list[int] = Field(default_factory=list, description="Ids de cortes que se devuelven al vídeo")
+    aplicados: list[int] = Field(default_factory=list, description="Ids de cortes SUGERIDOS que se aplican")
 
 
 class Valoracion(BaseModel):
@@ -191,7 +192,8 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
         }
     if detalle and ficha["estado"] == "listo":
         v["cortes"] = [
-            {**c, "devuelto": c["id"] in set(ficha.get("devueltos") or [])}
+            {**c, "devuelto": c["id"] in set(ficha.get("devueltos") or []),
+             "aplicado": c["id"] in set(ficha.get("aplicados") or [])}
             for c in svc.leer_cortes(ficha["id"])
         ]
     return v
@@ -416,15 +418,20 @@ def retocar(vid: str, body: Retoque, claims: Claims, queue: Annotated[JobQueue, 
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] != "listo":
         raise APIError("El vídeo aún no está listo para retocar.", status_code=409)
-    validos = {c["id"] for c in svc.leer_cortes(vid)}
+    cortes = svc.leer_cortes(vid)
+    validos = {c["id"] for c in cortes if c.get("tipo") != "sugerido"}
+    sugeridos = {c["id"] for c in cortes if c.get("tipo") == "sugerido"}
     pedidos = set(body.devueltos)
-    if not pedidos <= validos:
-        raise ValidationError("Hay cortes que no existen.", details={"desconocidos": sorted(pedidos - validos)})
-    if pedidos == set(ficha.get("devueltos") or []):
+    aplicar = set(body.aplicados)
+    if not pedidos <= validos or not aplicar <= sugeridos:
+        raise ValidationError("Hay cortes que no existen.", details={
+            "desconocidos": sorted((pedidos - validos) | (aplicar - sugeridos))})
+    if pedidos == set(ficha.get("devueltos") or []) and aplicar == set(ficha.get("aplicados") or []):
         raise APIError("No hay cambios que aplicar.", status_code=409)
     job = queue.enqueue(
         JobMode.EDITOR_RAPIDO, title=f"Rápido (retoque) · {ficha['nombre'][:40]}",
-        params={"video_id": vid, "modo": "retoque", "devueltos": sorted(pedidos), "user_name": claims.email},
+        params={"video_id": vid, "modo": "retoque", "devueltos": sorted(pedidos),
+                "aplicados": sorted(aplicar), "user_name": claims.email},
         enqueued_by=claims.email,
     )
     previos = set(ficha.get("devueltos") or [])
@@ -433,7 +440,8 @@ def retocar(vid: str, body: Retoque, claims: Claims, queue: Annotated[JobQueue, 
     svc.guardar_ficha(ficha)
     svc.registrar_evento(vid, claims.email, "retocar", {
         "devueltos": sorted(pedidos), "nuevos_devueltos": sorted(pedidos - previos),
-        "re_aplicados": sorted(previos - pedidos), "n_cortes": len(validos)})
+        "re_aplicados": sorted(previos - pedidos), "sugeridos_aplicados": sorted(aplicar),
+        "n_cortes": len(validos)})
     return {"ok": True, "job_id": job.id}
 
 

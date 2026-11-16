@@ -354,6 +354,7 @@ def nueva_ficha(email: str, nombre: str, duracion_s: float, bytes_: int) -> dict
         "cobrado": False, "devuelto": False,
         "duracion_final_s": None, "error": None, "version": 0,
         "devueltos": [],  # ids de cortes que el usuario ha devuelto
+        "aplicados": [],  # ids de cortes SUGERIDOS que el usuario ha aplicado
     }
     guardar_ficha(ficha)
     get_editor_redis().sadd(_k_lista(email), vid)
@@ -670,13 +671,13 @@ def guardar_dataset(ficha: dict) -> Path | None:
                     return None
                 shutil.copy2(orig, dst)
         cortes = leer_cortes(vid)
-        devueltos = set(ficha.get("devueltos") or [])
         (destino / "cortes.json").write_text(json.dumps(cortes, ensure_ascii=False), encoding="utf-8")
         (destino / "cortes_finales.json").write_text(
-            json.dumps([c for c in cortes if c["id"] not in devueltos], ensure_ascii=False), encoding="utf-8")
+            json.dumps(cortes_activos(cortes, set(ficha.get("devueltos") or []), set(ficha.get("aplicados") or [])),
+                       ensure_ascii=False), encoding="utf-8")
         (destino / "eventos.json").write_text(json.dumps(leer_eventos(vid), ensure_ascii=False), encoding="utf-8")
         meta = {k: ficha.get(k) for k in ("id", "email", "nombre", "duracion_s", "duracion_final_s", "ajustes",
-                                          "estado", "devueltos", "nota", "comentario", "n_cortes", "proceso_s",
+                                          "estado", "devueltos", "aplicados", "nota", "comentario", "n_cortes", "proceso_s",
                                           "descargas", "creado")}
         meta["calidad"] = calidad(ficha)
         (destino / "ficha.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
@@ -771,12 +772,38 @@ def calcular_cortes(proyecto: dict) -> list[dict]:
             "duracion": round(b - a, 2), "texto": txt,
             "tipo": "palabras" if txt else "silencio",
         })
+    # Detectados por el cortador y NO aplicados (repetición dudosa): se ofrecen en
+    # la línea de tiempo y el usuario decide. Se omiten los ya cortados casi enteros.
+    for s in proyecto.get("sugeridos") or []:
+        try:
+            a, b = float(s["start"]), min(float(s["end"]), dur or float(s["end"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if b - a < MIN_CORTE_S:
+            continue
+        ya = sum(max(0.0, min(b, y) - max(a, x)) for x, y in huecos)
+        if ya >= 0.7 * (b - a) or any(abs(c["inicio"] - a) < 0.1 and abs(c["fin"] - b) < 0.1
+                                      for c in cortes if c["tipo"] == "sugerido"):
+            continue
+        cortes.append({
+            "id": len(cortes), "inicio": round(a, 2), "fin": round(b, 2),
+            "duracion": round(b - a, 2), "texto": str(s.get("text") or "").strip(),
+            "tipo": "sugerido",
+        })
     return cortes
 
 
-def tramos_a_conservar(duracion: float, cortes: list[dict], devueltos: set[int]) -> list[tuple[float, float]]:
-    """Complemento de los cortes que siguen aplicados (los devueltos se quedan)."""
-    activos = sorted((c["inicio"], c["fin"]) for c in cortes if c["id"] not in devueltos)
+def cortes_activos(cortes: list[dict], devueltos: set[int], aplicados: set[int] | None = None) -> list[dict]:
+    """Cortes que quedan aplicados: los normales no devueltos y los sugeridos aplicados."""
+    aplicados = aplicados or set()
+    return [c for c in cortes
+            if (c["id"] in aplicados if c.get("tipo") == "sugerido" else c["id"] not in devueltos)]
+
+
+def tramos_a_conservar(duracion: float, cortes: list[dict], devueltos: set[int],
+                       aplicados: set[int] | None = None) -> list[tuple[float, float]]:
+    """Complemento de los cortes que siguen aplicados (los devueltos se quedan; los sugeridos, solo si se aplican)."""
+    activos = sorted((c["inicio"], c["fin"]) for c in cortes_activos(cortes, devueltos, aplicados))
     keeps, cursor = [], 0.0
     for a, b in activos:
         if a > cursor:
@@ -801,8 +828,8 @@ def resumen(ficha: dict) -> dict | None:
     """Qué se quitó: nº de cortes aplicados y segundos, a partir de cortes.json y la ficha."""
     if ficha.get("estado") != "listo":
         return None
-    devueltos = set(ficha.get("devueltos") or [])
-    activos = [c for c in leer_cortes(ficha["id"]) if c["id"] not in devueltos]
+    activos = cortes_activos(leer_cortes(ficha["id"]), set(ficha.get("devueltos") or []),
+                             set(ficha.get("aplicados") or []))
     orig = float(ficha.get("duracion_s") or 0.0)
     final = ficha.get("duracion_final_s")
     quitados = sum(float(c["duracion"]) for c in activos)
@@ -1034,6 +1061,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                 cortes = leer_cortes(vid)
                 keeps = tramos_a_conservar(
                     float(ficha["duracion_s"]), cortes, set(job.params.get("devueltos") or []),
+                    set(job.params.get("aplicados") or []),
                 )
                 cfg["manual_keep_intervals"] = [[a, b] for a, b in keeps]
             SilenceCutterTool().run(
@@ -1047,7 +1075,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                 if proyecto.exists():
                     cortes = calcular_cortes(json.loads(proyecto.read_text(encoding="utf-8")))
                 (carp / "cortes.json").write_text(json.dumps(cortes, ensure_ascii=False), encoding="utf-8")
-                n_cortes = len(cortes)
+                n_cortes = sum(1 for c in cortes if c["tipo"] != "sugerido")
                 proyecto.unlink(missing_ok=True)
             os.replace(salida, cortado)
             ruta_palabras(vid).unlink(missing_ok=True)  # corte nuevo → tiempos nuevos
@@ -1073,6 +1101,9 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
         ficha["aviso"] = " ".join(avisos) or None
         if modo == "retoque":
             ficha["devueltos"] = sorted(set(job.params.get("devueltos") or []))
+            ficha["aplicados"] = sorted(set(job.params.get("aplicados") or []))
+        elif modo == "auto":
+            ficha["devueltos"], ficha["aplicados"] = [], []
         if n_cortes is not None:
             ficha["n_cortes"] = n_cortes
         ficha["proceso_s"] = round(time.time() - t_ini, 1)

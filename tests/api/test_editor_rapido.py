@@ -181,6 +181,27 @@ def test_calcular_cortes_con_texto():
     assert keeps == [(0.5, 9.0)]
 
 
+def test_cortes_sugeridos():
+    proy = {
+        "video_duration_s": 10.0,
+        "keep_intervals": [[0.5, 3.0], [4.0, 9.0]],
+        "words": [{"idx": 0, "word": "hola", "start": 1.0, "end": 1.4}],
+        "sugeridos": [
+            {"start": 5.0, "end": 6.0, "text": "chicas cómo son", "motivo": "ia"},
+            {"start": 3.0, "end": 3.9, "text": "ya cortado", "motivo": "barrido"},  # ya quitado → fuera
+            {"start": 5.0, "end": 6.0, "text": "chicas cómo son", "motivo": "barrido"},  # duplicado → fuera
+        ],
+    }
+    cortes = svc.calcular_cortes(proy)
+    sug = [c for c in cortes if c["tipo"] == "sugerido"]
+    assert len(sug) == 1 and sug[0]["id"] == 3 and sug[0]["texto"] == "chicas cómo son"
+    # sin aplicar: el sugerido se queda en el vídeo
+    assert svc.tramos_a_conservar(10.0, cortes, set()) == [(0.5, 3.0), (4.0, 9.0)]
+    # aplicado: se corta
+    assert svc.tramos_a_conservar(10.0, cortes, set(), {3}) == [(0.5, 3.0), (4.0, 5.0), (6.0, 9.0)]
+    assert len(svc.cortes_activos(cortes, {0}, {3})) == 3
+
+
 def test_runner_auto_y_retoque_y_descarga(rapido, monkeypatch):
     c, q, hdr = rapido
     vid = _subir(c, hdr).json()["id"]
