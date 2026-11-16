@@ -27,6 +27,14 @@ ATLASCLOUD_API_KEY=...
 # FAL_API_KEY=...
 # FAL_POLL_TIMEOUT_S=1800                                # default 30 min
 
+# === Programa 3 — Editor rápido (editor.nebulabsmedia.com): cobro con Lemon Squeezy ===
+# Webhook POST /api/v1/editor-auto/rapido/pagos/lemon (order_created/order_refunded).
+# Detalle: nebulabs-media/docs/LEMON_SQUEEZY_EDITOR.md. Sin el secreto el webhook da 503.
+# EDITOR_LS_WEBHOOK_SECRET=...                      # el «signing secret» del webhook (HMAC-SHA256)
+# EDITOR_LS_TIENDA_ID=525143                        # ignora pedidos de otras tiendas
+# EDITOR_LS_VARIANTES={"2381430":25,"2381434":60,"2381437":150}   # variante → créditos
+# EDITOR_LS_API_KEY=...                             # solo para crear/ver el webhook por API
+
 # === Compartido entre programas ===
 OPENAI_API_KEY=...                   # Presidentes — guion JSON
 MINIMAX_API_KEY=...                  # TTS — los 3 nichos CR + TikTok Shop

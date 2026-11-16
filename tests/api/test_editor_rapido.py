@@ -795,3 +795,56 @@ def test_preferencias_guardar_y_leer(rapido):
     assert p["guardado"] and p["preferencias"]["ritmo"] == "sin_pausas"
     assert p["preferencias"]["flecha"] == {"activo": True, "id": "auto"}
     assert c.put(f"{BASE}/preferencias", headers=hdr, json={"ritmo": "loco"}).status_code == 422
+
+
+# ── Webhook de Lemon Squeezy ────────────────────────────────────────────────
+
+def _lemon(c, evento, pid="9001", *, email="compra@x.com", variante="2381430", estado="paid",
+           tienda="525143", secreto="s" * 32, firma=None):
+    import hashlib, hmac, json as _j
+    cuerpo = _j.dumps({"meta": {"event_name": evento, "custom_data": {"email": email}},
+                       "data": {"id": pid, "attributes": {"store_id": int(tienda), "status": estado,
+                                                           "user_email": "otro@x.com", "total": 900,
+                                                           "first_order_item": {"variant_id": int(variante)}}}}).encode()
+    f = firma if firma is not None else hmac.new(secreto.encode(), cuerpo, hashlib.sha256).hexdigest()
+    return c.post("/api/v1/editor-auto/rapido/pagos/lemon", content=cuerpo,
+                  headers={"X-Signature": f, "Content-Type": "application/json"})
+
+
+@pytest.fixture
+def lemon(rapido, monkeypatch):
+    monkeypatch.setenv("EDITOR_LS_WEBHOOK_SECRET", "s" * 32)
+    monkeypatch.setenv("EDITOR_LS_TIENDA_ID", "525143")
+    monkeypatch.setenv("EDITOR_LS_VARIANTES", '{"2381430":25,"2381434":60,"2381437":150}')
+    return rapido[0]
+
+
+def test_lemon_firma_mala_401_y_sin_secreto_503(lemon, monkeypatch):
+    assert _lemon(lemon, "order_created", firma="00" * 32).status_code == 401
+    assert _lemon(lemon, "order_created", firma="").status_code == 401
+    monkeypatch.delenv("EDITOR_LS_WEBHOOK_SECRET")
+    assert _lemon(lemon, "order_created").status_code == 503
+    assert svc.get_editor_redis().get_json("rapido:saldo:compra@x.com") is None
+
+
+def test_lemon_compra_suma_una_vez_y_reembolso_resta(lemon):
+    base = svc.saldo("compra@x.com")["creditos"]
+    r = _lemon(lemon, "order_created")
+    assert r.status_code == 200 and r.json()["accion"] == "sumado"
+    assert "email" not in r.json()
+    assert svc.saldo("compra@x.com")["creditos"] == base + 25
+    assert _lemon(lemon, "order_created").json()["accion"] == "repetido"  # reintento de Lemon
+    assert svc.saldo("compra@x.com")["creditos"] == base + 25
+    assert _lemon(lemon, "order_refunded").json()["accion"] == "restado"
+    assert _lemon(lemon, "order_refunded").json()["accion"] == "repetido"
+    assert svc.saldo("compra@x.com")["creditos"] == base
+    assert [e["tipo"] for e in svc.leer_eventos("pagos")] == ["compra", "reembolso"]
+
+
+def test_lemon_ignora_otra_tienda_variante_estado_y_evento(lemon):
+    assert _lemon(lemon, "order_created", tienda="1").json()["accion"] == "ignorado"
+    assert _lemon(lemon, "order_created", variante="1").json()["accion"] == "ignorado"
+    assert _lemon(lemon, "order_created", estado="pending").json()["accion"] == "ignorado"
+    assert _lemon(lemon, "subscription_created").json()["accion"] == "ignorado"
+    assert _lemon(lemon, "order_refunded", pid="77").json()["accion"] == "ignorado"
+    assert _lemon(lemon, "order_created", pid="2", variante="2381437").json()["creditos"] == 150

@@ -1136,3 +1136,78 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                               else "No se pudo cambiar el estilo: ") + str(e)[:200]
             guardar_ficha(ficha)
         raise
+
+
+# ── Pagos de Lemon Squeezy (webhook) ─────────────────────────────────────────
+# Cada pedido se guarda en `editor_rapido:ls_pedido:<id>` (email, créditos, reembolsado):
+# Lemon reintenta los webhooks y así nunca se suma dos veces; el reembolso resta lo mismo.
+
+def _k_pedido(pid: str) -> str:
+    return f"editor_rapido:ls_pedido:{pid}"
+
+
+def variantes_lemon() -> dict[str, float]:
+    """`EDITOR_LS_VARIANTES` = JSON {"<variant_id>": créditos}. Vacío si no está o está mal."""
+    try:
+        d = json.loads(os.getenv("EDITOR_LS_VARIANTES", "") or "{}")
+        return {str(k): float(v) for k, v in d.items() if float(v) > 0}
+    except (ValueError, TypeError, AttributeError):
+        logger.warning("[rapido] EDITOR_LS_VARIANTES no es un JSON válido")
+        return {}
+
+
+def procesar_lemon(evento: str, meta: dict, data: dict) -> dict:
+    """Aplica un webhook YA FIRMADO de Lemon. Devuelve qué se hizo (para el log y la respuesta).
+
+    order_created (pagado) → suma los créditos de la variante; order_refunded → los resta.
+    Nunca lanza por datos raros: devuelve {"accion": "ignorado", "motivo": ...}."""
+    attrs = data.get("attributes") or {}
+    tienda = os.getenv("EDITOR_LS_TIENDA_ID", "").strip()
+    if tienda and str(attrs.get("store_id", "")) != tienda:
+        return {"accion": "ignorado", "motivo": "otra tienda"}
+    if evento not in ("order_created", "order_refunded"):
+        return {"accion": "ignorado", "motivo": f"evento {evento}"}
+    pid = str(data.get("id") or "").strip()
+    if not pid:
+        return {"accion": "ignorado", "motivo": "sin id de pedido"}
+    r = get_editor_redis()
+    datos_ev = {"pedido": pid, "total": attrs.get("total_formatted") or attrs.get("total"),
+                "prueba": bool(attrs.get("test_mode") or meta.get("test_mode"))}
+
+    if evento == "order_created":
+        if attrs.get("status") != "paid":
+            return {"accion": "ignorado", "motivo": f"estado {attrs.get('status')}"}
+        email = str((meta.get("custom_data") or {}).get("email") or attrs.get("user_email") or "").strip().lower()
+        if "@" not in email:
+            return {"accion": "ignorado", "motivo": "sin email"}
+        variante = str((attrs.get("first_order_item") or {}).get("variant_id") or "")
+        n = variantes_lemon().get(variante)
+        if not n:
+            logger.warning("[rapido] pedido %s de %s con variante desconocida %s", pid, email, variante)
+            registrar_evento("pagos", email, "compra_sin_variante", {**datos_ev, "variante": variante})
+            return {"accion": "ignorado", "motivo": f"variante {variante} desconocida"}
+        with _LOCK:
+            if r.get_json(_k_pedido(pid)) is not None:
+                return {"accion": "repetido", "pedido": pid}
+            r.set_json(_k_pedido(pid), {"email": email, "creditos": n, "variante": variante,
+                                        "t": time.time(), "reembolsado": False})
+        saldo_nuevo = ajustar_creditos(email, n, recarga=True)
+        registrar_evento("pagos", email, "compra", {**datos_ev, "variante": variante, "creditos": cr(n)})
+        logger.info("[rapido] compra %s: +%s créditos a %s", pid, cr(n), email)
+        return {"accion": "sumado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}
+
+    # order_refunded
+    with _LOCK:
+        p = r.get_json(_k_pedido(pid))
+        if not p:
+            return {"accion": "ignorado", "motivo": "reembolso de un pedido que no sumó"}
+        if p.get("reembolsado"):
+            return {"accion": "repetido", "pedido": pid}
+        p["reembolsado"] = True
+        p["t_reembolso"] = time.time()
+        r.set_json(_k_pedido(pid), p)
+    email, n = p["email"], float(p.get("creditos") or 0)
+    saldo_nuevo = ajustar_creditos(email, -n)
+    registrar_evento("pagos", email, "reembolso", {**datos_ev, "creditos": cr(n)})
+    logger.info("[rapido] reembolso %s: -%s créditos a %s", pid, cr(n), email)
+    return {"accion": "restado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}

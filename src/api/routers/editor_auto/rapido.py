@@ -10,7 +10,11 @@ Créditos: 1 = 1 vídeo (hasta 5 min gasta 1, hasta 10 min gasta 2). V1 sin pago
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
+import os
 import re
 import time
 from typing import Annotated
@@ -594,6 +598,31 @@ def admin_cuentas(claims: Claims) -> dict:
     """Cuentas con saldo y nº de vídeos (solo rol admin del ticket)."""
     _admin_o_403(claims)
     return {"cuentas": svc.listar_cuentas()}
+
+
+@router.post("/pagos/lemon")
+async def pago_lemon(request: Request, x_signature: Annotated[str | None, Header()] = None) -> dict:
+    """Webhook de Lemon Squeezy (sin login): firma HMAC-SHA256 del cuerpo con
+    `EDITOR_LS_WEBHOOK_SECRET`. Con firma buena responde 200 aunque no aplique nada
+    (si no, Lemon reintentaría sin fin)."""
+    secreto = os.getenv("EDITOR_LS_WEBHOOK_SECRET", "")
+    cuerpo = await request.body()
+    if not secreto:
+        logger.error("[rapido] webhook de Lemon sin EDITOR_LS_WEBHOOK_SECRET")
+        raise APIError("Webhook no configurado.", status_code=503)
+    firma = hmac.new(secreto.encode(), cuerpo, hashlib.sha256).hexdigest()
+    if not x_signature or not hmac.compare_digest(firma, x_signature.strip()):
+        raise UnauthorizedError("Firma no válida.")
+    try:
+        d = json.loads(cuerpo)
+        meta, data = d.get("meta") or {}, d.get("data") or {}
+        evento = str(meta.get("event_name") or "")
+    except (ValueError, AttributeError):
+        logger.warning("[rapido] webhook de Lemon con cuerpo no JSON")
+        return {"ok": True, "accion": "ignorado", "motivo": "cuerpo no válido"}
+    res = svc.procesar_lemon(evento, meta, data)
+    logger.info("[rapido] webhook Lemon %s → %s", evento, res)
+    return {"ok": True, **{k: v for k, v in res.items() if k != "email"}}
 
 
 @router.post("/admin/dar")
