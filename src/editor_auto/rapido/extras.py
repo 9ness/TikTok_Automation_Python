@@ -28,9 +28,9 @@ MODOS: dict[str, dict[str, Any]] = {
                "desde_creditos": 1, "solo_admin": False, "disponible": True},
     "replica": {"nombre": "Réplica", "descripcion": "Pega un viral de TikTok y copia su edición en tu vídeo.",
                 "desde_creditos": 3, "solo_admin": True, "disponible": True},
-    "conversacion": {"nombre": "Conversación",
-                     "descripcion": "Para vídeos de dos o más personas: un color de subtítulos para cada una. "
-                                    "Si haces tú de dos con el móvil fijo, os junta a los dos en el plano.",
+    "conversacion": {"nombre": "Varias personas",
+                     "descripcion": "Para cuando te duplicas y haces de varios personajes con el móvil fijo, "
+                                    "o habláis dos o más: os junta en el plano y cada uno lleva su color de subtítulos.",
                      "desde_creditos": 2, "solo_admin": True, "disponible": True},
 }
 
