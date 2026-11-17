@@ -505,7 +505,9 @@ def referido(email: str) -> dict:
             r.set_json(_k_ref_codigo(codigo), {"email": email})
             d = {"codigo": codigo, "ganados": 0}
             r.set_json(_k_ref_email(email), d)
-    return {"codigo": d["codigo"], "enlace": f"{URL_REF}?ref={d['codigo']}", "ganados": cr(d.get("ganados", 0))}
+    return {"codigo": d["codigo"], "enlace": f"{URL_REF}?ref={d['codigo']}", "ganados": cr(d.get("ganados", 0)),
+            # créditos que gana CADA uno (dueño y comprador) según el pack que se compra
+            "tabla": [{"pack": int(k), "creditos": v} for k, v in REFERIDO_CREDITOS.items()]}
 
 
 def dueno_de_codigo(codigo: Any) -> str | None:
@@ -1450,7 +1452,7 @@ def _abonar_pedido(pid: str, email: str, n: float, variante: str, datos_ev: dict
 
 
 def _abonar_referido(pid: str, comprador: str, variante: str, ref: str, datos_ev: dict) -> None:
-    """Suma al dueño del código la cantidad FIJA de su pack. Solo se llama la primera vez que se abona el pedido.
+    """Suma al dueño del código y al comprador la cantidad FIJA de su pack. Solo se llama la primera vez que se abona el pedido.
     Revalida (la metadata del checkout podría estar manipulada): código existente y dueño ≠ comprador."""
     try:
         dueno = dueno_de_codigo(ref)
@@ -1461,12 +1463,16 @@ def _abonar_referido(pid: str, comprador: str, variante: str, ref: str, datos_ev
         r = get_editor_redis()
         with _LOCK:
             p = r.get_json(_k_pedido(pid)) or {}
-            p.update({"ref": normalizar_codigo(ref), "ref_email": dueno, "ref_creditos": n})
+            p.update({"ref": normalizar_codigo(ref), "ref_email": dueno, "ref_creditos": n, "ref_comprador_creditos": n})
             r.set_json(_k_pedido(pid), p)
         ajustar_creditos(dueno, n, recarga=True)
         _sumar_ganados(dueno, n)
         registrar_evento("pagos", dueno, "referido", {**datos_ev, "comprador": comprador, "creditos": cr(n)})
         registrar_movimiento(dueno, f"Referido: +{cr(n)}", n)
+        # El que pone el código gana lo mismo que el dueño (Néstor, 17/11/2026).
+        ajustar_creditos(comprador, n, recarga=True)
+        registrar_evento("pagos", comprador, "bono_codigo", {**datos_ev, "codigo_de": dueno, "creditos": cr(n)})
+        registrar_movimiento(comprador, f"Bono por código: +{cr(n)}", n)
         logger.info("[rapido] referido %s: +%s créditos a %s", pid, cr(n), dueno)
     except Exception as e:  # noqa: BLE001 — el referido nunca rompe la compra
         logger.warning("[rapido] no se pudo abonar el referido del pedido %s: %s", pid, e)
@@ -1555,5 +1561,10 @@ def _reembolsar_pedido(pid: str, datos_ev: dict) -> dict:
         _sumar_ganados(dueno, -nr)
         registrar_evento("pagos", dueno, "referido_devuelto", {**datos_ev, "comprador": email, "creditos": cr(nr)})
         registrar_movimiento(dueno, f"Referido devuelto: −{cr(nr)}", -nr)
+    nb = float(p.get("ref_comprador_creditos") or 0)
+    if nb:  # el bono del comprador por usar el código
+        ajustar_creditos(email, -nb)
+        registrar_evento("pagos", email, "bono_codigo_devuelto", {**datos_ev, "creditos": cr(nb)})
+        registrar_movimiento(email, f"Bono por código devuelto: −{cr(nb)}", -nb)
     logger.info("[rapido] reembolso %s: -%s créditos a %s", pid, cr(n), email)
     return {"accion": "restado", "pedido": pid, "email": email, "creditos": cr(n), "saldo": saldo_nuevo}

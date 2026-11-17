@@ -1027,8 +1027,9 @@ def test_referido_abona_al_dueno_una_vez(polar):
     base_d, base_c = svc.saldo("dueno@x.com")["creditos"], svc.saldo("p@x.com")["creditos"]
     assert _polar(polar, ref=cod).json()["accion"] == "sumado"
     assert _polar(polar, wid="msg_2", ref=cod).json()["accion"] == "repetido"  # reintento
-    assert svc.saldo("p@x.com")["creditos"] == base_c + 60
+    assert svc.saldo("p@x.com")["creditos"] == base_c + 60 + 15  # el comprador gana lo mismo
     assert svc.saldo("dueno@x.com")["creditos"] == base_d + 15  # tabla fija: pack 60 → 15
+    assert svc.historial("p@x.com")["movimientos"][0]["texto"] == "Bono por código: +15"
     assert svc.referido("dueno@x.com")["ganados"] == 15
     p = svc.get_editor_redis().get_json(svc._k_pedido("ord-1"))
     assert p["ref_email"] == "dueno@x.com" and p["ref_creditos"] == 15
@@ -1045,7 +1046,7 @@ def test_referido_tabla_fija_por_pack(polar):
 
 def test_referido_devuelto_en_reembolso(polar):
     cod = _codigo_de("dueno@x.com")
-    base = svc.saldo("dueno@x.com")["creditos"]
+    base, base_c = svc.saldo("dueno@x.com")["creditos"], svc.saldo("p@x.com")["creditos"]
     _polar(polar, oid="r1", ref=cod)
     assert _polar(polar, oid="r1", tipo="order.refunded", estado="partially_refunded", wid="m2").json()["accion"] == "ignorado"
     assert svc.saldo("dueno@x.com")["creditos"] == base + 15
@@ -1053,6 +1054,7 @@ def test_referido_devuelto_en_reembolso(polar):
     assert _polar(polar, oid="r1", tipo="order.refunded", estado="refunded", wid="m4").json()["accion"] == "repetido"
     assert svc.saldo("dueno@x.com")["creditos"] == base and svc.referido("dueno@x.com")["ganados"] == 0
     assert svc.historial("dueno@x.com")["movimientos"][0]["texto"] == "Referido devuelto: −15"
+    assert svc.saldo("p@x.com")["creditos"] == base_c  # compra y bono devueltos
 
 
 def test_autorreferido_rechazado_en_webhook(polar):
