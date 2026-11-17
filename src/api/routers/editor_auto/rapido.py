@@ -98,6 +98,7 @@ class Ajustes(BaseModel):
     modo: str = Field("basico", description="id de GET /opciones → modos")
     extras: list[str] = Field(default_factory=list, max_length=10, description="ids de GET /opciones → extras")
     nombre_producto: str | None = Field(None, max_length=200, description="texto del extra «Nombre del producto»")
+    referencia_url: str | None = Field(None, max_length=300, description="modo «replica»: enlace del viral de TikTok")
 
 
 class Estilo(BaseModel):
@@ -131,11 +132,12 @@ def _validar_modo(ajustes: Ajustes, claims: TicketClaims) -> dict:
     """Modo y extras: lo `solo_admin` pedido por un usuario normal → 403; lo inválido → 422."""
     try:
         modo, extras, nombre = ex.validar(ajustes.modo, ajustes.extras, ajustes.nombre_producto, _es_admin(claims))
+        ref = ex.validar_referencia(modo, ajustes.referencia_url)
     except ex.Prohibido as e:
         raise APIError(str(e), status_code=403) from e
     except ValueError as e:
         raise ValidationError(str(e)) from e
-    return {"modo": modo, "extras": extras, "nombre_producto": nombre}
+    return {"modo": modo, "extras": extras, "nombre_producto": nombre, "referencia_url": ref}
 
 
 def _admin_o_403(claims: TicketClaims) -> None:
@@ -406,7 +408,7 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     # Tarifa vigente (fichas de antes del cambio a vídeos) + cada extra. `creditos` = total cobrado
     # (lo que devuelve `devolver_creditos` si el trabajo falla).
     ficha["creditos_base"] = svc.creditos_de(ficha["duracion_s"])
-    ficha["creditos"] = svc.cr(ficha["creditos_base"] + ex.precio(mx["extras"]))
+    ficha["creditos"] = svc.cr(ficha["creditos_base"] + ex.precio_modo(mx["modo"]) + ex.precio(mx["extras"]))
     if not admin and not svc.cobrar(claims.email, svc.cr(ficha["creditos"])):
         raise APIError(
             f"Necesitas {ficha['creditos']} crédito(s) y no te alcanzan.", status_code=402,

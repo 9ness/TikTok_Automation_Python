@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 
 import pytest
 
@@ -1102,7 +1103,7 @@ def test_opciones_modos_y_extras_segun_admin(rapido):
     a = c.get(f"{BASE}/opciones", headers=_adm()).json()
     assert [m["id"] for m in a["modos"]] == ["basico", "replica"]
     rep = a["modos"][1]
-    assert rep["solo_admin"] is True and rep["disponible"] is False
+    assert rep["solo_admin"] is True and rep["disponible"] is True
     ids = {e["id"]: e for e in a["extras"]}
     assert set(ids) == {"voz", "gancho", "fotos", "nombre_producto"}
     assert all(e["creditos"] == 0.5 and e["solo_admin"] for e in ids.values())
@@ -1122,7 +1123,8 @@ def test_extras_solo_admin_403_y_validacion(rapido):
     adm = _adm()
     va = _subir(c, adm).json()["id"]
     ua = f"{BASE}/videos/{va}/cortar"
-    assert c.post(ua, headers=adm, json={"modo": "replica"}).status_code in (400, 422)  # aún no disponible
+    assert c.post(ua, headers=adm, json={"modo": "replica"}).status_code in (400, 422)  # sin enlace
+    assert c.post(ua, headers=adm, json={"modo": "replica", "referencia_url": "https://youtube.com/x"}).status_code in (400, 422)
     assert c.post(ua, headers=adm, json={"extras": ["nombre_producto"]}).status_code in (400, 422)  # sin texto
     assert c.post(ua, headers=adm, json={"extras": ["nombre_producto"], "nombre_producto": "x" * 41}).status_code in (400, 422)
 
@@ -1230,3 +1232,68 @@ def test_elegir_gancho_limites(monkeypatch):
         assert (g is not None) == ok, resp
     monkeypatch.setattr(claude_client, "analyze_transcript_json", lambda **kw: (_ for _ in ()).throw(RuntimeError("x")))
     assert ex.elegir_gancho(pal, 30.0, lambda m: None) is None
+
+
+def test_replica_admin_encola_con_enlace_y_precio(rapido):
+    c, q, _ = rapido
+    adm = _adm()
+    vid = _subir(c, adm).json()["id"]
+    r = c.post(f"{BASE}/videos/{vid}/cortar", headers=adm,
+               json={"modo": "replica", "referencia_url": " https://vm.tiktok.com/ZNabc123/ "})
+    assert r.status_code == 202
+    f = svc.cargar_ficha(vid)
+    assert f["ajustes"]["modo"] == "replica" and f["ajustes"]["referencia_url"] == "https://vm.tiktok.com/ZNabc123/"
+    assert f["creditos"] == 3 and len(q.get_all()) == 1
+
+
+def _runner_replica(rapido, monkeypatch, leer):
+    c, q, _ = rapido
+    adm = _adm()
+    vid = _subir(c, adm).json()["id"]
+    c.post(f"{BASE}/videos/{vid}/cortar", headers=adm,
+           json={"modo": "replica", "referencia_url": "https://www.tiktok.com/@a/video/1"})
+    job = q.get_all()[0]
+    subs, flechas, usadas = [], [], []
+    sc = _falsas_estilo(monkeypatch, subs, flechas)
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(vid))
+    monkeypatch.setattr(svc, "duracion_video", lambda p: 70.0)
+    monkeypatch.setattr(svc, "leer_palabras", lambda v: [{"word": "hola", "start": 0.0, "end": 0.4}])
+    monkeypatch.setattr(svc, "_leer_replica", leer)
+
+    def falsa(nombre):
+        class T:
+            def run(self, *, input_path, output_path, config, ctx):
+                usadas.append((nombre, config))
+                Path(output_path).write_bytes(Path(input_path).read_bytes())
+        return T()
+    monkeypatch.setattr(svc, "_tool_extra", falsa)
+    svc.ejecutar(job, lambda m: None, lambda f, m: None)
+    return vid, usadas
+
+
+def test_replica_aplica_vip_con_lo_leido(rapido, monkeypatch):
+    sacado = {"ritmo_ref": {"rotulos_min": 8}, "zooms": True, "_flujo": {"subs_auto": {}}}
+    vid, usadas = _runner_replica(rapido, monkeypatch, lambda f, carp, log: sacado)
+    assert [u[0] for u in usadas] == ["vip_overlays"]
+    cfg = usadas[0][1]
+    assert cfg["zooms"] is True and cfg["fotos_internet"] is False and "_flujo" not in cfg
+    f = svc.cargar_ficha(vid)
+    assert f["estado"] == "listo" and not f.get("aviso")
+
+
+def test_replica_sin_viral_sigue_como_basico(rapido, monkeypatch):
+    vid, usadas = _runner_replica(rapido, monkeypatch, lambda f, carp, log: None)
+    assert usadas == []
+    f = svc.cargar_ficha(vid)
+    assert f["estado"] == "listo" and "modo Básico" in (f.get("aviso") or "")
+
+
+def test_leer_replica_falla_descarga_devuelve_none(monkeypatch, tmp_path):
+    from src.replicar_viral import servicio as rv
+
+    def rompe(url, destino):
+        raise RuntimeError("tikwm caído")
+    monkeypatch.setattr(rv, "descargar_tiktok", rompe)
+    ficha = {"ajustes": {"referencia_url": "https://www.tiktok.com/@a/video/1"}}
+    assert svc._leer_replica(ficha, tmp_path, lambda m: None) is None
+    assert "replica" not in ficha

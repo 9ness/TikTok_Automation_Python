@@ -1109,6 +1109,32 @@ def _tool_extra(nombre: str):
     raise ValueError(nombre)
 
 
+def _leer_replica(ficha: dict, carp: Path, on_log: Callable[[str], None]) -> dict | None:
+    """Estilo + ritmo del viral del modo Réplica (se guarda en la ficha: re-estilizar no repite
+    la descarga ni la IA). None si tikwm o la IA fallan: el vídeo sigue como Básico."""
+    url = (ficha.get("ajustes") or {}).get("referencia_url")
+    hecho = ficha.get("replica") or {}
+    if hecho.get("url") == url and hecho.get("config"):
+        return hecho["config"]
+    ref = carp / "referencia.mp4"
+    try:
+        from src.replicar_viral.servicio import descargar_tiktok
+        from src.editor_auto.services.referencia_vip import analizar
+
+        descargar_tiktok(url, ref)
+        sacado = analizar(str(ref), on_log)
+    except Exception as e:  # noqa: BLE001
+        on_log(f"[rapido] ⚠️ Réplica: no se pudo leer el viral ({str(e)[:200]})")
+        return None
+    finally:
+        ref.unlink(missing_ok=True)
+    if not sacado.get("ritmo_ref") and not sacado.get("preset"):
+        on_log("[rapido] ⚠️ Réplica: la IA no devolvió el ritmo ni el estilo del viral")
+        return None
+    ficha["replica"] = {"url": url, "config": sacado}
+    return sacado
+
+
 def _estilizar(base: Path, destino: Path, ficha: dict, job,
                on_log: Callable[[str], None], on_progress: Callable[[float, str], None],
                tramos: tuple[float, float, float], cronometro=None) -> tuple[Path, list[str]]:
@@ -1151,7 +1177,8 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
             actual = out
         except Exception as e:  # noqa: BLE001
             out.unlink(missing_ok=True)
-            avisos.append(f"No se pudo aplicar «{_ex().EXTRAS[eid]['nombre']}»: " + str(e)[:150])
+            nombre_paso = (_ex().EXTRAS.get(eid) or _ex().MODOS.get(eid) or {}).get("nombre", eid)
+            avisos.append(f"No se pudo aplicar «{nombre_paso}»: " + str(e)[:150])
             on_log(f"[rapido] ⚠️ {avisos[-1]}")
 
     def _asegurar_palabras() -> list[dict]:
@@ -1178,6 +1205,15 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
             palabras_f = _asegurar_palabras()
         _paso("fotos", "photo_insert", ex.config_fotos(idioma), t0, "Poniendo fotos de apoyo…",
               {"palabras": palabras_f} if palabras_f else None)
+
+    if ajustes.get("modo") == "replica" and ajustes.get("referencia_url"):
+        with crono.medir("replica"):
+            sacado = _leer_replica(ficha, carp, on_log)
+        if sacado:
+            _paso("replica", "vip_overlays", ex.config_replica(sacado), t0, "Copiando la edición del viral…",
+                  {"palabras": _asegurar_palabras()})
+        else:
+            avisos.append("No se pudo bajar o leer el viral; se editó en modo Básico.")
 
     if sub.get("activo", True):
         out = carp / f"subs_{job.id}.mp4"
@@ -1303,6 +1339,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                                      tramos, crono)
         os.replace(entrega, final)
         gancho_elegido = ficha.get("gancho")
+        replica_leida = ficha.get("replica")
         # Coste: todo local (Silero, faster-whisper, ffmpeg) → sin API de pago.
         try:
             from src import cost_tracking
@@ -1313,6 +1350,8 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
         except Exception:  # noqa: BLE001
             pass
         ficha = cargar_ficha(vid) or ficha
+        if replica_leida:
+            ficha["replica"] = replica_leida
         ficha["estado"] = "listo"
         ficha["version"] = int(ficha.get("version", 0)) + 1
         ficha["duracion_final_s"] = round(duracion_video(final), 2)

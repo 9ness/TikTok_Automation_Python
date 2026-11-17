@@ -12,6 +12,7 @@ Los precios viven en las tablas de abajo: cambiar un precio = cambiar una línea
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 from typing import Any, Callable
@@ -26,7 +27,7 @@ MODOS: dict[str, dict[str, Any]] = {
     "basico": {"nombre": "Básico", "descripcion": "Quita pausas y repeticiones, con tus subtítulos y flecha.",
                "desde_creditos": 1, "solo_admin": False, "disponible": True},
     "replica": {"nombre": "Réplica", "descripcion": "Pega un viral de TikTok y copia su edición en tu vídeo.",
-                "desde_creditos": 3, "solo_admin": True, "disponible": False},
+                "desde_creditos": 3, "solo_admin": True, "disponible": True},
 }
 
 # Orden = orden en que se aplican: voz y fotos antes de los subtítulos; gancho y nombre al final.
@@ -81,6 +82,35 @@ def validar(modo: str, ids: list[str], nombre_producto: str | None, admin: bool)
         if len(nombre) > MAX_NOMBRE_PRODUCTO:
             raise ValueError(f"Nombre del producto: máximo {MAX_NOMBRE_PRODUCTO} letras.")
     return modo, [e for e in EXTRAS if e in pedidos], nombre
+
+
+# Enlaces de TikTok que acepta el modo Réplica (www, m, vm, vt…).
+_URL_TIKTOK = re.compile(r"^https?://([a-z0-9-]+\.)*tiktok\.com/\S+$", re.I)
+
+
+def validar_referencia(modo: str, url: str | None) -> str | None:
+    """Enlace del viral para «replica» (obligatorio ahí; en otro modo se ignora). ValueError → 422."""
+    if modo != "replica":
+        return None
+    url = (url or "").strip()
+    if not url:
+        raise ValueError("Pega el enlace del vídeo de TikTok que quieres copiar.")
+    if len(url) > 300 or not _URL_TIKTOK.match(url):
+        raise ValueError("El enlace tiene que ser de un vídeo de tiktok.com.")
+    return url
+
+
+def precio_modo(modo: str) -> float:
+    """Lo que el modo suma al corte (Básico = 0; «desde» incluye ya el crédito del corte)."""
+    m = MODOS.get(modo) or {}
+    return max(0.0, float(m.get("desde_creditos", 1)) - 1.0)
+
+
+def config_replica(sacado: dict) -> dict[str, Any]:
+    """vip_overlays con el estilo y el ritmo leídos del viral (sin fotos de internet: gastan)."""
+    cfg = {k: v for k, v in (sacado or {}).items() if k != "_flujo"}
+    cfg.update(fotos=False, fotos_internet=False)
+    return cfg
 
 
 def precio(ids: list[str]) -> float:
