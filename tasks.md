@@ -1,4 +1,8 @@
 ## Pendiente
+- 2026-11-17 · Editor Rápido: Básico tardó ~9 min con un vídeo de 51 s (Varias personas 4-5 min). Tras las llamadas a Claude (3,5 min), el render estuvo ~9 min sin dar señales y el VPS estaba cargado (load 5,6). Medir por fases y ver si es la cola o el render de MoviePy.
+- 2026-11-17 · Editor Rápido «Varias personas»: el personaje de la derecha queda a veces cortado por el borde del plano (prueba bici, t02/t08). Revisar el encuadre de `clon_duo`.
+- 2026-11-17 · Editor web: falta comprobar en el navegador los commits 125643c y 0ae6e58 de nebulabs-media (papelera de «Mis vídeos», nombre del modo, borrar → Inicio, «Saltar» del tutorial). Vercel los desplegó bien, pero no se pudo recargar por el challenge.
+- 2026-11-17 · Néstor: ADMIN_EMAILS en Vercel (tarea manual #778, la API da 403 al VPS) y decidir si los modos nuevos se abren a todos (quitar solo_admin).
 - [ ] 2026-11-16 · Lemon editor: push del backend (c7293b92, 79216022) en la ventana de mañana → con EDITOR_LS_API_KEY puesta: `python3 scripts/lemon_editor.py webhook` + recrear api + compra de prueba.
 - [ ] **Editor · entrega programada (11/11/2026, aviso de la sesión Fable tras aeb828bf):** (1) `_day_processing_start` usa 00:00 UTC: un envío para HOY entre 00:00 y 01:00 de Madrid sin plan sale con `scheduled_for` futuro (hasta 1 h de retraso y sin register_enqueue). La ventana de los planes es UTC a propósito (quota_service): decidir si pasar todo a hora de Madrid. (2) Un día futuro con todos los vídeos fallidos sale como «programado» en el calendario.
 - [ ] FrutiNovelas: sacar las fichas de personajes de las 15 carpetas de sueltos/ anteriores al 6/11 (~2,6 GB) a series/<serie>/personajes y decir a VPS - Factory que mueva esas carpetas a ~/archivo (10/11)
