@@ -1390,3 +1390,69 @@ def test_runner_conversacion_colorea_subs(rapido, monkeypatch):
     assert cfgs[0]["manual_style"] == "conversation" and cfgs[0]["auto_detect_style"] is False
     assert [w["color"] for w in vistos[0]] == ["#FFFFFF", "#FDE047"]
     assert svc.ruta_hablantes(va).exists()
+
+
+def test_ajustar_cambio_de_turno_a_la_pausa():
+    from src.editor_auto.tools import hablantes as H
+    # el cambio visual llega a 2,0 s pero la pausa real está entre 2,6 y 3,0
+    ws = [{"word": w, "start": s, "end": e} for w, s, e in
+          [("uno", 1.0, 1.4), ("dos", 1.45, 1.9), ("tres", 2.0, 2.6), ("cuatro", 3.0, 3.4)]]
+    t = H.ajustar_a_pausas([[0.0, 2.0, 0], [2.0, 5.0, 1]], ws)
+    assert t[0][1] == t[1][0] == 2.8
+    assert [w["hablante"] for w in H.asignar_palabras(ws, [[0.0, 2.0, 0], [2.0, 5.0, 1]])] == [0, 0, 0, 1]
+
+
+def _video_sintetico(path, turnos):
+    """Fondo fijo y un «personaje» (caja) a la izquierda o la derecha en cada turno de 2 s."""
+    import subprocess
+    partes = "+".join(f"between(t,{2*i},{2*i+2})*{x}" for i, x in enumerate(turnos))
+    d = 2 * len(turnos)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x406080:s=180x320:d={d}:r=10",
+                    "-f", "lavfi", "-i", f"color=c=white:s=40x150:d={d}:r=10",
+                    "-filter_complex", f"[0][1]overlay=x='{partes}+12*sin(t*5)':y=100:eval=frame", str(path)], check=True)
+
+
+def test_por_imagen_dos_personajes_y_monologo(tmp_path):
+    from src.editor_auto.tools import hablantes as H
+    duelo = tmp_path / "duelo.mp4"
+    _video_sintetico(duelo, [20, 120, 20, 120, 20, 120, 20])
+    r = H._por_imagen(str(duelo), 14.0)
+    assert r["personas"] == 2 and len(r["tramos"]) >= 5
+    assert r["tramos"][0][2] != r["tramos"][1][2]
+    quieto = tmp_path / "solo.mp4"
+    _video_sintetico(quieto, [70, 75, 70, 75, 70, 75])
+    assert H._por_imagen(str(quieto), 12.0)["personas"] == 1
+
+
+def test_colores_hablantes_en_preferencias_y_estilo(rapido):
+    c, q, hdr = rapido
+    sub = {"colores_hablantes": ["#FFFFFF", "#22D3EE"]}
+    r = c.put(f"{BASE}/preferencias", headers=_adm(), json={"modo": "conversacion", "subtitulos": sub})
+    assert r.status_code == 200, r.text
+    got = c.get(f"{BASE}/preferencias", headers=_adm()).json()["preferencias"]
+    assert got["subtitulos"]["colores_hablantes"] == ["#FFFFFF", "#22D3EE"]
+    vid = _subir(c, _adm()).json()["id"]
+    f = svc.cargar_ficha(vid)
+    f["estado"] = "listo"
+    svc.guardar_ficha(f)
+    r = c.post(f"{BASE}/videos/{vid}/estilo", headers=_adm(), json={"subtitulos": {"colores_hablantes": ["#FDE047", "#FFFFFF"]}})
+    assert r.status_code == 202, r.text
+    assert svc.cargar_ficha(vid)["ajustes"]["subtitulos"]["colores_hablantes"] == ["#FDE047", "#FFFFFF"]
+
+
+def test_clon_junta_a_los_dos_personajes(tmp_path):
+    import subprocess
+    import numpy as np
+    from src.editor_auto.tools import clon_duo, hablantes as H
+    duelo = tmp_path / "duelo.mp4"
+    _video_sintetico(duelo, [20, 120, 20, 120, 20, 120, 20])
+    r = H._por_imagen(str(duelo), 14.0)
+    m = r["metricas"]
+    out = clon_duo.componer(str(duelo), str(tmp_path / "clon.mp4"), r["tramos"], m["img_izquierda"], m["img_corte"])
+    assert out
+    # en mitad de cada turno hay «persona» (blanco) a los DOS lados
+    for t in (1.0, 3.0, 5.0):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(t), "-i", out, "-frames:v", "1",
+                              "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True).stdout
+        f = np.frombuffer(raw, np.uint8).reshape(320, 180)
+        assert (f[120:240, :90] > 200).mean() > 0.05 and (f[120:240, 90:] > 200).mean() > 0.05, t

@@ -11,6 +11,9 @@ Cómo:
   4. Agrupado jerárquico por coseno: se queda con 2-3 grupos solo si están lejos
      entre sí y cada uno habla un mínimo; si no, 1 persona.
   5. Suavizado de etiquetas (una ventana suelta entre dos de otro no cambia de voz).
+  6. Si la voz dice 1 persona pero la cámara está FIJA y hay alguien a cada lado por
+     turnos (Néstor haciendo de dos personajes: «mío vs tuyo»), se separa por IMAGEN:
+     fondo = mediana, persona = lo que cambia, lado = x media de esa mancha.
 
 Todo es CPU local: ~3-6 s por minuto de vídeo. Nunca lanza en `detectar_seguro`.
 """
@@ -30,8 +33,8 @@ MIN_TRAMO_S = 0.6           # tramos de voz más cortos no dan huella fiable
 MAX_VENTANAS = 600          # ~7,5 min de voz; vídeos más largos se muestrean
 
 # Umbrales calibrados con vídeos reales (ver learnings 17/11/2026).
-DIST_SEPARAR = float(os.getenv("EDITOR_HABLANTES_DIST", "0.62"))  # 1 - coseno entre centroides
-MIN_PARTE = 0.12            # cada persona debe hablar ≥ 12 % de la voz
+DIST_SEPARAR = float(os.getenv("EDITOR_HABLANTES_DIST", "0.70"))  # 1 - coseno entre centroides
+MIN_PARTE = 0.18            # cada persona debe hablar ≥ 18 % de la voz
 MAX_PERSONAS = 3
 
 MODELO_URL = ("https://huggingface.co/Wespeaker/wespeaker-voxceleb-resnet34-LM/"
@@ -203,10 +206,115 @@ def detectar(path: str, on_log: Callable[[str], None] = lambda _: None) -> dict[
     vent_ok = [ventanas[i] for i in ok]
     tramos = _a_tramos(vent_ok, etq) if personas > 1 else [[a, b, 0] for a, b in tramos_voz]
     met["ventanas"] = len(vent_ok)
-    on_log(f"[hablantes] {personas} voz/voces ({met.get('motivo')}, dist={met.get('dist_2')}, "
-           f"partes={met.get('partes_2')})")
+    met["fuente"] = "voz"
+    if personas == 1 and os.getenv("EDITOR_HABLANTES_IMAGEN", "1") != "0":
+        try:
+            img = _por_imagen(path, dur)
+        except Exception as e:  # noqa: BLE001
+            img = None
+            on_log(f"[hablantes] (imagen) no se pudo mirar: {str(e)[:120]}")
+        if img:
+            met.update(img.get("metricas") or {})
+            if img["personas"] >= 2:
+                personas, tramos, met["fuente"] = img["personas"], img["tramos"], "imagen"
+    on_log(f"[hablantes] {personas} persona(s) por {met['fuente']} ({met.get('motivo')}, "
+           f"dist={met.get('dist_2')}, partes={met.get('partes_2')}, lados={met.get('img_lados')})")
     return {"personas": personas, "tramos": tramos, "voz_s": voz_s,
             "duracion_s": round(dur, 2), "metricas": met}
+
+
+# Plan B por imagen (misma voz, dos personajes a cada lado; calibrado con el duelo de la bici).
+IMG_FPS_MAX = 4
+IMG_MAX_FRAMES = 600
+IMG_ANCHO = 120
+IMG_ESTABLE_MIN = 0.85      # % de píxeles quietos casi siempre (trípode)
+IMG_SEPARACION = 0.30       # distancia mínima entre los dos lados (fracción del ancho)
+IMG_DISPERSION = 0.12       # cada lado debe ser compacto (desviación de x)
+IMG_MIN_PARTE = 0.15
+IMG_MIN_TURNO_S = 0.75
+
+
+def _por_imagen(path: str, dur: float) -> dict[str, Any] | None:
+    """Tramos [t0,t1,persona] por el lado de la pantalla en que está la persona, o None."""
+    import numpy as np
+
+    if dur <= 0:
+        return None
+    fps = min(IMG_FPS_MAX, IMG_MAX_FRAMES / dur)
+    pr = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                         "stream=width,height:stream_side_data=rotation", "-of", "csv=p=0", str(path)],
+                        capture_output=True, text=True, timeout=60)
+    nums = [int(float(x)) for x in pr.stdout.replace("\n", ",").split(",") if x.strip().lstrip("-").replace(".", "").isdigit()]
+    if len(nums) < 2:
+        return None
+    w0, h0 = nums[0], nums[1]
+    if len(nums) > 2 and abs(nums[2]) in (90, 270):
+        w0, h0 = h0, w0
+    alto = max(2, int(round(h0 * IMG_ANCHO / w0 / 2)) * 2)
+    proc = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vf", f"fps={fps:.4f},scale={IMG_ANCHO}:{alto}",
+                           "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, timeout=600)
+    fr = np.frombuffer(proc.stdout, np.uint8)
+    n = len(fr) // (IMG_ANCHO * alto)
+    if n < 8:
+        return None
+    fr = fr[: n * IMG_ANCHO * alto].reshape(n, alto, IMG_ANCHO)
+    fondo = np.median(fr, axis=0).astype(np.int16)
+    xs_por_frame: list[float | None] = []
+    quietos = np.zeros((alto, IMG_ANCHO), np.int32)
+    for f in fr:
+        d = np.abs(f.astype(np.int16) - fondo)
+        quietos += d < 18
+        m = d > 40
+        # fuera píxeles sueltos: una columna cuenta si tiene varios píxeles de persona
+        col = m.sum(axis=0)
+        if m.mean() < 0.01 or col.max() < 4:
+            xs_por_frame.append(None)
+            continue
+        pesos = np.where(col >= 3, col, 0).astype(np.float64)
+        xs_por_frame.append(float((pesos * np.arange(IMG_ANCHO)).sum() / max(pesos.sum(), 1) / IMG_ANCHO))
+    estable = float((quietos / n > 0.5).mean())
+    xs = np.array([x for x in xs_por_frame if x is not None])
+    met: dict[str, Any] = {"img_estable": round(estable, 3), "img_con_persona": round(len(xs) / n, 3)}
+    if estable < IMG_ESTABLE_MIN or len(xs) < 0.6 * n:
+        return {"personas": 1, "metricas": met}
+    # 2 lados por k-medias 1D (simple y estable)
+    a, b = float(np.percentile(xs, 20)), float(np.percentile(xs, 80))
+    for _ in range(20):
+        izq = np.abs(xs - a) <= np.abs(xs - b)
+        if izq.all() or (~izq).all():
+            return {"personas": 1, "metricas": met}
+        a, b = float(xs[izq].mean()), float(xs[~izq].mean())
+    parte_izq = float(izq.mean())
+    disp = max(float(xs[izq].std()), float(xs[~izq].std()))
+    met.update(img_lados=[round(a, 3), round(b, 3)], img_partes=[round(parte_izq, 3), round(1 - parte_izq, 3)],
+               img_dispersion=round(disp, 3))
+    if abs(b - a) < IMG_SEPARACION or disp > IMG_DISPERSION or min(parte_izq, 1 - parte_izq) < IMG_MIN_PARTE:
+        return {"personas": 1, "metricas": met}
+    p_izq = 0 if parte_izq >= 0.5 else 1  # 0 = quien más sale
+    etq = [None if x is None else (p_izq if abs(x - a) <= abs(x - b) else 1 - p_izq) for x in xs_por_frame]
+    for i in range(len(etq)):  # huecos sin persona → el de antes (o el siguiente)
+        if etq[i] is None:
+            etq[i] = etq[i - 1] if i else next((e for e in etq if e is not None), 0)
+    # turnos más cortos que IMG_MIN_TURNO_S se pegan al anterior
+    minimo = max(1, int(round(IMG_MIN_TURNO_S * fps)))
+    tramos: list[list] = []
+    i = 0
+    while i < len(etq):
+        j = i
+        while j < len(etq) and etq[j] == etq[i]:
+            j += 1
+        t0, t1 = i / fps, min(j / fps, dur)
+        if tramos and (j - i < minimo or tramos[-1][2] == etq[i]):
+            tramos[-1][1] = round(t1, 3)
+        else:
+            tramos.append([round(t0, 3), round(t1, 3), int(etq[i])])
+        i = j
+    if len({t[2] for t in tramos}) < 2 or len(tramos) < 3:  # sin ir y venir no es un diálogo
+        return {"personas": 1, "metricas": met}
+    met["img_turnos"] = len(tramos)
+    met["img_izquierda"] = p_izq          # persona que está a la izquierda
+    met["img_corte"] = round((a + b) / 2, 3)  # dónde partir el plano para el efecto clon
+    return {"personas": 2, "tramos": tramos, "metricas": met}
 
 
 def _a_tramos(ventanas, etq) -> list[list]:
@@ -242,9 +350,31 @@ def persona_en(tramos: list[list], t: float) -> int | None:
     return mejor
 
 
+AJUSTE_PAUSA_S = 1.5  # un cambio de turno se lleva a la pausa más larga a ±1,5 s
+
+
+def ajustar_a_pausas(tramos: list[list], palabras: list[dict]) -> list[list]:
+    """Cada cambio de persona se mueve al hueco entre palabras más largo cercano: la imagen
+    (y la voz por ventanas) cambian un poco antes o después de que cambie quien habla."""
+    ws = sorted((float(w.get("start", 0)), float(w.get("end", w.get("start", 0)))) for w in palabras
+                if str(w.get("word", "")).strip())
+    huecos = [(ws[i + 1][0] - ws[i][1], (ws[i][1] + ws[i + 1][0]) / 2) for i in range(len(ws) - 1)]
+    out = [list(t) for t in tramos]
+    for i in range(1, len(out)):
+        b = out[i][0]
+        cerca = [h for h in huecos if abs(h[1] - b) <= AJUSTE_PAUSA_S and h[0] >= 0.12
+                 and out[i - 1][0] < h[1] < out[i][1]]
+        if cerca:
+            nuevo = round(max(cerca, key=lambda h: (h[0], -abs(h[1] - b)))[1], 3)
+            out[i - 1][1] = out[i][0] = nuevo
+    return out
+
+
 def asignar_palabras(palabras: list[dict], tramos: list[list]) -> list[dict]:
     """Copia de las palabras con `hablante` (0, 1, 2) por el centro de cada palabra.
-    Una palabra suelta de otra voz entre dos de la misma se iguala (errores de borde)."""
+    Los cambios de turno se llevan antes a la pausa más cercana; una palabra suelta de otra
+    voz entre dos de la misma se iguala (errores de borde)."""
+    tramos = ajustar_a_pausas(tramos, palabras)
     out = []
     for w in palabras:
         c = (float(w.get("start", 0)) + float(w.get("end", w.get("start", 0)))) / 2

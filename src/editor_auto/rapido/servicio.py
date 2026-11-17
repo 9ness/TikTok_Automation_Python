@@ -1002,20 +1002,31 @@ def ruta_hablantes(vid: str) -> Path:
     return carpeta(vid) / "hablantes.json"
 
 
-def hablantes_del_corte(vid: str, video: Path, on_log: Callable[[str], None]) -> list[list] | None:
-    """Tramos [t0, t1, persona] del corte (cacheados hasta el siguiente corte)."""
+def info_hablantes_del_corte(vid: str, video: Path, on_log: Callable[[str], None]) -> dict | None:
+    """{tramos [[t0,t1,persona]], fuente voz|imagen, izquierda, corte} del corte, cacheado hasta
+    el siguiente corte (el efecto clon cambia la imagen: hay que mirar ANTES de componer)."""
     p = ruta_hablantes(vid)
     if p.exists():
         try:
-            return json.loads(p.read_text(encoding="utf-8"))
+            d = json.loads(p.read_text(encoding="utf-8"))
+            return {"tramos": d, "fuente": "voz"} if isinstance(d, list) else d
         except Exception:  # noqa: BLE001
             pass
     from src.editor_auto.tools import hablantes
     r = hablantes.detectar_seguro(str(video), on_log)
     if not r:
         return None
-    p.write_text(json.dumps(r["tramos"]), encoding="utf-8")
-    return r["tramos"]
+    m = r.get("metricas") or {}
+    d = {"tramos": r["tramos"], "personas": r["personas"], "fuente": m.get("fuente", "voz"),
+         "izquierda": m.get("img_izquierda"), "corte": m.get("img_corte")}
+    p.write_text(json.dumps(d), encoding="utf-8")
+    return d
+
+
+def hablantes_del_corte(vid: str, video: Path, on_log: Callable[[str], None]) -> list[list] | None:
+    """Tramos [t0, t1, persona] del corte."""
+    d = info_hablantes_del_corte(vid, video, on_log)
+    return d["tramos"] if d else None
 
 
 def palabras_con_colores(palabras: list[dict], tramos: list[list], colores: list[str] | None) -> list[dict]:
@@ -1274,6 +1285,23 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
         except Exception as e:  # noqa: BLE001
             on_log(f"[rapido] ⚠️ No se pudo transcribir para los extras: {str(e)[:150]}")
             return []
+
+    if ajustes.get("modo") == "conversacion":
+        # Una persona haciendo de dos con trípode → los DOS personajes a la vez en el plano.
+        with crono.medir("clon"):
+            info = info_hablantes_del_corte(ficha["id"], base, on_log)
+            if info and info.get("fuente") == "imagen" and info.get("izquierda") is not None:
+                from src.editor_auto.tools import clon_duo
+                on_progress(t0, "Juntando a los dos personajes…")
+                out = carp / f"clon_{job.id}.mp4"
+                if clon_duo.componer(str(actual), str(out), info["tramos"], int(info["izquierda"]),
+                                     float(info.get("corte") or 0.5), on_log):
+                    if actual != base:
+                        actual.unlink(missing_ok=True)
+                    actual = out
+                else:
+                    out.unlink(missing_ok=True)
+                    avisos.append("No pudimos juntar a los dos personajes en el plano; va como lo grabaste.")
 
     ex = _ex()
     if "voz" in pedidos:
