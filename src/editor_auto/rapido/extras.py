@@ -31,7 +31,7 @@ MODOS: dict[str, dict[str, Any]] = {
     "conversacion": {"nombre": "Conversación",
                      "descripcion": "Para vídeos de dos o más personas: un color de subtítulos para cada una. "
                                     "Si haces tú de dos con el móvil fijo, os junta a los dos en el plano.",
-                     "desde_creditos": 1, "solo_admin": True, "disponible": True},
+                     "desde_creditos": 2, "solo_admin": True, "disponible": True},
 }
 
 # Color de los subtítulos de cada persona en «Conversación» (la 1ª = quien más habla).

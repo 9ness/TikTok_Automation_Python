@@ -1336,7 +1336,7 @@ def test_conversacion_solo_admin_y_colores_validados(rapido):
                "subtitulos": {"colores_hablantes": ["#FFFFFF", "#22C55E"]}})
     assert r.status_code == 202
     f = svc.cargar_ficha(va)
-    assert f["ajustes"]["modo"] == "conversacion" and f["creditos"] == 1
+    assert f["ajustes"]["modo"] == "conversacion" and f["creditos"] == 2
     assert f["ajustes"]["subtitulos"]["colores_hablantes"] == ["#FFFFFF", "#22C55E"]
     assert svc.config_cortador(f["ajustes"])["manual_style"] == "conversation"
     assert "manual_style" not in svc.config_cortador({"modo": "basico"})
