@@ -834,6 +834,22 @@ def _marcas_catalogo(usuario: str, videos: list[dict]) -> None:
                 refs[i] = ref[:3]
         elif v.get("source") in marcas.FUENTES_MARCAS and v.get("carpeta") and v.get("producto"):
             refs[i] = (str(v["source"]), str(v["carpeta"]), str(v["producto"]))
+    # Variantes de otro catálogo (p. ej. «Variantes regalo» de inventario_general) llevan
+    # `origen` = "source|carpeta|producto" del producto marcado: heredan sus marcas.
+    sueltos = {i: (str(v["source"]), str(v["carpeta"]), str(v["producto"]))
+               for i, v in enumerate(videos)
+               if i not in refs and v.get("source") and v.get("carpeta") and v.get("producto")}
+    if sueltos:
+        cs = sorted({(s, c) for s, c, _ in sueltos.values()})
+        try:
+            ds = dict(zip(cs, product_repo.load_folders(cs)))
+        except Exception:  # noqa: BLE001
+            ds = {}
+        for i, (s, c, pr) in sueltos.items():
+            ori = str((((ds.get((s, c)) or {}).get("productos") or {}).get(pr) or {}).get("origen") or "")
+            o = ori.split("|")
+            if len(o) == 3 and o[0] in marcas.FUENTES_MARCAS:
+                refs[i] = (o[0], o[1], o[2])
     carpetas = sorted({(s, c) for s, c, _ in refs.values() if s in marcas.FUENTES_MARCAS})
     try:
         docs = dict(zip(carpetas, product_repo.load_folders(carpetas)))
