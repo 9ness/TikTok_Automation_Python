@@ -77,6 +77,8 @@ class SubsAjustes(BaseModel):
     fuente: str | None = Field(None, description="id de GET /opciones → fuentes")
     posicion: str = Field("abajo", description="abajo | centro | arriba")
     palabras: str = Field("frase", description="una | dos | frase (palabras que salen a la vez)")
+    colores_hablantes: list[str] | None = Field(
+        None, max_length=3, description="modo «conversacion»: color (#RRGGBB) de cada persona; 1ª = quien más habla")
 
     @field_validator("color", "estilo", "fuente", mode="before")
     @classmethod
@@ -308,6 +310,8 @@ async def subir(claims: Claims, file: Annotated[UploadFile, File(...)]) -> dict:
     svc.registrar_evento(vid, claims.email, "subido", {
         "nombre": nombre[:120], "duracion_s": ficha_prov["duracion_s"], "bytes": total,
         "creditos": ficha_prov["creditos"], "via": "multipart"})
+    if _es_admin(claims):  # el modo Conversación es solo de admin: solo ahí gastamos CPU en oír voces
+        svc.lanzar_deteccion_voces(vid)
     return {
         "id": vid, "duracion_s": ficha_prov["duracion_s"], "creditos": ficha_prov["creditos"],
         "saldo": svc.cr(svc.saldo(claims.email)["creditos"]),
@@ -391,8 +395,22 @@ def subida_fin(vid: str, claims: Claims) -> dict:
     svc.registrar_evento(vid, claims.email, "subido", {
         "nombre": f["nombre"], "duracion_s": f["duracion_s"], "bytes": tam,
         "creditos": f["creditos"], "via": "trozos"})
+    if _es_admin(claims):
+        svc.lanzar_deteccion_voces(vid)
     return {"id": vid, "duracion_s": f["duracion_s"], "creditos": f["creditos"],
             "saldo": svc.cr(svc.saldo(claims.email)["creditos"])}
+
+
+@router.get("/videos/{vid}/voces")
+def voces(vid: str, claims: Claims) -> dict:
+    """Cuántas personas hablan en el vídeo (se calcula solo al subir, unos segundos).
+    {estado: pendiente|listo|error, personas, recomendado: conversacion|basico|null}. Solo admin."""
+    _admin_o_403(claims)
+    f = _ficha_o_404(vid, claims.email)
+    if not f.get("voces") and f.get("estado") != "subiendo":
+        svc.lanzar_deteccion_voces(vid)  # vídeos subidos antes de existir la detección
+        f = svc.cargar_ficha(vid) or f
+    return svc.vista_voces(f)
 
 
 @router.post("/videos/{vid}/cortar", status_code=status.HTTP_202_ACCEPTED)

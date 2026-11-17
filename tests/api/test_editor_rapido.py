@@ -1103,7 +1103,7 @@ def test_opciones_modos_y_extras_segun_admin(rapido):
     o = c.get(f"{BASE}/opciones", headers=hdr).json()
     assert [m["id"] for m in o["modos"]] == ["basico"] and o["extras"] == []
     a = c.get(f"{BASE}/opciones", headers=_adm()).json()
-    assert [m["id"] for m in a["modos"]] == ["basico", "replica"]
+    assert [m["id"] for m in a["modos"]] == ["basico", "replica", "conversacion"]
     rep = a["modos"][1]
     assert rep["solo_admin"] is True and rep["disponible"] is True
     ids = {e["id"]: e for e in a["extras"]}
@@ -1299,3 +1299,94 @@ def test_leer_replica_falla_descarga_devuelve_none(monkeypatch, tmp_path):
     ficha = {"ajustes": {"referencia_url": "https://www.tiktok.com/@a/video/1"}}
     assert svc._leer_replica(ficha, tmp_path, lambda m: None) is None
     assert "replica" not in ficha
+
+
+# ───────────── Modo Conversación (17/11/2026) ─────────────
+
+def test_chunks_no_mezclan_hablantes_y_color_fijo():
+    from src.subtitles import _chunk_words
+    ws = [{"word": w, "start": i * 0.3, "end": i * 0.3 + 0.25, "hablante": h}
+          for i, (w, h) in enumerate([("hola", 0), ("qué", 0), ("tal", 1), ("bien", 1)])]
+    assert [[w["word"] for w in c] for c in _chunk_words(ws, 3)] == [["hola", "qué"], ["tal", "bien"]]
+    sin = [{k: v for k, v in w.items() if k != "hablante"} for w in ws]
+    assert len(_chunk_words(sin, 3)) == 2 and len(_chunk_words(sin, 3)[0]) == 3  # monólogo: igual que antes
+
+
+def test_asignar_palabras_y_colores():
+    from src.editor_auto.tools import hablantes as H
+    tramos = [[0.0, 2.0, 0], [2.0, 4.0, 1]]
+    ws = [{"word": "a", "start": 0.2, "end": 0.5}, {"word": "b", "start": 2.2, "end": 2.5},
+          {"word": "c", "start": 2.6, "end": 2.9}, {"word": "d", "start": 9.0, "end": 9.2}]
+    assert [w["hablante"] for w in H.asignar_palabras(ws, tramos)] == [0, 1, 1, 1]
+    col = svc.palabras_con_colores(ws, tramos, ["#111111"])
+    assert [w["color"] for w in col[:2]] == ["#111111", "#FDE047"] and all(w["color_fijo"] for w in col)
+
+
+def test_conversacion_solo_admin_y_colores_validados(rapido):
+    c, q, hdr = rapido
+    vid = _subir(c, hdr).json()["id"]
+    url = f"{BASE}/videos/{vid}/cortar"
+    assert c.post(url, headers=hdr, json={"modo": "conversacion"}).status_code == 403
+    assert c.get(f"{BASE}/videos/{vid}/voces", headers=hdr).status_code == 403
+    va = _subir(c, _adm()).json()["id"]
+    ua = f"{BASE}/videos/{va}/cortar"
+    assert c.post(ua, headers=_adm(), json={"modo": "conversacion",
+                  "subtitulos": {"colores_hablantes": ["rojo"]}}).status_code in (400, 422)
+    r = c.post(ua, headers=_adm(), json={"modo": "conversacion",
+               "subtitulos": {"colores_hablantes": ["#FFFFFF", "#22C55E"]}})
+    assert r.status_code == 202
+    f = svc.cargar_ficha(va)
+    assert f["ajustes"]["modo"] == "conversacion" and f["creditos"] == 1
+    assert f["ajustes"]["subtitulos"]["colores_hablantes"] == ["#FFFFFF", "#22C55E"]
+    assert svc.config_cortador(f["ajustes"])["manual_style"] == "conversation"
+    assert "manual_style" not in svc.config_cortador({"modo": "basico"})
+
+
+def test_voces_al_subir_admin(rapido, monkeypatch):
+    c, q, hdr = rapido
+    from src.editor_auto.tools import hablantes as H
+    llamadas = []
+    monkeypatch.setattr(H, "detectar_seguro", lambda p, on_log=None: llamadas.append(p) or
+                        {"personas": 2, "tramos": [], "metricas": {}})
+
+    class HiloSincrono:
+        def __init__(self, target, args, **kw):
+            self.t, self.a = target, args
+
+        def start(self):
+            self.t(*self.a)
+    monkeypatch.setattr(svc.threading, "Thread", HiloSincrono)
+    _subir(c, hdr)
+    assert not llamadas  # usuario normal: no se gasta CPU
+    va = _subir(c, _adm()).json()["id"]
+    assert len(llamadas) == 1
+    assert c.get(f"{BASE}/videos/{va}/voces", headers=_adm()).json() == {
+        "estado": "listo", "personas": 2, "recomendado": "conversacion"}
+
+
+def test_runner_conversacion_colorea_subs(rapido, monkeypatch):
+    c, q, _ = rapido
+    va = _subir(c, _adm()).json()["id"]
+    c.post(f"{BASE}/videos/{va}/cortar", headers=_adm(), json={"modo": "conversacion"})
+    job = q.get_all()[-1]
+    subs, flechas = [], []
+    sc = _falsas_estilo(monkeypatch, subs, flechas)
+    cfgs = []
+    monkeypatch.setattr(sc, "SilenceCutterTool", _falso_cortador(va, cfgs))
+    palabras = [{"word": "hola", "start": 0.1, "end": 0.4}, {"word": "adiós", "start": 3.0, "end": 3.3}]
+    monkeypatch.setattr(svc, "leer_palabras", lambda vid: palabras)
+    from src.editor_auto.tools import hablantes as H
+    monkeypatch.setattr(H, "detectar_seguro", lambda p, on_log=None:
+                        {"personas": 2, "tramos": [[0, 2, 0], [2, 4, 1]], "metricas": {}})
+    vistos = []
+
+    class SubsQueMira:
+        def run(self, *, input_path, output_path, config, ctx):
+            vistos.append(ctx.extras.get("palabras"))
+            open(output_path, "wb").write(b"x")
+    import src.editor_auto.tools.subs_auto as sa
+    monkeypatch.setattr(sa, "SubsAutoTool", SubsQueMira)
+    svc.ejecutar(job, lambda m: None, lambda f, m="": None)
+    assert cfgs[0]["manual_style"] == "conversation" and cfgs[0]["auto_detect_style"] is False
+    assert [w["color"] for w in vistos[0]] == ["#FFFFFF", "#FDE047"]
+    assert svc.ruta_hablantes(va).exists()

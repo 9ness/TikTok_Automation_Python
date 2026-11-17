@@ -28,7 +28,14 @@ MODOS: dict[str, dict[str, Any]] = {
                "desde_creditos": 1, "solo_admin": False, "disponible": True},
     "replica": {"nombre": "Réplica", "descripcion": "Pega un viral de TikTok y copia su edición en tu vídeo.",
                 "desde_creditos": 3, "solo_admin": True, "disponible": True},
+    "conversacion": {"nombre": "Conversación",
+                     "descripcion": "Para vídeos de dos o más personas: respeta los turnos y pone un color "
+                                    "de subtítulos a cada una.",
+                     "desde_creditos": 1, "solo_admin": True, "disponible": True},
 }
+
+# Color de los subtítulos de cada persona en «Conversación» (la 1ª = quien más habla).
+COLORES_HABLANTES = ["#FFFFFF", "#FDE047", "#5EEAD4"]
 
 # Orden = orden en que se aplican: voz y fotos antes de los subtítulos; gancho y nombre al final.
 EXTRAS: dict[str, dict[str, Any]] = {

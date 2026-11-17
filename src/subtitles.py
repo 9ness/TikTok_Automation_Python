@@ -422,7 +422,9 @@ def render_chunk_image(
             # (lo usa el nicho Pronósticos para pintar de verde el texto del pick
             # y la cifra del bote — ver src/pronosticos/pick_locator.py).
             per_word_color = chunk_words[idx].get("color") if idx < len(chunk_words) else None
-            if is_active and mode == "color_swap":
+            if per_word_color and chunk_words[idx].get("color_fijo"):
+                text_fill = per_word_color  # Conversación: el color dice QUIÉN habla, también al resaltar
+            elif is_active and mode == "color_swap":
                 text_fill = s["highlight_color"]
             elif per_word_color:
                 text_fill = per_word_color
@@ -490,6 +492,8 @@ def _chunk_words(
        - Hay una pausa ≥ `pause_threshold` segundos entre palabras consecutivas
          (límite natural de frase: respeta el fraseo real del audio y evita
          que un chunk arrastre tras un silencio largo).
+       - Cambia la persona que habla (`hablante`, modo Conversación): nunca se
+         mezclan en un mismo subtítulo palabras de dos personas.
     """
     chunks: list[list[dict]] = []
     current: list[dict] = []
@@ -501,6 +505,7 @@ def _chunk_words(
                 len(current) >= max_words_per_chunk
                 or time_since_start > max_duration
                 or pause_before > pause_threshold
+                or w.get("hablante") != current[-1].get("hablante")
             ):
                 chunks.append(current)
                 current = []

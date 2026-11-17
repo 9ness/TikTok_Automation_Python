@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import os
 import shutil
 import subprocess
@@ -197,8 +198,14 @@ def validar_subtitulos(d: dict | None) -> dict:
     palabras = d.get("palabras") or "frase"
     if palabras not in PALABRAS:
         raise ValueError(f"Palabras a la vez desconocido: {palabras}")
+    colores = d.get("colores_hablantes") or None
+    if colores is not None:
+        if not isinstance(colores, list) or len(colores) > 3 or not all(
+                isinstance(c, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", c) for c in colores):
+            raise ValueError("Colores de cada persona: hasta 3 colores en formato #RRGGBB.")
     return {"activo": bool(d.get("activo", True)), "estilo": estilo, "color": d.get("color") or None,
-            "fuente": fuente or None, "posicion": pos, "palabras": palabras}
+            "fuente": fuente or None, "posicion": pos, "palabras": palabras,
+            "colores_hablantes": colores}
 
 
 FLECHA_AUTO = "auto"  # modo Inteligente: el motor elige forma+color por contraste con el fondo
@@ -990,6 +997,71 @@ KEYTERMS = (
 )
 
 
+def ruta_hablantes(vid: str) -> Path:
+    """Quién habla en cada tramo de `cortado.mp4` (modo Conversación)."""
+    return carpeta(vid) / "hablantes.json"
+
+
+def hablantes_del_corte(vid: str, video: Path, on_log: Callable[[str], None]) -> list[list] | None:
+    """Tramos [t0, t1, persona] del corte (cacheados hasta el siguiente corte)."""
+    p = ruta_hablantes(vid)
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            pass
+    from src.editor_auto.tools import hablantes
+    r = hablantes.detectar_seguro(str(video), on_log)
+    if not r:
+        return None
+    p.write_text(json.dumps(r["tramos"]), encoding="utf-8")
+    return r["tramos"]
+
+
+def palabras_con_colores(palabras: list[dict], tramos: list[list], colores: list[str] | None) -> list[dict]:
+    from src.editor_auto.tools import hablantes
+    cols = list(colores or []) + _ex().COLORES_HABLANTES[len(colores or []):]
+    return [{**w, "color": cols[min(int(w["hablante"]), len(cols) - 1)], "color_fijo": True}
+            for w in hablantes.asignar_palabras(palabras, tramos)]
+
+
+_voces_lock = threading.Lock()
+
+
+def detectar_voces(vid: str) -> None:
+    """Cuántas personas hablan en el ORIGINAL (para recomendar Conversación). Guarda `ficha.voces`.
+    Se lanza en un hilo al acabar la subida; un fallo deja estado «error» y nada más."""
+    from src.editor_auto.tools import hablantes
+    with _voces_lock:  # una a una: es CPU
+        f = cargar_ficha(vid)
+        orig = ruta_original(vid)
+        if f is None or orig is None:
+            return
+        t = time.time()
+        r = hablantes.detectar_seguro(str(orig), lambda m: logger.info(m))
+        f = cargar_ficha(vid) or f
+        f["voces"] = ({"estado": "listo", "personas": int(r["personas"]), "s": round(time.time() - t, 1),
+                       "metricas": r.get("metricas")}
+                      if r else {"estado": "error", "personas": None})
+        guardar_ficha(f)
+
+
+def lanzar_deteccion_voces(vid: str) -> None:
+    f = cargar_ficha(vid)
+    if f is None or (f.get("voces") or {}).get("estado") in ("pendiente", "listo"):
+        return
+    f["voces"] = {"estado": "pendiente", "personas": None}
+    guardar_ficha(f)
+    threading.Thread(target=detectar_voces, args=(vid,), daemon=True, name=f"voces-{vid}").start()
+
+
+def vista_voces(f: dict) -> dict:
+    v = f.get("voces") or {}
+    n = v.get("personas")
+    return {"estado": v.get("estado") or "pendiente", "personas": n,
+            "recomendado": None if n is None else ("conversacion" if n >= 2 else "basico")}
+
+
 def leer_palabras(vid: str) -> list[dict] | None:
     p = ruta_palabras(vid)
     if not p.exists():
@@ -1078,6 +1150,10 @@ def config_cortador(ajustes: dict) -> dict[str, Any]:
         "ai_language": None if idioma == "auto" else idioma,
         "output_aspect": ajustes.get("formato", "9:16"),
         "ritmo": ajustes.get("ritmo", "natural"),
+        # Conversación: reglas de diálogo del cortador (respeta el hueco entre turnos y no
+        # come la réplica corta de la otra persona) en vez de adivinar el estilo.
+        **({"auto_detect_style": False, "manual_style": "conversation"}
+           if ajustes.get("modo") == "conversacion" else {}),
     }
 
 
@@ -1223,6 +1299,16 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
             from src.editor_auto.tools.subs_auto import SubsAutoTool
             # Palabras ya transcritas de este corte (con correcciones) → sin Whisper.
             palabras = leer_palabras(ficha["id"])
+            if ajustes.get("modo") == "conversacion":
+                with crono.medir("conversacion"):
+                    palabras = palabras or _asegurar_palabras()
+                    tramos_h = hablantes_del_corte(ficha["id"], base, on_log) if palabras else None
+                if tramos_h:
+                    palabras = palabras_con_colores(palabras, tramos_h, sub.get("colores_hablantes"))
+                    n_p = len({w["hablante"] for w in palabras})
+                    on_log(f"[rapido] Conversación: {n_p} persona(s) en los subtítulos")
+                elif palabras:
+                    avisos.append("No pudimos distinguir las voces; los subtítulos van de un solo color.")
             extras = {"palabras": palabras} if palabras else {"guardar_palabras": str(ruta_palabras(ficha["id"]))}
             SubsAutoTool().run(input_path=str(actual), output_path=str(out),
                                config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Poniendo subtítulos…", extras))
@@ -1333,6 +1419,7 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
                 proyecto.unlink(missing_ok=True)
             os.replace(salida, cortado)
             ruta_palabras(vid).unlink(missing_ok=True)  # corte nuevo → tiempos nuevos
+            ruta_hablantes(vid).unlink(missing_ok=True)
             tramos = (0.6, 0.9, 1.0)
         final = ruta_resultado(vid)
         ficha = cargar_ficha(vid) or ficha
