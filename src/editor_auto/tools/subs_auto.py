@@ -227,6 +227,20 @@ class SubsAutoTool:
         last_word_end = max((float(w.get("end", 0) or 0) for w in words), default=0.0)
         last_chunk_max_end = last_word_end + 1.0 if last_word_end > 0 else None
 
+        # Flecha en la MISMA pasada (Editor Rápido, 18/11/2026): `extras["flecha"]`
+        # es una función palabras → plan de StickerArrowTool.planificar. Si no se
+        # puede (moviepy de respaldo, fallo al planificar) `flecha_aplicada` queda
+        # en False y quien llama pone la flecha aparte, como antes.
+        ctx.extras["flecha_aplicada"] = False
+        planificar_flecha = ctx.extras.get("flecha")
+        if callable(planificar_flecha) and quality.get("motor") == "ffmpeg":
+            try:
+                plan = planificar_flecha(words)
+                if plan:
+                    quality = {**quality, "flecha": plan}
+            except Exception as e:  # noqa: BLE001 — la flecha nunca rompe los subtítulos
+                ctx.on_log(f"[subs_auto] ⚠️ no se pudo planificar la flecha: {e}")
+
         render_subtitles_on_video(
             input_path, words, style, output_path,
             quality_settings=quality,
@@ -234,6 +248,7 @@ class SubsAutoTool:
             logger=None,
             last_chunk_max_end=last_chunk_max_end,
         )
+        ctx.extras["flecha_aplicada"] = bool(quality.get("flecha_aplicada"))
         ctx.on_progress(1.0, "✅ Subtítulos aplicados")
         return output_path
 

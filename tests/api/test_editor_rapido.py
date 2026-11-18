@@ -397,7 +397,7 @@ def test_cortar_con_estilo_se_guarda_y_valida(rapido):
     assert c.post(f"{BASE}/videos/{vid}/cortar", headers=hdr, json=body).status_code == 202
     aj = c.get(f"{BASE}/videos/{vid}", headers=hdr).json()["ajustes"]
     assert aj["subtitulos"]["color"] == "#FDE047" and aj["subtitulos"]["posicion"] == "arriba"
-    assert aj["flecha"] == {"activo": True, "id": o["flechas"][0]["id"]}
+    assert aj["flecha"] == {"activo": True, "id": o["flechas"][0]["id"], "todo_video": False}
 
 
 def test_peticion_antigua_defaults(rapido):
@@ -761,7 +761,7 @@ def test_ajustes_color_vacio_y_flecha_inteligente():
     from src.editor_auto.rapido import servicio as s
     a = Ajustes(subtitulos={"activo": True, "color": "", "fuente": "", "estilo": ""}, flecha={"activo": True, "id": "auto"})
     assert a.subtitulos.color is None and a.subtitulos.fuente is None
-    assert s.validar_flecha({"activo": True, "id": "auto"}) == {"activo": True, "id": "auto"}
+    assert s.validar_flecha({"activo": True, "id": "auto"}) == {"activo": True, "id": "auto", "todo_video": False}
     assert s.validar_flecha({"activo": True})["id"] == "auto"
 
 
@@ -794,7 +794,7 @@ def test_preferencias_guardar_y_leer(rapido):
     assert r.status_code == 200
     p = c.get(f"{BASE}/preferencias", headers=hdr).json()
     assert p["guardado"] and p["preferencias"]["ritmo"] == "sin_pausas"
-    assert p["preferencias"]["flecha"] == {"activo": True, "id": "auto"}
+    assert p["preferencias"]["flecha"] == {"activo": True, "id": "auto", "todo_video": False}
     assert c.put(f"{BASE}/preferencias", headers=hdr, json={"ritmo": "loco"}).status_code == 422
 
 
@@ -1456,3 +1456,18 @@ def test_clon_junta_a_los_dos_personajes(tmp_path):
                               "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True).stdout
         f = np.frombuffer(raw, np.uint8).reshape(320, 180)
         assert (f[120:240, :90] > 200).mean() > 0.05 and (f[120:240, 90:] > 200).mean() > 0.05, t
+
+
+def test_flecha_todo_video_y_minimo_5s():
+    """Flecha en todo el vídeo o, por palabra clave, mínimo 5 s (y últimos 5 s si no se dice)."""
+    from src.editor_auto.rapido import servicio as sv
+    from src.editor_auto.tools import sticker_arrow as sa
+
+    assert sv.validar_flecha({"activo": True, "id": "auto", "todo_video": True})["todo_video"] is True
+    cfg = sv.config_flecha({"activo": True, "id": "auto", "todo_video": True}, "es")
+    assert cfg["full_video"] is True and cfg["fallback_last_seconds"] == 5.0 and cfg["min_window_seconds"] == 5.0
+
+    f = sa.filtro_flecha(windows=[(0.0, 40.0)], position_x_pct=22, position_y_pct=82, scale_width_pct=20,
+                         rotation_deg=0, flip_horizontal=False, flip_vertical=False, de_entrada=False,
+                         main_w_px=1080, entrada="0:v", sticker="1:v", salida="v")
+    assert "overlay" in f and f.endswith("[v]") and "between(t,0.000,40.000)" in f

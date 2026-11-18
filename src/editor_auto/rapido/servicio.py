@@ -219,7 +219,7 @@ def validar_flecha(d: dict | None) -> dict:
         raise ValueError(f"Flecha desconocida: {fid}")
     if activo and not fid:
         fid = FLECHA_AUTO  # por defecto la inteligente (se ajusta al fondo de cada vídeo)
-    return {"activo": activo, "id": fid or None}
+    return {"activo": activo, "id": fid or None, "todo_video": bool(d.get("todo_video", False))}
 
 
 # ───────────────────────── Redis ─────────────────────────
@@ -1143,6 +1143,11 @@ def config_flecha(fl: dict, idioma: str) -> dict[str, Any]:
     cfg["whisper_model_size"] = os.getenv("EDITOR_RAPIDO_WHISPER_MODEL", "small")
     cfg["ai_language"] = None if idioma == "auto" else idioma
     cfg["keyterms"] = list(KEYTERMS)
+    # Cuándo sale (Néstor, 18/11/2026): en todo el vídeo, o con la palabra clave
+    # («carrito naranja»…) y, si no la dice, en los últimos 5 s.
+    cfg["full_video"] = bool(fl.get("todo_video"))
+    cfg["fallback_last_seconds"] = 5.0
+    cfg["min_window_seconds"] = 5.0
     return cfg
 
 
@@ -1321,6 +1326,7 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
         else:
             avisos.append("No se pudo bajar o leer el viral; se editó en modo Básico.")
 
+    flecha_hecha = False
     if sub.get("activo", True):
         out = carp / f"subs_{job.id}.mp4"
         try:
@@ -1338,8 +1344,18 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
                 elif palabras:
                     avisos.append("No pudimos distinguir las voces; los subtítulos van de un solo color.")
             extras = {"palabras": palabras} if palabras else {"guardar_palabras": str(ruta_palabras(ficha["id"]))}
+            if fl.get("activo"):
+                # Flecha en la misma pasada de ffmpeg que los subtítulos (~40 s menos).
+                from src.editor_auto.tools.sticker_arrow import StickerArrowTool
+                def _plan_flecha(ws, _a=actual):
+                    c = _ctx(t0, t1, "Poniendo subtítulos…", {"palabras": ws})
+                    c.on_progress = lambda *_x: None  # la barra la lleva la de subtítulos
+                    return StickerArrowTool().planificar(input_path=str(_a),
+                                                         config=config_flecha(fl, idioma), ctx=c)
+                extras["flecha"] = _plan_flecha
             SubsAutoTool().run(input_path=str(actual), output_path=str(out),
-                               config=config_subtitulos(sub, idioma), ctx=_ctx(t0, t1, "Poniendo subtítulos…", extras))
+                               config=config_subtitulos(sub, idioma), ctx=(ctx_s := _ctx(t0, t1, "Poniendo subtítulos…", extras)))
+            flecha_hecha = bool(ctx_s.extras.get("flecha_aplicada"))
             if not out.exists() or out.stat().st_size == 0:
                 raise RuntimeError("no se generó el vídeo con subtítulos")
             if actual != base:
@@ -1350,7 +1366,9 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
             avisos.append("No se pudieron poner los subtítulos: " + str(e)[:150])
             on_log(f"[rapido] ⚠️ {avisos[-1]}")
     on_progress(t1, "Subtítulos listos")
-    if fl.get("activo"):
+    if flecha_hecha:
+        on_log("[rapido] Flecha puesta en la misma pasada que los subtítulos")
+    if fl.get("activo") and not flecha_hecha:
         out = carp / f"flecha_{job.id}.mp4"
         try:
             from src.editor_auto.tools.sticker_arrow import StickerArrowTool

@@ -89,6 +89,7 @@ class SubsAjustes(BaseModel):
 class FlechaAjustes(BaseModel):
     activo: bool = False
     id: str | None = Field(None, description="id de GET /opciones → flechas, o «auto» = Inteligente (por defecto)")
+    todo_video: bool = Field(False, description="True = en todo el vídeo; False = con la palabra clave («carrito naranja»…) o, si no la dice, los últimos 5 s")
 
 
 class Ajustes(BaseModel):

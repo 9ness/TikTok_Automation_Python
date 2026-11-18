@@ -333,7 +333,7 @@ API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapi
 - Subida: `POST /videos` (multipart) o por trozos `POST /subidas` → `PUT /subidas/{id}?offset=` → `POST /subidas/{id}/fin`. Saldo: `GET /saldo`.
 - `GET /opciones` → `{estilos[{id,nombre,fuente,color_texto,color_resalte,modo_resalte,borde}], colores[8 hex], fuentes[{id,nombre}], flechas[{id,nombre,png_url}], posiciones}`
   (estilos y flechas de bucle del catálogo común `src/catalogo_edicion`). `GET /flechas/{id}.png` es público (sin ticket).
-- `POST /videos/{id}/cortar` `{ritmo, formato, idioma, subtitulos:{activo=true, estilo, color, fuente, posicion=abajo|centro|arriba}, flecha:{activo=false, id}}`
+- `POST /videos/{id}/cortar` `{ritmo, formato, idioma, subtitulos:{activo=true, estilo, color, fuente, posicion=abajo|centro|arriba}, flecha:{activo=false, id, todo_video=false}}` (flecha: todo el vídeo, o con la palabra clave —«carrito»…— mín. 5 s y, si no la dice, los últimos 5 s; va en la MISMA pasada de ffmpeg que los subtítulos)
   (todo opcional; estilo por defecto = el primero del catálogo). Se valida (400/422) y se guarda en `ficha.ajustes`.
 - Runner `ejecutar` (modos `auto`, `retoque`, `estilo`): corte (0-0.6) → guarda `cortado.mp4` → `SubsAutoTool` (0.6-0.9, Whisper `EDITOR_RAPIDO_WHISPER_MODEL`, def. `small`)
   → `StickerArrowTool` (0.9-1) vía `style_mapper.build_tool_flow`. Si subs/flecha fallan se entrega el corte con `aviso` en la ficha (sin devolver créditos).

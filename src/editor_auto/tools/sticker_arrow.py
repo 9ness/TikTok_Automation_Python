@@ -128,6 +128,10 @@ class StickerArrowTool:
             "extend_to_end": True,
             # Fallback si no hay keyword: aparece en los últimos N s del vídeo.
             "fallback_last_seconds": 4.0,
+            # Flecha en todo el vídeo (sin buscar gatillo).
+            "full_video": False,
+            # Mínimo de segundos visibles cuando sale por gatillo (0 = sin mínimo).
+            "min_window_seconds": 0.0,
             # Solo buscar keyword en el último X% del vídeo (anti-falso-positivo).
             "search_last_fraction": 0.5,
             # Tolerancia a errores de Whisper (edit-distance 1 para keywords
@@ -192,6 +196,12 @@ class StickerArrowTool:
             {"key": "extend_to_end",
              "label": "Una vez aparece, dura hasta el FINAL del vídeo",
              "type": "bool"},
+            {"key": "full_video",
+             "label": "Flecha en TODO el vídeo (sin buscar gatillo)",
+             "type": "bool"},
+            {"key": "min_window_seconds",
+             "label": "Mínimo de segundos visibles por gatillo (0 = sin mínimo)",
+             "type": "float", "min": 0.0, "max": 15.0, "step": 0.5},
             {"key": "fallback_last_seconds",
              "label": "Fallback: últimos N segundos si no hay gatillo",
              "type": "float", "min": 1.0, "max": 15.0, "step": 0.5},
@@ -227,6 +237,23 @@ class StickerArrowTool:
         config: dict[str, Any],
         ctx: ToolContext,
     ) -> str:
+        plan = self.planificar(input_path=input_path, config=config, ctx=ctx)
+        ctx.on_progress(0.65, "🎬 Aplicando overlay…")
+        _apply_overlay_ffmpeg(input_path=input_path, output_path=output_path,
+                              log=ctx.on_log, **plan)
+        ctx.on_progress(1.0, "✅ Sticker aplicado")
+        return output_path
+
+    def planificar(
+        self,
+        *,
+        input_path: str,
+        config: dict[str, Any],
+        ctx: ToolContext,
+    ) -> dict[str, Any]:
+        """Qué flecha, cuándo y dónde, SIN tocar el vídeo. Lo usa `run` y también el
+        Editor Rápido para meter la flecha en la MISMA pasada de ffmpeg que los
+        subtítulos (18/11/2026: la pasada aparte costaba ~41 s en 38 s de vídeo)."""
         sticker_file = (config.get("sticker_file") or "").strip()
         if not sticker_file:
             raise RuntimeError(
@@ -250,7 +277,10 @@ class StickerArrowTool:
         # 2) Detectar timestamp(s) del gatillo (opcional). Soporta múltiples
         # ocurrencias según `match_strategy` (first / last / all).
         keyword_matches: list[dict] = []
-        if bool(config.get("transcribe_for_detection", True)):
+        todo_video = bool(config.get("full_video", False))
+        if todo_video:
+            ctx.on_log("[sticker_arrow] 'full_video' activo → la flecha va en todo el vídeo.")
+        elif bool(config.get("transcribe_for_detection", True)):
             ctx.on_progress(0.15, "🎙️ Whisper para detectar gatillo…")
             try:
                 from src.subtitles_only import (
@@ -333,10 +363,18 @@ class StickerArrowTool:
         dur_overlay = max(0.5, float(config.get("duration_seconds", 3.5)))
         extend_to_end = bool(config.get("extend_to_end", False))
         windows: list[tuple[float, float]] = []
-        if keyword_matches:
+        if todo_video:
+            windows.append((0.0, duration))
+            source = "todo"
+        elif keyword_matches:
             for m in keyword_matches:
                 ws = max(0.0, float(m["start"]) - lead)
                 we = duration if extend_to_end else min(duration, ws + dur_overlay)
+                # Mínimo visible (Editor Rápido: 5 s): si la palabra cae al final,
+                # la flecha empieza antes en vez de durar un segundo.
+                minimo = float(config.get("min_window_seconds", 0) or 0)
+                if minimo and we - ws < minimo:
+                    ws = max(0.0, we - minimo)
                 if we > ws:
                     windows.append((ws, we))
             source = "keyword"
@@ -434,32 +472,22 @@ class StickerArrowTool:
                         f"→ quiero flecha '{want}' → {os.path.basename(sticker_path)}"
                     )
 
-        # 4) FFmpeg overlay
-        ctx.on_progress(0.65, "🎬 Aplicando overlay…")
-        # `rotation_deg` ∈ [0, 359]. Múltiplos de 90 usan `transpose`
-        # (lossless, rápido); el resto cae al filtro `rotate` con
-        # interpolación bilinear y fondo transparente.
+        # 4) Transformaciones del sticker. `rotation_deg` ∈ [0, 359].
         try:
             rotation_deg = int(str(config.get("rotation_deg", 0)).strip())
         except (TypeError, ValueError):
             rotation_deg = 0
-        rotation_deg = rotation_deg % 360
-        _apply_overlay_ffmpeg(
-            input_path=input_path,
-            sticker_path=sticker_path,
-            output_path=output_path,
-            windows=windows,
-            position_x_pct=float(config.get("position_x_pct", 50.0)),
-            position_y_pct=float(config.get("position_y_pct", 80.0)),
-            scale_width_pct=float(config.get("scale_width_pct", 25.0)),
-            rotation_deg=rotation_deg,
-            flip_horizontal=bool(config.get("flip_horizontal", False)),
-            flip_vertical=bool(config.get("flip_vertical", False)),
-            log=ctx.on_log,
-            de_entrada=_es_de_entrada(sticker_path),
-        )
-        ctx.on_progress(1.0, "✅ Sticker aplicado")
-        return output_path
+        return {
+            "sticker_path": sticker_path,
+            "windows": windows,
+            "position_x_pct": float(config.get("position_x_pct", 50.0)),
+            "position_y_pct": float(config.get("position_y_pct", 80.0)),
+            "scale_width_pct": float(config.get("scale_width_pct", 25.0)),
+            "rotation_deg": rotation_deg % 360,
+            "flip_horizontal": bool(config.get("flip_horizontal", False)),
+            "flip_vertical": bool(config.get("flip_vertical", False)),
+            "de_entrada": _es_de_entrada(sticker_path),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -888,6 +916,72 @@ def _merge_overlapping_windows(
     return out
 
 
+
+def entradas_flecha(plan: dict[str, Any]) -> list[str]:
+    """Argumentos `-i` de ffmpeg para el sticker del `plan` (en bucle salvo las de entrada)."""
+    bucle = [] if plan.get("de_entrada") else ["-stream_loop", "-1"]
+    return [*bucle, "-i", plan["sticker_path"]]
+
+
+def filtro_flecha(
+    *,
+    windows: list[tuple[float, float]],
+    position_x_pct: float,
+    position_y_pct: float,
+    scale_width_pct: float,
+    rotation_deg: int = 0,
+    flip_horizontal: bool = False,
+    flip_vertical: bool = False,
+    de_entrada: bool = False,
+    main_w_px: int,
+    entrada: str,
+    sticker: str,
+    salida: str,
+    sticker_path: str | None = None,  # noqa: ARG001 — viene en el plan
+) -> str:
+    """Trozo de filter_complex que pone la flecha: `[entrada]`+`[sticker]` → `[salida]`.
+    Lo usan `_apply_overlay_ffmpeg` y el render de subtítulos (misma pasada)."""
+    if not windows:
+        raise RuntimeError("sticker_arrow: lista de windows vacía")
+    sw = max(0.05, scale_width_pct / 100.0)
+    px = max(0.0, min(1.0, position_x_pct / 100.0))
+    py = max(0.0, min(1.0, position_y_pct / 100.0))
+    pre_filters: list[str] = []
+    if flip_horizontal:
+        pre_filters.append("hflip")
+    if flip_vertical:
+        pre_filters.append("vflip")
+    rot = int(rotation_deg) % 360
+    if rot == 90:
+        pre_filters.append("transpose=1")
+    elif rot == 180:
+        pre_filters.append("transpose=1,transpose=1")
+    elif rot == 270:
+        pre_filters.append("transpose=2")
+    elif rot != 0:
+        angle_rad = f"{rot}*PI/180"
+        pre_filters.append(
+            f"rotate={angle_rad}:c=none:ow=rotw({angle_rad}):oh=roth({angle_rad})"
+        )
+    pre_chain = (",".join(pre_filters) + ",") if pre_filters else ""
+    # `main_w` no vale en un `scale` plano → ancho literal en píxeles.
+    if main_w_px <= 0:
+        main_w_px = 1080
+    sticker_w_px = max(2, int(round(main_w_px * sw)))
+    if sticker_w_px % 2 != 0:
+        sticker_w_px -= 1
+    enable_expr = "+".join(f"between(t,{ws:.3f},{we:.3f})" for ws, we in windows)
+    desfase = f",setpts=PTS-STARTPTS+{windows[0][0]:.3f}/TB" if de_entrada else ""
+    et = f"fl_{salida}"
+    return (
+        f"[{sticker}]{pre_chain}scale={sticker_w_px}:-2,format=rgba{desfase}[{et}];"
+        f"[{entrada}][{et}]overlay="
+        f"x=(main_w*{px})-(overlay_w/2):"
+        f"y=(main_h*{py})-(overlay_h/2):"
+        + ("eof_action=repeat:" if de_entrada else "")
+        + f"enable='{enable_expr}'[{salida}]"
+    )
+
 def _apply_overlay_ffmpeg(
     *,
     input_path: str,
@@ -937,67 +1031,17 @@ def _apply_overlay_ffmpeg(
     """
     if not windows:
         raise RuntimeError("sticker_arrow: lista de windows vacía")
-    # Resolver pct → expresiones FFmpeg que usan W/H del vídeo:
+    main_w_px, _main_h_px = _probe_video_size(input_path)
+    filter_complex = filtro_flecha(
+        windows=windows, position_x_pct=position_x_pct, position_y_pct=position_y_pct,
+        scale_width_pct=scale_width_pct, rotation_deg=rotation_deg,
+        flip_horizontal=flip_horizontal, flip_vertical=flip_vertical,
+        de_entrada=de_entrada, main_w_px=main_w_px,
+        entrada="0:v", sticker="1:v", salida="v",
+    )
     sw = max(0.05, scale_width_pct / 100.0)
     px = max(0.0, min(1.0, position_x_pct / 100.0))
     py = max(0.0, min(1.0, position_y_pct / 100.0))
-
-    # Cadena de transformaciones previas al scale. Orden importa:
-    # primero flip (sobre ejes del asset original), luego rotación,
-    # luego scale para que el "ancho final" siempre referencie el lado
-    # mayor del sticker rotado.
-    pre_filters: list[str] = []
-    if flip_horizontal:
-        pre_filters.append("hflip")
-    if flip_vertical:
-        pre_filters.append("vflip")
-    rot = rotation_deg % 360
-    if rot == 90:
-        pre_filters.append("transpose=1")
-    elif rot == 180:
-        pre_filters.append("transpose=1,transpose=1")
-    elif rot == 270:
-        pre_filters.append("transpose=2")
-    elif rot != 0:
-        # Rotación arbitraria con BBox ajustado y fondo transparente.
-        # `c=none` mantiene el alpha del asset; `ow/oh=rotw/roth` calcula
-        # el contenedor mínimo del sticker rotado (sin recortar esquinas).
-        angle_rad = f"{rot}*PI/180"
-        pre_filters.append(
-            f"rotate={angle_rad}:c=none:ow=rotw({angle_rad}):oh=roth({angle_rad})"
-        )
-    pre_chain = (",".join(pre_filters) + ",") if pre_filters else ""
-
-    # Filter complex:
-    #   [1:v] (flip/rotate),scale=W*sw:-2,format=rgba [s];
-    #   [0:v][s] overlay=x:y:enable='between(t,T0,T1)' [v]
-    # `format=rgba` asegura que el alpha del MOV/WebM/GIF se preserve.
-    #
-    # IMPORTANTE: `main_w`/`main_h` son variables de `scale2ref` / `overlay`
-    # y NO son válidas en un `scale` plano (ffmpeg 5.x del container las
-    # rechaza con "Expressions with scale2ref variables are not valid in
-    # scale filter"). En `overlay` SÍ son válidas. Para el scale del
-    # sticker probamos el width real del input vía ffprobe y usamos un
-    # literal. Si ffprobe falla (raro), caemos a 1080 como tamaño TikTok
-    # típico — mejor que reventar.
-    main_w_px, _main_h_px = _probe_video_size(input_path)
-    if main_w_px <= 0:
-        main_w_px = 1080
-    sticker_w_px = max(2, int(round(main_w_px * sw)))
-    if sticker_w_px % 2 != 0:
-        sticker_w_px -= 1
-    enable_expr = "+".join(
-        f"between(t,{ws:.3f},{we:.3f})" for ws, we in windows
-    )
-    desfase = f",setpts=PTS-STARTPTS+{windows[0][0]:.3f}/TB" if de_entrada else ""
-    filter_complex = (
-        f"[1:v]{pre_chain}scale={sticker_w_px}:-2,format=rgba{desfase}[s];"
-        f"[0:v][s]overlay="
-        f"x=(main_w*{px})-(overlay_w/2):"
-        f"y=(main_h*{py})-(overlay_h/2):"
-        + ("eof_action=repeat:" if de_entrada else "")
-        + f"enable='{enable_expr}'[v]"
-    )
     bucle = [] if de_entrada else ["-stream_loop", "-1"]
 
     cmd = [

@@ -792,6 +792,24 @@ def _split_chunks_to_one_line(
     return out
 
 
+def _flecha_en_filtro(quality_settings: dict, prev: str, idx: int, ancho: int,
+                      duracion: float) -> tuple[list[str], list[str], str]:
+    """Flecha del Editor Rápido en la MISMA pasada que los subtítulos (18/11/2026).
+
+    `quality_settings["flecha"]` = plan de `StickerArrowTool.planificar`. Devuelve
+    (args -i, trozos de filtro, etiqueta de salida); sin plan, nada. La flecha va
+    ENCIMA de los subtítulos, como cuando era una pasada aparte."""
+    plan = quality_settings.get("flecha")
+    if not plan:
+        return [], [], prev
+    from src.editor_auto.tools.sticker_arrow import entradas_flecha, filtro_flecha
+    # La ventana que acaba en el final sigue durante el tpad del cierre.
+    ventanas = [(a, b + 5.0 if b >= duracion - 0.05 else b) for a, b in plan["windows"]]
+    filtro = filtro_flecha(**{**plan, "windows": ventanas}, main_w_px=ancho,
+                           entrada=prev, sticker=f"{idx}:v", salida="conflecha")
+    return entradas_flecha(plan), [filtro], "conflecha"
+
+
 def _render_overlays_ffmpeg(
     video_path: str,
     overlays: list,
@@ -858,6 +876,13 @@ def _render_overlays_ffmpeg(
              "stream=index", "-of", "csv=p=0", video_path],
             capture_output=True, text=True,
         ).stdout.strip())
+        dur_v = float(_sp.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", video_path], capture_output=True, text=True,
+        ).stdout.strip() or 0)
+        ent_f, filt_f, prev = _flecha_en_filtro(quality_settings, prev, len(overlays) + 1, W, dur_v)
+        inputs += ent_f
+        filt += filt_f
         if con_audio:
             filt.append(f"[{prev}]tpad=stop_mode=clone:stop_duration=0.5[vout]")
             prev = "vout"
@@ -958,6 +983,8 @@ def _render_overlays_ffmpeg_capa(
     prev = "b" if filt else "0:v"
     filt.append(f"[{prev}][1:v]overlay=x=0:y={top}:eof_action=pass:format=auto[s]")
     prev = "s"
+    ent_f, filt_f, prev = _flecha_en_filtro(quality_settings, prev, 2, W, duracion)
+    filt += filt_f
     if con_audio:
         filt.append(f"[{prev}]tpad=stop_mode=clone:stop_duration=0.5[vout]")
         prev = "vout"
@@ -966,6 +993,7 @@ def _render_overlays_ffmpeg_capa(
            "-i", video_path,
            "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{bh}",
            "-framerate", f"{float(fps):.6g}", "-i", "pipe:0",
+           *ent_f,
            "-filter_complex", ";".join(filt),
            "-map", f"[{prev}]", "-map", "0:a:0?",
            "-r", f"{float(fps):.6g}",
@@ -1221,6 +1249,7 @@ def render_subtitles_on_video(
         try:
             _render_overlays_ffmpeg(video_path, overlays, (W, H), video.fps,
                                     quality_settings, output_path)
+            quality_settings["flecha_aplicada"] = bool(quality_settings.get("flecha"))
             if log_callback:
                 log_callback(f"⚡ Subtítulos compuestos con ffmpeg ({len(overlays)} capas)")
             video.close()
@@ -1233,6 +1262,7 @@ def render_subtitles_on_video(
         try:
             _render_overlays_ffmpeg_capa(video_path, overlays, (W, H), video.fps,
                                          float(video.duration or 0), quality_settings, output_path)
+            quality_settings["flecha_aplicada"] = bool(quality_settings.get("flecha"))
             if log_callback:
                 log_callback(f"⚡ Subtítulos animados compuestos con ffmpeg ({len(overlays)} palabras)")
             video.close()
