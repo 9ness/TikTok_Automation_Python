@@ -371,7 +371,7 @@ NOMBRE_CORTO = {
     "manchester city": "City", "manchester united": "United", "atletico madrid": "Atlético",
     "atletico de madrid": "Atlético", "real madrid": "Madrid", "paris saint germain": "PSG",
     "bayern": "Bayern", "inter milan": "Inter", "ac milan": "Milan", "borussia dortmund": "Dortmund",
-    "rayo vallecano": "Rayo", "aek athens fc": "AEK", "aek athens": "AEK", "gil vicente": "Gil Vicente",
+    "rayo vallecano": "Rayo", "sao paulo": "São Paulo", "aek athens fc": "AEK", "aek athens": "AEK", "gil vicente": "Gil Vicente",
 }
 
 
