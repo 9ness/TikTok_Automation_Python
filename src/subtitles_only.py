@@ -733,6 +733,10 @@ def _apply_pop_in(clip, dur: float):
     try:
         out = clip.resize(_scale)
         out = out.crossfadein(pop)
+        # El motor ffmpeg (`_render_overlays_ffmpeg_capa`) solo anima este tramo
+        # y reutiliza el fotograma fijo del resto (moviepy re-escalaba TODOS).
+        out._pop_s = pop
+        out._sin_pop = clip
         return out
     except Exception:
         return clip
@@ -877,6 +881,151 @@ def _render_overlays_ffmpeg(
         raise RuntimeError((e.stderr or "")[-300:]) from None
     finally:
         _sh.rmtree(tmp, ignore_errors=True)
+
+
+def _render_overlays_ffmpeg_capa(
+    video_path: str,
+    overlays: list,
+    size: tuple[int, int],
+    fps: float,
+    duracion: float,
+    quality_settings: dict,
+    output_path: str,
+) -> None:
+    """Como `_render_overlays_ffmpeg`, pero para capas ANIMADAS (pop de una palabra).
+
+    La franja de subtítulos se pinta en numpy fotograma a fotograma y entra en
+    ffmpeg por tubería (rawvideo RGBA) como UNA sola capa. Solo se anima el pop
+    (~160 ms por palabra); el resto de cada palabra es su fotograma fijo en caché.
+    18/11/2026: con moviepy, 139 palabras con pop en 38 s de vídeo tardaban 550 s."""
+    import json as _json
+    import math as _math
+    import subprocess as _sp
+    import tempfile as _tf
+
+    W, H = size
+    pr = _sp.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=width,height:stream_side_data=rotation:stream_tags=rotate",
+         "-of", "json", video_path],
+        capture_output=True, text=True, check=True,
+    )
+    st = (_json.loads(pr.stdout).get("streams") or [{}])[0]
+    iw, ih = int(st["width"]), int(st["height"])
+    rot = str((st.get("tags") or {}).get("rotate", "0"))
+    for sd in st.get("side_data_list") or []:
+        if "rotation" in sd:
+            rot = str(sd["rotation"])
+    if rot.lstrip("-") in ("90", "270"):
+        iw, ih = ih, iw
+    if abs(iw / ih - W / H) > 0.01:
+        raise RuntimeError(f"tamaño {iw}x{ih} no cuadra con {W}x{H}")
+
+    def _frame(c, ct: float):
+        """(rgb uint8, alpha float32 0-1, x, y) del clip en su tiempo local `ct`."""
+        rgb = np.asarray(c.get_frame(ct))
+        if c.mask is not None:
+            alpha = np.clip(np.asarray(c.mask.get_frame(ct), dtype=np.float32), 0, 1)
+        else:
+            alpha = np.ones(rgb.shape[:2], np.float32)
+        x, y = c.pos(ct)
+        h, w = rgb.shape[:2]
+        x = (W - w) // 2 if x == "center" else int(x)
+        y = (H - h) // 2 if y == "center" else int(y)
+        return rgb[:, :, :3].astype(np.float32), alpha, x, y
+
+    capas = []  # (start, end, clip, pop_s, fijo)
+    for c in overlays:
+        pop = float(getattr(c, "_pop_s", 0.0) or 0.0)
+        # Fotograma fijo: el clip SIN animar (escala 1, opaco) si hay pop.
+        fijo = _frame(getattr(c, "_sin_pop", None) or c, 0.0)
+        capas.append((float(c.start), float(c.end), c, pop, fijo))
+    if not capas:
+        raise RuntimeError("sin capas")
+    top = max(0, min(f[4][3] for f in capas))
+    bot = min(H, max(f[4][3] + f[4][0].shape[0] for f in capas))
+    bh = bot - top
+    if bh <= 0:
+        raise RuntimeError("franja vacía")
+    capas.sort(key=lambda f: f[0])
+
+    con_audio = bool(_sp.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries",
+         "stream=index", "-of", "csv=p=0", video_path],
+        capture_output=True, text=True,
+    ).stdout.strip())
+    filt = [f"[0:v]scale={W}:{H}[b]"] if (iw, ih) != (W, H) else []
+    prev = "b" if filt else "0:v"
+    filt.append(f"[{prev}][1:v]overlay=x=0:y={top}:eof_action=pass:format=auto[s]")
+    prev = "s"
+    if con_audio:
+        filt.append(f"[{prev}]tpad=stop_mode=clone:stop_duration=0.5[vout]")
+        prev = "vout"
+
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+           "-i", video_path,
+           "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{bh}",
+           "-framerate", f"{float(fps):.6g}", "-i", "pipe:0",
+           "-filter_complex", ";".join(filt),
+           "-map", f"[{prev}]", "-map", "0:a:0?",
+           "-r", f"{float(fps):.6g}",
+           "-c:v", "libx264", "-preset", str(quality_settings.get("preset", "medium")),
+           "-crf", str(quality_settings.get("crf", 20)), "-pix_fmt", "yuv420p",
+           "-threads", "8",
+           "-c:a", "aac", "-b:a", "192k",
+           "-shortest", "-movflags", "+faststart", output_path]
+    vacio = bytes(W * bh * 4)
+    n = int(_math.ceil(max(0.0, duracion) * float(fps))) + 1
+    with _tf.TemporaryFile() as err:
+        proc = _sp.Popen(cmd, stdin=_sp.PIPE, stdout=_sp.DEVNULL, stderr=err)
+        try:
+            i0 = 0
+            for k in range(n):
+                t = k / float(fps)
+                while i0 < len(capas) and capas[i0][1] <= t:
+                    i0 += 1
+                activas = []
+                for j in range(i0, len(capas)):
+                    a, b, c, pop, fijo = capas[j]
+                    if a > t:
+                        break
+                    if t < b:
+                        ct = t - a
+                        activas.append(_frame(c, ct) if (pop and ct < pop) else fijo)
+                if not activas:
+                    proc.stdin.write(vacio)
+                    continue
+                rgb_o = np.zeros((bh, W, 3), np.float32)
+                al_o = np.zeros((bh, W), np.float32)
+                for rgb, al, x, y in activas:
+                    h, w = al.shape
+                    y0, x0 = y - top, x
+                    ya, yb = max(0, y0), min(bh, y0 + h)
+                    xa, xb = max(0, x0), min(W, x0 + w)
+                    if ya >= yb or xa >= xb:
+                        continue
+                    sa = al[ya - y0:yb - y0, xa - x0:xb - x0]
+                    sr = rgb[ya - y0:yb - y0, xa - x0:xb - x0]
+                    da = al_o[ya:yb, xa:xb]
+                    na = sa + da * (1 - sa)
+                    with np.errstate(invalid="ignore", divide="ignore"):
+                        rgb_o[ya:yb, xa:xb] = np.where(
+                            na[..., None] > 0,
+                            (sr * sa[..., None] + rgb_o[ya:yb, xa:xb] * (da * (1 - sa))[..., None])
+                            / np.maximum(na, 1e-6)[..., None],
+                            0,
+                        )
+                    al_o[ya:yb, xa:xb] = na
+                out = np.dstack([np.clip(rgb_o, 0, 255), al_o * 255]).round().astype(np.uint8)
+                proc.stdin.write(out.tobytes())
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        finally:
+            rc = proc.wait()
+        if rc != 0:
+            err.seek(0)
+            raise RuntimeError(err.read().decode("utf-8", "replace")[-300:])
 
 
 def render_subtitles_on_video(
@@ -1079,6 +1228,18 @@ def render_subtitles_on_video(
         except Exception as e:  # noqa: BLE001 — nunca romper: moviepy de respaldo
             if log_callback:
                 log_callback(f"⚠️ ffmpeg overlay falló ({type(e).__name__}: {e}); sigo con moviepy")
+    elif quality_settings.get("motor") == "ffmpeg" and overlays:
+        # Con pop (una palabra): capa animada por tubería. Mismo aspecto, ~10× menos tiempo.
+        try:
+            _render_overlays_ffmpeg_capa(video_path, overlays, (W, H), video.fps,
+                                         float(video.duration or 0), quality_settings, output_path)
+            if log_callback:
+                log_callback(f"⚡ Subtítulos animados compuestos con ffmpeg ({len(overlays)} palabras)")
+            video.close()
+            return output_path
+        except Exception as e:  # noqa: BLE001 — nunca romper: moviepy de respaldo
+            if log_callback:
+                log_callback(f"⚠️ ffmpeg (capa animada) falló ({type(e).__name__}: {e}); sigo con moviepy")
 
     final = CompositeVideoClip([video] + overlays, size=(W, H))
 

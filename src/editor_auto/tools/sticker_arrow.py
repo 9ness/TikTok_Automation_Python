@@ -26,9 +26,11 @@ Position_weight = 80 (entre silence_cutter=10 y subs_auto=90).
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
+import threading
 import time
 import unicodedata
 from pathlib import Path
@@ -395,6 +397,7 @@ class StickerArrowTool:
                         # mejor) → usa toda la variedad de formas/colores sin
                         # perder visibilidad.
                         import random
+                        _precalcular_colores(pool, ctx)
                         scored = [(p, _contrast_ratio(_repr_color(p, ctx), bg)) for p in pool]
                         best = max(s for _, s in scored)
                         eligible = [p for p, s in scored if s >= best * 0.82]
@@ -641,11 +644,16 @@ def _repr_color(path: str, ctx: ToolContext) -> tuple[int, int, int]:
         return _ARROW_COLORS[base]
     if path in _REPR_COLOR_CACHE:
         return _REPR_COLOR_CACHE[path]
+    clave = _clave_color(path)
+    guardado = _leer_cache_disco().get(clave) if clave else None
+    if guardado:
+        _REPR_COLOR_CACHE[path] = tuple(guardado)  # type: ignore[assignment]
+        return _REPR_COLOR_CACHE[path]
     color: tuple[int, int, int] = (255, 255, 255)
     try:
         from PIL import Image
         os.makedirs(ctx.temp_folder, exist_ok=True)
-        tmp = os.path.join(ctx.temp_folder, f"arrowc_{ctx.job_id}_{int(time.time()*1000)}.png")
+        tmp = os.path.join(ctx.temp_folder, f"arrowc_{ctx.job_id}_{threading.get_ident()}_{int(time.time()*1000)}.png")
         proc = subprocess.run(
             ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", path,
              "-frames:v", "1", tmp], capture_output=True, timeout=40)
@@ -663,8 +671,62 @@ def _repr_color(path: str, ctx: ToolContext) -> tuple[int, int, int]:
                 pass
     except Exception as e:
         ctx.on_log(f"[sticker_arrow] color auto de {base} falló ({e}); uso blanco.")
+        _REPR_COLOR_CACHE[path] = color
+        return color
     _REPR_COLOR_CACHE[path] = color
+    if clave:
+        _guardar_cache_disco(clave, color)
     return color
+
+
+# 18/11/2026: el modo Inteligente leía con ffmpeg las ~67 flechas del Drive en
+# CADA vídeo (85 s de 124 s de la flecha). Ahora el color se guarda en disco
+# (clave = nombre + tamaño + fecha del fichero) y las nuevas se leen en paralelo.
+_CACHE_DISCO = os.path.join(
+    os.environ.get("EDITOR_CACHE_DIR") or os.path.join(os.getcwd(), "temp_work"),
+    ".flechas_color.json",
+)
+_CACHE_LOCK = threading.Lock()
+
+
+def _clave_color(path: str) -> str | None:
+    try:
+        st = os.stat(path)
+        return f"{os.path.basename(path).lower()}|{st.st_size}|{int(st.st_mtime)}"
+    except OSError:
+        return None
+
+
+def _leer_cache_disco() -> dict:
+    try:
+        with open(_CACHE_DISCO, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _guardar_cache_disco(clave: str, color: tuple[int, int, int]) -> None:
+    with _CACHE_LOCK:
+        try:
+            datos = _leer_cache_disco()
+            datos[clave] = list(color)
+            os.makedirs(os.path.dirname(_CACHE_DISCO), exist_ok=True)
+            tmp = f"{_CACHE_DISCO}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(datos, f)
+            os.replace(tmp, _CACHE_DISCO)
+        except Exception:
+            pass  # sin caché solo se pierde velocidad
+
+
+def _precalcular_colores(pool: list[str], ctx: ToolContext) -> None:
+    """Calcula en paralelo los colores que aún no están en caché."""
+    from concurrent.futures import ThreadPoolExecutor
+    faltan = [p for p in pool
+              if os.path.basename(p).lower() not in _ARROW_COLORS and p not in _REPR_COLOR_CACHE]
+    if len(faltan) > 1:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            list(ex.map(lambda p: _repr_color(p, ctx), faltan))
 
 
 def _best_contrast_arrow(pool: list[str], bg_rgb: tuple[float, float, float]) -> str:
