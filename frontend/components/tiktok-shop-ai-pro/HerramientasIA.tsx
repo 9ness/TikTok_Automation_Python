@@ -17,7 +17,7 @@ import { ExternalLink } from "lucide-react";
  *      Google Flow, que es lo que sabe locutar.
  */
 export const FLOW_URL = "https://flow.google.com/";
-export const GENAIPRO_URL = "https://genaipro.io/video-image-ai";
+export const GENAIPRO_URL = "https://lumenon.ai/video-image-ai"; // 19/11/2026: GenAI Pro ahora es Lumenon
 
 /** Las opciones que hay que dejar puestas en GenAI Pro. Se escriben aquí y no
  *  en cada pantalla porque son las mismas para todos los vídeos. */
@@ -65,7 +65,7 @@ export function HerramientasIA({ video = "genaipro" }: { video?: "genaipro" | "f
       {video === "genaipro" ? (
         <BotonHerramienta
           url={GENAIPRO_URL}
-          label="🎬 GenAI Pro"
+          label="🎬 Lumenon (GenAI Pro)"
           hint={GENAIPRO_AJUSTES}
         />
       ) : (

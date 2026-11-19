@@ -45,7 +45,7 @@ los mismos en los dos casos.
 1. **Esta página** (reglas y preguntas de arranque).
 2. [`comun/app.md`](comun/app.md) — cómo se maneja la app (login, pantallas,
    pasos, tarjetas, subir y descargar ficheros).
-3. [`comun/plataformas.md`](comun/plataformas.md) — Google Flow, GenAI Pro y
+3. [`comun/plataformas.md`](comun/plataformas.md) — Google Flow, Lumenon (antes GenAI Pro) y
    Magnific: dónde se hace cada foto y cada clip, y cómo.
 4. [`comun/revision-calidad.md`](comun/revision-calidad.md) — cómo decidir si
    una foto o un clip generado vale o se repite.

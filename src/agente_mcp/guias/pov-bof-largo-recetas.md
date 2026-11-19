@@ -97,7 +97,7 @@ Trampas:
   pidiendo «edita esta imagen manteniendo TODO idéntico, pero…». Adjunta **solo**
   esa imagen (un ingrediente sobrante la contamina: salió una tienda de campaña).
 
-## 3. Clips — GenAI Pro (`genaipro.io/video-image-ai?ws=video&mode=frames`)
+## 3. Clips — Lumenon, antes GenAI Pro (`lumenon.ai/video-image-ai?ws=video&mode=frames`)
 
 - Ajustes: **Video · Veo · Frames · solo start frame · Portrait 9:16 · 1 vídeo ·
   «Original»**. **Nunca 1080p**: sale 1920×1080 horizontal (bug reconfirmado

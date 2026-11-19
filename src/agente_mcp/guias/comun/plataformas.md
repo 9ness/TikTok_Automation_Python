@@ -83,7 +83,9 @@ mismo proyecto: se satura y se congela.
 
 ---
 
-## GenAI Pro — `https://genaipro.io/video-image-ai`
+## Lumenon (antes GenAI Pro) — `https://lumenon.ai/video-image-ai`
+
+> 19/11/2026: GenAI Pro pasa a llamarse **Lumenon**. Mismo servicio, cuenta y créditos; `genaipro.io` redirige a `lumenon.ai`. Donde estas guías digan «GenAI Pro», es Lumenon. Los enlaces de resultados pueden salir ya como `files.lumenon.ai/...` en vez de `files.genaipro.io/...`.
 
 ### Omni 1.1 — lo de ahora (desde 7/10/2026)
 
@@ -153,7 +155,7 @@ Solo vídeo, **mudo**. Ajustes, siempre los mismos:
 - «Generation failed, please try again» = fallo genérico, **se reembolsa**:
   reintenta con el mismo botón. Van varios en paralelo, ~3-5 min cada uno.
 - Las URL de los resultados están en el DOM (`video.currentSrc`,
-  `files.genaipro.io/video_<uuid>.mp4`): se bajan con curl sin tocar el botón.
+  `files.genaipro.io/video_<uuid>.mp4`, o el dominio nuevo de Lumenon): se bajan con curl sin tocar el botón.
 
 ---
 

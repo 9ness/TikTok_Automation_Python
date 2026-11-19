@@ -21,7 +21,7 @@ UGC = "/api/v1/nicho-general"
 CREATIVOS = "/api/v1/nicho-creativos"
 
 FLOW = "Google Flow"
-GENAIPRO = "GenAI Pro"
+GENAIPRO = "Lumenon (antes GenAI Pro)"  # 19/11/2026: GenAI Pro se llama Lumenon (lumenon.ai)
 MAGNIFIC = "Magnific"
 
 
