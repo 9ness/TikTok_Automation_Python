@@ -9,7 +9,7 @@ def collect():
     ledger=json.loads(path.read_text()) if path.exists() else []
     if not ledger:print('No hay peticiones enviadas.');return
     with sync_playwright() as p:
-        browser=p.chromium.connect_over_cdp('http://127.0.0.1:9222');page=own_page(browser);page.goto('https://genaipro.io/video-image-ai?ws=video&mode=frames&model=veo',wait_until='domcontentloaded',timeout=90000);page.wait_for_timeout(8000);page.keyboard.press('Escape');page.wait_for_timeout(1500)
+        browser=p.chromium.connect_over_cdp('http://127.0.0.1:9222');page=own_page(browser);page.goto('https://lumenon.ai/video-image-ai?ws=video&mode=frames&model=veo',wait_until='domcontentloaded',timeout=90000);page.wait_for_timeout(8000);page.keyboard.press('Escape');page.wait_for_timeout(1500)
         for entry in ledger:
             if entry['estado']!='pendiente':continue
             result=page.evaluate('''prompt=>{
@@ -29,7 +29,7 @@ def collect():
             }''',entry['prompt'])
             if result and result.get('failed'):
                 entry.update(estado='fallido_reembolsado',coste_cargado=0,diagnostico=result['text'][:1200])
-            elif result and result.get('url','').startswith('https://files.genaipro.io/'):
+            elif result and result.get('url','').startswith(('https://files.genaipro.io/','https://files.lumenon.ai/')):
                 dest=Path("brutos")/f"{entry['clave']}_i{entry['intento']}.mp4";dest.parent.mkdir(exist_ok=True)
                 r=requests.get(result['url'],timeout=90);r.raise_for_status();dest.write_bytes(r.content)
                 entry.update(estado='descargado',archivo=str(dest),url=result['url'])

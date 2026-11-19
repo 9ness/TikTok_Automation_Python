@@ -5,7 +5,7 @@ import requests
 os.environ['BROWSER_JSON']='browser.json'
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 from flowlib import Tab
-URL='https://genaipro.io/video-image-ai?ws=video&mode=frames&model=omni'
+URL='https://lumenon.ai/video-image-ai?ws=video&mode=frames&model=omni'
 JS='''(prompt=>{
   const matches=[...document.querySelectorAll('p,div,span')].filter(e=>e.textContent.trim()===prompt);
   matches.sort((a,b)=>a.querySelectorAll('*').length-b.querySelectorAll('*').length);
@@ -28,7 +28,7 @@ async def main():
             if e['estado']!='pendiente': continue
             r=await t.js(f"{JS}({json.dumps(e['prompt'])})")
             if r and r.get('failed'): e.update(estado='fallido_reembolsado',coste_cargado=0,diagnostico=r['text'][:600])
-            elif r and r.get('url','').startswith('https://files.genaipro.io/'):
+            elif r and r.get('url','').startswith(('https://files.genaipro.io/','https://files.lumenon.ai/')):
                 d=Path('brutos')/f"{e['clave']}_i{e['intento']}.mp4"; d.parent.mkdir(exist_ok=True)
                 x=requests.get(r['url'],timeout=120); x.raise_for_status(); d.write_bytes(x.content)
                 e.update(estado='descargado',archivo=str(d),url=r['url'])

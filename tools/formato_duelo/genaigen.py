@@ -6,7 +6,7 @@ fin = sys.argv[3] if len(sys.argv) > 3 else None
 prompt = open(ptxt, encoding="utf-8").read().strip()
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
-    pg = [x for c in b.contexts for x in c.pages if "genaipro" in x.url][0]
+    pg = [x for c in b.contexts for x in c.pages if "genaipro" in x.url or "lumenon" in x.url][0]
     pg.bring_to_front()
     pg.get_by_text("Frames", exact=True).first.click(); pg.wait_for_timeout(600)
     # Quitar los fotogramas del vídeo anterior (la ✕ de cada miniatura).

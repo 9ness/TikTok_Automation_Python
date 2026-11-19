@@ -7,7 +7,7 @@ os.environ['BROWSER_JSON']='browser.json'
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 from flowlib import Tab,clic,tecla
 TOPE=int(os.environ.get('TOPE_CREDITOS','25'))
-URL='https://genaipro.io/video-image-ai?ws=video&mode=frames&model=omni'
+URL='https://lumenon.ai/video-image-ai?ws=video&mode=frames&model=omni'
 BTN="(t=>[...document.querySelectorAll('button')].find(b=>b.offsetParent&&b.innerText.trim().replace(/\\s+/g,' ')===t))"
 def oscuro(t): return f"(()=>{{const b={BTN}({json.dumps(t)});return !!b&&b.getAttribute('aria-pressed')==='true'}})()"
 async def generar(t,clave):

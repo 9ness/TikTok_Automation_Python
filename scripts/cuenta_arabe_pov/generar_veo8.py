@@ -15,7 +15,7 @@ def generate(clave):
     if prev: prompt+=' The framing stays fixed for this second take.'
     with sync_playwright() as p:
         pg=own_page(p.chromium.connect_over_cdp('http://127.0.0.1:9222')); pg.set_default_timeout(20000)
-        pg.goto('https://genaipro.io/video-image-ai?ws=video&mode=frames&model=veo',wait_until='commit',timeout=120000)
+        pg.goto('https://lumenon.ai/video-image-ai?ws=video&mode=frames&model=veo',wait_until='commit',timeout=120000)
         pg.locator('textarea').wait_for(timeout=90000)
         try: pg.get_by_role('button',name='Got it',exact=True).click(timeout=5000)
         except PT: pass

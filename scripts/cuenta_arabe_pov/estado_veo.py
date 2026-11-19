@@ -3,7 +3,7 @@ from browser import own_page,sync_playwright
 L=json.load(open('GENERACIONES.json'))
 with sync_playwright() as p:
   pg=own_page(p.chromium.connect_over_cdp('http://127.0.0.1:9222'))
-  pg.goto('https://genaipro.io/video-image-ai?ws=video&mode=frames&model=veo',wait_until='domcontentloaded',timeout=90000);pg.wait_for_timeout(5000);pg.keyboard.press('Escape');pg.wait_for_timeout(1000)
+  pg.goto('https://lumenon.ai/video-image-ai?ws=video&mode=frames&model=veo',wait_until='domcontentloaded',timeout=90000);pg.wait_for_timeout(5000);pg.keyboard.press('Escape');pg.wait_for_timeout(1000)
   t=pg.locator('body').inner_text()
   for r in L:
     if r['estado']!='pendiente':continue
