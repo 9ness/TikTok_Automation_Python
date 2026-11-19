@@ -221,6 +221,18 @@ def pick_hablado(pick: str, local: str, visitante: str) -> str:
     m = re.match(r"(?i)^gana a cero\s+(.+)$", p)
     if m:
         return f"{_con_articulo(m.group(1).strip())} gana sin recibir gol"
+    # «Hándicap Bayern München -1.5» se leía tal cual con «menos uno coma cinco» (19-nov).
+    m = re.match(r"(?i)^h[áa]ndicap\s+(.+?)\s*([+-])\s*(\d+)(?:\.5)?$", p)
+    if m:
+        eq, n = _con_articulo(m.group(1).strip()), int(m.group(3))
+        nums = {0: "cero", 1: "un", 2: "dos", 3: "tres", 4: "cuatro", 5: "cinco"}
+        if m.group(2) == "-":
+            if n == 0:
+                return f"gana {eq}"
+            return f"{eq} gana por {nums.get(n + 1, str(n + 1))} o más goles"
+        if n == 0:
+            return f"{eq} no pierde"
+        return f"{eq} no pierde por más de {nums.get(n, str(n))} {'gol' if n == 1 else 'goles'}"
     if low.startswith("ambos"):
         return "no marcan los dos equipos" if re.search(r"-\s*no\b|\bno$", low) else "marcan los dos equipos"
     m = re.match(r"(?i)^(?:([+-])|(más|menos) de)\s*(\d+(?:\.\d+)?)\s+(.+)$", p)
