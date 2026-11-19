@@ -32,7 +32,7 @@ import {
   familiaModo,
 } from "@/lib/tiktok-shop-ai-pro/coloresModo";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
-import { CopyChip, idProducto } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { CopyChip, idProducto, urlFicha } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
 import { MontadoEl } from "@/components/tiktok-shop-ai-pro/MontadoEl";
 
@@ -533,7 +533,7 @@ export function MisTandas() {
                 </span>
                 {v.product_url ? (
                   <a
-                    href={v.product_url}
+                    href={urlFicha(v.product_url)}
                     target="_blank"
                     rel="noreferrer"
                     title="Abrir la ficha para ver si ha vuelto"
@@ -876,7 +876,7 @@ export function MisTandas() {
                           <CopyChip label="ID" text={idProducto(v.product_url)} />
                           {v.product_url ? (
                             <a
-                              href={v.product_url}
+                              href={urlFicha(v.product_url)}
                               target="_blank"
                               rel="noreferrer"
                               title="Abrir la ficha en TikTok Shop"

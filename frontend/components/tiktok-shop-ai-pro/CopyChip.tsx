@@ -59,3 +59,12 @@ export function CopyChip({
 export function idProducto(url?: string | null): string {
   return url?.match(/\/product\/(\d{15,22})/)?.[1] ?? "";
 }
+
+/** Enlace para ABRIR la ficha. `shop.tiktok.com/view/product/<id>` (el que
+ *  guardaban las altas de GMV Max) no abre bien el producto en el móvil;
+ *  `www.tiktok.com/view/product/<id>` sí. El resto se deja tal cual. */
+export function urlFicha(url?: string | null): string {
+  if (!url) return "";
+  const id = url.match(/shop\.tiktok\.com\/view\/product\/(\d{15,22})/)?.[1];
+  return id ? `https://www.tiktok.com/view/product/${id}` : url;
+}

@@ -1620,3 +1620,4 @@
 - 2026-11-19 · GenAI Pro pasa a llamarse Lumenon (lumenon.ai; genaipro.io redirige): mismo servicio, cuenta y créditos → guías del MCP, menus.GENAIPRO y botón de la web dicen «Lumenon (antes GenAI Pro)»; los scripts con genaipro.io siguen valiendo por la redirección
 - 2026-11-18 · El MCP tiktok de un chat puede ir como otro usuario («arabe») y registrar_replica_video da 404/403 para nestor2 → registrar con `cd ~/work && MCP_USER=nestor2 python3 mcp.py ...`.
 - 2026-11-17 · Vercel challenge salta al VPS tras varias recargas seguidas (web y CLI, 403 + retry-after) → pruebas web con 1-2 cargas, sin recargar; no saltarlo con proxy
+- 2026-11-19 · El 🛍️ de Mis tandas no abría la ficha en los GMV Max: las altas guardaban shop.tiktok.com/view/product/<id> → urlFicha() lo abre como www.tiktok.com/view/product/<id>, y alta.py ya guarda www.

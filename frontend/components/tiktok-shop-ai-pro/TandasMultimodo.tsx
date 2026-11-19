@@ -15,7 +15,7 @@ import {
   type VideoMultimodo,
 } from "@/lib/queries/nichoRopa";
 import { Caja } from "@/components/tiktok-shop-ai-pro/Paso";
-import { CopyChip } from "@/components/tiktok-shop-ai-pro/CopyChip";
+import { CopyChip, urlFicha } from "@/components/tiktok-shop-ai-pro/CopyChip";
 import { RehacerDialog } from "@/components/tiktok-shop-ai-pro/RehacerDialog";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
 
@@ -266,7 +266,7 @@ export function TandasMultimodo() {
                           </button>
                           {v.product_url ? (
                             <a
-                              href={v.product_url}
+                              href={urlFicha(v.product_url)}
                               target="_blank"
                               rel="noreferrer"
                               className="shrink-0 rounded-md border border-border/60 px-1.5 py-1 text-[10px] text-muted-foreground hover:text-foreground"
