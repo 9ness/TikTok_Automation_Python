@@ -1,4 +1,7 @@
 ## Pendiente
+- [ ] 2026-11-17 · Editor Rápido «Varias personas»: el personaje de la derecha queda a veces cortado por el borde del plano (prueba bici, t02/t08). Revisar el encuadre de `clon_duo`.
+- [ ] 2026-11-17 · Néstor: ADMIN_EMAILS en Vercel (tarea manual #778, la API da 403 al VPS) y decidir si los modos nuevos se abren a todos (quitar solo_admin).
+- [ ] 2026-11-17 · Editor web: comprobar en el navegador 0ab5504 de nebulabs-media (sin errores CORS de prefetch ni 403 del logo); solo con clics, el challenge de Vercel salta al recargar.
 - [ ] 2026-11-16 · Lemon editor: push del backend (c7293b92, 79216022) en la ventana de mañana → con EDITOR_LS_API_KEY puesta: `python3 scripts/lemon_editor.py webhook` + recrear api + compra de prueba.
 - [ ] **Editor · entrega programada (11/11/2026, aviso de la sesión Fable tras aeb828bf):** (1) `_day_processing_start` usa 00:00 UTC: un envío para HOY entre 00:00 y 01:00 de Madrid sin plan sale con `scheduled_for` futuro (hasta 1 h de retraso y sin register_enqueue). La ventana de los planes es UTC a propósito (quota_service): decidir si pasar todo a hora de Madrid. (2) Un día futuro con todos los vídeos fallidos sale como «programado» en el calendario.
 - [ ] FrutiNovelas: sacar las fichas de personajes de las 15 carpetas de sueltos/ anteriores al 6/11 (~2,6 GB) a series/<serie>/personajes y decir a VPS - Factory que mueva esas carpetas a ~/archivo (10/11)
@@ -718,6 +721,7 @@ recorta los audios largos en vez de tocar el render.
 - [Viralización] El "reanudar batch" (skip de MP4 ya válidos) es código muerto:
   `batch_id` lleva un uuid aleatorio, así que el staging nunca preexiste.
 ## ✅ Done
+- 2026-11-19 · Editor Rápido: Básico vuelve a minutos (cc9d2fb8, subs por ffmpeg + caché de flechas) y flecha en la misma pasada que los subs (a50b6cc3), probada en prod con 4 casos.
 - [x] 27/10 · Nestor2: réplica Genjutsu del dispensador de celo Eagle (`rv|2036a79352fb`) corregida desde el bruto del mismo job; audio original ×1,5, CTA navideño con campanillas y gancho original en español solo de 0 a 3,133 s; sin voz en off ni subtítulos. Revisada, semáforo verde y descarga comprobada; sin nuevos créditos. Archivos y revisión en `/mnt/HC_Volume_106974679/navegador/trabajo/celo_nestor2/recuperacion/`.
 - [x] 27/10 · Estadísticas de ventas de ness (`/estadisticas`): meses may–oct, días, productos con venta y origen de 482 pedidos de afiliados (vídeo/carrusel/anuncios/escaparate, España vs fuera, no aptos aparte) leídos del OPPO por ADB; MCP `estadisticas_ventas`/`guardar_estadisticas`.
 - [x] 26/10 · Mis tandas: filtro 🎯 por tarea de Campañas de creadores (chips con subidos/requeridos y horas que quedan, etiqueta por vídeo, MCP `guardar_tarea`/`tareas_tiktok`).
