@@ -16,6 +16,10 @@ import unicodedata
 # Desde el 11/11 para TODAS las cuentas (Néstor), no solo Viva Shop.
 PRINCIPAL = ("#TikTokShopBlackFriday", dt.date(2026, 11, 11), dt.date(2026, 11, 30))
 CATEGORIA = (dt.date(2026, 11, 11), dt.date(2026, 11, 17))
+# 2.º pico (agencia IFC vía Néstor, 19/11; ~/proyectos/admin/campana_bf_23nov.md). Los de skincare no van:
+# solo valen para productos de piel y aquí no se distingue con seguridad.
+PICO_23 = (("#OfertasParaTi", "#TemporadaDeCaprichos", "#BlackFriday", "#TikTokShop", "#BrandFridayFinds"),
+           dt.date(2026, 11, 19), dt.date(2026, 11, 23))
 
 # Orden = prioridad (una crema «para manos» es Beauty, no Fashion).
 _PALABRAS = [
@@ -65,4 +69,6 @@ def hashtags(usuario: str, pieza: dict, hoy: dt.date | None = None) -> list[str]
     salida = [tag]
     if CATEGORIA[0] <= hoy <= CATEGORIA[1]:
         salida.append(categoria(pieza.get("titulo") or pieza.get("producto_titulo") or ""))
+    if PICO_23[1] <= hoy <= PICO_23[2]:
+        salida += list(PICO_23[0])
     return salida
