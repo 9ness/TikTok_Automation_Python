@@ -163,6 +163,21 @@ def _cerrojo_carpeta(source: str, folder: str, espera_s: float = 12.0):
             r.delete(clave)
 
 
+_RE_URL_SHOP = re.compile(
+    r"^https?://(?:[a-z0-9-]+\.)*tiktok\.com/(?:[^?#]*/)?(?:view/)?product/(\d{12,25})", re.I
+)
+
+
+def normalizar_product_url(url: str) -> str:
+    """`shop.tiktok.com/view/product/<id>?…` → `https://www.tiktok.com/view/product/<id>`.
+
+    Lo demás (enlaces cortos vm.tiktok.com, otras webs) se deja igual.
+    """
+    u = (url or "").strip()
+    m = _RE_URL_SHOP.match(u)
+    return f"https://www.tiktok.com/view/product/{m.group(1)}" if m else u
+
+
 def update_product(
     source: str, folder: str, producto: str, usuario: str = "", **fields
 ) -> dict:
@@ -175,6 +190,11 @@ def update_product(
     # La hora de subida se sella aquí y no la manda el caller: es lo que deja
     # comprobar de un vistazo si un producto repetido se marcó bien (si la hora
     # cambia, el toque llegó).
+    # Néstor 20/11: el enlace de la ficha va SIEMPRE como
+    # www.tiktok.com/view/product/<id>; el de shop.tiktok.com no abre en el
+    # móvil y los agentes lo copian de Social1 una y otra vez.
+    if fields.get("product_url"):
+        fields["product_url"] = normalizar_product_url(fields["product_url"])
     if fields.get("uploaded") is True:
         fields.setdefault("uploaded_at", time.time())
     elif fields.get("uploaded") is False:
