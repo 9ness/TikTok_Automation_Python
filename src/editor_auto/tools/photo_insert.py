@@ -343,6 +343,20 @@ def _entidades_ia(*, system_prompt: str, payload: dict, ia: str, ctx: ToolContex
     )
 
 
+# Las redes donde se publica el vídeo no aportan nada como foto: «TikTok» sale en
+# casi todos los vídeos y su logo solo tapa la cara.
+_PLATAFORMAS = frozenset({
+    "tiktok", "tik tok", "tiktok shop", "instagram", "insta", "facebook", "youtube",
+    "youtube shorts", "shorts", "reels", "whatsapp", "twitter", "x", "threads",
+    "snapchat", "telegram", "twitch", "pinterest", "linkedin", "google", "capcut",
+})
+
+
+def _es_plataforma(texto: str) -> bool:
+    t = " ".join(texto.lower().replace("logo", " ").replace("de ", " ").split())
+    return t in _PLATAFORMAS
+
+
 def _extract_entities(
     *, words: list[dict], max_n: int, entity_types: str, ctx: ToolContext,
     ia: str = "gemini", system_prompt: str | None = None,
@@ -379,6 +393,8 @@ def _extract_entities(
             label = str(it.get("label", "")).strip()
             query = str(it.get("search_query", "")).strip() or label
             if not label or label.lower() in seen:
+                continue
+            if _es_plataforma(label) or _es_plataforma(query):
                 continue
             try:
                 t_start = float(it.get("t_start", 0.0))

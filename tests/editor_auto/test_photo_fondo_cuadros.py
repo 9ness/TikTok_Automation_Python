@@ -29,3 +29,9 @@ def test_fondo_blanco_y_transparencia_real_valen(tmp_path):
     a.save(tmp_path / "a.png")
     assert _fondo_cuadros(str(tmp_path / "b.png")) is False
     assert _fondo_cuadros(str(tmp_path / "a.png")) is False
+
+
+def test_plataformas_sin_foto():
+    from src.editor_auto.tools.photo_insert import _es_plataforma
+    assert _es_plataforma("TikTok") and _es_plataforma("logo TikTok") and _es_plataforma("Instagram")
+    assert not _es_plataforma("Nike") and not _es_plataforma("logo Nike")
