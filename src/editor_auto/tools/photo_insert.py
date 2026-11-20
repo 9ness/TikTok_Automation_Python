@@ -423,6 +423,9 @@ def _search_and_download(
             continue
         if not _download_and_normalize(url, dest):
             continue
+        if _fondo_cuadros(dest):
+            log(f"[photo_insert] ✗ imagen con fondo de cuadros (falsa transparencia) para '{query}' — pruebo otra.")
+            continue
         if verificar and revisadas < _MAX_VERIFICACIONES:
             revisadas += 1
             ok = _foto_encaja(dest, query)
@@ -488,6 +491,35 @@ def _foto_encaja(path: str, query: str) -> bool | None:
         return None
     except Exception:  # noqa: BLE001 — sin comprobación, se acepta como antes
         return None
+
+
+def _fondo_cuadros(path: str) -> bool:
+    """True si el borde de la imagen es el tablero gris/blanco de una «transparencia»
+    falsa (PNG de stock guardado como JPG): en el vídeo se ven los cuadros."""
+    try:
+        from PIL import Image
+
+        img = Image.open(path).convert("RGBA")
+        img.thumbnail((256, 256))
+        w, h = img.size
+        if w < 32 or h < 32:
+            return False
+        b = max(4, min(w, h) // 12)
+        px = img.load()
+        borde = [px[x, y] for y in range(h) for x in range(w)
+                 if (x < b or y < b or x >= w - b or y >= h - b)]
+        opacos = [(r, g, bl) for r, g, bl, a in borde if a > 200]
+        if len(opacos) < len(borde) * 0.8:
+            return False  # transparencia de verdad: bien
+        grises = [r for r, g, bl in opacos if max(r, g, bl) - min(r, g, bl) <= 12 and r >= 150]
+        if len(grises) < len(opacos) * 0.85:
+            return False
+        claros = sum(1 for v in grises if v >= 245)
+        medios = sum(1 for v in grises if 170 <= v < 240)
+        # Dos tonos que se reparten el borde = tablero; un fondo blanco liso no cuenta.
+        return claros >= len(grises) * 0.2 and medios >= len(grises) * 0.2
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _download_and_normalize(url: str, dest: str) -> bool:

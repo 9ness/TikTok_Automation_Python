@@ -1628,3 +1628,4 @@
 - 2026-11-20 · Estadísticas Viva: el diálogo «Gana recompensas» tapaba Studio y, al salir y volver a entrar, saltó el puzle → dias_mi8.py lo cierra con «Ahora no» en la misma pasada; regla en vivashop-estadisticas-diaria.md.
 - 2026-11-20 · Las altas de Mis productos guardaban shop.tiktok.com/view/product (no abre en el móvil) aunque la rutina lo prohibía → product_repo.update_product normaliza a www.tiktok.com/view/product/<id> al guardar; 98 corregidas a mano
 - 2026-11-20 · Multicuentas para los 3 vídeos gratis del Editor Rápido (alias +x y puntos de Gmail, correos temporales) → gratis una vez por buzón real (`email_canonico`, clave `rapido:gratis:<canon>`) y 0 a dominios desechables
+- 2026-11-20 · Fotos de apoyo del Editor: el buscador da logos «transparentes» que son JPG con el tablero de cuadros pintado → `_fondo_cuadros` mira el borde y los descarta antes de Haiku
