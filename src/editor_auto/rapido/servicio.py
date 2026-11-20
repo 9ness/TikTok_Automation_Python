@@ -275,6 +275,52 @@ def caduca_en(s: dict) -> float | None:
     return base + CADUCIDAD_DIAS * 86400
 
 
+# Correos de usar y tirar: sin créditos gratis (se pueden comprar igual).
+DOMINIOS_DESECHABLES = frozenset({
+    "mailinator.com", "guerrillamail.com", "guerrillamail.net", "sharklasers.com", "grr.la",
+    "10minutemail.com", "10minutemail.net", "temp-mail.org", "tempmail.com", "tempmail.net",
+    "tempmailo.com", "temp-mail.io", "yopmail.com", "yopmail.fr", "yopmail.net", "trashmail.com",
+    "getnada.com", "nada.email", "dispostable.com", "maildrop.cc", "mailnesia.com", "mintemail.com",
+    "throwawaymail.com", "fakeinbox.com", "emailondeck.com", "mohmal.com", "tempail.com",
+    "moakt.com", "mail.tm", "mail.gw", "burnermail.io", "spamgourmet.com", "inboxkitten.com",
+    "tmail.ws", "minuteinbox.com", "emailfake.com", "fakemail.net", "luxusmail.org", "tmpmail.org",
+    "tmpmail.net", "cs.email", "dropmail.me", "spambox.us", "33mail.com", "anonaddy.me",
+})
+
+
+def email_canonico(email: str) -> str:
+    """El buzón real detrás de un correo: sin «+lo-que-sea» y, en Gmail, sin puntos.
+    nombre+1@gmail.com, n.o.m.b.r.e@gmail.com y nombre@googlemail.com son la misma persona."""
+    e = (email or "").strip().lower()
+    if "@" not in e:
+        return e
+    local, dominio = e.rsplit("@", 1)
+    if dominio == "googlemail.com":
+        dominio = "gmail.com"
+    local = local.split("+", 1)[0]
+    if dominio == "gmail.com":
+        local = local.replace(".", "")
+    return f"{local}@{dominio}"
+
+
+def _k_gratis(canon: str) -> str:
+    return f"rapido:gratis:{canon}"
+
+
+def _gratis_para(email: str) -> int:
+    """Créditos de alta: una sola vez por buzón real y nunca a correos de usar y tirar.
+    Se llama con _LOCK tomado, al crear el saldo."""
+    canon = email_canonico(email)
+    if canon.rsplit("@", 1)[-1] in DOMINIOS_DESECHABLES:
+        return 0
+    r = get_editor_redis()
+    dueno = r.get_str(_k_gratis(canon))
+    if dueno and dueno != email:
+        return 0
+    r.set_str(_k_gratis(canon), email)
+    return gratis_inicial()
+
+
 def saldo(email: str) -> dict:
     """Saldo del usuario; lo crea con los créditos gratis la primera vez.
     Si la caducidad está activa (CADUCIDAD_DIAS) y ha vencido, el saldo se pone a 0."""
@@ -283,7 +329,8 @@ def saldo(email: str) -> dict:
         s = r.get_json(_k_saldo(email))
         if s is None:
             ahora = time.time()
-            s = {"creditos": gratis_inicial(), "gratis_dados": gratis_inicial(), "creado": ahora,
+            g = _gratis_para(email)
+            s = {"creditos": g, "gratis_dados": g, "creado": ahora,
                  "ultima_recarga": ahora, "unidad": UNIDAD}
             r.set_json(_k_saldo(email), s)
             r.sadd(_K_CUENTAS, email)

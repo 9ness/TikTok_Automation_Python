@@ -1487,3 +1487,14 @@ def test_flecha_posicion_libre():
     assert cfg["position_x_pct"] == 22.0 and cfg["position_y_pct"] == 82.0
     with pytest.raises(ValueError):
         sv.validar_flecha({"activo": True, "y": "abajo"})
+
+
+def test_gratis_una_vez_por_buzon(rapido):
+    """Alias de Gmail (+x, puntos, googlemail) y correos de usar y tirar no repiten los gratis."""
+    assert svc.email_canonico("Pe.Pe+editor@GoogleMail.com") == "pepe@gmail.com"
+    assert svc.email_canonico("pe.pe+x@outlook.com") == "pe.pe@outlook.com"
+    assert svc.saldo("pepe@gmail.com")["creditos"] == 150
+    assert svc.saldo("p.e.p.e+2@gmail.com")["creditos"] == 0
+    assert svc.saldo("pepe@gmail.com")["creditos"] == 150  # el primero no pierde nada
+    assert svc.saldo("alguien@yopmail.com")["creditos"] == 0
+    assert svc.saldo("otra@example.com")["creditos"] == 150
