@@ -1471,3 +1471,19 @@ def test_flecha_todo_video_y_minimo_5s():
                          rotation_deg=0, flip_horizontal=False, flip_vertical=False, de_entrada=False,
                          main_w_px=1080, entrada="0:v", sticker="1:v", salida="v")
     assert "overlay" in f and f.endswith("[v]") and "between(t,0.000,40.000)" in f
+
+
+def test_flecha_posicion_libre():
+    """La flecha se puede mover (x/y, centro 0-1) y se guarda; sin x/y va sobre el enlace."""
+    from src.editor_auto.rapido import servicio as sv
+
+    assert "y" not in sv.validar_flecha({"activo": True, "id": "auto"})
+    d = sv.validar_flecha({"activo": True, "id": "auto", "x": 0.4, "y": 0.6})
+    assert d["x"] == 0.4 and d["y"] == 0.6
+    assert sv.validar_flecha({"activo": True, "y": 1.5})["y"] == 0.95
+    cfg = sv.config_flecha(d, "es")
+    assert cfg["position_x_pct"] == 40.0 and cfg["position_y_pct"] == 60.0
+    cfg = sv.config_flecha({"activo": True, "id": "auto"}, "es")
+    assert cfg["position_x_pct"] == 22.0 and cfg["position_y_pct"] == 82.0
+    with pytest.raises(ValueError):
+        sv.validar_flecha({"activo": True, "y": "abajo"})

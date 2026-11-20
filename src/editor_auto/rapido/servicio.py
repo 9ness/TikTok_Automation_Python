@@ -208,6 +208,7 @@ def validar_subtitulos(d: dict | None) -> dict:
             "colores_hablantes": colores}
 
 
+FLECHA_X, FLECHA_Y = 0.22, 0.82  # centro por defecto: sobre el enlace naranja del carrito
 FLECHA_AUTO = "auto"  # modo Inteligente: el motor elige forma+color por contraste con el fondo
 
 
@@ -219,7 +220,17 @@ def validar_flecha(d: dict | None) -> dict:
         raise ValueError(f"Flecha desconocida: {fid}")
     if activo and not fid:
         fid = FLECHA_AUTO  # por defecto la inteligente (se ajusta al fondo de cada vídeo)
-    return {"activo": activo, "id": fid or None, "todo_video": bool(d.get("todo_video", False))}
+    out = {"activo": activo, "id": fid or None, "todo_video": bool(d.get("todo_video", False))}
+    # Sitio de la flecha (centro, fracción 0-1 del ancho/alto), movida a mano en la web.
+    # Sin x/y = la de siempre, sobre el enlace naranja (FLECHA_X/FLECHA_Y).
+    for k in ("x", "y"):
+        v = d.get(k)
+        if v is not None:
+            try:
+                out[k] = round(min(0.95, max(0.05, float(v))), 3)
+            except (TypeError, ValueError):
+                raise ValueError(f"Posición de flecha no válida: {k}={v!r}")
+    return out
 
 
 # ───────────────────────── Redis ─────────────────────────
@@ -1138,7 +1149,8 @@ def config_flecha(fl: dict, idioma: str) -> dict[str, Any]:
     estilo = {"cuts": {"enabled": False}, "subtitle": {"enabled": False},
               # Apuntando al enlace naranja del carrito (abajo a la izquierda): misma
               # posición que ya validó el operador en los vídeos listos (learnings 22/07).
-              "arrow": {"enabled": True, "shapeId": fichero, "x": 0.22, "y": 0.82, "scale": 0.8}}
+              "arrow": {"enabled": True, "shapeId": fichero, "x": fl.get("x") or FLECHA_X,
+                        "y": fl.get("y") or FLECHA_Y, "scale": 0.8}}
     cfg = next(st.config for st in build_tool_flow(estilo) if st.tool_id == "sticker_arrow")
     cfg["whisper_model_size"] = os.getenv("EDITOR_RAPIDO_WHISPER_MODEL", "small")
     cfg["ai_language"] = None if idioma == "auto" else idioma

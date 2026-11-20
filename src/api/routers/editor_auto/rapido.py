@@ -90,6 +90,8 @@ class FlechaAjustes(BaseModel):
     activo: bool = False
     id: str | None = Field(None, description="id de GET /opciones → flechas, o «auto» = Inteligente (por defecto)")
     todo_video: bool = Field(False, description="True = en todo el vídeo; False = con la palabra clave («carrito naranja»…) o, si no la dice, los últimos 5 s")
+    x: float | None = Field(None, ge=0, le=1, description="Centro de la flecha, fracción del ancho (0 izq. · 1 der.). Vacío = sobre el enlace del carrito (0,22)")
+    y: float | None = Field(None, ge=0, le=1, description="Centro de la flecha, fracción del alto (0 arriba · 1 abajo). Vacío = sobre el enlace del carrito (0,82)")
 
 
 class Ajustes(BaseModel):
