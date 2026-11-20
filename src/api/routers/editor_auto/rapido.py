@@ -202,7 +202,7 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
         "duracion_s": ficha["duracion_s"], "duracion_final_s": ficha.get("duracion_final_s"),
         "creditos": ficha["creditos"], "creado": ficha["creado"], "error": ficha.get("error"),
         "ajustes": ficha.get("ajustes"), "version": ficha.get("version", 0),
-        "aviso": ficha.get("aviso"), "resumen": svc.resumen(ficha),
+        "aviso": ficha.get("aviso"), "aviso_fotos": ficha.get("aviso_fotos"), "resumen": svc.resumen(ficha),
         "fecha": svc.fecha_iso(ficha["creado"]), "nota": ficha.get("nota"),
         "progreso": None,
     }

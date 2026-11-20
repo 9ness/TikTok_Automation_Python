@@ -481,6 +481,31 @@ def borrar_ficha(ficha: dict) -> None:
     shutil.rmtree(carpeta(ficha["id"]), ignore_errors=True)
 
 
+AVISO_SIN_FOTOS = "No se ha puesto ninguna foto de apoyo"
+
+
+def devolver_extra(ficha: dict, eid: str, modo: str | None) -> str:
+    """Devuelve lo cobrado por un extra que no se pudo aplicar (solo el corte inicial cobra extras).
+
+    Idempotente por extra (`extras_devueltos`). Devuelve el texto para el aviso."""
+    from src.editor_auto.rapido import extras as ex
+    p = cr(ex.precio([eid]))
+    if modo != "auto" or p <= 0:
+        return "No se cobra ese extra." if modo == "auto" else ""
+    with _LOCK:
+        f = cargar_ficha(ficha["id"]) or ficha
+        if not f.get("cobrado") or f.get("devuelto") or eid in (f.get("extras_devueltos") or []):
+            return "No se cobra ese extra."
+        f["extras_devueltos"] = sorted(set(f.get("extras_devueltos") or []) | {eid})
+        f["creditos"] = cr(max(0, cr(f.get("creditos", 0)) - p))  # un fallo posterior devuelve solo el resto
+        guardar_ficha(f)
+    ficha.update(extras_devueltos=f["extras_devueltos"], creditos=f["creditos"])
+    ajustar_creditos(f["email"], p)
+    descontar_historial(f["email"], f.get("cobrado_fecha"), p)
+    registrar_evento(f["id"], f["email"], "extra_devuelto", {"extra": eid, "creditos": p})
+    return f"Te hemos devuelto {p:g} crédito(s) de ese extra."
+
+
 def devolver_creditos(ficha: dict) -> None:
     """Reembolsa lo cobrado si el trabajo falló. Idempotente."""
     with _LOCK:
@@ -1373,8 +1398,12 @@ def _estilizar(base: Path, destino: Path, ficha: dict, job,
     if "fotos" in pedidos:
         with crono.medir("fotos"):
             palabras_f = _asegurar_palabras()
-        _paso("fotos", "photo_insert", ex.config_fotos(idioma), t0, "Poniendo fotos de apoyo…",
-              {"palabras": palabras_f} if palabras_f else None)
+        info_f: dict = {"palabras": palabras_f} if palabras_f else {}
+        _paso("fotos", "photo_insert", ex.config_fotos(idioma), t0, "Poniendo fotos de apoyo…", info_f)
+        if info_f.get("fotos_puestas") == 0:
+            # Sin fotos que aporten → se avisa y (en el corte cobrado) se devuelve lo del extra.
+            avisos.append(AVISO_SIN_FOTOS + ": " + str(info_f.get("fotos_motivo") or "no había nada bueno que enseñar")
+                          + ". " + devolver_extra(ficha, "fotos", job.params.get("modo")))
 
     if ajustes.get("modo") == "replica" and ajustes.get("referencia_url"):
         with crono.medir("replica"):
@@ -1550,7 +1579,9 @@ def ejecutar(job, on_log: Callable[[str], None], on_progress: Callable[[float, s
         ficha["version"] = int(ficha.get("version", 0)) + 1
         ficha["duracion_final_s"] = round(duracion_video(final), 2)
         ficha["error"] = None
-        ficha["aviso"] = " ".join(avisos) or None
+        # «No se puso ninguna foto» no es un fallo: va aparte para que la web lo enseñe entero.
+        ficha["aviso_fotos"] = next((a for a in avisos if a.startswith(AVISO_SIN_FOTOS)), None)
+        ficha["aviso"] = " ".join(a for a in avisos if not a.startswith(AVISO_SIN_FOTOS)) or None
         if modo == "retoque":
             ficha["devueltos"] = sorted(set(job.params.get("devueltos") or []))
             ficha["aplicados"] = sorted(set(job.params.get("aplicados") or []))

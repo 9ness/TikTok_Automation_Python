@@ -178,6 +178,7 @@ class PhotoInsertTool:
             words = _transcribe(input_path, config, ctx)
         if not words:
             ctx.on_log("[photo_insert] Sin transcripción — no inserto fotos.")
+            _sin_fotos(ctx, "no se entiende ninguna frase en el audio")
             return _noop_copy(input_path, output_path)
 
         # 2) Gemini → entidades con timestamp.
@@ -199,6 +200,7 @@ class PhotoInsertTool:
                 "[photo_insert] No se detectó ninguna persona/marca — "
                 "no inserto fotos (es lo esperado en muchos vídeos)."
             )
+            _sin_fotos(ctx, "en el vídeo no se nombra a ninguna persona, marca o lugar conocido del que una foto aporte algo")
             return _noop_copy(input_path, output_path)
 
         ctx.on_log(
@@ -234,6 +236,7 @@ class PhotoInsertTool:
 
         if not items:
             ctx.on_log("[photo_insert] Ninguna imagen descargada — no-op.")
+            _sin_fotos(ctx, "no encontramos fotos buenas de " + ", ".join(i["label"] for i in inserts))
             return _noop_copy(input_path, output_path)
 
         # Ordenar por inicio y recortar solapes (que no se pisen 2 fotos).
@@ -253,6 +256,8 @@ class PhotoInsertTool:
             scale_width_pct=float(config.get("scale_width_pct", 38.0)),
             log=ctx.on_log,
         )
+        if ctx.extras is not None:
+            ctx.extras["fotos_puestas"] = len(items)
         ctx.on_progress(1.0, f"✅ {len(items)} foto(s) insertada(s)")
         return output_path
 
@@ -260,6 +265,13 @@ class PhotoInsertTool:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def _sin_fotos(ctx: ToolContext, motivo: str) -> None:
+    """Deja en ctx.extras por qué no se puso ninguna foto (el editor rápido lo avisa y no lo cobra)."""
+    if ctx.extras is not None:
+        ctx.extras["fotos_puestas"] = 0
+        ctx.extras["fotos_motivo"] = motivo
+
+
 def _noop_copy(input_path: str, output_path: str) -> str:
     """Copia el input al output sin tocar — la tool no aplicó nada."""
     if os.path.abspath(input_path) != os.path.abspath(output_path):
