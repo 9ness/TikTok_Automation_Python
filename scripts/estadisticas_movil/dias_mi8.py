@@ -125,8 +125,14 @@ def a_datos():
     p = None
     for i in range(4):
         # desde 7/11 a veces no sale en el volcado nativo: se busca también por OCR
-        p = so.boton_ver_detalles(volcado(), palabras(cap(f"studio_{i}")))
+        pal = palabras(cap(f"studio_{i}"))
+        p = so.boton_ver_detalles(volcado(), pal)
         if p: break
+        # 20/11: el diálogo «Gana recompensas» tapa Studio. Se cierra con «Ahora no» AQUÍ y se sigue;
+        # salir y volver a entrar en Studio fue lo que sacó el puzle.
+        if hay("recompensas", pal) and donde("Ahora", pal):
+            tap(*donde("Ahora", pal), 3)
+            continue
         if i == 1: swipe(1500, 900)                     # la tarjeta puede quedar debajo de un banner
         else: tap(927, 739, 2)                          # aviso «Estado de la cuenta» (no sale en el volcado)
     else:
