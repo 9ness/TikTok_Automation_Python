@@ -682,11 +682,10 @@ ESTILOS_TEXTO = ("blanco", "clasico", "regalo")
 # (tres líneas iguales, sin color) es el que usan los POV de 20s para eso; el
 # de urgencia de precio va con el clásico de color, que llama más y es lo que
 # pega con una oferta.
-# 12/11/2026: TODOS a "blanco". El clásico y el de regalo queman «CUPÓN
-# DESCUENTO» (y el de regalo, un rótulo navideño): prohibido si la ficha no
-# tiene esa oferta (memoria infraccion-producto-inconsistente) y nada navideño
-# en Viva. Siguen disponibles solo si se piden a propósito.
-ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "blanco", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "regalo": "blanco", "viral": "blanco"}
+# 12/11/2026 se pasaron todos a "blanco"; 21/11/2026 Néstor lo devuelve como
+# antes: precio → clásico (banner de urgencia, puede decir «CUPÓN DESCUENTO»
+# tal cual) y regalo → rótulo de regalo con la flecha animada, ya navideños.
+ESTILO_TEXTO_POR_GANCHO = {"dolor": "blanco", "precio": "clasico", "epico": "blanco", "inversa": "blanco", "accion": "blanco", "regalo": "regalo", "viral": "blanco"}
 
 
 def estilo_texto_de(estilo_guion: str = "") -> str:

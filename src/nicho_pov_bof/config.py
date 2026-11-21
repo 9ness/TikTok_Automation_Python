@@ -1078,6 +1078,17 @@ def estacion_actual() -> str:
     return _ESTACIONES[datetime.now().month]
 
 
+def temporada_paletas() -> str:
+    """Temporada para las paletas del texto quemado: «navidad» del 20/11 a Reyes
+    (Néstor, 21/11/2026); el resto del año, la estación."""
+    from datetime import datetime
+
+    hoy = datetime.now()
+    if (hoy.month == 11 and hoy.day >= 20) or hoy.month == 12 or (hoy.month == 1 and hoy.day <= 6):
+        return "navidad"
+    return estacion_actual()
+
+
 def epoca_actual() -> str:
     """`"septiembre, o sea otoño en España"`. Se calcula al pedir el prompt."""
     from datetime import datetime

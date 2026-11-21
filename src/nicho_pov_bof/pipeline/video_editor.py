@@ -1144,6 +1144,51 @@ _PALETAS = (
         "cta_fill": (255, 214, 196),    "cta_glow": (184, 30, 64),
         "tono": 348, "familias": "🍷🧣💰🥀❤️",
     },
+    # NAVIDAD (20/11 → Reyes, Néstor 21/11/2026): sustituyen a las de otoño en
+    # esas fechas. Repartidas por la rueda como las otoñales para que el
+    # criterio de contraste siempre tenga alguna que se lea sobre el fondo.
+    {
+        "nombre": "rojo_navidad", "estacion": "navidad",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (226, 18, 46),
+        "cta_fill": (255, 226, 160),    "cta_glow": (168, 8, 30),
+        "tono": 352, "familias": "🎅❤️🎁🔥🏷️",
+    },
+    {
+        "nombre": "oro_navidad", "estacion": "navidad",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (255, 190, 40),
+        "cta_fill": (255, 240, 190),    "cta_glow": (196, 140, 16),
+        "tono": 44, "familias": "⭐✨🌟💰🔔",
+    },
+    {
+        "nombre": "abeto", "estacion": "navidad",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (20, 168, 80),
+        "cta_fill": (255, 226, 140),    "cta_glow": (10, 110, 50),
+        "tono": 142, "familias": "🎄🌲🍀✅💚",
+    },
+    {
+        "nombre": "hielo", "estacion": "navidad",
+        "gancho_fill": (230, 250, 255), "gancho_glow": (60, 200, 255),
+        "cta_fill": (255, 255, 255),    "cta_glow": (20, 140, 210),
+        "tono": 196, "familias": "❄️☃️🧊💧👀",
+    },
+    {
+        "nombre": "azul_noche", "estacion": "navidad",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (70, 110, 255),
+        "cta_fill": (220, 230, 255),    "cta_glow": (30, 60, 190),
+        "tono": 226, "familias": "🌙💙🔎🎟️💳",
+    },
+    {
+        "nombre": "plata_violeta", "estacion": "navidad",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (176, 110, 240),
+        "cta_fill": (236, 230, 255),    "cta_glow": (120, 60, 200),
+        "tono": 276, "familias": "🔮💜✨🎀🪩",
+    },
+    {
+        "nombre": "frambuesa", "estacion": "navidad",
+        "gancho_fill": (255, 255, 255), "gancho_glow": (240, 40, 140),
+        "cta_fill": (255, 222, 236),    "cta_glow": (180, 20, 100),
+        "tono": 326, "familias": "🎀🍬💖🎉🍭",
+    },
 )
 
 
@@ -1293,7 +1338,7 @@ def _elegir_paleta(
     # eléctrico al lado de los de calabaza y la cuenta pierde el aire de
     # temporada, que es justo para lo que se hizo la gama. Las neutras quedan
     # de red de seguridad para una estación que aún no tenga las suyas.
-    ahora = config.estacion_actual()
+    ahora = config.temporada_paletas()
     de_temporada = [p for p in _PALETAS if p.get("estacion") == ahora]
     candidatas = de_temporada or [p for p in _PALETAS if not p.get("estacion")]
 
