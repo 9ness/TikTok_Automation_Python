@@ -113,7 +113,15 @@ def listo_at(usuario: str, id_: str) -> float:
     """Para poner el semáforo: comprueba además que el carrusel es de ESE usuario."""
     from src.replicar_viral import carrusel
 
-    return _listo_at(carrusel.con_estado(carrusel.ver(usuario or "ness", id_)))
+    usuario = usuario or "ness"
+    doc = carrusel.ver(usuario, id_)
+    valor = _listo_at(carrusel.con_estado(doc))
+    if valor <= 0:
+        # 0 = no se leyó ninguna foto (caché vacía o Drive caído): un semáforo
+        # guardado así nunca vale y el carrusel desaparece de Mis tandas (22/11).
+        carrusel.olvidar_disco(usuario, id_)
+        valor = _listo_at(carrusel.con_estado(doc))
+    return valor
 
 
 def _semaforo(d: dict, sem: dict) -> dict | None:

@@ -874,7 +874,8 @@ async def marcar_gmv_max(ctx: Context, producto: str = "", tienda: str = "", id:
 @_herramienta(structured_output=False)
 async def lista_gmv_max(ctx: Context) -> str:
     """Tiendas y productos marcados GMV Max y tus vídeos/carruseles PENDIENTES de
-    subir que los llevan (con su semáforo): súbelos primero en el Black Friday.
+    subir que los llevan (con su semáforo): súbelos primero en el Black Friday,
+    pero SOLO los de `listos_para_subir` (en verde): gmv_max no autoriza subir.
     En `mis_tandas` cada vídeo trae `gmv_max` y cada tanda cuántos. Solo lee."""
     return _json(await Interno(_usuario(ctx)).get("/api/v1/mis-tandas/gmv-max"))
 

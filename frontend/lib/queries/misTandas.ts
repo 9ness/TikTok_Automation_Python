@@ -55,6 +55,8 @@ export interface VideoTanda {
   tareas?: string[];
   /** Su tienda o producto inyecta GMV Max: se sube primero en el Black Friday. */
   gmv_max?: boolean;
+  /** GMV Max Y en verde: lo único que se sube primero. */
+  gmv_max_listo?: boolean;
   /** Su producto es de «Muestras gratuitas» (pide vídeo). */
   muestra_gratis?: boolean;
   /** Su producto tiene un reembolso en curso. */

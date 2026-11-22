@@ -196,6 +196,32 @@ def test_semaforo_de_carrusel(entorno):  # noqa: F811
         mt.poner_semaforo("ana", f"car|{i}", "verde")
 
 
+def test_semaforo_de_carrusel_sin_fotos_leidas_no_se_guarda(entorno, monkeypatch):  # noqa: F811
+    """22/11: semáforos con listo_at=0 (no se leyó ninguna foto) nunca valen y
+    el carrusel desaparecía de Mis tandas. Se relee sin caché; si sigue en 0, error."""
+    from src.mis_tandas import servicio as mt
+
+    (i,) = _crear(1)
+    reales = carrusel._fotos_en_disco
+    llamadas = []
+
+    def primera_vacia(*a, **k):
+        llamadas.append(1)
+        if len(llamadas) == 1:
+            return {t: {} for t in carrusel.TIPOS_FOTO}
+        return reales(*a, **k)
+
+    monkeypatch.setattr(carrusel, "_fotos_en_disco", primera_vacia)
+    s = mt.poner_semaforo("ness", f"car|{i}", "verde", "ok")["semaforo"]
+    assert s["listo_at"] > 0 and len(llamadas) == 2
+    monkeypatch.setattr(carrusel, "_fotos_en_disco", lambda *a, **k: {t: {} for t in carrusel.TIPOS_FOTO})
+    with pytest.raises(mt.ErrorTanda) as e:
+        mt.poner_semaforo("ness", f"car|{i}", "verde", "ok")
+    assert e.value.status == 503
+    # Un rojo de descarte sí se pone aunque no haya fotos.
+    assert mt.poner_semaforo("ness", f"car|{i}", "rojo", "descartado")["ok"]
+
+
 def test_enlace_del_producto_sale_del_catalogo(monkeypatch):
     """La copia del producto en el carrusel no lleva el enlace: se lee del catálogo."""
     from src.nicho_pov_bof.repos import product_repo as pov_repo

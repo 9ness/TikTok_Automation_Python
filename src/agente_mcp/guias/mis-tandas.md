@@ -246,7 +246,9 @@ también nuestros vídeos de afiliado, así que en el Black Friday **se suben pr
   En `mis_tandas` cada pieza trae `gmv_max: true` y cada tanda `gmv_max` = pendientes marcados.
 - **Web**: chip «🚀 GMV Max» en Mis tandas (filtra y pone primero) y botón 🚀 en cada tarjeta.
 - Marca solo lo que hayas VISTO inyectando (Social1 › anuncios de la tienda/producto). No cambia el
-  semáforo: un GMV Max sin verde sigue sin poder subirse.
+  semáforo: un GMV Max sin verde sigue sin poder subirse. `gmv_max: true` sale en TODAS las piezas
+  de un producto marcado, también en ámbar/rojo; para subir mira `gmv_max_listo` (GMV Max + verde)
+  o `lista_gmv_max()` › `listos_para_subir`.
 
 ## Muestra gratis y reembolsable (filtros)
 

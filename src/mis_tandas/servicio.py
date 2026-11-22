@@ -234,6 +234,9 @@ def poner_semaforo(usuario: str, id_: str, color: str, motivo: str = "", por: st
         from src.mis_tandas import fotos
 
         f = {"video_listo_at": fotos.listo_at(usuario, id_[len(CARRUSEL):])}
+        if color == "verde" and not f["video_listo_at"]:
+            raise ErrorTanda("No se han podido leer las fotos de ese carrusel en el Drive "
+                             "(o aún no tiene ninguna): reintenta en un momento.", status=503)
     else:
         f = _fila_de(usuario, id_)
     r = _redis()
@@ -742,6 +745,8 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
     for t in salida:
         for v in t.get("items", []):
             v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
+            # GMV Max es prioridad del PRODUCTO, no permiso: solo se sube primero si está en verde.
+            v["gmv_max_listo"] = bool(v.get("gmv_max")) and (v.get("semaforo") or {}).get("color") == "verde"
         items = t.get("items", [])
         t["semaforo"] = {c: sum(1 for v in items if (v.get("semaforo") or {}).get("color") == c and not v["uploaded"])
                          for c in config.SEMAFORO_COLORES}
@@ -1095,7 +1100,10 @@ def lista_gmv_max(usuario: str) -> dict:
     return {"tiendas": [v.get("nombre") or k for k, v in m["tiendas"].items()],
             "productos": [{"titulo": v.get("titulo", ""), "tienda": v.get("tienda", "")}
                           for v in m["productos"].values()],
-            "pendientes_videos": videos, "pendientes_carruseles": carr}
+            "pendientes_videos": videos, "pendientes_carruseles": carr,
+            # Lo único que se puede subir ya: GMV Max Y en verde. El resto espera a su semáforo.
+            "listos_para_subir": [p["id"] for p in videos + carr if p["semaforo"] == "verde"],
+            "aviso": "gmv_max marca el PRODUCTO (prioridad), no autoriza subir: sin verde no se sube."}
 
 
 def _fila_de(usuario: str, id_: str) -> dict:
