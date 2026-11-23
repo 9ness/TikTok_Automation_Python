@@ -424,7 +424,7 @@ def cortar(vid: str, ajustes: Ajustes, claims: Claims, queue: Annotated[JobQueue
     mx = _validar_modo(ajustes, claims)
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] not in ("subido", "error"):
-        raise APIError("Este vídeo ya se ha cortado o está en marcha.", status_code=409)
+        raise APIError("Este vídeo ya está editado o en marcha.", status_code=409)
     admin = _es_admin(claims)  # el admin no gasta créditos
     # Tarifa vigente (fichas de antes del cambio a vídeos) + cada extra. `creditos` = total cobrado
     # (lo que devuelve `devolver_creditos` si el trabajo falla).
@@ -515,7 +515,7 @@ def cambiar_estilo(vid: str, body: Estilo, claims: Claims, queue: Annotated[JobQ
     if ficha["estado"] == "cola":
         raise APIError("El vídeo está en marcha; espera a que termine.", status_code=409)
     if ficha["estado"] != "listo":
-        raise APIError("El vídeo aún no está cortado.", status_code=409)
+        raise APIError("El vídeo aún no está editado.", status_code=409)
     aj = dict(ficha.get("ajustes") or {})
     if sub is not None:
         aj["subtitulos"] = sub
@@ -552,7 +552,7 @@ def corregir_subtitulos(vid: str, body: CorreccionSubs, claims: Claims,
     if ficha["estado"] == "cola":
         raise APIError("El vídeo está en marcha; espera a que termine.", status_code=409)
     if ficha["estado"] != "listo":
-        raise APIError("El vídeo aún no está cortado.", status_code=409)
+        raise APIError("El vídeo aún no está editado.", status_code=409)
     try:
         n = svc.corregir_palabras(vid, [c.model_dump() for c in body.cambios])
     except ValueError as e:
@@ -623,7 +623,7 @@ def archivo(
     base = re.sub(r"[^A-Za-z0-9._-]+", "_", ficha["nombre"].rsplit(".", 1)[0]) or "video"
     return FileResponse(
         ruta, media_type="video/mp4" if tipo == "resultado" else None,
-        filename=f"{base}_cortado.mp4" if descargar else None,
+        filename=f"{base}_editado.mp4" if descargar else None,
         content_disposition_type="attachment" if descargar else "inline",
     )
 
@@ -632,7 +632,7 @@ def archivo(
 def borrar(vid: str, claims: Claims) -> dict:
     ficha = _ficha_o_404(vid, claims.email)
     if ficha["estado"] == "cola":
-        raise APIError("Espera a que termine el corte.", status_code=409)
+        raise APIError("Espera a que el vídeo termine de editarse.", status_code=409)
     svc.registrar_evento(vid, claims.email, "borrado", {"estado": ficha["estado"]})
     svc.guardar_dataset(ficha)  # el original se conserva (hardlink) salvo opt-out
     svc.borrar_ficha(ficha)
