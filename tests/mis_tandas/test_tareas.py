@@ -61,3 +61,37 @@ def test_vencida_desaparece_sola(r):
     # al leer se borra de Redis: no se acumulan tareas pasadas
     assert [x["id"] for x in tareas.listar("ness")] == ["viva"]
     assert [x["id"] for x in r.get_json(tareas.TAREAS_KEY.format(usuario="ness"))["tareas"]] == ["viva"]
+
+
+def test_hashtag_exclusivo_y_duracion_minima(r, monkeypatch):
+    """23/11: «Publica 5 vídeos» pide #7694275802761789461 en el caption y ≥ 20 s."""
+    from src.mis_tandas import servicio
+
+    t = tareas.guardar("ness", {"nombre": "Publica 5", "productos": [PID],
+                                "hashtags": ["7694275802761789461", "#7694275802761789461"], "duracion_min": 20})
+    assert t["hashtags"] == ["#7694275802761789461"] and t["duracion_min"] == 20
+    otra = tareas.guardar("ness", {"nombre": "Otra", "productos": [PID], "hashtags": "#a, b", "duracion_min": 10})
+    req = tareas.requisitos([t["id"], otra["id"]], [t, otra])
+    assert req == {"hashtags": ["#7694275802761789461", "#a", "#b"], "duracion_min": 20}
+    assert tareas.requisitos([], [t]) == {"hashtags": [], "duracion_min": 0}
+    (res,) = tareas.resumen([t], [])
+    assert res["hashtags"] == ["#7694275802761789461"] and res["duracion_min"] == 20
+
+    verde = {"color": "verde", "motivo": "ok", "listo_at": 1}
+    assert servicio._por_duracion(verde, 0) is verde
+    assert servicio._por_duracion({**verde, "duracion": 24.0}, 20)["color"] == "verde"
+    corto = servicio._por_duracion({**verde, "duracion": 16.1}, 20)
+    assert corto["color"] == "ambar" and "16.1 s" in corto["motivo"]
+    assert servicio._por_duracion(verde, 20)["color"] == "ambar"  # verde sin medir
+
+    # Al poner verde se mide: corto → se guarda en ámbar.
+    rs = FakeRedis()
+    monkeypatch.setattr(servicio, "_redis", lambda: rs)
+    monkeypatch.setattr(servicio, "_fila_de", lambda u, i: {"id": i, "video_listo_at": 5, "video_path": "/x.mp4"})
+    monkeypatch.setattr(servicio, "_minimo_de_tareas", lambda u, f: 20)
+    monkeypatch.setattr(servicio, "_duracion", lambda ruta: 16.0)
+    s = servicio.poner_semaforo("ness", "pov|x", "verde", "bien")["semaforo"]
+    assert s["color"] == "ambar" and s["duracion"] == 16.0 and "≥ 20 s" in s["motivo"]
+    monkeypatch.setattr(servicio, "_duracion", lambda ruta: 23.9)
+    s = servicio.poner_semaforo("ness", "pov|x", "verde", "bien")["semaforo"]
+    assert s["color"] == "verde" and s["duracion"] == 23.9

@@ -213,6 +213,38 @@ def _semaforo_vigente(s: dict | None, f: dict) -> dict | None:
     return s
 
 
+def _por_duracion(s: dict | None, minimo: int) -> dict | None:
+    """Vídeo de una tarea con duración mínima: un verde que no la cumple (o que
+    se puso sin medirla) se enseña en ámbar con el motivo."""
+    if not s or not minimo or s.get("color") != "verde":
+        return s
+    dura = float(s.get("duracion") or 0)
+    if dura >= minimo:
+        return s
+    motivo = (f"Dura {dura:.1f} s y la tarea pide ≥ {minimo} s." if dura else
+              f"La tarea pide ≥ {minimo} s y no se midió: vuelve a poner el semáforo.")
+    return {**s, "color": "ambar", "motivo": f"{motivo} {s.get('motivo') or ''}".strip()}
+
+
+def _duracion(ruta: str) -> float:
+    try:
+        from src.comprobador_video.tecnico import sondear
+
+        return float(sondear(Path(ruta), timeout=30)["duracion"])
+    except Exception:  # noqa: BLE001 — sin leer: 0 (la tarea lo enseña en ámbar)
+        return 0.0
+
+
+def _minimo_de_tareas(usuario: str, f: dict) -> int:
+    try:
+        from src.mis_tandas import tareas as tareas_mod
+
+        activas = [t for t in tareas_mod.listar(usuario) if tareas_mod.activa(t)]
+        return tareas_mod.requisitos(tareas_mod.de_fila(f, activas), activas)["duracion_min"]
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def sin_revisar(v: dict) -> bool:
     """Un vídeo NO está terminado hasta que se comprueba (18/10/2026: -24 a una
     Estrella de Belén que se subió sin pasar por el semáforo). Cuenta como sin
@@ -245,9 +277,20 @@ def poner_semaforo(usuario: str, id_: str, color: str, motivo: str = "", por: st
     clave = config.SEMAFORO_KEY.format(usuario=usuario)
     doc = r.get_json(clave) or {}
     videos = doc.get("videos") or {}
+    duracion = None
+    if color == "verde" and not id_.startswith(CARRUSEL):
+        minimo = _minimo_de_tareas(usuario, f)
+        if minimo:
+            duracion = round(_duracion(f.get("video_path") or ""), 2)
+            if duracion < minimo:
+                color = "ambar"
+                motivo = (f"Dura {duracion:.1f} s y la tarea pide ≥ {minimo} s. {motivo or ''}" if duracion else
+                          f"No se pudo medir la duración (la tarea pide ≥ {minimo} s). {motivo or ''}")
     if color:
         videos[id_] = {"color": color, "motivo": (motivo or "").strip()[:300], "por": (por or "").strip()[:40],
                        "listo_at": float(f.get("video_listo_at") or 0), "at": time.time()}
+        if duracion is not None:
+            videos[id_]["duracion"] = duracion
     else:
         videos.pop(id_, None)
     r.set_json(clave, {"videos": videos, "updated_at": time.time()})
@@ -737,6 +780,14 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
         v["tareas"] = tareas_de.get(v["id"], [])
         v["gmv_max"] = gmv_max.es_gmv_max(v, marcas_gmv)
         v["hashtags_campana"] = campana_bf.hashtags(usuario, v)
+        if v["tareas"]:
+            # Hashtag exclusivo de la tarea: SIEMPRE en el caption (va con los de campaña,
+            # que ya copian la web y la subida del móvil) + duración mínima.
+            req = tareas_mod.requisitos(v["tareas"], lista_tareas)
+            v["hashtags_tarea"] = req["hashtags"]
+            v["duracion_min"] = req["duracion_min"]
+            v["hashtags_campana"] = req["hashtags"] + [h for h in v["hashtags_campana"]
+                                                       if h.lower() not in {x.lower() for x in req["hashtags"]}]
     _marcas_catalogo(usuario, [v for t in salida for v in t.get("items", [])])
     for t in salida:
         t["gmv_max"] = sum(1 for v in t.get("items", []) if v["gmv_max"] and not v["uploaded"])
@@ -744,7 +795,7 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
         t["reembolsable"] = sum(1 for v in t.get("items", []) if v["reembolsable"] and not v["uploaded"])
     for t in salida:
         for v in t.get("items", []):
-            v["semaforo"] = _semaforo_vigente(sem.get(v["id"]), v)
+            v["semaforo"] = _por_duracion(_semaforo_vigente(sem.get(v["id"]), v), v.get("duracion_min") or 0)
             # GMV Max es prioridad del PRODUCTO, no permiso: solo se sube primero si está en verde.
             v["gmv_max_listo"] = bool(v.get("gmv_max")) and (v.get("semaforo") or {}).get("color") == "verde"
         items = t.get("items", [])

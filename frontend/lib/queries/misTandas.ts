@@ -63,6 +63,10 @@ export interface VideoTanda {
   reembolsable?: boolean;
   /** Hashtags de campaña (Black Friday de la agencia) que se añaden al caption. */
   hashtags_campana?: string[];
+  /** Hashtag(s) exclusivo(s) de su tarea (ya van también en `hashtags_campana`). */
+  hashtags_tarea?: string[];
+  /** Duración mínima que pide su tarea, en segundos (0 = sin mínimo). */
+  duracion_min?: number;
 }
 
 /** Tarea de «Campañas de creadores» con su progreso (`src/mis_tandas/tareas.py`). */
@@ -73,6 +77,8 @@ export interface TareaActiva {
   fin?: string;
   notas?: string;
   videos_requeridos: number;
+  hashtags?: string[];
+  duracion_min?: number;
   videos: number;
   subidos: number;
   pendientes: number;

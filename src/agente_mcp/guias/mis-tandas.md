@@ -281,6 +281,14 @@ productos concretos); las de GMV de 1.000 €, directos o similares, no.
   `productos` son IDs de TikTok o enlaces a la ficha (casa con CUALQUIER vídeo de
   ese producto, de cualquier nicho); `refs` = `source|carpeta|producto` si aún no
   hay enlace. `anadir=True` suma productos; `borrar=True` la quita.
+- **Hashtag exclusivo y duración mínima** (23/11/2026; p. ej. «Publica 5 vídeos»
+  pide `#7694275802761789461` y ≥ 20 s): `guardar_tarea(id, hashtags=[...],
+  duracion_min=20)`. Cada vídeo de la tarea trae `hashtags_tarea` y `duracion_min`,
+  y el hashtag va ya PRIMERO en `hashtags_campana` (lo copian la web y la subida
+  del móvil): no lo quites del caption. Para llegar a 20 s monta el POV BOF Largo
+  con **3 clips** de 8 s (~24 s; con 2 se queda en ~16 s). Al poner el semáforo
+  verde la app mide el vídeo: si dura menos, lo deja en ÁMBAR con el motivo
+  (y un verde de antes, sin medir, se enseña en ámbar: vuelve a ponerlo).
 - Los productos de una tarea se dan de alta en «Tareas Productos»
   (`tareas_productos`) con foto limpia + ficha y se hacen en formato POV. El tipo
   de guion se ELIGE POR PRODUCTO (urgencia de precio del POV BOF, o dolor /

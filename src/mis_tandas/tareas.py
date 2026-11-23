@@ -114,6 +114,10 @@ def guardar(usuario: str, datos: dict) -> dict:
             t[campo] = str(datos[campo])
     if datos.get("videos_requeridos") is not None:
         t["videos_requeridos"] = max(0, int(datos["videos_requeridos"]))
+    if datos.get("hashtags") is not None:
+        t["hashtags"] = normalizar_hashtags(datos["hashtags"])
+    if datos.get("duracion_min") is not None:
+        t["duracion_min"] = max(0, int(datos["duracion_min"]))
     if datos.get("productos") is not None:
         base = t.get("productos", []) if datos.get("anadir") else []
         t["productos"] = list(dict.fromkeys(base + productos))
@@ -126,6 +130,27 @@ def guardar(usuario: str, datos: dict) -> dict:
     tareas = [x for x in tareas if x["id"] != id_] + [t]
     _guardar(usuario, tareas)
     return t
+
+
+def normalizar_hashtags(tags) -> list[str]:
+    """«7694275802761789461» o «#7694…» → «#7694…»; sin espacios ni repetidos."""
+    if isinstance(tags, str):
+        tags = tags.replace(",", " ").split()
+    salida: list[str] = []
+    for x in tags or []:
+        x = re.sub(r"\s+", "", str(x)).lstrip("#")
+        if x and f"#{x}".lower() not in {y.lower() for y in salida}:
+            salida.append(f"#{x}")
+    return salida
+
+
+def requisitos(ids: list[str], tareas: list[dict]) -> dict:
+    """Lo que exigen a un vídeo las tareas en las que está (23/11/2026: la de
+    «Publica 5 vídeos» pide su hashtag exclusivo en el caption y ≥ 20 s):
+    `hashtags` (todos, sin repetir) y `duracion_min` (la mayor, en segundos)."""
+    suyas = [t for t in tareas if t["id"] in ids]
+    tags = normalizar_hashtags([h for t in suyas for h in t.get("hashtags") or []])
+    return {"hashtags": tags, "duracion_min": max([int(t.get("duracion_min") or 0) for t in suyas] or [0])}
 
 
 def borrar(usuario: str, id_: str) -> dict:
@@ -170,6 +195,8 @@ def resumen(tareas: list[dict], filas: list[dict], ahora: float | None = None) -
         fin = _fin_ts(t)
         salida.append({
             **{k: t.get(k) for k in ("id", "nombre", "recompensa", "fin", "notas")},
+            "hashtags": t.get("hashtags") or [],
+            "duracion_min": int(t.get("duracion_min") or 0),
             "videos_requeridos": int(t.get("videos_requeridos") or 0),
             "videos": len(suyas),
             "subidos": sum(1 for f in suyas if f["uploaded"] and (f.get("uploaded_at") or 0) >= desde),

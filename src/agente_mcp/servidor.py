@@ -951,13 +951,18 @@ async def guardar_tarea(ctx: Context, nombre: str = "", id: str = "", recompensa
                         fin: str | None = None, videos_requeridos: int | None = None,
                         productos: list[str] | None = None, refs: list[str] | None = None,
                         notas: str | None = None, anadir: bool = False,
-                        archivada: bool | None = None, borrar: bool = False) -> str:
+                        archivada: bool | None = None, borrar: bool = False,
+                        hashtags: list[str] | None = None, duracion_min: int | None = None) -> str:
     """Crea o actualiza (por `id`; sin `id` lo saca del `nombre`) una tarea de
     Campañas de creadores. `fin` ISO hora de Madrid («2026-10-30T17:00»);
     `productos`: IDs de producto de TikTok o enlaces a su ficha (así casa con
     cualquier vídeo de ese producto, de cualquier nicho); `refs`:
     «source|carpeta|producto» del catálogo si aún no tiene enlace.
     `anadir=True` suma productos/refs a los que ya tenía. `borrar=True` la quita.
+    `hashtags`: el/los exclusivo(s) de la tarea («#7694275802761789461»), van
+    SIEMPRE en el caption de sus vídeos (`hashtags_tarea`, primero en `hashtags_campana`);
+    `duracion_min`: segundos mínimos (20 → POV BOF Largo de 3 clips); un verde
+    más corto queda en ámbar. Guía `mis-tandas.md` › Tareas.
     Solo tareas realistas (N vídeos de productos concretos), no las de GMV o directos."""
     api = Interno(_usuario(ctx))
     if borrar:
@@ -967,7 +972,8 @@ async def guardar_tarea(ctx: Context, nombre: str = "", id: str = "", recompensa
     body = {k: v for k, v in {
         "id": id, "nombre": nombre or None, "recompensa": recompensa, "fin": fin,
         "videos_requeridos": videos_requeridos, "productos": productos, "refs": refs,
-        "notas": notas, "archivada": archivada}.items() if v is not None}
+        "notas": notas, "archivada": archivada, "hashtags": hashtags,
+        "duracion_min": duracion_min}.items() if v is not None}
     body["anadir"] = anadir
     return _json(await api.post("/api/v1/mis-tandas/tareas", body))
 

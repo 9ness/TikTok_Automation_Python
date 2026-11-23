@@ -320,6 +320,9 @@ class TareaRequest(BaseModel):
     fin: str | None = None
     desde: str | None = None
     videos_requeridos: int | None = None
+    # Hashtag(s) exclusivo(s) de la tarea, van SIEMPRE en el caption; y duración mínima en segundos.
+    hashtags: list[str] | None = None
+    duracion_min: int | None = None
     productos: list[str] | None = None
     refs: list[str] | None = None
     notas: str | None = None
