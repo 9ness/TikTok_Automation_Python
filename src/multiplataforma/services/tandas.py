@@ -332,7 +332,7 @@ def encolar(slug: str, *, incluir_no_subidos: bool = False, limite: int = 0,
         pub = Publicacion(
             cuenta=slug, video_path=mus["path"] if mus else f["video_path"], tipo=TIPO, producto_ref=k,
             titulo=titulo[: config.MAX_TITULO_PINTEREST], caption=caption, hashtags=tags, textos=t["textos"], comentario=t["comentario"],
-            enlace=e["enlace"], plataformas=list(config.PLATAFORMAS), programada_en=next(reloj), origen=ORIGEN,
+            enlace=e["enlace"], plataformas=config.plataformas_de(slug, TIPO, config.PLATAFORMAS), programada_en=next(reloj), origen=ORIGEN,
         )
         pub, creada = publicaciones_repo.encolar(pub)
         r.sadd(_key_encoladas(slug), f["video_path"])

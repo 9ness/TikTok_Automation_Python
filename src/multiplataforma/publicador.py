@@ -192,6 +192,17 @@ def publicar_una(pub: Publicacion, *, ahora: float, dry_run: bool = False, http:
         if not dry_run:
             publicaciones_repo.guardar(pub)
 
+    # IG sin productos en algunas cuentas (config.SIN_IG): si algo lo coló, fuera
+    # antes de publicar. Lo ya publicado en IG no se toca.
+    if config.sin_ig(pub.cuenta, pub.tipo) and "instagram" in pub.plataformas \
+            and pub.estado.get("instagram") not in config.ESTADOS_FINALES:
+        pub.plataformas = [p for p in pub.plataformas if p != "instagram"]
+        pub.estado.pop("instagram", None)
+        informe["sin_instagram"] = True
+        log(f"[multiplataforma] {pub.id} instagram: quitado (cuenta sin productos en IG)")
+        if not dry_run:
+            publicaciones_repo.guardar(pub)
+
     for plat in pub.plataformas:
         estado = pub.estado.get(plat, config.ESTADO_PENDIENTE)
         if estado in config.ESTADOS_FINALES:

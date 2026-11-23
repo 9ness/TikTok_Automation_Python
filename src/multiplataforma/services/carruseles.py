@@ -121,6 +121,7 @@ def encolar(slug: str, carrusel_id: str, *, usuario: str = "", asin: str = "", s
     except Exception as e:  # noqa: BLE001 — ErrorReplica u otro: no existe
         raise ErrorCarrusel(f"No encuentro el carrusel {carrusel_id}: {e}", status=404) from e
     plataformas = [p for p in (plataformas or config.PLATAFORMAS) if p in config.PLATAFORMAS]
+    plataformas = config.plataformas_de(slug, "carrusel", plataformas)
     if not plataformas:
         raise ErrorCarrusel("plataformas: ninguna válida")
     fotos = fotos_replica(doc)

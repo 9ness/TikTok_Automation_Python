@@ -193,6 +193,20 @@ DESFASE_MAX_MIN = int(os.getenv("MULTIPLATAFORMA_DESFASE_MIN", "4"))
 # viralización son para ganar seguidores en Instagram (clase 7/10: «solo
 # mételos en reel de prueba»); FB y Threads ya tienen enlace y no los necesitan.
 PLATAFORMAS_POR_TIPO: dict[str, tuple[str, ...]] = {"prueba_viral": ("instagram",), "foto": ("facebook",)}
+# Cuentas cuyo Instagram ya no lleva productos ni carruseles (Néstor 20/11/2026:
+# en IG de ama_shop y viva_shop solo salen los avatares de `calentar`). Se quita
+# IG al encolar y, por si algo lo cuela, también justo antes de publicar.
+SIN_IG = frozenset(x.strip() for x in os.getenv("MULTIPLATAFORMA_SIN_IG", "ama_shop,viva_shop").split(",") if x.strip())
+SIN_IG_TIPOS: tuple[str, ...] = ("producto", "carrusel")
+
+
+def sin_ig(cuenta: str, tipo: str) -> bool:
+    return cuenta in SIN_IG and tipo in SIN_IG_TIPOS
+
+
+def plataformas_de(cuenta: str, tipo: str, plataformas) -> list[str]:
+    """`plataformas` sin instagram si la cuenta no lleva productos en IG."""
+    return [p for p in plataformas if not (p == "instagram" and sin_ig(cuenta, tipo))]
 # Historia de Facebook tras cada reel publicado (cuentas con `fb_historias`).
 # La API de historias de página admite vídeos de 3 a 60 s: los más largos se
 # recortan a los primeros `FB_HISTORIA_MAX_S` (de gancho al reel).

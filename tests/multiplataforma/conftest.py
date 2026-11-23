@@ -105,3 +105,10 @@ def form(request: httpx.Request) -> dict:
     from urllib.parse import parse_qs
 
     return {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
+
+
+@pytest.fixture(autouse=True)
+def sin_cuentas_sin_ig(monkeypatch):
+    """Las pruebas usan viva_shop como cuenta cualquiera: sin la regla de IG sin productos salvo que el test la ponga."""
+    from src.multiplataforma import config
+    monkeypatch.setattr(config, "SIN_IG", frozenset())
