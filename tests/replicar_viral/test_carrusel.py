@@ -693,3 +693,17 @@ def test_disco_guardar_durante_una_carga_no_pisa_la_copia(tmp_path, monkeypatch)
     carga.join(5)
     carrusel._guardar_disco()
     assert list(R.escrito.values()) == [{"a": buena}]
+
+
+def test_hashtags_tiktok_de_hombre_sin_modamujer(monkeypatch):
+    """23/11: Ama Shop tiene #modamujer como general y salía en los de hombre."""
+    from src.nicho_pov_bof.repos import product_repo
+    from src.replicar_viral import carrusel
+
+    monkeypatch.setattr(product_repo, "get_hashtags",
+                        lambda nicho="", usuario="": ["#modamujer", "#tiktokshop"])
+    doc = {"producto": {"titulo": "TNZI Abrigo largo hombre cuello doble"},
+           "hashtags": ["#AbrigoHombre", "#ModaHombre", "#TikTokShop", "#AbrigoLargo", "#TNZI", "#otro"]}
+    assert carrusel.hashtags_tiktok(doc) == ["#tiktokshop", "#AbrigoHombre", "#ModaHombre", "#AbrigoLargo", "#TNZI"]
+    mujer = {"producto": {"titulo": "Vestido largo"}, "hashtags": ["#vestido"]}
+    assert carrusel.hashtags_tiktok(mujer) == ["#modamujer", "#tiktokshop"]

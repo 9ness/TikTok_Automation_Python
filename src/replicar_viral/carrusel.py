@@ -394,6 +394,24 @@ def es_ropa(doc: dict) -> bool:
         _ROPA.search(str(prod.get("titulo", ""))))
 
 
+_HOMBRE = re.compile(r"hombre|caballero|chico\b|masculin", re.IGNORECASE)
+
+
+def es_de_hombre(doc: dict) -> bool:
+    prod = doc.get("producto") or {}
+    return str(prod.get("source", "")).startswith("hombre") or bool(_HOMBRE.search(str(prod.get("titulo", ""))))
+
+
+def _para_hombre(tags: list[str], doc: dict) -> list[str]:
+    """23/11: Ama Shop lleva #modamujer como general y salía en los carruseles
+    de hombre. Fuera los «mujer» y, en su lugar, los del propio carrusel."""
+    base = [t for t in tags if "mujer" not in t.lower()]
+    vistos = {t.lower() for t in base}
+    propios = [t for t in (doc.get("hashtags") or [])
+               if t.lower() not in vistos and "mujer" not in t.lower()]
+    return base + propios[:4]
+
+
 def hashtags_tiktok(doc: dict) -> list[str]:
     """Los de TikTok son los MISMOS que llevan los vídeos (los generales de la
     configuración del POV BOF) y, si el producto es ropa/calzado/bolsos, los de
@@ -415,11 +433,13 @@ def hashtags_tiktok(doc: dict) -> list[str]:
     try:
         from src.nicho_pov_bof.repos import product_repo
 
-        tags = product_repo.get_hashtags(
-            "nicho-ropa-mujer" if es_ropa(doc) else "", str(doc.get("usuario") or ""),
-        )
+        hombre = es_de_hombre(doc)
+        nicho = ("nicho-ropa-hombre" if hombre else "nicho-ropa-mujer") if es_ropa(doc) else ""
+        tags = product_repo.get_hashtags(nicho, str(doc.get("usuario") or ""))
     except Exception:  # noqa: BLE001 — sin Redis: los de la IA
-        tags = []
+        hombre, tags = es_de_hombre(doc), []
+    if hombre:
+        return _para_hombre(tags, doc)
     return tags or list(doc.get("hashtags") or [])
 
 

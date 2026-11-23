@@ -1634,3 +1634,4 @@
 - 2026-11-23 · Producto de ama_shop salió en IG: el auto-encolado (07:10) lo crea con IG y meta-diaria lo quitaba a las 21:13, tarde → config.SIN_IG quita IG al encolar y en el publicador
 - 2026-11-22 · gmv_max salía en vídeos ámbar/rojo y parecía permiso de subida → es marca del PRODUCTO; añadidos gmv_max_listo (GMV Max + verde) y lista_gmv_max.listos_para_subir
 - 2026-11-22 · Semáforos de carrusel con listo_at=0 (caché del disco vacía al ponerlo) → el carrusel desaparecía de Mis tandas; fotos.listo_at relee sin caché y poner_semaforo da 503 si un VERDE sigue en 0 (los rojos de descarte sin fotos sí se ponen)
+- 2026-11-23 · Carruseles de hombre de Ama Shop salían con #modamujer (general de ana) → hashtags_tiktok: si es de hombre quita los «mujer» y añade hasta 4 del propio carrusel
