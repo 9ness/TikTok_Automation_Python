@@ -160,7 +160,7 @@ def lista_partidos(filas: list[dict], y0: int = LISTA_Y) -> Image.Image:
     y1 = y0 + fila * len(filas)
     tarjeta = Image.new("RGBA", (ANCHO, ALTO), (0, 0, 0, 0))
     dt = ImageDraw.Draw(tarjeta)
-    dt.rounded_rectangle((x0, y0, x1, y1), 30, fill=(255, 255, 255, 250))
+    dt.rounded_rectangle((x0, y0, x1, y1), 30, fill=(255, 255, 255, 200))  # 200: deja ver la cara de la foto (Néstor 23-nov)
     capa.alpha_composite(tarjeta.filter(ImageFilter.GaussianBlur(0.6)))
     d = ImageDraw.Draw(capa)
     f_nom = _fuente("Poppins-SemiBold.ttf", 28)
