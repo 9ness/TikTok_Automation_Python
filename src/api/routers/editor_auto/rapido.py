@@ -204,6 +204,8 @@ def _vista(ficha: dict, queue: JobQueue, *, detalle: bool = False) -> dict:
         "ajustes": ficha.get("ajustes"), "version": ficha.get("version", 0),
         "aviso": ficha.get("aviso"), "aviso_fotos": ficha.get("aviso_fotos"), "resumen": svc.resumen(ficha),
         "fecha": svc.fecha_iso(ficha["creado"]), "nota": ficha.get("nota"),
+        "titulos": ficha.get("titulos"),
+        "titulos_restantes": max(0, ex.MAX_TITULOS_VIDEO - int(ficha.get("titulos_n", 0))),
         "progreso": None,
     }
     if ficha["estado"] == "cola" and job is not None:
@@ -593,6 +595,45 @@ def valorar(vid: str, body: Valoracion, claims: Claims) -> dict:
 def historial(claims: Claims) -> dict:
     """Días con actividad de los últimos 30 (más reciente primero) y créditos gastados en total."""
     return svc.historial(claims.email, 30)
+
+
+@router.post("/videos/{vid}/titulos")
+def titulos(vid: str, claims: Claims) -> dict:
+    """5 títulos gancho con IA (Haiku) desde la transcripción. Gratis, máx. `MAX_TITULOS_VIDEO` por vídeo.
+
+    409 sin transcripción (el vídeo aún no se ha cortado con subtítulos), 429 al pasar el máximo, 502 si falla la IA."""
+    ficha = _ficha_o_404(vid, claims.email)
+    n = int(ficha.get("titulos_n", 0))
+    if n >= ex.MAX_TITULOS_VIDEO:
+        raise APIError(f"Ya has generado {ex.MAX_TITULOS_VIDEO} listas de títulos para este vídeo.", status_code=429)
+    palabras = svc.leer_palabras(vid)
+    if not palabras:
+        raise APIError("Este vídeo aún no tiene transcripción: córtalo con subtítulos primero.", status_code=409)
+    try:
+        lista = ex.generar_titulos(palabras, (ficha.get("ajustes") or {}).get("idioma", "auto"))
+    except ex.TitulosError as e:
+        raise APIError(f"No se pudieron generar los títulos: {e}", status_code=502)
+    ficha = svc.cargar_ficha(vid, claims.email) or ficha
+    ficha["titulos"] = lista
+    ficha["titulos_n"] = int(ficha.get("titulos_n", 0)) + 1
+    svc.guardar_ficha(ficha)
+    return {"titulos": lista, "restantes": max(0, ex.MAX_TITULOS_VIDEO - ficha["titulos_n"])}
+
+
+@router.get("/videos/{vid}/original")
+def original(vid: str, claims: Claims):
+    """Sirve el MP4 original (Range lo gestiona FileResponse). 404 si ya no está."""
+    _ficha_o_404(vid, claims.email)
+    ruta = svc.ruta_original(vid)
+    if ruta is None or not ruta.exists():
+        raise APIError("El vídeo original ya no está disponible.", status_code=404)
+    return FileResponse(ruta, media_type="video/mp4", content_disposition_type="inline")
+
+
+@router.get("/estadisticas")
+def estadisticas(claims: Claims) -> dict:
+    """Cifras personales (ver `svc.estadisticas_usuario` para qué es aproximado)."""
+    return svc.estadisticas_usuario(claims.email)
 
 
 @router.get("/videos/{vid}/archivo")

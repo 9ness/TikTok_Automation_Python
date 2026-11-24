@@ -366,5 +366,10 @@ API móvil en `src/api/routers/editor_auto/rapido.py` (`/api/v1/editor-auto/rapi
   `Ajustes` gana `modo`, `extras[]`, `nombre_producto`. Precio: `ficha.creditos = creditos_base + Σ extras` (0,5 cada uno; tabla `EXTRAS`), y eso es lo que se devuelve si falla.
   Orden en `_estilizar`: voz → fotos → subs → flecha → gancho (copia la frase ya subtitulada) → nombre. Un extra que falla deja `aviso` y se sigue sin él. Segundos de servidor por extra
   en `ficha.extras_s` (última pasada) y `extras_total_s`; `admin/actividad` los suma en `totales.extras_s{id:{videos,segundos,medio_s}}`. En `estilo` se reusa `ficha.gancho`.
+- **Títulos, original y estadísticas (24/11/2026).** `POST /videos/{id}/titulos` → `{titulos[{texto(≤60),tipo(curiosidad|problema|pov|beneficio|pregunta)}], restantes}`:
+  5 títulos gancho de Haiku (`extras.MODELO_TITULOS`, prompt `prompts/titulos.md`) sobre `palabras.json`; gratis, máx. 3 por vídeo (`ficha.titulos_n`; 429 al pasarlo),
+  409 sin transcripción, 502 si falla la IA (no cuenta). Guarda `ficha.titulos`; la vista del vídeo trae `titulos` y `titulos_restantes`.
+  `GET /videos/{id}/original` sirve el MP4 original (Range, ticket en cabecera o `?t=`; 404 si ya no está). `GET /estadisticas` →
+  `{videos_editados, segundos_quitados, racha_dias, dias_activos_30, media_pct_mas_corto}` (`servicio.estadisticas_usuario`; aproximado: videos desde `rapido:hist`, segundos y % solo de vídeos listos que aún existen; racha en hora de Madrid).
 - `temp_storage.cleanup_expired` (arranque de la API, TTL 24 h sobre `api_uploads/`) ahora SALTA `editor_rapido/`: antes borraba originales y resultados de más de un día en cada reinicio/deploy.
   El editor rápido aún no tiene caducidad propia para los vídeos de los usuarios (crece el disco).

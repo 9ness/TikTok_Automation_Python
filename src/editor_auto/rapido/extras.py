@@ -160,6 +160,52 @@ def elegir_gancho(palabras: list[dict], duracion: float, on_log: Callable[[str],
         return None
 
 
+# ───────────────────────── Títulos gancho (Claude Haiku) ─────────────────────────
+
+# El modelo de los títulos va aquí y solo aquí (al salir otro se cambia esta línea).
+MODELO_TITULOS = "claude-haiku-5-5"
+MAX_TITULOS_VIDEO = 3      # generaciones gratis por vídeo
+MAX_CHARS_TITULO = 60
+TIPOS_TITULO = ("curiosidad", "problema", "pov", "beneficio", "pregunta")
+
+
+class TitulosError(Exception):
+    """La IA no está disponible o devolvió algo inservible (→ 502)."""
+
+
+def generar_titulos(palabras: list[dict], idioma: str = "auto") -> list[dict]:
+    """5 títulos gancho [{texto, tipo}] a partir de las palabras del vídeo (Haiku).
+
+    Lanza TitulosError si Claude no está configurado, falla o no devuelve ningún título válido."""
+    from src.editor_auto.api import claude_client
+    if not claude_client.activo():
+        raise TitulosError("La IA no está configurada.")
+    texto = " ".join(str(w.get("word", "")).strip() for w in palabras if str(w.get("word", "")).strip())
+    if not texto:
+        raise TitulosError("No hay texto en la transcripción.")
+    try:
+        r = claude_client.analyze_transcript_json(
+            system_prompt=(_PROMPTS / "titulos.md").read_text(encoding="utf-8"),
+            user_payload={"idioma": idioma or "auto", "transcripcion": texto[:12000]},
+            modelo_forzado=MODELO_TITULOS, esfuerzo="low", detalle="editor_rapido.titulos",
+        )
+    except Exception as e:  # noqa: BLE001
+        raise TitulosError(f"La IA falló: {str(e)[:150]}") from e
+    lista = r.get("titulos") if isinstance(r, dict) else r
+    out: list[dict] = []
+    for t in lista if isinstance(lista, list) else []:
+        if not isinstance(t, dict):
+            continue
+        txt = " ".join(str(t.get("texto") or "").split())
+        if not txt:
+            continue
+        tipo = str(t.get("tipo") or "").strip().lower()
+        out.append({"texto": txt[:MAX_CHARS_TITULO].rstrip(), "tipo": tipo if tipo in TIPOS_TITULO else "curiosidad"})
+    if not out:
+        raise TitulosError("La IA no devolvió títulos.")
+    return out[:5]
+
+
 # ───────────────────────── Configuración de cada herramienta ─────────────────────────
 
 def config_voz() -> dict[str, Any]:

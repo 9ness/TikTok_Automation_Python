@@ -738,6 +738,38 @@ def historial(email: str, dias: int = 30) -> dict:
             "movimientos": list(reversed(movs if isinstance(movs, list) else []))}
 
 
+def estadisticas_usuario(email: str) -> dict:
+    """Resumen personal del usuario. APROXIMADO:
+    - `videos_editados`: vídeos contados en `rapido:hist` (últimos 180 días; no baja si luego borra el vídeo
+      ni si se devuelven créditos).
+    - `segundos_quitados` y `media_pct_mas_corto`: solo de los vídeos «listo» que siguen existiendo
+      (hasta 1000 fichas); borrar un vídeo lo quita de estas dos cifras.
+    - `racha_dias`: días seguidos con ≥1 vídeo hasta hoy (si hoy aún no hay, se cuenta desde ayer), hora de Madrid.
+    - `dias_activos_30`: días distintos con vídeo en los últimos 30 días."""
+    h = get_editor_redis().get_json(_k_hist(email)) or {}
+    dias = {f for f, x in (h.get("dias") or {}).items() if int((x or {}).get("videos", 0)) > 0}
+    total = sum(int((x or {}).get("videos", 0)) for x in (h.get("dias") or {}).values())
+    hoy = datetime.now(TZ).date()
+    dia = hoy if hoy.isoformat() in dias else hoy - timedelta(days=1)
+    racha = 0
+    while dia.isoformat() in dias:
+        racha += 1
+        dia -= timedelta(days=1)
+    desde = (hoy - timedelta(days=29)).isoformat()
+    activos = sum(1 for f in dias if desde <= f <= hoy.isoformat())
+    quitados, pcts = 0.0, []
+    for f in listar_fichas(email, limite=1000):
+        r = resumen(f)
+        if not r:
+            continue
+        quitados += float(r["segundos_quitados"])
+        orig = float(r["duracion_original_s"] or 0)
+        if orig > 0:
+            pcts.append(100.0 * min(orig, float(r["segundos_quitados"])) / orig)
+    return {"videos_editados": total, "segundos_quitados": round(quitados, 1), "racha_dias": racha,
+            "dias_activos_30": activos, "media_pct_mas_corto": round(sum(pcts) / len(pcts), 1) if pcts else 0.0}
+
+
 def actividad(dias: int = 7, limite_videos: int = 100) -> dict:
     """Admin: agregado por día (con ceros, de más antiguo a más reciente) + últimos vídeos."""
     ahora = time.time()
