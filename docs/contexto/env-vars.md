@@ -15,6 +15,10 @@
 # no se define (escanea "Mi unidad/Nebulabs/TikTok/TIKTOK_SHOP").
 # TIKTOK_SHOP_ROOT_PATH="H:/Mi unidad/Nebulabs/TikTok/TIKTOK_SHOP"
 
+# Clave de SOLO LECTURA de la API: solo abre GET /api/v1/queue (hoja «En marcha» del Panel,
+# que la lee de ~/.config/factory-panel.token en vps-trabajo). Sin ella, solo vale API_KEY.
+# API_KEY_LECTURA=...
+
 # Atlas Cloud (Seedance — los 3 tiers Standard/Advanced/Pro). URL default oficial.
 ATLASCLOUD_API_KEY=...
 # ATLASCLOUD_BASE_URL=https://api.atlascloud.ai/api/v1   # opcional override

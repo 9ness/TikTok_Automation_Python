@@ -23,6 +23,9 @@ class APISettings:
         self.host: str = os.getenv("API_HOST", "0.0.0.0")
         self.port: int = int(os.getenv("API_PORT", "8000"))
         self.api_key: str | None = os.getenv("API_KEY") or None
+        # Clave de SOLO LECTURA (26/11/2026): solo vale para GET /api/v1/queue
+        # (la hoja «En marcha» del Panel lee la cola en vivo). Ver get_current_user.
+        self.api_key_lectura: str | None = os.getenv("API_KEY_LECTURA") or None
         raw = os.getenv(
             "API_CORS_ORIGINS",
             "http://localhost:3000,http://localhost:8501",

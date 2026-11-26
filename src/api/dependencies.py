@@ -100,7 +100,12 @@ def exigir_admin(request: Request) -> str:
     return quien
 
 
+# Rutas que acepta la clave de solo lectura (API_KEY_LECTURA), solo con GET.
+_RUTAS_LECTURA = ("/api/v1/queue",)
+
+
 def get_current_user(
+    request: Request,
     settings: Annotated[APISettings, Depends(get_settings)],
     x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
     api_key: Annotated[str | None, Query()] = None,
@@ -118,6 +123,14 @@ def get_current_user(
     if not settings.api_key:
         return "anonymous"
     provided = x_api_key or api_key
+    if (
+        provided
+        and settings.api_key_lectura
+        and provided == settings.api_key_lectura
+        and request.method == "GET"
+        and request.url.path.rstrip("/") in _RUTAS_LECTURA
+    ):
+        return "panel-lectura"
     if not provided or provided != settings.api_key:
         raise UnauthorizedError("API key inválida o ausente.")
     return "api-key-user"
