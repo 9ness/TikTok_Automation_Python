@@ -262,6 +262,9 @@ export function MisTandas() {
   const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
   const primeraPendiente = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
   const abiertaReal = abierta ?? primeraPendiente;
+  // Vista simple: los packs abiertos se cuentan desde 1 (y los cerrados aparte).
+  const numPack = (t: { numero: number; abierta: boolean }) =>
+    (datos?.tandas ?? []).filter((x) => x.abierta === t.abierta && x.numero <= t.numero).length;
 
   const nombre = (numero: number, i: number, v: VideoTanda) =>
     nombreDescarga(
@@ -604,7 +607,7 @@ export function MisTandas() {
                     className="min-w-0 flex-1 text-left"
                   >
                     <span className="text-xs font-semibold sm:text-sm">
-                      {abiertaEsta ? "▾" : "▸"} {simple ? "Pack" : "Tanda"} {t.numero}
+                      {abiertaEsta ? "▾" : "▸"} {simple ? `Pack ${numPack(t)}${t.abierta ? "" : " (cerrado)"}` : `Tanda ${t.numero}`}
                       {hayFiltro ? (
                         <span className="ml-1 text-[10px] font-normal text-amber-500">
                           · {visibles.length} de {t.items.length}{" "}
