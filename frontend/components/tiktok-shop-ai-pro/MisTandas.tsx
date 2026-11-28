@@ -261,7 +261,8 @@ export function MisTandas() {
       ).length;
   const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
   const primeraPendiente = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
-  const abiertaReal = abierta ?? primeraPendiente;
+  // Vista simple: todos los packs empiezan contraídos.
+  const abiertaReal = abierta ?? (simple ? null : primeraPendiente);
   // Vista simple: los packs abiertos se cuentan desde 1 (y los cerrados aparte).
   const numPack = (t: { numero: number; abierta: boolean }) =>
     (datos?.tandas ?? []).filter((x) => x.abierta === t.abierta && x.numero <= t.numero).length;
