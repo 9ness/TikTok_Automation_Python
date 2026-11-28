@@ -86,7 +86,8 @@ SOLO_HABLADOS: set[str] = {"ana"}
 
 # Vídeos por tanda por usuario (si no, `POR_TANDA`): Ana, 6 al día desde el
 # 18/10/2026 (del 10 al 17, uno al día: sube solo el mejor de la tanda).
-POR_TANDA_USUARIO: dict[str, int] = {"ana": 6}
+# Mauro, de 20 en 20 desde el 28/11/2026 (solo POV BOF Largo).
+POR_TANDA_USUARIO: dict[str, int] = {"ana": 6, "mauro": 20}
 
 
 def por_tanda(usuario: str) -> int:
