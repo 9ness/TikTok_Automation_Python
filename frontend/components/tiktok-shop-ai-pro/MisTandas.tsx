@@ -191,12 +191,15 @@ function Miniatura({ v }: { v: VideoTanda }) {
 const VISTA_SIMPLE = ["mauro"];
 /** Usuarios con las tandas contraídas al entrar (28/11/2026): solo se abre la que toques. */
 const CONTRAIDAS = ["mauro", "ness"];
+/** Usuarios que no ven las carpetas (📁) de cada tanda ni de cada vídeo (28/11/2026). */
+const SIN_CARPETAS = ["ness"];
 const FILTROS_KEY = "mis-tandas:filtros";
 
 export function MisTandas() {
   const usuario = useMe().data?.username ?? "";
   const simple = VISTA_SIMPLE.includes(usuario);
   const contraidas = CONTRAIDAS.includes(usuario);
+  const sinCarpetas = SIN_CARPETAS.includes(usuario);
   const listo = (v: VideoTanda) => !sinRevisar(v) && !(v.sin_stock && !v.uploaded);
   const [verCerradas, setVerCerradas] = useState(false);
   const tandas = useMisTandas(verCerradas);
@@ -688,7 +691,7 @@ export function MisTandas() {
                           🚫 {t.sin_stock}
                         </span>
                       ) : null}
-                      {resumenCarpetas(t.items).map(([k, n]) => (
+                      {!sinCarpetas && resumenCarpetas(t.items).map(([k, n]) => (
                         <span
                           key={k}
                           className="rounded-full border border-border/60 px-1.5 py-px text-[9px] font-semibold text-muted-foreground"
@@ -818,9 +821,11 @@ export function MisTandas() {
                               <span className={`rounded border px-1.5 py-px text-[9px] font-semibold ${colorCatalogo(v.catalogo)}`}>
                                 {v.catalogo_label || v.catalogo}
                               </span>
+                              {sinCarpetas ? null : (
                               <span className="rounded bg-muted px-1.5 py-px text-[9px] font-semibold text-foreground">
                                 📁 {nombreCarpeta(v.carpeta_corta)} · Producto {v.producto}
                               </span>
+                              )}
                               <MontadoEl ts={v.video_listo_at} />
                               {(v.tareas ?? []).map((id) => (
                                 <span
