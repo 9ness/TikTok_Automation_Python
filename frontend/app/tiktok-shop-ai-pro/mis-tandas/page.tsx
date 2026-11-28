@@ -6,12 +6,15 @@ import { ListChecks } from "lucide-react";
 import { CarruselesReplicados } from "@/components/tiktok-shop-ai-pro/CarruselesReplicados";
 import { GuiaIA } from "@/components/tiktok-shop-ai-pro/GuiaIA";
 import { MisTandas } from "@/components/tiktok-shop-ai-pro/MisTandas";
+import { useMe } from "@/lib/queries/auth";
 import { useMisTandas, useTandasFotos } from "@/lib/queries/misTandas";
 
 /** «Mis tandas»: lo montado en TODOS tus nichos, para publicarlo de diez en
  *  diez. No es un nicho: solo junta y marca (ver `src/mis_tandas/`). */
 export default function MisTandasPage() {
   const [pestana, setPestana] = useState<"videos" | "fotos">("videos");
+  // Mauro (28/11/2026): solo sus packs de vídeo, sin carruseles ni guía.
+  const simple = useMe().data?.username === "mauro";
   // Cada pestaña lleva su contador: los vídeos y los carruseles no se mezclan.
   const videos = useMisTandas(false).data;
   const fotos = useTandasFotos(false).data;
@@ -25,20 +28,25 @@ export default function MisTandasPage() {
         <div className="flex items-center gap-2">
           <ListChecks className="h-5 w-5 shrink-0 text-violet-500" />
           <div className="min-w-0">
-            <h1 className="text-base font-bold sm:text-lg">Mis tandas</h1>
+            <h1 className="text-base font-bold sm:text-lg">{simple ? "Mis packs" : "Mis tandas"}</h1>
             <p className="text-[11px] text-muted-foreground">
-              Tus vídeos y carruseles listos para subir, de diez en diez y con el día que toca
+              {simple
+                ? "Tus vídeos listos para subir, de 20 en 20"
+                : "Tus vídeos y carruseles listos para subir, de diez en diez y con el día que toca"}
             </p>
           </div>
-          <GuiaIA guia="mis-tandas" />
+          {simple ? null : <GuiaIA guia="mis-tandas" />}
         </div>
+        {simple ? null : (
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
           Junta lo que ya está montado en POV BOF, POV BOF Largo y Moda Mujer · Multimodo. Aquí
           no se monta nada: cuando un vídeo se termina en su nicho (lo haga una persona o un
           agente), aparece solo al final de la cola. Subido, sin stock y rehacer se guardan en
           el propio nicho, así que su pantalla lo ve igual.
         </p>
+        )}
       </header>
+      {simple ? null : (
       <div className="grid grid-cols-2 gap-1.5" role="tablist">
         {pestanas.map((p) => (
           <button
@@ -62,7 +70,8 @@ export default function MisTandasPage() {
           </button>
         ))}
       </div>
-      {pestana === "videos" ? <MisTandas /> : <CarruselesReplicados />}
+      )}
+      {pestana === "videos" || simple ? <MisTandas /> : <CarruselesReplicados />}
     </div>
   );
 }

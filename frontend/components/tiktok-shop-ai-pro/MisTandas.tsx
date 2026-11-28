@@ -24,6 +24,7 @@ import {
   type VideoTanda,
 } from "@/lib/queries/misTandas";
 import { useHashtags } from "@/lib/queries/nichoPovBof";
+import { useMe } from "@/lib/queries/auth";
 import {
   COLOR_NICHO,
   NOMBRE_NICHO,
@@ -183,7 +184,15 @@ function Miniatura({ v }: { v: VideoTanda }) {
  *  que lo que se marca aquí sale marcado en su pantalla y al revés. El orden
  *  es fijo (lo nuevo entra al final) y cada tanda abierta lleva la fecha en la
  *  que toca subirla. */
+/** Usuarios con la vista simple (28/11/2026, Mauro): «packs» y por vídeo solo
+ *  caption, descargar, ficha y «Subido». Solo se OCULTA en su pantalla: el
+ *  semáforo, sin stock, etc. siguen en los datos, la API y el MCP. Lo que no
+ *  está en verde o ámbar (rojo, sin revisar, sin stock) no le sale. */
+const VISTA_SIMPLE = ["mauro"];
+
 export function MisTandas() {
+  const simple = VISTA_SIMPLE.includes(useMe().data?.username ?? "");
+  const listo = (v: VideoTanda) => !sinRevisar(v) && !(v.sin_stock && !v.uploaded);
   const [verCerradas, setVerCerradas] = useState(false);
   const tandas = useMisTandas(verCerradas);
   const recargar = useRecargarTandas();
@@ -233,6 +242,7 @@ export function MisTandas() {
   const totalMuestra = (datos?.tandas ?? []).reduce((n, t) => n + (t.muestra_gratis ?? 0), 0);
   const totalReembolso = (datos?.tandas ?? []).reduce((n, t) => n + (t.reembolsable ?? 0), 0);
   const pasa = (v: VideoTanda) =>
+    (!simple || listo(v)) &&
     (!soloGmv || !!v.gmv_max) &&
     (!soloMuestra || !!v.muestra_gratis) &&
     (!soloReembolso || !!v.reembolsable) &&
@@ -246,6 +256,7 @@ export function MisTandas() {
         (v) =>
           !v.uploaded &&
           !v.sin_stock &&
+          (!simple || listo(v)) &&
           (!id || (id === SIN_TAREA ? !v.tareas?.length : !!v.tareas?.includes(id))),
       ).length;
   const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
@@ -305,13 +316,15 @@ export function MisTandas() {
   return (
     <Caja
       icono="📦"
-      titulo="Vídeos para subir, de diez en diez"
-      hint="Todo lo montado en tus nichos, en el orden en que toca publicarlo. Baja la tanda, copia el caption de cada vídeo, ábrelo en la tienda y pulsa «Subido» al publicarlo. Lo que marques aquí queda marcado en la pantalla de su nicho."
+      titulo={simple ? "Packs para subir, de 20 en 20" : "Vídeos para subir, de diez en diez"}
+      hint={simple
+        ? "Baja el pack, copia el caption de cada vídeo, ábrelo en la tienda (🛍️) y pulsa «Subido» al publicarlo."
+        : "Todo lo montado en tus nichos, en el orden en que toca publicarlo. Baja la tanda, copia el caption de cada vídeo, ábrelo en la tienda y pulsa «Subido» al publicarlo. Lo que marques aquí queda marcado en la pantalla de su nicho."}
       extra={
         datos
           ? `${porSubir("")} vídeos por subir` +
             (datos.subidos_hoy ? ` · hoy ${datos.subidos_hoy}` : "") +
-            (datos.sin_stock ? ` · 🚫 ${datos.sin_stock}` : "")
+            (datos.sin_stock && !simple ? ` · 🚫 ${datos.sin_stock}` : "")
           : undefined
       }
     >
@@ -335,10 +348,10 @@ export function MisTandas() {
                 : "border-border/60 text-muted-foreground hover:text-foreground"
             }`}
           >
-            {verCerradas ? "Ocultar" : "Ver"} las {datos.cerradas} tandas cerradas
+            {verCerradas ? "Ocultar" : "Ver"} {simple ? `los ${datos.cerradas} packs cerrados` : `las ${datos.cerradas} tandas cerradas`}
           </button>
         ) : null}
-        {datos?.ocultos ? (
+        {datos?.ocultos && !simple ? (
           <button
             type="button"
             onClick={() => setVerOcultos((x) => !x)}
@@ -354,6 +367,7 @@ export function MisTandas() {
         ) : null}
       </div>
 
+      {!simple && (<>
       <div className="mb-2 flex flex-wrap items-center gap-1">
         <button
           type="button"
@@ -556,6 +570,8 @@ export function MisTandas() {
         </details>
       ) : null}
 
+      </>)}
+
       {tandas.isLoading ? (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Cargando…
@@ -571,7 +587,7 @@ export function MisTandas() {
           {datos.tandas.map((t) => {
             const completa = !t.abierta;
             const visibles = t.items.filter(pasa);
-            if (hayFiltro && !visibles.length) return null;
+            if ((hayFiltro || simple) && !visibles.length) return null;
             // Con filtro se ven todas las tandas que tengan algo de la tarea.
             const abiertaEsta = hayFiltro ? abierta !== t.numero : abiertaReal === t.numero;
             return (
@@ -588,7 +604,7 @@ export function MisTandas() {
                     className="min-w-0 flex-1 text-left"
                   >
                     <span className="text-xs font-semibold sm:text-sm">
-                      {abiertaEsta ? "▾" : "▸"} Tanda {t.numero}
+                      {abiertaEsta ? "▾" : "▸"} {simple ? "Pack" : "Tanda"} {t.numero}
                       {hayFiltro ? (
                         <span className="ml-1 text-[10px] font-normal text-amber-500">
                           · {visibles.length} de {t.items.length}{" "}
@@ -596,6 +612,19 @@ export function MisTandas() {
                         </span>
                       ) : null}
                     </span>
+                    {simple ? (
+                      <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                        <span
+                          className={`rounded-full px-1.5 py-px text-[9px] font-semibold ${
+                            visibles.every((v) => v.uploaded)
+                              ? "bg-emerald-500/15 text-emerald-500"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {visibles.filter((v) => v.uploaded).length}/{visibles.length} subidos
+                        </span>
+                      </span>
+                    ) : (
                     <span className="mt-0.5 flex flex-wrap items-center gap-1">
                       <span
                         className={`rounded-full px-1.5 py-px text-[9px] font-semibold ${
@@ -653,10 +682,11 @@ export function MisTandas() {
                         </span>
                       ) : null}
                     </span>
+                    )}
                   </button>
                   <div className="flex shrink-0 flex-col items-stretch gap-1">
                     {/* También con el filtro de tarea: cierra la tanda ENTERA, no solo lo de la tarea. */}
-                    {t.abierta ? (
+                    {t.abierta && !simple ? (
                       <button
                         type="button"
                         disabled={completar.isPending}
@@ -697,7 +727,7 @@ export function MisTandas() {
                       ] as const
                     ).map(([solo, etiqueta, cuantos]) => {
                       const clave = `${t.numero}|${solo ? "pendientes" : "todos"}`;
-                      if (solo && (cuantos === 0 || cuantos === visibles.length)) return null;
+                      if (simple ? !solo || cuantos === 0 : solo && (cuantos === 0 || cuantos === visibles.length)) return null;
                       return (
                         <button
                           key={clave}
@@ -734,8 +764,9 @@ export function MisTandas() {
                                 v.sin_stock && !v.uploaded ? "text-muted-foreground line-through" : ""
                               }`}
                             >
-                              <PuntoSemaforo v={v} /> {v.titulo || `Producto ${v.producto}`}
+                              {simple ? null : <PuntoSemaforo v={v} />} {v.titulo || `Producto ${v.producto}`}
                             </p>
+                            {simple ? null : (
                             <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
                               <span className={`rounded px-1.5 py-px text-[9px] font-semibold ${COLOR_NICHO[v.nicho] ?? ""}`}>
                                 {NOMBRE_NICHO[v.nicho] ?? v.nicho}
@@ -791,8 +822,10 @@ export function MisTandas() {
                                 </span>
                               ) : null}
                             </div>
+                            )}
                           </div>
                         </div>
+                        {simple ? null : (<>
                         {v.semaforo && !v.uploaded && v.semaforo.color !== "verde" ? (
                           <p className={`break-words pl-6 text-[10px] ${SEMAFORO[v.semaforo.color].texto}`}>
                             {v.semaforo.color === "ambar" ? "🟡" : "🔴"} {v.semaforo.motivo || SEMAFORO[v.semaforo.color].nombre}
@@ -810,8 +843,10 @@ export function MisTandas() {
                         ) : v.rehecho && !v.uploaded ? (
                           <p className="pl-6 text-[10px] text-sky-400">✨ Rehecho — revísalo antes de subirlo</p>
                         ) : null}
+                        </>)}
                         <div className="flex min-w-0 flex-wrap items-center gap-1 pl-6">
                           <CopyChip label="✍️ Caption" text={captionDe(v)} siempre />
+                          {simple ? null : (<>
                           <CopyChip label="🔎 Título" text={v.titulo_tiktok_completo || v.titulo || ""} siempre />
                           <CopyChip label="🏪 Tienda" text={v.tienda || ""} siempre />
                           {v.musica?.busqueda ? (
@@ -848,6 +883,7 @@ export function MisTandas() {
                               <ExternalLink className="h-2.5 w-2.5" /> {NOMBRE_NICHO[v.nicho]}
                             </Link>
                           ) : null}
+                          </>)}
                         <div className="ml-auto flex items-center gap-1">
                           {/* Un enlace normal, como en el POV BOF Largo: el
                               navegador baja cada vídeo por su cuenta y se pueden
@@ -873,7 +909,7 @@ export function MisTandas() {
                           >
                             <Download className="h-3 w-3" />
                           </a>
-                          <CopyChip label="ID" text={idProducto(v.product_url)} />
+                          {simple ? null : <CopyChip label="ID" text={idProducto(v.product_url)} />}
                           {v.product_url ? (
                             <a
                               href={urlFicha(v.product_url)}
@@ -885,7 +921,7 @@ export function MisTandas() {
                               🛍️
                             </a>
                           ) : null}
-                          {(!v.uploaded || v.sin_stock) && (
+                          {!simple && (!v.uploaded || v.sin_stock) && (
                             <button
                               type="button"
                               onClick={() => marcar.mutate({ id: v.id, sin_stock: !v.sin_stock, video: v })}
@@ -903,6 +939,7 @@ export function MisTandas() {
                               🚫
                             </button>
                           )}
+                          {simple ? null : (<>
                           <span className="flex shrink-0 items-center gap-0.5 rounded-md border border-border/60 px-1 py-0.5">
                             {(["verde", "ambar", "rojo"] as const).map((c) => (
                               <button
@@ -963,6 +1000,7 @@ export function MisTandas() {
                             <EyeOff className="h-3 w-3" />
                             {aOcultar === v.id ? "¿Quitar?" : null}
                           </button>
+                          </>)}
                           <button
                             type="button"
                             onClick={() => marcar.mutate({ id: v.id, uploaded: !v.uploaded })}

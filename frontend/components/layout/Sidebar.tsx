@@ -467,6 +467,12 @@ function visiblePara(n: NavGroup, usuario?: string | null): boolean {
  *  físicos (Ana). Mauro no tiene ninguno y el menú solo le enseñaría lo de otros. */
 const PRO_SUBEN_PRODUCTOS = ["ana"];
 
+/** `pro` con menú recortado: solo estas pantallas (Mauro solo baja y sube
+ *  vídeos del POV BOF Largo desde Mis tandas; 28/11/2026). */
+const PRO_SOLO_PANTALLAS: Record<string, string[]> = {
+  mauro: [`${BASE_AI_PRO}/mis-tandas`],
+};
+
 export function navPara(
   rol: string | null | undefined,
   usuario?: string | null,
@@ -494,6 +500,7 @@ export function navPara(
             n.items.filter(
               (i) =>
                 ITEMS_PRO.includes(i.href) &&
+                (PRO_SOLO_PANTALLAS[usuario ?? ""]?.includes(i.href) ?? true) &&
                 (i.href !== `${BASE_AI_PRO}/subir-productos` ||
                   PRO_SUBEN_PRODUCTOS.includes(usuario ?? "")),
             ),

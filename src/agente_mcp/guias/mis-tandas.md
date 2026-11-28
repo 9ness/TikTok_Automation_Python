@@ -20,6 +20,15 @@ siempre (generar, `subir_clip`, montar). Cuando el vídeo queda montado en su
 nicho, **aparece solo al final** de Mis tandas. No hay ninguna herramienta
 para «añadir a Mis tandas», y no hace falta.
 
+## Vista simple de Mauro (28/11/2026)
+
+Mauro ve tandas de **20** («Pack 1, Pack 2…», `POR_TANDA_USUARIO`) y en su web
+solo: Recargar, «Ver packs cerrados», el progreso subidos/total y «Pendientes»
+por pack, y por vídeo caption (copiar), descargar, 🛍️ y «Marcar subido». Lo
+que no está en verde o ámbar (rojo, sin revisar, sin stock) no le sale. Es
+solo la pantalla: semáforo, sin stock, rehacer, quitar, GMV Max y época
+siguen igual por MCP y para el admin. Su menú: solo Mis tandas.
+
 ## Cómo se reparte (calendario)
 
 El orden de base es fijo (lo nuevo entra al final), con tres reglas que lo
