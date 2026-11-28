@@ -2,7 +2,7 @@
 
 import { Check, Copy, Download, ExternalLink, EyeOff, Loader2, RefreshCw, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { bajarEnOrden, nombreDescarga } from "@/lib/descargas";
@@ -189,9 +189,14 @@ function Miniatura({ v }: { v: VideoTanda }) {
  *  semáforo, sin stock, etc. siguen en los datos, la API y el MCP. Lo que no
  *  está en verde o ámbar (rojo, sin revisar, sin stock) no le sale. */
 const VISTA_SIMPLE = ["mauro"];
+/** Usuarios con las tandas contraídas al entrar (28/11/2026): solo se abre la que toques. */
+const CONTRAIDAS = ["mauro", "ness"];
+const FILTROS_KEY = "mis-tandas:filtros";
 
 export function MisTandas() {
-  const simple = VISTA_SIMPLE.includes(useMe().data?.username ?? "");
+  const usuario = useMe().data?.username ?? "";
+  const simple = VISTA_SIMPLE.includes(usuario);
+  const contraidas = CONTRAIDAS.includes(usuario);
   const listo = (v: VideoTanda) => !sinRevisar(v) && !(v.sin_stock && !v.uploaded);
   const [verCerradas, setVerCerradas] = useState(false);
   const tandas = useMisTandas(verCerradas);
@@ -233,6 +238,32 @@ export function MisTandas() {
   const [soloGmv, setSoloGmv] = useState(false);
   const [soloMuestra, setSoloMuestra] = useState(false);
   const [soloReembolso, setSoloReembolso] = useState(false);
+  // Los filtros se recuerdan en este navegador (al recargar no hay que volver a elegirlos).
+  const [filtrosLeidos, setFiltrosLeidos] = useState(false);
+  useEffect(() => {
+    try {
+      const f = JSON.parse(localStorage.getItem(FILTROS_KEY) || "{}");
+      if (typeof f.filtro === "string") setFiltro(f.filtro);
+      setSoloGmv(!!f.soloGmv);
+      setSoloMuestra(!!f.soloMuestra);
+      setSoloReembolso(!!f.soloReembolso);
+    } catch {}
+    setFiltrosLeidos(true);
+  }, []);
+  useEffect(() => {
+    if (!filtrosLeidos) return;
+    try {
+      localStorage.setItem(FILTROS_KEY, JSON.stringify({ filtro, soloGmv, soloMuestra, soloReembolso }));
+    } catch {}
+  }, [filtrosLeidos, filtro, soloGmv, soloMuestra, soloReembolso]);
+  // Al abrir una tanda, su cabecera sube arriba de la pantalla (en el móvil se perdía).
+  const abrir = (n: number | null) => {
+    setAbierta(n);
+    if (n === null || n < 0) return;
+    requestAnimationFrame(() =>
+      document.getElementById(`tanda-${n}`)?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
 
   const datos = tandas.data;
   const tareasActivas = datos?.tareas_activas ?? [];
@@ -261,8 +292,8 @@ export function MisTandas() {
       ).length;
   const nombreTarea = (id: string) => tareasActivas.find((x) => x.id === id)?.nombre ?? id;
   const primeraPendiente = datos?.tandas.find((t) => t.abierta)?.numero ?? null;
-  // Vista simple: todos los packs empiezan contraídos.
-  const abiertaReal = abierta ?? (simple ? null : primeraPendiente);
+  // Contraídas (Mauro, ness): todas empiezan cerradas.
+  const abiertaReal = abierta ?? (contraidas ? null : primeraPendiente);
   // Vista simple: los packs abiertos se cuentan desde 1 (y los cerrados aparte).
   const numPack = (t: { numero: number; abierta: boolean }) =>
     (datos?.tandas ?? []).filter((x) => x.abierta === t.abierta && x.numero <= t.numero).length;
@@ -597,13 +628,14 @@ export function MisTandas() {
             return (
               <div
                 key={t.numero}
-                className={`rounded-lg border ${completa ? "border-border/40 opacity-80" : "border-border/60"}`}
+                id={`tanda-${t.numero}`}
+                className={`scroll-mt-20 rounded-lg border ${completa ? "border-border/40 opacity-80" : "border-border/60"}`}
               >
                 <div className="flex items-center gap-2 px-2 py-1.5">
                   <button
                     type="button"
                     onClick={() =>
-                      hayFiltro ? setAbierta(abiertaEsta ? t.numero : null) : setAbierta(abiertaEsta ? -1 : t.numero)
+                      hayFiltro ? setAbierta(abiertaEsta ? t.numero : null) : abrir(abiertaEsta ? -1 : t.numero)
                     }
                     className="min-w-0 flex-1 text-left"
                   >
