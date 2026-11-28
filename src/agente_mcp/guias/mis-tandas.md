@@ -28,6 +28,7 @@ por pack, y por vídeo caption (copiar), descargar, 🛍️ y «Marcar subido».
 que no está en verde o ámbar (rojo, sin revisar, sin stock) no le sale. Es
 solo la pantalla: semáforo, sin stock, rehacer, quitar, GMV Max y época
 siguen igual por MCP y para el admin. Su menú: solo Mis tandas.
+- Los packs salen contraídos y **se cierran solos** cuando está subido todo lo que él ve (`config.CIERRE_AUTO_USUARIOS`); lo rojo, sin revisar o sin stock que quedara dentro vuelve a la cola. No tiene botón «Tanda completada».
 
 ## Cómo se reparte (calendario)
 

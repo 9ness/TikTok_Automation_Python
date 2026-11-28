@@ -641,12 +641,26 @@ def _tandas(usuario: str, todas: bool = False, fresco: bool = False, ver_ocultos
     grupos: list[tuple[list[dict], dt.date | None, bool]] = []  # (vídeos, fecha, cerrada)
     abiertas_info: list[tuple[dict, list[dict], dt.date]] = []  # (fija, vídeos, fecha)
     previos: dict[str, dt.date] = {}
+    sem_auto: dict | None = None
     for t in fijas:
         items = [por_id[i] for i in t.get("ids", []) if i in por_id]
         if not items:
             continue
         # Solo «Tanda completada» cierra una tanda fija: toda subida sigue a la vista.
         cerrada = bool(t.get("completada_at"))
+        if not cerrada and usuario in config.CIERRE_AUTO_USUARIOS:
+            # Vista simple (Mauro): el pack se cierra solo cuando está subido todo
+            # lo que él ve; lo rojo, sin revisar o sin stock vuelve a la cola.
+            if sem_auto is None:
+                sem_auto = semaforos(usuario)
+            visibles = [f for f in items if f["uploaded"] or not (
+                f["sin_stock"] or sin_revisar({"semaforo": _semaforo_vigente(sem_auto.get(f["id"]), f)}))]
+            if visibles and all(f["uploaded"] for f in visibles):
+                items = [f for f in items if f["uploaded"]]
+                t["ids"] = [f["id"] for f in items]
+                t["completada_at"] = time.time()
+                cerrada = True
+                cambio = True
         fecha = None
         if not cerrada:
             desde = [d for d in (_desde(f) for f in items if not _cerrado(f)) if d]

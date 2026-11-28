@@ -88,6 +88,8 @@ SOLO_HABLADOS: set[str] = {"ana"}
 # 18/10/2026 (del 10 al 17, uno al día: sube solo el mejor de la tanda).
 # Mauro, de 20 en 20 desde el 28/11/2026 (solo POV BOF Largo).
 POR_TANDA_USUARIO: dict[str, int] = {"ana": 6, "mauro": 20}
+# Su pack se cierra solo al subir todo lo que ve (vista simple, sin «Tanda completada»).
+CIERRE_AUTO_USUARIOS = {"mauro"}
 
 
 def por_tanda(usuario: str) -> int:
